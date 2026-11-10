@@ -27,7 +27,7 @@
 - The 551 kB bundle warning is left alone; Three.js is not split into its own chunk. (2026-11-10)
 - Piece 6 brush size: a fixed radius slider from 100 to 3,000 km, default 500 km, the same on every world. (2026-11-10)
 - Piece 6 raise and lower strength: metres per second at the brush centre, 100 to 5,000, default 1,000. (2026-11-10)
-- Piece 6 smooth strength: the share of the gap to the neighbour average closed per second, on the same slider, capped so it cannot overshoot. (2026-11-10)
+- Piece 6 smooth strength: a unitless 1 to 100 setting on the same slider, scaled by resolution so one setting smooths a feature of a given size equally fast at 64, 128 and 256, and capped so it cannot overshoot ("Same feel, plain 1 to 100"). This replaces the first choice, "share of the gap per second", which could not be both a true figure and resolution-independent: smoothing acts over one cell's width, so the literal version is 16 times slower at 256 than at 64. (2026-11-10)
 
 ## Open
 

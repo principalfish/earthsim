@@ -14,7 +14,7 @@ The design decisions are all in `decisions.md` and carried into `plan.md` Contex
 2. 2026-11-10 — `main` pushed by the user; planner branch pushed with their agreement; GitHub issue created.
 
 ## The pending decision (exact)
-Nothing is pending with the user. Pieces 1 to 5 are committed and pushed (latest `21862d7`). The build was paused on 2026-11-10 before piece 6 wrote anything, then the user said "resume" and that was relayed: the builder is building piece 6 (sculpting brushes) from the beginning with the choices in `decisions.md`, and will stop uncommitted at its review, which has a manual review.
+Nothing is pending with the user. Pieces 1 to 5 are committed and pushed (latest `21862d7`). The build was paused on 2026-11-10 before piece 6 wrote anything, then the user said "resume" and that was relayed: the builder is building piece 6 (sculpting brushes) from the beginning with the choices in `decisions.md`, and will stop uncommitted at its review, which has a manual review. Mid-piece the builder asked what the smooth brush's strength should mean; the user answered "Same feel, plain 1 to 100 (Recommended)" and that was relayed (`decisions.md`).
 
 ## What the next session does
 1. Run the state checks; piece 6 should be uncommitted in the builder's worktree, or its review request should be waiting. The branch head is `21862d7` until piece 6 is approved.
