@@ -14,12 +14,14 @@ The design decisions are all in `decisions.md` and carried into `plan.md` Contex
 2. 2026-11-10 — `main` pushed by the user; planner branch pushed with their agreement; GitHub issue created.
 
 ## The pending decision (exact)
-Nothing is pending with the user right now. They approved piece 6 after trying it ("Tried it, approve") and that was relayed. The builder is committing and pushing piece 6 and will then send a piece-committed note with its look-ahead for piece 7, and wait.
+Nothing is pending with the user. Pieces 1 to 6 are committed and pushed (latest `3c7e6ea`). The user settled piece 7's choices (`decisions.md`) and chose "Run 7 and 8, stop at 9's review": the builder builds pieces 7 (undo and redo) and 8 (worker and statistics readout) without pauses, committing and pushing each, then sends piece 9's look-ahead and choices and waits before building it. Piece 9 stops uncommitted at its review, which has a manual review.
 
 ## What the next session does
-1. Run the state checks. `git log --oneline main..<meta.branch>` should gain piece 6's commit after `21862d7`.
-2. After the commit: ingest, verify on origin, tick piece 6 on the issue checklist and `gh issue edit 1`.
-3. Give the user the next-stage briefing for piece 7 (undo and redo; no manual review in the plan) and ask whether to start it. Raise the plan's default of a 100-stroke history, and anything in the builder's look-ahead. Normal per-piece pauses apply unless the user says otherwise.
+1. Run the state checks; the branch gains a commit per piece after `3c7e6ea`.
+2. `planner.py ingest 1` on every builder message. After each commit: verify on origin, tick the issue checklist and `gh issue edit 1`, and report it to the user in a few lines.
+3. When the builder sends piece 9's look-ahead: put its choices to the user (and the plan's defaults for piece 9: with no saved world the page opens on a blank ocean with the new-world dialog showing; a new world resets sea level to zero; the seed is a whole number from 0 to 4,294,967,295), then relay their answers.
+4. When piece 9's review request arrives, give the review briefing with the manual review first; relay an approval only when the user's words say they tried it.
+5. If the builder has been idle a while with uncommitted work and no message, it may have stalled on a process restart: message it to resume.
 
 ## Don't
 - Don't build in the planner chat, and don't start a second builder for this issue.

@@ -29,12 +29,16 @@
 - Piece 6 raise and lower strength: metres per second at the brush centre, 100 to 5,000, default 1,000. (2026-11-10)
 - Piece 6 smooth strength: a unitless 1 to 100 setting on the same slider, scaled by resolution so one setting smooths a feature of a given size equally fast at 64, 128 and 256, and capped so it cannot overshoot ("Same feel, plain 1 to 100"). This replaces the first choice, "share of the gap per second", which could not be both a true figure and resolution-independent: smoothing acts over one cell's width, so the literal version is 16 times slower at 256 than at 64. (2026-11-10)
 - Piece 6 approved after the user tried sculpting ("Tried it, approve"), with no tuning asked for: Smooth's default of 50 and the brush ranges stay as built. (2026-11-10)
+- Piece 7 undo history: up to 100 strokes and about 64 MB in total, dropping the oldest first ("100 strokes and 64 MB"). (2026-11-10)
+- Piece 7: Ctrl+Z pressed mid-stroke is ignored until the mouse button is released ("Ignore it"). (2026-11-10)
+- Pieces 7 and 8 run without pauses and piece 9 stops uncommitted at its review ("Run 7 and 8, stop at 9's review"). Builder questions still stop the run. (2026-11-10)
 
 ## Open
 
 _None._
 
 ## Assumed
+- Piece 7: Cmd+Z and Cmd+Shift+Z work as well as the Ctrl forms; the shortcuts are ignored while the focus is in a text field; Undo and Redo buttons sit side by side at the top of the Tools section. The user was told and did not object.
 - Piece 6: the brush outline is a thin ring on the globe under the cursor, hidden with the move tool and off the globe; the browser's right-click menu is suppressed on the canvas only. The user was told and did not object.
 - "Pauseable" means the later run through time (drift, ice ages) can be stopped at any point, the terrain sculpted and other inputs changed, and the run resumed from the edited state. Which inputs are editable while paused, and whether editing is locked while a run is in progress, are decided in the issues that add those runs.
 - Cube-to-sphere mapping is equiangular (the variant that keeps cell sizes most even).

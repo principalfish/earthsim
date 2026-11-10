@@ -14,7 +14,7 @@ Not included: any climate or time simulation, a flat map view, and changing a wo
 
 ## Plan
 
-_2026-11-10 · 6 of 11 pieces done · now: waiting on a decision_
+_2026-11-10 · 6 of 11 pieces done · now: piece 7 in progress_
 
 - [x] **1/11 Scaffold tooling and app shell** · `b22e81a`
   An npm project with Vite, Vitest, Biome, TypeScript and Three.js, and an empty page.
@@ -28,7 +28,7 @@ _2026-11-10 · 6 of 11 pieces done · now: waiting on a decision_
   The lit 3D globe tinted by height, with raised relief, sea-level and exaggeration sliders and a grid overlay.
 - [x] **6/11 Sculpting brushes** · `3c7e6ea`
   Raise, lower and smooth brushes applied on the globe with the mouse.
-- [ ] **7/11 Undo and redo** · not started
+- [ ] **7/11 Undo and redo** · in progress
   Step back and forward one brush stroke at a time.
 - [ ] **8/11 Worker compute service and statistics readout** · not started
   The Web Worker channel, proven with live land and height statistics.
