@@ -1,8 +1,8 @@
 # Resume point — read this first
 
 ## Where we are
-Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`) is in the planning discussion, state `investigating`. The discussion is finished: the user confirmed the ledger in `decisions.md` with "That's everything". Planning is stopped on approval of the `issue.md` draft, which has been shown in chat but not yet written to the folder. No `plan.md` yet, no builder started.
-State checks: `git -C /home/philiph/workspace/earth_sim status --short --branch` shows `No commits yet on main` and a clean tree; `git remote` prints nothing (no `origin`). `planner.py meta 1` shows state `investigating`.
+Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`) is in the planning discussion, state `investigating`. The discussion is finished: the user confirmed the ledger in `decisions.md` with "That's everything". Planning is stopped on approval of the `issue.md` draft, which has been shown in chat but not yet written to the folder. No `plan.md` yet, no builder started. The user also said "let me create a repo before you start": they are creating the GitHub repo and adding it as `origin` themselves, and planning waits for that.
+State checks: `git -C /home/philiph/workspace/earth_sim status --short --branch` shows `No commits yet on main` and a clean tree; `git remote` prints nothing until the user adds `origin`; once it prints `origin`, the remote steps below apply. `planner.py meta 1` shows state `investigating`.
 If anything differs, stop and tell the user.
 
 ## How it got here — decisions already answered, in order
@@ -26,7 +26,7 @@ If anything differs, stop and tell the user.
 18. 2026-11-10 — Is the ledger complete and correct → "That's everything". The reading of "pauseable" as the later run through time stands.
 
 ## The pending decision (exact)
-Does the user approve this `issue.md` draft? Only explicit approval counts; iterate on any changes.
+Two things. First, the user is adding a GitHub remote; wait for them to say it is done. `main` has no commits, and a builder worktree cannot branch from an unborn `main`, so `main` needs a first commit on origin (the user was advised to create the GitHub repo with a README and pull it). Second: does the user approve this `issue.md` draft? Only explicit approval counts; iterate on any changes.
 
     # Add globe, cubed-sphere grid and elevation sculpting
 
@@ -45,10 +45,12 @@ Does the user approve this `issue.md` draft? Only explicit approval counts; iter
 ## What the next session does
 1. Run the state checks.
 2. If the user has not approved the draft, show it again and ask.
-3. On approval, write `issue.md` and save. Skip `gh issue create`: there is no remote.
-4. Write `plan.md` (the planner skill's Planning steps), propose manual reviews, add the `## Plan` checklist to `issue.md`, then `planner.py set 1 state=planned`.
+3. When `origin` exists: tell the user the next save pushes the planner branch to GitHub, where it is visible, and get a yes before saving. Check `git log main` has a commit.
+4. On approval of the draft, write `issue.md` and save. With a remote, `gh issue create` and record `gh_issue`; without one, skip it.
+5. Write `plan.md` (the planner skill's Planning steps), propose manual reviews, add the `## Plan` checklist to `issue.md`, then `planner.py set 1 state=planned`.
 
 ## Don't
 - Don't write source files or build in the planner chat.
-- Don't create a GitHub issue or PR: there is no `origin` remote.
+- Don't create the GitHub repo, add the remote, or push `main`: those are the user's.
+- Don't create a GitHub issue until `origin` exists and the user has agreed to the planner branch being pushed.
 - Don't treat items under "Proposed, not yet confirmed" in the design note as decided.
