@@ -15,19 +15,28 @@
 - Undo and redo are in this issue, one whole brush stroke per step (Ctrl+Z, Ctrl+Shift+Z), remembering only the cells each stroke changed. (2026-11-10)
 - The current world autosaves to browser storage and is restored on reopen or refresh. File export and import remain the way to keep, back up and share worlds. (2026-11-10)
 - No flat map view in this issue; the globe is the only view. A flat map comes as its own issue around the temperature step. (2026-11-10)
+- Sea level is an adjustable per-world setting with a slider, default zero. Elevation is stored in metres against a fixed zero datum; a cell is land when its elevation is above the world's sea level. (2026-11-10)
+- A world's resolution is set at creation only. Changing it later (resampling) is out of scope and can be its own issue. (2026-11-10)
+- The Earth preset uses NOAA's ETOPO 2022 ice-surface elevation: Greenland and Antarctica at the top of their ice. Bedrock data is not included; the ice-sheet issue may add it. (2026-11-10)
+- The continent generator exposes a seed (same seed gives the same world, with a button for a random one) and a land-fraction slider. Its output is noise-shaped, a base to sculpt, not geologically plausible terrain. (2026-11-10)
 
 ## Open
-- Sea level: fixed at zero elevation, or an adjustable setting.
-- Whether an existing world's resolution can be changed after creation (resampling the terrain).
-- Earth preset data: which dataset, and whether Greenland and Antarctica use the ice surface or the bedrock beneath it.
-- Generated continents: which controls the generator exposes.
+
+_None._
 
 ## Assumed
 - Cube-to-sphere mapping is equiangular (the variant that keeps cell sizes most even).
-- Elevation is stored in metres relative to sea level, one number per cell.
 - Planet radius is Earth's for now; it becomes a parameter in a later issue.
-- Target is a current desktop Chrome or Firefox with a mouse. Touch and mobile are out of scope.
+- Elevation is one number per cell, kept within about -12,000 m to +12,000 m.
+- A blank ocean world has a uniform depth of 4,000 m.
+- Brushes have a size (radius in km) and a strength control, and act on the surface point under the cursor.
+- Mouse: with a brush selected, left-drag sculpts and right-drag rotates the globe; the wheel zooms. A "move" tool makes left-drag rotate.
+- The worker's statistics show in a small readout: land percentage, highest point, deepest point, mean land height and mean ocean depth.
+- Autosave uses IndexedDB and keeps one slot: the current world only.
+- The save file is a single versioned file holding the world's settings (resolution, sea level, generator seed if any) and its elevation data.
+- The Earth data is committed once at 256 cells per face and averaged down for 128 and 64. A script kept in the repo regenerates it from the ETOPO download.
+- ETOPO 2022's licence has not been checked; the builder verifies it allows redistribution before committing the data, and stops to ask if it does not.
 - Terrain passes between the main thread and the worker as copied or transferred arrays, not shared memory, because shared memory needs server headers a plain static host cannot set.
+- Target is a current desktop Chrome or Firefox with a mouse. Touch and mobile are out of scope.
 - Deployment (for example GitHub Pages) is out of scope; the app runs from the Vite dev server and a static build.
-- The save file is a single versioned file holding the world's settings and its elevation data.
 - No GitHub remote exists, so no GitHub issue or draft PR can be created until `origin` is added.
