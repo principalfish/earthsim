@@ -19,12 +19,14 @@
 - A world's resolution is set at creation only. Changing it later (resampling) is out of scope and can be its own issue. (2026-11-10)
 - The Earth preset uses NOAA's ETOPO 2022 ice-surface elevation: Greenland and Antarctica at the top of their ice. Bedrock data is not included; the ice-sheet issue may add it. (2026-11-10)
 - The continent generator exposes a seed (same seed gives the same world, with a button for a random one) and a land-fraction slider. Its output is noise-shaped, a base to sculpt, not geologically plausible terrain. (2026-11-10)
+- The simulation must be pauseable, with the user able to edit the map while it is paused. Nothing runs through time in this issue, so no pause control is built here, but the design must not block it: the main thread's world is always the editable, authoritative copy, and any later run starts from whatever that copy holds. (2026-11-10)
 
 ## Open
 
 _None._
 
 ## Assumed
+- "Pauseable" means the later run through time (drift, ice ages) can be stopped at any point, the terrain sculpted and other inputs changed, and the run resumed from the edited state. Which inputs are editable while paused, and whether editing is locked while a run is in progress, are decided in the issues that add those runs.
 - Cube-to-sphere mapping is equiangular (the variant that keeps cell sizes most even).
 - Planet radius is Earth's for now; it becomes a parameter in a later issue.
 - Elevation is one number per cell, kept within about -12,000 m to +12,000 m.

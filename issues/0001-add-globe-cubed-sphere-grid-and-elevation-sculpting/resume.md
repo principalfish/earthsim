@@ -22,9 +22,10 @@ If anything differs, stop and tell the user.
 14. 2026-11-10 — Changing resolution after creation → no, set at creation only.
 15. 2026-11-10 — Earth data → ETOPO 2022, ice surface.
 16. 2026-11-10 — Generator controls → seed and land fraction.
+17. 2026-11-10 — User's own addition: the simulation must be pauseable with human input on the map when paused → recorded as a design constraint; no pause control in this issue because nothing runs through time yet.
 
 ## The pending decision (exact)
-Is the ledger in `decisions.md` complete and correct? The user was asked to confirm, and to promote any item under Assumed that they want to decide themselves. The Assumed items most worth their eye: the mouse scheme (left-drag sculpts, right-drag rotates), the single autosave slot, and that ETOPO's licence is unverified. Only an explicit "that's everything" or "go ahead" ends the discussion.
+Two things, asked together. First: is my reading of "pauseable" right (it is about the later run through time; this issue only has to keep the main thread's world editable and authoritative), or did the user mean something that needs building in this issue? Second: is the ledger in `decisions.md` complete and correct? The user was asked to confirm, and to promote any item under Assumed that they want to decide themselves. The Assumed items most worth their eye: the mouse scheme (left-drag sculpts, right-drag rotates), the single autosave slot, and that ETOPO's licence is unverified. Only an explicit "that's everything" or "go ahead" ends the discussion.
 
 ## What the next session does
 1. Run the state checks.

@@ -13,6 +13,7 @@ The whole-simulator design for earth_sim and the eight-step build order, so each
 - Architecture: TypeScript; the simulation is a pure library with no browser dependency, run in a Web Worker; Three.js draws the globe; no server, static files only; worlds saved by file export and import.
 - Tooling: npm, Vite, Vitest, Biome, `tsc`.
 - One issue per build step, starting with step 1.
+- The simulation must be pauseable, with the user able to edit the map while it is paused; a run continues from the edited state. The main thread holds the editable, authoritative world and the worker computes from copies of it, which is what makes this possible.
 
 ## Proposed, not yet confirmed
 
