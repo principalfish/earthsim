@@ -14,13 +14,13 @@ The design decisions are all in `decisions.md` and carried into `plan.md` Contex
 2. 2026-11-10 — `main` pushed by the user; planner branch pushed with their agreement; GitHub issue created.
 
 ## The pending decision (exact)
-The build is **paused at the user's request**. They said "can we pause at the next appropriate moment" and, asked where, chose "Right now". Pieces 1 to 5 are committed and pushed (latest `21862d7`). Piece 6 (sculpting brushes) was stopped before anything was written: the builder confirmed its worktree is clean at `21862d7` and none of its processes is running. A Vite dev server started by the user for the piece 5 review may still be running from that worktree; it is theirs. Piece 6's choices are settled (`decisions.md`). Nothing resumes until the user says so.
+Nothing is pending with the user. Pieces 1 to 5 are committed and pushed (latest `21862d7`). The build was paused on 2026-11-10 before piece 6 wrote anything, then the user said "resume" and that was relayed: the builder is building piece 6 (sculpting brushes) from the beginning with the choices in `decisions.md`, and will stop uncommitted at its review, which has a manual review.
 
 ## What the next session does
-1. Run the state checks. `git -C /home/philiph/workspace/earth_sim/.claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9 status --short` prints nothing; the branch head is `21862d7`.
-2. `planner.py ingest 1` and read the builder's stop report (its last message to the planner chat, or `plan.md` Notes) for what is written and what must not be trusted.
-3. Wait for the user's word to continue. Then relay it to the builder, quoting it: build piece 6 from the beginning on `claude-fable-5-2`, run the checks and analysis loop, and stop uncommitted at the review (it has a manual review). If the builder session is gone, the planner skill's "Starting the builder" and "Retiring a builder" apply; run `planner.py check-builder 1` first so the uncommitted work is not lost.
-4. After each commit: verify on origin, tick the issue checklist, `gh issue edit 1`, then the next-stage briefing for the following piece. Normal per-piece pauses apply.
+1. Run the state checks; piece 6 should be uncommitted in the builder's worktree, or its review request should be waiting. The branch head is `21862d7` until piece 6 is approved.
+2. `planner.py ingest 1`. When the review request arrives, give the user the review briefing with the manual review first; relay an approval only when their words say they tried it.
+3. After each commit: verify on origin, tick the issue checklist, `gh issue edit 1`, then the next-stage briefing for the following piece. Normal per-piece pauses apply.
+4. If the builder has been idle a while with uncommitted work and no review request, it may have stalled on a process restart: message it to resume.
 
 ## Don't
 - Don't build in the planner chat, and don't start a second builder for this issue.
