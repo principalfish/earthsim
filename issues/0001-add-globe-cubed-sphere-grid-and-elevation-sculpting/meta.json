@@ -9,6 +9,14 @@
   "gh_issue": 1,
   "build_model": "claude-opus-5-5",
   "created": "2026-11-10 11:12",
-  "updated": "2026-11-10 11:32",
-  "done": null
+  "updated": "2026-11-10 11:33",
+  "done": null,
+  "local": [
+    {
+      "kind": "session",
+      "name": "local_acf49a6d-c0ef-4a98-8721-d05319ed32de",
+      "added": "2026-11-10 11:33",
+      "note": "builder: add-globe-cubed-sphere-grid-and-elevation-sculpting"
+    }
+  ]
 }
