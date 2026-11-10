@@ -14,11 +14,11 @@ Not included: any climate or time simulation, a flat map view, and changing a wo
 
 ## Plan
 
-_2026-11-10 · 0 of 11 pieces done · now: piece 1 in progress_
+_2026-11-10 · 1 of 11 pieces done · now: piece 2 in progress_
 
-- [ ] **1/11 Scaffold tooling and app shell** · in progress
+- [x] **1/11 Scaffold tooling and app shell** · `b22e81a`
   An npm project with Vite, Vitest, Biome, TypeScript and Three.js, and an empty page.
-- [ ] **2/11 Cubed-sphere grid** · not started
+- [ ] **2/11 Cubed-sphere grid** · in progress
   Cell centres, areas, neighbours across cube edges, and lookups for any resolution.
 - [ ] **3/11 World model and terrain statistics** · not started
   The world's data, a blank ocean world, and land, sea and height statistics.
