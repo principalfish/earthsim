@@ -15,6 +15,13 @@ State checks (run from `/home/philiph/workspace/earth_sim`):
 - `git -C .planner status --short` is empty.
 If the branch head or `meta` differs, stop and tell the user. If the worktree is missing, see "If the builder session is gone" below.
 
+## The builder's stop report (confirmed by the builder, 2026-11-10)
+The builder stopped its subagent and wrote the state into `plan.md` Notes (the entry beginning "Piece 8 was stopped mid-implementation"). In short:
+- **Drafted, all untested and unreviewed:** `src/core/protocol.ts` (request and response types, `parseSimRequest`, `simFailure`, `isSimResponse`), `src/worker/handle.ts` (`handleRequest`), `src/worker/sim.worker.ts`, `src/worker/client.ts` (`createSimClient` with `request`, `latest`, `dispose`), `tsconfig.worker.json`, and small edits to `tsconfig.json`, `tsconfig.app.json` and `src/core/index.ts`.
+- **Not started:** `src/worker/handle.test.ts`, `src/worker/client.test.ts`, `src/app/ui/statsPanel.ts` and its test, the debounced statistics scheduler, the wiring in `src/app/main.ts`, styles, README lines, the browser check of the worker, and the whole analysis loop.
+- **On resume** the drafts are read against piece 8's plan entry before being built on, or discarded and the piece restarted from `8bfa67b`. To discard, in the builder's worktree: `git checkout -- src/core/index.ts tsconfig.app.json tsconfig.json`, then remove `src/core/protocol.ts`, `src/worker/` and `tsconfig.worker.json`.
+- **Piece 8's defaults stand:** a "Statistics" section at the bottom of the panel with the five planned figures; requests debounced by about 150 ms and sent only after a stroke ends; "Statistics unavailable" on a worker error.
+
 ## How it got here — decisions already answered, in order
 All design decisions are in `decisions.md` (Settled) and `plan.md` (Context and Notes); read those, not this list, for the detail. The ones that shape how the build runs:
 1. 2026-11-10 — Implementation model → `claude-fable-5-2` for this issue only ("lets use fable to implement this one time"). It overrides the "Builder on Sonnet" experiment here; `models.md` is unchanged. The builder's shell is still Sonnet per its skill.
