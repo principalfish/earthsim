@@ -1,7 +1,7 @@
 # Resume point — read this first
 
 ## Where we are
-Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`) is in the planning discussion, state `investigating`. Every question raised so far is answered and `decisions.md` has nothing under Open. The discussion is stopped on the closing check: the user has been shown the full ledger and asked whether anything is missing or wrong. No `issue.md` or `plan.md` yet, no builder started.
+Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`) is in the planning discussion, state `investigating`. The discussion is finished: the user confirmed the ledger in `decisions.md` with "That's everything". Planning is stopped on approval of the `issue.md` draft, which has been shown in chat but not yet written to the folder. No `plan.md` yet, no builder started.
 State checks: `git -C /home/philiph/workspace/earth_sim status --short --branch` shows `No commits yet on main` and a clean tree; `git remote` prints nothing (no `origin`). `planner.py meta 1` shows state `investigating`.
 If anything differs, stop and tell the user.
 
@@ -23,14 +23,30 @@ If anything differs, stop and tell the user.
 15. 2026-11-10 — Earth data → ETOPO 2022, ice surface.
 16. 2026-11-10 — Generator controls → seed and land fraction.
 17. 2026-11-10 — User's own addition: the simulation must be pauseable with human input on the map when paused → recorded as a design constraint; no pause control in this issue because nothing runs through time yet.
+18. 2026-11-10 — Is the ledger complete and correct → "That's everything". The reading of "pauseable" as the later run through time stands.
 
 ## The pending decision (exact)
-Two things, asked together. First: is my reading of "pauseable" right (it is about the later run through time; this issue only has to keep the main thread's world editable and authoritative), or did the user mean something that needs building in this issue? Second: is the ledger in `decisions.md` complete and correct? The user was asked to confirm, and to promote any item under Assumed that they want to decide themselves. The Assumed items most worth their eye: the mouse scheme (left-drag sculpts, right-drag rotates), the single autosave slot, and that ETOPO's licence is unverified. Only an explicit "that's everything" or "go ahead" ends the discussion.
+Does the user approve this `issue.md` draft? Only explicit approval counts; iterate on any changes.
+
+    # Add globe, cubed-sphere grid and elevation sculpting
+
+    earth_sim is a browser-based planet simulator for worldbuilding. This is its first step: a planet you can see and shape, and the foundation every later layer (temperature, winds, rainfall, oceans, ice, plate drift) is built on.
+
+    The planet's surface is stored on a cubed-sphere grid whose resolution is chosen per world: 64 cells per cube face by default (about 150 km), or 128 or 256. A 3D globe shows it tinted by height and lit, with mountains raised from the sphere by an adjustable exaggeration and an optional overlay of the cell grid.
+
+    You shape the terrain by sculpting directly on the globe with raise, lower and smooth brushes, with undo and redo per stroke. Sea level is an adjustable setting that decides what is land. A new world starts as a blank ocean, as generated continents from a seed and a land fraction, or as real Earth from NOAA's ETOPO 2022 elevation data.
+
+    The simulation code is a pure TypeScript library with no browser dependency, run in a Web Worker as a compute service, while the page owns the editable world. Here the worker returns land and sea areas and height statistics; later climate layers use the same channel. That split is also what will let a run through time be paused, edited and resumed.
+
+    Worlds autosave in the browser and can be exported to and imported from a file. Everything runs client-side as static files. The issue also scaffolds the project tooling: npm, Vite, Vitest, Biome and TypeScript.
+
+    Not included: any climate or time simulation, a flat map view, and changing a world's resolution after it is created.
 
 ## What the next session does
 1. Run the state checks.
-2. If the user has not confirmed the ledger, show it again and ask.
-3. On confirmation, draft `issue.md` and present it for approval, then write `plan.md` (the planner skill's Planning steps). Skip `gh issue create`: there is no remote.
+2. If the user has not approved the draft, show it again and ask.
+3. On approval, write `issue.md` and save. Skip `gh issue create`: there is no remote.
+4. Write `plan.md` (the planner skill's Planning steps), propose manual reviews, add the `## Plan` checklist to `issue.md`, then `planner.py set 1 state=planned`.
 
 ## Don't
 - Don't write source files or build in the planner chat.
