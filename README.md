@@ -11,6 +11,13 @@ The Tools panel chooses what the left mouse button does on the globe:
 
 Two sliders set the brush. Brush radius runs from 100 to 3,000 km. Brush strength is how fast the centre of the brush rises or falls, from 100 to 5,000 m/s, for Raise and Lower; for Smooth it is a setting from 1 (gentlest) to 100 (strongest). The two strengths are kept apart, so changing one leaves the other as it was.
 
+The Undo and Redo buttons at the top of the Tools panel step back and forward through the strokes, one stroke at a time:
+
+- **Undo**: Ctrl+Z, or Cmd+Z on a Mac.
+- **Redo**: Ctrl+Shift+Z or Ctrl+Y, or Cmd+Shift+Z on a Mac.
+
+Up to the last 100 strokes can be undone, or fewer once they hold about 64 MB between them, which takes very long strokes on a fine grid. Making a new stroke after an undo discards what could have been redone. The keys do nothing while a stroke is being made or while typing in a text field. Only the terrain is put back: the sea level, the view settings and the tool settings are not part of the history.
+
 ## Development
 
 Requires Node.js and npm. Run `npm install` once, then:
@@ -28,6 +35,7 @@ The page opens on a generated world with 64 cells per cube face, seed 1977 and 3
 - `src/core/`: the simulation as a pure library, with no DOM, Three.js or worker globals.
 - `src/app/`: the page, which imports the core.
   - `src/app/sculpt.ts`: sculpting with the mouse, which turns the cursor's path into dabs of a brush.
+  - `src/app/undo.ts`: undo and redo of strokes, and the keys that ask for them.
   - `src/app/globe/`: the globe's renderer, shaders, camera and picking.
   - `src/app/ui/`: the panels of controls.
 

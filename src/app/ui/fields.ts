@@ -48,6 +48,18 @@ export type CheckFieldOptions = {
 	readonly onChange: (checked: boolean) => void;
 };
 
+/** What a button is built from. */
+export type ButtonOptions = {
+	/** The text on the button, which is also its accessible name. */
+	readonly label: string;
+	/** A longer description shown when the cursor rests on the button. */
+	readonly title?: string;
+	/** Whether it starts greyed out; false when left out. */
+	readonly disabled?: boolean;
+	/** Called when the button is pressed. */
+	readonly onClick: () => void;
+};
+
 /** Class a field carries while its control cannot be used. */
 const DISABLED_CLASS = 'is-disabled';
 
@@ -141,4 +153,23 @@ export const createCheckField = (options: CheckFieldOptions): HTMLElement => {
 
 	field.append(input, label);
 	return field;
+};
+
+/**
+ * Creates a button that does something on the page.
+ *
+ * @param options - The button's wording, starting state and callback.
+ * @returns The button, to put in a panel. Setting its `disabled` property
+ * greys it out and brings it back.
+ */
+export const createButton = (options: ButtonOptions): HTMLButtonElement => {
+	const button = createElement('button', 'button');
+	button.type = 'button';
+	button.textContent = options.label;
+	if (options.title !== undefined) {
+		button.title = options.title;
+	}
+	button.disabled = options.disabled ?? false;
+	button.addEventListener('click', options.onClick);
+	return button;
 };

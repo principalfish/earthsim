@@ -1,6 +1,6 @@
 /**
- * The tool controls: what the main mouse button does on the globe, and how
- * wide and strong the brush is.
+ * The tool controls: undoing and redoing strokes, what the main mouse
+ * button does on the globe, and how wide and strong the brush is.
  */
 
 import {
@@ -17,7 +17,13 @@ import {
 	TOOLS,
 	type Tool,
 } from '../sculpt';
-import { createElement, createRangeField, type RangeScale } from './fields';
+import type { HistoryAction, HistoryState } from '../undo';
+import {
+	createButton,
+	createElement,
+	createRangeField,
+	type RangeScale,
+} from './fields';
 
 /** The step between brush radii the slider can be set to, in kilometres. */
 export const BRUSH_RADIUS_SLIDER_STEP_KM = 50;
@@ -39,6 +45,21 @@ export const TOOL_LABELS: Readonly<Record<Tool, string>> = {
 	smooth: 'Smooth',
 };
 
+/** The name each step through the history goes by on the page. */
+export const HISTORY_LABELS: Readonly<Record<HistoryAction, string>> = {
+	undo: 'Undo',
+	redo: 'Redo',
+};
+
+/**
+ * What each history button says when the cursor rests on it: what it does
+ * and the keys that do the same.
+ */
+export const HISTORY_TITLES: Readonly<Record<HistoryAction, string>> = {
+	undo: 'Undo the last stroke (Ctrl+Z)',
+	redo: 'Redo the last undone stroke (Ctrl+Shift+Z or Ctrl+Y)',
+};
+
 /** What the tool panel starts with and whom it tells about changes. */
 export type ToolPanelOptions = {
 	/** The tool chosen at first; the default tool when left out. */
@@ -49,6 +70,13 @@ export type ToolPanelOptions = {
 	readonly strength?: number;
 	/** The smoothing setting at first. */
 	readonly smoothSetting?: number;
+	/**
+	 * Whether there is anything to undo and to redo at first; nothing of
+	 * either when left out.
+	 */
+	readonly history?: HistoryState;
+	/** Called with the step when the undo or the redo button is pressed. */
+	readonly onHistory: (action: HistoryAction) => void;
 	/** Called with the tool when another is chosen. */
 	readonly onTool: (tool: Tool) => void;
 	/** Called with the new radius in kilometres when its slider moves. */
@@ -63,6 +91,17 @@ export type ToolPanelOptions = {
 	 * with the smooth tool chosen.
 	 */
 	readonly onSmoothSetting: (setting: number) => void;
+};
+
+/** The tool controls on the page. */
+export type ToolPanel = {
+	/** The section that holds the controls. */
+	readonly element: HTMLElement;
+	/**
+	 * Greys out the undo and redo buttons that have nothing to do, and
+	 * brings back those that have.
+	 */
+	setHistoryState(state: HistoryState): void;
 };
 
 /** The two things the strength slider sets, each kept while the other shows. */
@@ -189,6 +228,9 @@ const createToolPicker = (options: ToolPickerOptions): HTMLElement => {
  * Adds the tool controls to the side panel.
  *
  * @remarks
+ * The undo and redo buttons come first, side by side. A button with nothing
+ * to do is disabled, which takes it out of the tab order.
+ *
  * The two sliders belong to the brushes: with the move tool chosen they are
  * greyed out. The strength slider sets the strength of raising and lowering
  * or, with the smooth tool chosen, the smoothing setting; each keeps its
@@ -196,15 +238,39 @@ const createToolPicker = (options: ToolPickerOptions): HTMLElement => {
  *
  * @param panel - The panel to add the controls to, after what it holds.
  * @param options - The starting values and the callbacks for changes.
- * @returns The section that was added.
+ * @returns The controls that were added.
  */
 export const createToolPanel = (
 	panel: HTMLElement,
 	options: ToolPanelOptions,
-): HTMLElement => {
+): ToolPanel => {
 	const section = createElement('section', 'panel__section');
 	const heading = createElement('h2', 'panel__heading');
 	heading.textContent = 'Tools';
+
+	const historyButton = (action: HistoryAction): HTMLButtonElement =>
+		createButton({
+			label: HISTORY_LABELS[action],
+			title: HISTORY_TITLES[action],
+			onClick: () => options.onHistory(action),
+		});
+	const undo = historyButton('undo');
+	const redo = historyButton('redo');
+	const historyRow = createElement('div', 'button-row');
+	historyRow.append(undo, redo);
+	const setHistoryState = (state: HistoryState): void => {
+		// A button disabled while it has the focus drops the focus to the
+		// page; the other button takes it so the keyboard keeps its place.
+		const focused = document.activeElement;
+		undo.disabled = !state.canUndo;
+		redo.disabled = !state.canRedo;
+		if (focused === undo && undo.disabled && !redo.disabled) {
+			redo.focus();
+		} else if (focused === redo && redo.disabled && !undo.disabled) {
+			undo.focus();
+		}
+	};
+	setHistoryState(options.history ?? { canUndo: false, canRedo: false });
 
 	const radius = createRangeField({
 		id: 'tool-radius',
@@ -244,6 +310,7 @@ export const createToolPanel = (
 
 	section.append(
 		heading,
+		historyRow,
 		createToolPicker({
 			tool,
 			onTool: (next) => {
@@ -255,5 +322,5 @@ export const createToolPanel = (
 		strengthField.element,
 	);
 	panel.append(section);
-	return section;
+	return { element: section, setHistoryState };
 };

@@ -10,6 +10,7 @@ import {
 import { parseStartOptions } from './startOptions';
 import { createToolPanel } from './ui/toolPanel';
 import { createViewPanel } from './ui/viewPanel';
+import { createUndoController, handleHistoryKey } from './undo';
 
 /** Looks up an element the page markup is required to contain. */
 const requireElement = <T extends Element>(
@@ -60,8 +61,16 @@ if (globe !== null) {
 		globe,
 		rotateButtonFor(DEFAULT_TOOL),
 	);
-	const sculpt = createSculptController(globe, world, { canvas });
-	createToolPanel(panel, {
+	// The history is cleared from the sculpt controller's own hook, so that
+	// replacing the world through `sculpt.setWorld` can never leave the
+	// strokes of the old one to be undone on the new.
+	const sculpt = createSculptController(globe, world, {
+		canvas,
+		onStrokeEnd: (changes) => edits.commit(changes),
+		onWorldChange: (next) => edits.setWorld(next),
+	});
+	const tools = createToolPanel(panel, {
+		onHistory: (action) => edits.perform(action),
 		onTool: (tool) => {
 			// The button that turns the globe changes first, so that a
 			// drag never both turns it and sculpts.
@@ -72,6 +81,15 @@ if (globe !== null) {
 		onStrength: sculpt.setStrength,
 		onSmoothSetting: sculpt.setSmoothSetting,
 	});
+	const edits = createUndoController({
+		world,
+		globe,
+		isStrokeActive: sculpt.isStrokeActive,
+		onHistoryChange: tools.setHistoryState,
+	});
+	window.addEventListener('keydown', (event) =>
+		handleHistoryKey(event, edits.perform),
+	);
 	createViewPanel(panel, {
 		seaLevel: world.seaLevel,
 		onExaggeration: globe.setExaggeration,

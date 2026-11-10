@@ -17,6 +17,8 @@ import {
 	formatKm,
 	formatSmoothSetting,
 	formatStrength,
+	HISTORY_LABELS,
+	HISTORY_TITLES,
 	SMOOTH_SETTING_SLIDER_STEP,
 	strengthScale,
 	TOOL_LABELS,
@@ -110,6 +112,19 @@ describe('the tool labels', () => {
 			expect(TOOL_LABELS[tool]).toMatch(/^[A-Z][a-z]+$/);
 		}
 		expect(Object.keys(TOOL_LABELS).length).toBe(TOOLS.length);
+	});
+});
+
+describe('the history buttons', () => {
+	it('are named for what they do', () => {
+		expect(HISTORY_LABELS).toEqual({ undo: 'Undo', redo: 'Redo' });
+	});
+
+	it('say which keys do the same', () => {
+		expect(HISTORY_TITLES.undo).toContain('Ctrl+Z');
+		expect(HISTORY_TITLES.undo).not.toContain('Shift');
+		expect(HISTORY_TITLES.redo).toContain('Ctrl+Shift+Z');
+		expect(HISTORY_TITLES.redo).toContain('Ctrl+Y');
 	});
 });
 

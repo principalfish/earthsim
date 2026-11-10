@@ -563,6 +563,13 @@ export type SculptOptions = {
 	 * the globe.
 	 */
 	readonly onStrokeEnd?: (changes: StrokeChanges) => void;
+	/**
+	 * Called with the new world whenever `setWorld` replaces the one being
+	 * sculpted, after a stroke under way on the old one has ended and been
+	 * reported. Whatever is kept about the old world's terrain, such as a
+	 * history of its strokes, is out of date from then on.
+	 */
+	readonly onWorldChange?: (world: World) => void;
 };
 
 /** The sculpting tools of one globe. */
@@ -601,6 +608,12 @@ export type SculptController = {
 	 * the world it began on. The globe must be given the same world.
 	 */
 	setWorld(world: World): void;
+	/**
+	 * Whether a stroke is under way: from the press of the main button with
+	 * a brush chosen until the stroke ends. Already false by the time
+	 * `onStrokeEnd` is called.
+	 */
+	isStrokeActive(): boolean;
 	/** Ends any stroke, hides the brush and stops listening to the canvas. */
 	dispose(): void;
 };
@@ -833,7 +846,9 @@ export const createSculptController = (
 			current = next;
 			record = createStrokeRecord(next.elevation.length);
 			showBrush();
+			options.onWorldChange?.(next);
 		},
+		isStrokeActive: () => stroke !== null,
 		dispose: () => {
 			endStroke();
 			listeners.abort();

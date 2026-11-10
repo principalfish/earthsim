@@ -4,6 +4,7 @@ export const CORE_VERSION = '0.0.0';
 export * from './brush';
 export * from './generate';
 export * from './grid';
+export * from './history';
 export * from './noise';
 export * from './stats';
 export * from './world';
