@@ -50,6 +50,14 @@ const MAX_PIXEL_RATIO = 2;
 /** Opacity of the cell grid's lines when shown. */
 const GRID_OPACITY = 0.3;
 
+/** A point of the window in CSS pixels, as pointer events report it. */
+export type WindowPoint = {
+	/** Distance from the left of the window. */
+	readonly clientX: number;
+	/** Distance from the top of the window. */
+	readonly clientY: number;
+};
+
 /** A drawing of a world as a globe, on a canvas. */
 export type Globe = {
 	/**
@@ -109,6 +117,24 @@ export type Globe = {
 	 */
 	pick(clientX: number, clientY: number): Vec3 | null;
 	/**
+	 * Shows the outline of a brush on the globe under the cursor, or hides
+	 * it.
+	 *
+	 * @remarks
+	 * The outline is a thin ring at the brush's radius around the point
+	 * {@link Globe.pick} finds under the cursor. That point is found afresh
+	 * for every frame drawn, so the ring stays under a cursor that is still
+	 * while the camera moves, and nothing is drawn while the cursor is off
+	 * the globe.
+	 *
+	 * @param cursor - Where the cursor is, or null to hide the outline.
+	 * @param radius - Angular radius of the brush in radians; needed
+	 * whenever a cursor is given.
+	 * @throws RangeError if a cursor is given without a positive, finite
+	 * radius.
+	 */
+	setBrush(cursor: WindowPoint | null, radius?: number): void;
+	/**
 	 * Turns the globe as a drag across the canvas does.
 	 *
 	 * @param dxPx - Cursor movement to the right, in CSS pixels.
@@ -126,6 +152,15 @@ export type Globe = {
 	getCamera(): CameraState;
 	/** Moves the camera; the state is brought within the camera's limits. */
 	setCamera(state: CameraState): void;
+	/**
+	 * Draws the globe at once if anything has changed since it was last
+	 * drawn, rather than at the next animation frame.
+	 *
+	 * @remarks
+	 * For changes made from within an animation frame, which would
+	 * otherwise not show until the frame after.
+	 */
+	draw(): void;
 	/**
 	 * Fits the drawing to the canvas's current size on the page and draws
 	 * it at once. Called automatically when the canvas is resized.
@@ -221,12 +256,24 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 	let elevation: ElevationTexture | null = null;
 	let segments = 0;
 	let fullUploadPending = false;
+	let brushCursor: WindowPoint | null = null;
+	let brushRadius = 0;
 	let frame = 0;
 	let disposed = false;
 
 	const aspect = (): number => {
 		const { clientWidth, clientHeight } = canvas;
 		return clientWidth > 0 && clientHeight > 0 ? clientWidth / clientHeight : 1;
+	};
+
+	const pick = (clientX: number, clientY: number): Vec3 | null => {
+		const [x, y] = clientToNdc(
+			clientX,
+			clientY,
+			canvas.getBoundingClientRect(),
+		);
+		const { origin, direction } = viewRay(cameraState, x, y, aspect());
+		return raySphere(origin, direction);
 	};
 
 	const render = (): void => {
@@ -237,6 +284,16 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		camera.position.copy(toVector3(coreToThree(cameraPosition(cameraState))));
 		camera.up.copy(toVector3(coreToThree([0, 0, 1])));
 		camera.lookAt(0, 0, 0);
+		const brushCentre =
+			brushCursor === null
+				? null
+				: pick(brushCursor.clientX, brushCursor.clientY);
+		if (brushCentre === null) {
+			uniforms.uBrushRadius.value = 0;
+		} else {
+			uniforms.uBrushCentre.value.set(...brushCentre);
+			uniforms.uBrushRadius.value = brushRadius;
+		}
 		renderer.render(scene, camera);
 		fullUploadPending = false;
 	};
@@ -244,6 +301,13 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 	const invalidate = (): void => {
 		if (frame === 0 && !disposed) {
 			frame = requestAnimationFrame(render);
+		}
+	};
+
+	const draw = (): void => {
+		if (frame !== 0) {
+			cancelAnimationFrame(frame);
+			render();
 		}
 	};
 
@@ -384,14 +448,31 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		invalidate();
 	};
 
-	const pick = (clientX: number, clientY: number): Vec3 | null => {
-		const [x, y] = clientToNdc(
-			clientX,
-			clientY,
-			canvas.getBoundingClientRect(),
-		);
-		const { origin, direction } = viewRay(cameraState, x, y, aspect());
-		return raySphere(origin, direction);
+	const setBrush = (cursor: WindowPoint | null, radius = 0): void => {
+		if (cursor === null) {
+			if (brushCursor !== null) {
+				brushCursor = null;
+				invalidate();
+			}
+			return;
+		}
+		if (!(radius > 0) || !Number.isFinite(radius)) {
+			throw new RangeError(
+				`A brush radius must be a positive angle in radians; got ${radius}`,
+			);
+		}
+		if (
+			brushCursor !== null &&
+			brushCursor.clientX === cursor.clientX &&
+			brushCursor.clientY === cursor.clientY &&
+			brushRadius === radius
+		) {
+			return;
+		}
+		// Copied, so that an event passed in is not kept alive.
+		brushCursor = { clientX: cursor.clientX, clientY: cursor.clientY };
+		brushRadius = radius;
+		invalidate();
 	};
 
 	const setCamera = (state: CameraState): void => {
@@ -433,10 +514,12 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		setExaggeration,
 		setGridVisible,
 		pick,
+		setBrush,
 		rotateBy,
 		zoomBy,
 		getCamera: () => cameraState,
 		setCamera,
+		draw,
 		resize,
 		dispose,
 	};

@@ -22,6 +22,7 @@ import {
 	GLSL3,
 	type IUniform,
 	RawShaderMaterial,
+	Vector3,
 } from 'three';
 import { normaliseSeaLevel, PLANET_RADIUS_KM } from '../../core/index';
 
@@ -357,11 +358,19 @@ void main() {
  * width in pixels comes from the screen derivative of the direction, which
  * is continuous everywhere, carried through the face mapping by hand: the
  * derivative of the cell position itself jumps at cube edges.
+ *
+ * The brush outline is a ring where the angle from the brush's centre equals
+ * its radius. It is worked out from the direction alone, so it crosses cube
+ * edges unbroken and lies on the relief like a line drawn on the ground.
+ * The line is light with a dark edge on each side, so it shows against both
+ * sea and snow.
  */
 const FRAGMENT_GLSL = /* glsl */ `
 ${ELEVATION_GLSL}
 uniform mat3 normalMatrix;
 uniform float uGridOpacity;
+uniform vec3 uBrushCentre;
+uniform float uBrushRadius;
 
 in vec3 vSurface;
 
@@ -384,6 +393,11 @@ const float RELIEF_STRENGTH = 0.8;
 const float GRID_HALF_WIDTH = 0.6;
 const float GRID_FADE_FROM = 2.5;
 const float GRID_FADE_TO = 7.0;
+// Half the width of the brush outline's light line, the width of the dark
+// edge on each side of it, both in pixels, and how dark that edge is.
+const float BRUSH_LINE_HALF_WIDTH = 0.75;
+const float BRUSH_EDGE_WIDTH = 1.0;
+const float BRUSH_EDGE_OPACITY = 0.55;
 
 ${glslRamp('landColour', LAND_RAMP)}
 
@@ -438,6 +452,18 @@ float gridCoverage(vec3 d) {
 	return max(line.x, line.y);
 }
 
+// How much of the fragment the brush outline covers, 0 to 1: x for its
+// light line alone and y for the line together with its dark edges.
+vec2 brushCoverage(vec3 d) {
+	// The arctangent keeps its precision for the small angles of a narrow
+	// brush, where an arccosine of the dot product would not.
+	float angle = atan(length(cross(d, uBrushCentre)), dot(d, uBrushCentre));
+	float perPixel = max(length(vec2(dFdx(angle), dFdy(angle))), 1e-7);
+	float pixels = abs(angle - uBrushRadius) / perPixel;
+	vec2 halfWidth = BRUSH_LINE_HALF_WIDTH + vec2(0.0, BRUSH_EDGE_WIDTH);
+	return 1.0 - smoothstep(halfWidth - 0.5, halfWidth + 0.5, vec2(pixels));
+}
+
 void main() {
 	vec3 d = normalize(vSurface);
 	float above = elevationAt(d) - uSeaLevel;
@@ -456,6 +482,12 @@ void main() {
 	if (uGridOpacity > 0.0) {
 		// Light lines over the sea and dark ones over the land.
 		colour = mix(colour, vec3(1.0 - land), uGridOpacity * gridCoverage(d));
+	}
+
+	if (uBrushRadius > 0.0) {
+		vec2 outline = brushCoverage(d);
+		colour = mix(colour, vec3(0.0), BRUSH_EDGE_OPACITY * outline.y);
+		colour = mix(colour, vec3(1.0), outline.x);
 	}
 
 	// A little noise, less than one step of the display's colour depth,
@@ -479,6 +511,13 @@ export type GlobeUniforms = {
 	readonly uExaggeration: IUniform<number>;
 	/** Opacity of the cell grid's lines, 0 (hidden) to 1. */
 	readonly uGridOpacity: IUniform<number>;
+	/** Centre of the brush outline: a unit vector in core coordinates. */
+	readonly uBrushCentre: IUniform<Vector3>;
+	/**
+	 * Angular radius of the brush outline in radians; 0 when no outline is
+	 * drawn.
+	 */
+	readonly uBrushRadius: IUniform<number>;
 };
 
 /** The globe's material and the uniforms that drive it. */
@@ -491,7 +530,7 @@ export type GlobeMaterial = {
  * Creates the material that draws the globe.
  *
  * @returns The material together with its uniforms, typed. The elevation
- * texture starts empty and the grid hidden.
+ * texture starts empty, the grid hidden and no brush outline drawn.
  */
 export const createGlobeMaterial = (): GlobeMaterial => {
 	const uniforms: GlobeUniforms = {
@@ -500,6 +539,8 @@ export const createGlobeMaterial = (): GlobeMaterial => {
 		uSeaLevel: { value: 0 },
 		uExaggeration: { value: DEFAULT_EXAGGERATION },
 		uGridOpacity: { value: 0 },
+		uBrushCentre: { value: new Vector3(1, 0, 0) },
+		uBrushRadius: { value: 0 },
 	};
 	const material = new RawShaderMaterial({
 		name: 'globe',

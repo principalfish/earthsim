@@ -117,6 +117,20 @@ describe('createGlobeMaterial', () => {
 		expect(material.uniforms).toBe(uniforms);
 	});
 
+	it('starts with no brush outline, centred on a unit vector', () => {
+		const { uniforms } = createGlobeMaterial();
+		expect(uniforms.uBrushRadius.value).toBe(0);
+		expect(uniforms.uBrushCentre.value.length()).toBe(1);
+	});
+
+	it('draws the brush outline in the fragment shader alone', () => {
+		const { material } = createGlobeMaterial();
+		expect(material.fragmentShader).toContain('vec2 brushCoverage(vec3 d)');
+		expect(material.fragmentShader).toContain('uniform float uBrushRadius;');
+		expect(material.fragmentShader).toContain('uniform vec3 uBrushCentre;');
+		expect(material.vertexShader).not.toContain('uBrush');
+	});
+
 	it('gives both shaders the elevation sampling and both ramps', () => {
 		const { material } = createGlobeMaterial();
 		expect(material.vertexShader).toContain('float elevationAt(vec3 d)');

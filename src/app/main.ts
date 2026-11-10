@@ -2,7 +2,13 @@ import './styles.css';
 import { CORE_VERSION, generateWorld, normaliseSeaLevel } from '../core/index';
 import { attachViewInput } from './globe/input';
 import { createGlobe, type Globe } from './globe/renderer';
+import {
+	createSculptController,
+	DEFAULT_TOOL,
+	rotateButtonFor,
+} from './sculpt';
 import { parseStartOptions } from './startOptions';
+import { createToolPanel } from './ui/toolPanel';
 import { createViewPanel } from './ui/viewPanel';
 
 /** Looks up an element the page markup is required to contain. */
@@ -49,7 +55,23 @@ const globe = createGlobeOrExplain();
 if (globe !== null) {
 	const world = generateWorld(parseStartOptions(window.location.search));
 	globe.setWorld(world);
-	attachViewInput(canvas, globe);
+	const viewInput = attachViewInput(
+		canvas,
+		globe,
+		rotateButtonFor(DEFAULT_TOOL),
+	);
+	const sculpt = createSculptController(globe, world, { canvas });
+	createToolPanel(panel, {
+		onTool: (tool) => {
+			// The button that turns the globe changes first, so that a
+			// drag never both turns it and sculpts.
+			viewInput.setRotateButton(rotateButtonFor(tool));
+			sculpt.setTool(tool);
+		},
+		onRadius: sculpt.setRadiusKm,
+		onStrength: sculpt.setStrength,
+		onSmoothSetting: sculpt.setSmoothSetting,
+	});
 	createViewPanel(panel, {
 		seaLevel: world.seaLevel,
 		onExaggeration: globe.setExaggeration,

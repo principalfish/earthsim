@@ -10,6 +10,7 @@ import {
 	MIN_DRAWN_SEA_LEVEL_M,
 	MIN_EXAGGERATION,
 } from '../globe/material';
+import { createCheckField, createElement, createRangeField } from './fields';
 
 /** The step between sea levels the slider can be set to, in metres. */
 export const SEA_LEVEL_SLIDER_STEP_M = 10;
@@ -49,84 +50,6 @@ export const formatMetres = (metres: number): string => {
 	return `${rounded < 0 ? '−' : ''}${digits} m`;
 };
 
-/** What a slider is built from. */
-type RangeFieldOptions = {
-	readonly id: string;
-	readonly label: string;
-	readonly min: number;
-	readonly max: number;
-	readonly step: number;
-	readonly value: number;
-	readonly format: (value: number) => string;
-	readonly onInput: (value: number) => void;
-};
-
-const createElement = <K extends keyof HTMLElementTagNameMap>(
-	tag: K,
-	className: string,
-): HTMLElementTagNameMap[K] => {
-	const element = document.createElement(tag);
-	element.className = className;
-	return element;
-};
-
-/** A labelled slider with its current value written beside the label. */
-const createRangeField = (options: RangeFieldOptions): HTMLElement => {
-	const field = createElement('div', 'field');
-	const header = createElement('div', 'field__header');
-
-	const label = createElement('label', 'field__label');
-	label.htmlFor = options.id;
-	label.textContent = options.label;
-
-	const output = createElement('output', 'field__value');
-	output.htmlFor.add(options.id);
-	output.textContent = options.format(options.value);
-
-	const input = createElement('input', 'field__range');
-	input.id = options.id;
-	input.type = 'range';
-	input.min = String(options.min);
-	input.max = String(options.max);
-	input.step = String(options.step);
-	input.value = String(options.value);
-	input.addEventListener('input', () => {
-		const value = input.valueAsNumber;
-		output.textContent = options.format(value);
-		options.onInput(value);
-	});
-
-	header.append(label, output);
-	field.append(header, input);
-	return field;
-};
-
-/** What a checkbox is built from. */
-type CheckFieldOptions = {
-	readonly id: string;
-	readonly label: string;
-	readonly checked: boolean;
-	readonly onChange: (checked: boolean) => void;
-};
-
-/** A labelled checkbox. */
-const createCheckField = (options: CheckFieldOptions): HTMLElement => {
-	const field = createElement('div', 'field field--check');
-
-	const input = createElement('input', 'field__checkbox');
-	input.id = options.id;
-	input.type = 'checkbox';
-	input.checked = options.checked;
-	input.addEventListener('change', () => options.onChange(input.checked));
-
-	const label = createElement('label', 'field__label');
-	label.htmlFor = options.id;
-	label.textContent = options.label;
-
-	field.append(input, label);
-	return field;
-};
-
 /**
  * Adds the view controls to the side panel.
  *
@@ -153,7 +76,7 @@ export const createViewPanel = (
 			value: options.exaggeration ?? DEFAULT_EXAGGERATION,
 			format: formatExaggeration,
 			onInput: options.onExaggeration,
-		}),
+		}).element,
 		createRangeField({
 			id: 'view-sea-level',
 			label: 'Sea level',
@@ -163,7 +86,7 @@ export const createViewPanel = (
 			value: options.seaLevel,
 			format: formatMetres,
 			onInput: options.onSeaLevel,
-		}),
+		}).element,
 		createCheckField({
 			id: 'view-grid',
 			label: 'Show cell grid',
