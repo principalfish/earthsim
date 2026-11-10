@@ -14,7 +14,7 @@ Not included: any climate or time simulation, a flat map view, and changing a wo
 
 ## Plan
 
-_2026-11-10 · 3 of 11 pieces done · now: piece 4 in progress_
+_2026-11-10 · 4 of 11 pieces done · now: piece 5 in progress_
 
 - [x] **1/11 Scaffold tooling and app shell** · `b22e81a`
   An npm project with Vite, Vitest, Biome, TypeScript and Three.js, and an empty page.
@@ -22,9 +22,9 @@ _2026-11-10 · 3 of 11 pieces done · now: piece 4 in progress_
   Cell centres, areas, neighbours across cube edges, and lookups for any resolution.
 - [x] **3/11 World model and terrain statistics** · `81749de`
   The world's data, a blank ocean world, and land, sea and height statistics.
-- [ ] **4/11 Continent generator** · in progress
+- [x] **4/11 Continent generator** · `dbc0939`
   Noise-shaped continents from a seed and a land fraction.
-- [ ] **5/11 Globe renderer with relief and view controls** · not started
+- [ ] **5/11 Globe renderer with relief and view controls** · in progress
   The lit 3D globe tinted by height, with raised relief, sea-level and exaggeration sliders and a grid overlay.
 - [ ] **6/11 Sculpting brushes** · not started
   Raise, lower and smooth brushes applied on the globe with the mouse.
