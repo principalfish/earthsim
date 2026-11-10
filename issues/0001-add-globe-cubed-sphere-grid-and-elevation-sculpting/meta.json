@@ -3,12 +3,12 @@
   "slug": "add-globe-cubed-sphere-grid-and-elevation-sculpting",
   "title": "Add globe, cubed-sphere grid and elevation sculpting",
   "mode": "build",
-  "state": "investigating",
+  "state": "planned",
   "branch": "add-globe-cubed-sphere-grid-and-elevation-sculpting",
   "base": "main",
-  "gh_issue": null,
+  "gh_issue": 1,
   "build_model": null,
   "created": "2026-11-10 11:12",
-  "updated": "2026-11-10 11:12",
+  "updated": "2026-11-10 11:32",
   "done": null
 }
