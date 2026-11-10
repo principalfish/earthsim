@@ -116,9 +116,9 @@ earth_sim is a browser-based planet simulator for worldbuilding. The repo holds 
    - Manual review: how sculpting feels. Run `npm run dev` from the builder's worktree. Build an island, cut a bay, smooth a ridge, drag fast, and sculpt across a cube corner (turn on the grid overlay to find one). Try it at 256 too, with `?resolution=256` in the address.
 
 7. Undo and redo
-   - Files: `src/core/history.ts`, `src/core/history.test.ts`, `src/app/sculpt.ts`, `src/app/ui/toolPanel.ts`, `src/app/main.ts`
+   - Files: `src/core/history.ts`, `src/core/history.test.ts`, `src/core/index.ts`, `src/app/sculpt.ts`, `src/app/ui/toolPanel.ts`, `src/app/main.ts`, `src/app/styles.css`, `README.md` (and the tests beside any of these)
    - What: a stroke history. Each stroke records the before and after values of only the cells it touched. Ctrl+Z undoes, Ctrl+Shift+Z and Ctrl+Y redo, with matching buttons that disable when there is nothing to do. A new stroke clears the redo stack. The history is capped (100 strokes) and is cleared when the world is replaced. Sea level and view settings are not part of the history.
-   - Functions: `createHistory(limit)`, `history.begin()`, `history.record(cell, before)`, `history.commit(world)`, `history.undo(world)`, `history.redo(world)`
+   - Functions: `createHistory(limit)`, `history.commit(world, { cells, before })` (reads the after-values from the world; the sculpt controller's `onStrokeEnd` already supplies each touched cell once with its value before the stroke), `history.undo(world)`, `history.redo(world)`, `history.clear()`, and can-undo and can-redo flags for the buttons
    - Depends on: 6
    - Acceptance: any sequence of strokes can be undone back to the starting terrain exactly and redone forward exactly; the globe updates on each step.
    - Tests: undo after one stroke restores the exact prior array; redo reapplies it exactly; several overlapping strokes undo in reverse order; a cell touched many times in one stroke restores to its value before the stroke; a new stroke after an undo discards redo; undo with empty history is a no-op; the cap drops the oldest stroke; a stroke that changed nothing adds no history entry; undo and redo report the changed cells so the right faces are re-uploaded.
