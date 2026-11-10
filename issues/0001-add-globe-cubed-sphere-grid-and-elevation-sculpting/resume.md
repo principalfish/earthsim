@@ -14,7 +14,7 @@ The design decisions are all in `decisions.md` and carried into `plan.md` Contex
 2. 2026-11-10 — `main` pushed by the user; planner branch pushed with their agreement; GitHub issue created.
 
 ## The pending decision (exact)
-Nothing is pending with the user. Pieces 1 to 6 are committed and pushed (latest `3c7e6ea`). The user settled piece 7's choices (`decisions.md`) and chose "Run 7 and 8, stop at 9's review": the builder builds pieces 7 (undo and redo) and 8 (worker and statistics readout) without pauses, committing and pushing each, then sends piece 9's look-ahead and choices and waits before building it. Piece 9 stops uncommitted at its review, which has a manual review.
+Nothing is pending with the user. Pieces 1 to 7 are committed and pushed (latest `8bfa67b`). The user settled piece 7's choices (`decisions.md`) and chose "Run 7 and 8, stop at 9's review": the builder builds pieces 7 (undo and redo) and 8 (worker and statistics readout) without pauses, committing and pushing each, then sends piece 9's look-ahead and choices and waits before building it. Piece 9 stops uncommitted at its review, which has a manual review.
 
 ## What the next session does
 1. Run the state checks; the branch gains a commit per piece after `3c7e6ea`.
