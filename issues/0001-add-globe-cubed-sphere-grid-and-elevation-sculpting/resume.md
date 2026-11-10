@@ -14,14 +14,14 @@ The design decisions are all in `decisions.md` and carried into `plan.md` Contex
 2. 2026-11-10 — `main` pushed by the user; planner branch pushed with their agreement; GitHub issue created.
 
 ## The pending decision (exact)
-Nothing is pending with the user. Pieces 1 to 7 are committed and pushed (latest `8bfa67b`). The user settled piece 7's choices (`decisions.md`) and chose "Run 7 and 8, stop at 9's review": the builder builds pieces 7 (undo and redo) and 8 (worker and statistics readout) without pauses, committing and pushing each, then sends piece 9's look-ahead and choices and waits before building it. Piece 9 stops uncommitted at its review, which has a manual review.
+Nothing is pending with the user, but **a pause is requested**. Pieces 1 to 7 are committed and pushed (latest `8bfa67b`). The builder is finishing piece 8 (worker and statistics readout), which it commits and pushes without a pause under "Run 7 and 8, stop at 9's review". The user then said "can you pause the builder when appropriate" and chose "After piece 8 is committed": after that commit the builder sends piece 9's look-ahead and stops, and does not start piece 9 until the user says to resume.
 
 ## What the next session does
-1. Run the state checks; the branch gains a commit per piece after `3c7e6ea`.
-2. `planner.py ingest 1` on every builder message. After each commit: verify on origin, tick the issue checklist and `gh issue edit 1`, and report it to the user in a few lines.
-3. When the builder sends piece 9's look-ahead: put its choices to the user (and the plan's defaults for piece 9: with no saved world the page opens on a blank ocean with the new-world dialog showing; a new world resets sea level to zero; the seed is a whole number from 0 to 4,294,967,295), then relay their answers.
-4. When piece 9's review request arrives, give the review briefing with the manual review first; relay an approval only when the user's words say they tried it.
-5. If the builder has been idle a while with uncommitted work and no message, it may have stalled on a process restart: message it to resume.
+1. Run the state checks; the branch gains piece 8's commit after `8bfa67b`.
+2. `planner.py ingest 1`. After piece 8's commit: verify on origin, tick the issue checklist, `gh issue edit 1` with the status line saying the build is paused, and report it to the user.
+3. The build stays paused until the user says to continue. Piece 9's choices can be put to them when they return (the builder's look-ahead, plus the plan's defaults: with no saved world the page opens on a blank ocean with the new-world dialog showing; a new world resets sea level to zero; the seed is a whole number from 0 to 4,294,967,295).
+4. On the user's word to resume: relay it explicitly, with their answers to piece 9's choices. Piece 9 is built and stops uncommitted at its review, which has a manual review.
+5. If the builder has been idle a while with piece 8 uncommitted and no message, it may have stalled on a process restart: message it to resume piece 8 only.
 
 ## Don't
 - Don't build in the planner chat, and don't start a second builder for this issue.
