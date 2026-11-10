@@ -14,13 +14,12 @@ The design decisions are all in `decisions.md` and carried into `plan.md` Contex
 2. 2026-11-10 — `main` pushed by the user; planner branch pushed with their agreement; GitHub issue created.
 
 ## The pending decision (exact)
-Piece 6 (sculpting brushes) is built, checked and **uncommitted** in the builder's worktree; the branch head is `21862d7` (piece 5). The builder sent its review request and the user has been given the review briefing. Waiting on the user for the manual review, then diff approval: from `/home/philiph/workspace/earth_sim/.claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` run `npm run dev` (or reload their own dev server, last seen on port 5176), pick Raise, Lower and Smooth in the Tools section, sculpt across a cube corner, and repeat at `?resolution=256`. Things to judge: whether Smooth's default of 50 is the right speed, and responsiveness at 256 with the 3,000 km brush. Relay an approval only when the user's words say they tried it; a round of tuning is likely.
+Nothing is pending with the user right now. They approved piece 6 after trying it ("Tried it, approve") and that was relayed. The builder is committing and pushing piece 6 and will then send a piece-committed note with its look-ahead for piece 7, and wait.
 
 ## What the next session does
-1. Run the state checks; `git -C <worktree> status --short` should still show piece 6 uncommitted.
-2. If the user has not answered, show the briefing again (manual review first) and ask.
-3. Relay the user's verdict to the builder, quoting their words: approval ("Commit and push") or the changes asked for.
-4. After the commit: ingest, verify on origin, tick piece 6 on the issue checklist and `gh issue edit 1`, then the next-stage briefing for piece 7 (undo and redo). Normal per-piece pauses apply.
+1. Run the state checks. `git log --oneline main..<meta.branch>` should gain piece 6's commit after `21862d7`.
+2. After the commit: ingest, verify on origin, tick piece 6 on the issue checklist and `gh issue edit 1`.
+3. Give the user the next-stage briefing for piece 7 (undo and redo; no manual review in the plan) and ask whether to start it. Raise the plan's default of a 100-stroke history, and anything in the builder's look-ahead. Normal per-piece pauses apply unless the user says otherwise.
 
 ## Don't
 - Don't build in the planner chat, and don't start a second builder for this issue.
