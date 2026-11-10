@@ -14,16 +14,12 @@ The design decisions are all in `decisions.md` and carried into `plan.md` Contex
 2. 2026-11-10 — `main` pushed by the user; planner branch pushed with their agreement; GitHub issue created.
 
 ## The pending decision (exact)
-Piece 5 (globe renderer with relief and view controls) is built, checked and **uncommitted** in the builder's worktree; the branch head is `dbc0939` (piece 4). The builder sent its review request and the user has been given the review briefing. Waiting on the user for three things:
-1. The manual review, then diff approval. From `/home/philiph/workspace/earth_sim/.claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` run `npm run dev` and open the URL Vite prints; `?resolution=256` or `?resolution=128&seed=7&land=0.4` choose other worlds. Relay an approval only when the user's words say they tried it.
-2. Are the generated continents acceptable as a base to sculpt? They show some straight trenches and ridges following the noise's grid, most visible at 256. Options: accept (builder's recommendation unless they jump out), or rework the generator's noise, which changes every seed's world.
-3. Bundle size warning (551 kB, Three.js): leave it (recommended) or split Three.js into its own chunk.
+Nothing is pending with the user right now. They approved piece 5 after trying it ("Tried it, approve"), accepted the generated continents ("Accept as they are") and left the bundle warning ("Leave it"); all three were relayed. The builder is committing and pushing piece 5 and will then send a piece-committed note with its look-ahead for piece 6, and wait.
 
 ## What the next session does
-1. Run the state checks; `git -C <worktree> status --short` should still show piece 5 uncommitted.
-2. If the user has not answered, show the briefing again (manual review first) and ask.
-3. Relay the user's verdict to the builder, quoting their words: approval ("Commit and push") or the changes asked for, plus their answers to questions 2 and 3.
-4. After the commit: ingest, verify on origin, tick piece 5 on the issue checklist and `gh issue edit 1`, then give the next-stage briefing for piece 6 (sculpting brushes). The run-through instruction ended at piece 5, so the normal per-piece pauses apply from piece 6 unless the user says otherwise.
+1. Run the state checks. `git log --oneline main..<meta.branch>` should gain piece 5's commit after `dbc0939`.
+2. After the commit: ingest, verify on origin, tick piece 5 on the issue checklist and `gh issue edit 1`.
+3. Give the user the next-stage briefing for piece 6 (sculpting brushes; it has a manual review) and ask whether to start it. The run-through ended at piece 5, so the normal per-piece pauses apply unless the user says otherwise. Decisions to raise for piece 6: none are open in the plan; check the builder's look-ahead.
 
 ## Don't
 - Don't build in the planner chat, and don't start a second builder for this issue.

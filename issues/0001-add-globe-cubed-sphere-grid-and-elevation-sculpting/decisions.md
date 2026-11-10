@@ -20,6 +20,11 @@
 - The Earth preset uses NOAA's ETOPO 2022 ice-surface elevation: Greenland and Antarctica at the top of their ice. Bedrock data is not included; the ice-sheet issue may add it. (2026-11-10)
 - The continent generator exposes a seed (same seed gives the same world, with a button for a random one) and a land-fraction slider. Its output is noise-shaped, a base to sculpt, not geologically plausible terrain. (2026-11-10)
 - The simulation must be pauseable, with the user able to edit the map while it is paused. Nothing runs through time in this issue, so no pause control is built here, but the design must not block it: the main thread's world is always the editable, authoritative copy, and any later run starts from whatever that copy holds. (2026-11-10)
+- Implementation model for this issue is `claude-fable-5-2`, this issue only ("lets use fable to implement this one time"). (2026-11-10)
+- Pieces 1 to 4 ran without pauses ("can you continue building to the first manual check piece?"); the normal per-piece pauses apply from piece 5 on. (2026-11-10)
+- Piece 5 approved after the user tried the globe ("Tried it, approve"). (2026-11-10)
+- The generated continents are accepted as they are, straight noise-grid features included; the generator's noise is not reworked. (2026-11-10)
+- The 551 kB bundle warning is left alone; Three.js is not split into its own chunk. (2026-11-10)
 
 ## Open
 
