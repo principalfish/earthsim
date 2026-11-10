@@ -3,13 +3,13 @@
   "slug": "add-globe-cubed-sphere-grid-and-elevation-sculpting",
   "title": "Add globe, cubed-sphere grid and elevation sculpting",
   "mode": "build",
-  "state": "planned",
-  "branch": "add-globe-cubed-sphere-grid-and-elevation-sculpting",
+  "state": "building",
+  "branch": "claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9",
   "base": "main",
   "gh_issue": 1,
   "build_model": "claude-opus-5-5",
   "created": "2026-11-10 11:12",
-  "updated": "2026-11-10 11:33",
+  "updated": "2026-11-10 11:34",
   "done": null,
   "local": [
     {
@@ -17,6 +17,16 @@
       "name": "local_acf49a6d-c0ef-4a98-8721-d05319ed32de",
       "added": "2026-11-10 11:33",
       "note": "builder: add-globe-cubed-sphere-grid-and-elevation-sculpting"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/philiph/workspace/earth_sim/.claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9",
+      "added": "2026-11-10 11:34"
+    },
+    {
+      "kind": "branch",
+      "name": "claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9",
+      "added": "2026-11-10 11:34"
     }
   ]
 }

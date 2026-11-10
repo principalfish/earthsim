@@ -1,6 +1,6 @@
 # Plan: add-globe-cubed-sphere-grid-and-elevation-sculpting
 
-**Build model:** claude-opus-5-5 — cube-edge stitching, spherical geometry and shader work are easy to get subtly wrong and everything later is built on them. Piece 1 is mechanical and names Sonnet.
+**Build model:** claude-fable-5-2 — the user's choice for this issue only (2026-11-10: "lets use fable to implement this one time"). It applies to every piece and every review fix, and for this issue it overrides the "Builder on Sonnet" experiment in `models.md`. The checks keep their `models.md` tiers. The planner's own choice had been claude-opus-5-5, with Sonnet for the mechanical piece 1.
 
 ## Context
 
@@ -72,7 +72,6 @@ earth_sim is a browser-based planet simulator for worldbuilding. The repo holds 
    - Depends on: none
    - Acceptance: `npm run dev` serves the page; `npm run build`, `npm test`, `npm run check` and `npm run typecheck` all pass; adding a `document` reference to a file in `src/core` makes `npm run typecheck` fail (try it, then remove it).
    - Tests: a smoke test that Vitest runs against `src/core`. This piece is configuration; behaviour tests start in piece 2.
-   - Model: claude-sonnet-5-5
 
 2. Cubed-sphere grid
    - Files: `src/core/grid.ts`, `src/core/grid.test.ts`
@@ -190,4 +189,5 @@ Test strategy: logic lives in `src/core` and in small pure functions in `src/app
 
 - 2026-11-10: After piece 1 is committed, the planner chat writes the worktree-setup and changed-lines coverage scripts in the planner branch's `tools/` and updates `project.md` with the real check commands. From then on the builder uses `project.md`'s commands.
 - 2026-11-10: Not asked of the user, chosen as defaults: with no saved world the page opens on a blank ocean with the new-world dialog showing (piece 9); the ocean is drawn as a smooth surface coloured by depth, with only land raised (piece 5); creating a new world resets sea level to zero (piece 9); the history keeps 100 strokes (piece 7). The planner chat raises these with the user in each piece's briefing.
+- 2026-11-10: Implementation model for this issue is `claude-fable-5-2`, on the user's instruction ("lets use fable to implement this one time"), given just after the builder was started. Implementation subagents and review fixes run on it; the "Builder on Sonnet" experiment does not apply to this issue, so no experiment notes are needed. `models.md` is unchanged and later issues follow it as usual.
 - 2026-11-10: The ETOPO download is large (hundreds of MB) and needs network access. If the builder cannot fetch it, stop and ask rather than substituting another dataset.
