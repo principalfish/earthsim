@@ -14,12 +14,12 @@ The design decisions are all in `decisions.md` and carried into `plan.md` Contex
 2. 2026-11-10 — `main` pushed by the user; planner branch pushed with their agreement; GitHub issue created.
 
 ## The pending decision (exact)
-The build is **paused at the user's request**. They said "can we pause at the next appropriate moment" and, asked where, chose "Right now". Pieces 1 to 5 are committed and pushed (latest `21862d7`). Piece 6 (sculpting brushes) was stopped mid-implementation: whatever its implementing subagent had written is uncommitted in the builder's worktree and may be half-finished. The builder was told to stop its subagents, leave the tree as it is, report what exists, and wait. Piece 6's choices are settled (`decisions.md`). Nothing resumes until the user says so.
+The build is **paused at the user's request**. They said "can we pause at the next appropriate moment" and, asked where, chose "Right now". Pieces 1 to 5 are committed and pushed (latest `21862d7`). Piece 6 (sculpting brushes) was stopped before anything was written: the builder confirmed its worktree is clean at `21862d7` and none of its processes is running. A Vite dev server started by the user for the piece 5 review may still be running from that worktree; it is theirs. Piece 6's choices are settled (`decisions.md`). Nothing resumes until the user says so.
 
 ## What the next session does
-1. Run the state checks. `git -C /home/philiph/workspace/earth_sim/.claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9 status --short` shows piece 6's partial files; the branch head is `21862d7`.
+1. Run the state checks. `git -C /home/philiph/workspace/earth_sim/.claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9 status --short` prints nothing; the branch head is `21862d7`.
 2. `planner.py ingest 1` and read the builder's stop report (its last message to the planner chat, or `plan.md` Notes) for what is written and what must not be trusted.
-3. Wait for the user's word to continue. Then relay it to the builder, quoting it: assess the partial piece 6 work, finish or redo it on `claude-fable-5-2`, run the checks and analysis loop, and stop uncommitted at the review (it has a manual review). If the builder session is gone, the planner skill's "Starting the builder" and "Retiring a builder" apply; run `planner.py check-builder 1` first so the uncommitted work is not lost.
+3. Wait for the user's word to continue. Then relay it to the builder, quoting it: build piece 6 from the beginning on `claude-fable-5-2`, run the checks and analysis loop, and stop uncommitted at the review (it has a manual review). If the builder session is gone, the planner skill's "Starting the builder" and "Retiring a builder" apply; run `planner.py check-builder 1` first so the uncommitted work is not lost.
 4. After each commit: verify on origin, tick the issue checklist, `gh issue edit 1`, then the next-stage briefing for the following piece. Normal per-piece pauses apply.
 
 ## Don't
