@@ -19,4 +19,4 @@ Browser-based planet simulator for worldbuilding: draw continents and plates, th
 - Purpose is worldbuilding: believable results and a fast-running simulation matter more than physical fidelity.
 - The app runs entirely in the browser as static files, with no server.
 - Formatting and linting belong to Biome; do not add ESLint or Prettier.
-- No GitHub remote yet: the planner branch is local-only and `/planner` cannot create GitHub issues until `origin` exists.
+- GitHub remote: `principalfish/earthsim` (private). The local folder is `earth_sim`.

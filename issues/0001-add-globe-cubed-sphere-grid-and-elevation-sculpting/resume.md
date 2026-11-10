@@ -1,9 +1,14 @@
 # Resume point — read this first
 
 ## Where we are
-Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`) is in the planning discussion, state `investigating`. The discussion is finished: the user confirmed the ledger in `decisions.md` with "That's everything". Planning is stopped on approval of the `issue.md` draft, which has been shown in chat but not yet written to the folder. No `plan.md` yet, no builder started. The user also said "let me create a repo before you start": they are creating the GitHub repo and adding it as `origin` themselves, and planning waits for that.
-State checks: `git -C /home/philiph/workspace/earth_sim status --short --branch` shows `No commits yet on main` and a clean tree; `git remote` prints nothing until the user adds `origin`; once it prints `origin`, the remote steps below apply. `planner.py meta 1` shows state `investigating`.
-If anything differs, stop and tell the user.
+Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`) is being planned, state `investigating`. The discussion is finished and the user approved the issue text. `issue.md` (with its `## Plan` checklist) and `plan.md` (11 pieces) are written in the planner worktree but **not saved**: the first save pushes the planner branch, and `main` must reach GitHub first or GitHub makes `planner` the default branch. No GitHub issue yet, no builder started.
+State checks:
+- `git -C /home/philiph/workspace/earth_sim remote -v` shows `origin git@github.com:principalfish/earthsim.git`.
+- `git -C /home/philiph/workspace/earth_sim log --oneline main` shows `ffed15a Add README and .gitignore`.
+- `git -C /home/philiph/workspace/earth_sim ls-remote --heads origin` lists `refs/heads/main` once the user has pushed it. If it lists nothing, the user has not pushed yet: do not save.
+- `git -C /home/philiph/workspace/earth_sim/.planner status --short` lists the unsaved files until the first save after the push.
+- `planner.py meta 1` shows state `investigating`.
+If anything else differs, stop and tell the user.
 
 ## How it got here — decisions already answered, in order
 1. 2026-11-10 — Scope of the first issue → step 1 only; the overall design is saved in `investigations/2026-11-10-simulator-design-and-roadmap.md`.
@@ -22,35 +27,29 @@ If anything differs, stop and tell the user.
 14. 2026-11-10 — Changing resolution after creation → no, set at creation only.
 15. 2026-11-10 — Earth data → ETOPO 2022, ice surface.
 16. 2026-11-10 — Generator controls → seed and land fraction.
-17. 2026-11-10 — User's own addition: the simulation must be pauseable with human input on the map when paused → recorded as a design constraint; no pause control in this issue because nothing runs through time yet.
-18. 2026-11-10 — Is the ledger complete and correct → "That's everything". The reading of "pauseable" as the later run through time stands.
+17. 2026-11-10 — User's own addition: the simulation must be pauseable with human input on the map when paused → recorded as a design constraint; no pause control in this issue.
+18. 2026-11-10 — Is the ledger complete and correct → "That's everything".
+19. 2026-11-10 — User: "let me create a repo before you start" → they created `principalfish/earthsim` (private, empty) and added it as `origin`.
+20. 2026-11-10 — Who makes `main`'s first commit → "Claude commits, I push": commit `ffed15a` made locally; the user pushes it.
+21. 2026-11-10 — May the planner branch be pushed once `main` is on GitHub → "Yes, push it".
+22. 2026-11-10 — Issue draft → "Approved".
 
 ## The pending decision (exact)
-Two things. First, the user is adding a GitHub remote; wait for them to say it is done. `main` has no commits, and a builder worktree cannot branch from an unborn `main`, so `main` needs a first commit on origin (the user was advised to create the GitHub repo with a README and pull it). Second: does the user approve this `issue.md` draft? Only explicit approval counts; iterate on any changes.
-
-    # Add globe, cubed-sphere grid and elevation sculpting
-
-    earth_sim is a browser-based planet simulator for worldbuilding. This is its first step: a planet you can see and shape, and the foundation every later layer (temperature, winds, rainfall, oceans, ice, plate drift) is built on.
-
-    The planet's surface is stored on a cubed-sphere grid whose resolution is chosen per world: 64 cells per cube face by default (about 150 km), or 128 or 256. A 3D globe shows it tinted by height and lit, with mountains raised from the sphere by an adjustable exaggeration and an optional overlay of the cell grid.
-
-    You shape the terrain by sculpting directly on the globe with raise, lower and smooth brushes, with undo and redo per stroke. Sea level is an adjustable setting that decides what is land. A new world starts as a blank ocean, as generated continents from a seed and a land fraction, or as real Earth from NOAA's ETOPO 2022 elevation data.
-
-    The simulation code is a pure TypeScript library with no browser dependency, run in a Web Worker as a compute service, while the page owns the editable world. Here the worker returns land and sea areas and height statistics; later climate layers use the same channel. That split is also what will let a run through time be paused, edited and resumed.
-
-    Worlds autosave in the browser and can be exported to and imported from a file. Everything runs client-side as static files. The issue also scaffolds the project tooling: npm, Vite, Vitest, Biome and TypeScript.
-
-    Not included: any climate or time simulation, a flat map view, and changing a world's resolution after it is created.
+Two things asked together:
+1. The user runs `git push -u origin main` and says when it is done.
+2. Which proposed manual reviews to keep. Proposed: piece 5 (look of the globe and generated continents), piece 6 (feel of sculpting), piece 9 (new-world flow), piece 10 (refresh, export, import), piece 11 (Earth looks right). Only the ones the user confirms stay in `plan.md`.
+Also put to the user, not blocking: the plan has 11 pieces (8 to 10 were estimated); browser-automation tests are not planned; and four defaults in `plan.md` Notes (first open shows the new-world dialog over a blank ocean; ocean drawn smooth with only land raised; a new world resets sea level; 100-stroke history).
 
 ## What the next session does
-1. Run the state checks.
-2. If the user has not approved the draft, show it again and ask.
-3. When `origin` exists: tell the user the next save pushes the planner branch to GitHub, where it is visible, and get a yes before saving. Check `git log main` has a commit.
-4. On approval of the draft, write `issue.md` and save. With a remote, `gh issue create` and record `gh_issue`; without one, skip it.
-5. Write `plan.md` (the planner skill's Planning steps), propose manual reviews, add the `## Plan` checklist to `issue.md`, then `planner.py set 1 state=planned`.
+1. Run the state checks. If `main` is not on origin, ask the user to push it and wait.
+2. Apply the user's answer on manual reviews to `plan.md` (remove the `Manual review:` lines they declined, and the "manual review done" wording on those checkpoints).
+3. `planner.py save "<slug> (0001): issue and plan written"` — this is the first push of the planner branch.
+4. `gh issue create --title "Add globe, cubed-sphere grid and elevation sculpting" --body "$(tail -n +2 "$FOLDER/issue.md")"`, then `planner.py set 1 gh_issue=<n>`.
+5. `planner.py set 1 state=planned`, then rewrite this file as a short pointer.
+6. Offer to start the builder, with the next-stage briefing for piece 1 (planner skill, "Starting the builder").
 
 ## Don't
+- Don't save through `planner.py` until `main` is on origin.
+- Don't push `main` or change remotes: those are the user's.
 - Don't write source files or build in the planner chat.
-- Don't create the GitHub repo, add the remote, or push `main`: those are the user's.
-- Don't create a GitHub issue until `origin` exists and the user has agreed to the planner branch being pushed.
 - Don't treat items under "Proposed, not yet confirmed" in the design note as decided.

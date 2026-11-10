@@ -41,4 +41,3 @@ _None._
 - Terrain passes between the main thread and the worker as copied or transferred arrays, not shared memory, because shared memory needs server headers a plain static host cannot set.
 - Target is a current desktop Chrome or Firefox with a mouse. Touch and mobile are out of scope.
 - Deployment (for example GitHub Pages) is out of scope; the app runs from the Vite dev server and a static build.
-- No GitHub remote exists, so no GitHub issue or draft PR can be created until `origin` is added.
