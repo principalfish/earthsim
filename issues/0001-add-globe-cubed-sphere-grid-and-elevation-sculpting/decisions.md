@@ -25,12 +25,16 @@
 - Piece 5 approved after the user tried the globe ("Tried it, approve"). (2026-11-10)
 - The generated continents are accepted as they are, straight noise-grid features included; the generator's noise is not reworked. (2026-11-10)
 - The 551 kB bundle warning is left alone; Three.js is not split into its own chunk. (2026-11-10)
+- Piece 6 brush size: a fixed radius slider from 100 to 3,000 km, default 500 km, the same on every world. (2026-11-10)
+- Piece 6 raise and lower strength: metres per second at the brush centre, 100 to 5,000, default 1,000. (2026-11-10)
+- Piece 6 smooth strength: the share of the gap to the neighbour average closed per second, on the same slider, capped so it cannot overshoot. (2026-11-10)
 
 ## Open
 
 _None._
 
 ## Assumed
+- Piece 6: the brush outline is a thin ring on the globe under the cursor, hidden with the move tool and off the globe; the browser's right-click menu is suppressed on the canvas only. The user was told and did not object.
 - "Pauseable" means the later run through time (drift, ice ages) can be stopped at any point, the terrain sculpted and other inputs changed, and the run resumed from the edited state. Which inputs are editable while paused, and whether editing is locked while a run is in progress, are decided in the issues that add those runs.
 - Cube-to-sphere mapping is equiangular (the variant that keeps cell sizes most even).
 - Planet radius is Earth's for now; it becomes a parameter in a later issue.

@@ -14,12 +14,13 @@ The design decisions are all in `decisions.md` and carried into `plan.md` Contex
 2. 2026-11-10 — `main` pushed by the user; planner branch pushed with their agreement; GitHub issue created.
 
 ## The pending decision (exact)
-Nothing is pending with the user right now. They approved piece 5 after trying it ("Tried it, approve"), accepted the generated continents ("Accept as they are") and left the bundle warning ("Leave it"); all three were relayed. The builder is committing and pushing piece 5 and will then send a piece-committed note with its look-ahead for piece 6, and wait.
+Nothing is pending with the user. Pieces 1 to 5 are committed and pushed (latest `21862d7`). The user settled piece 6's choices (see `decisions.md`) and said "Start it"; the builder is building piece 6 (sculpting brushes) and will stop uncommitted at its review, which has a manual review.
 
 ## What the next session does
-1. Run the state checks. `git log --oneline main..<meta.branch>` should gain piece 5's commit after `dbc0939`.
-2. After the commit: ingest, verify on origin, tick piece 5 on the issue checklist and `gh issue edit 1`.
-3. Give the user the next-stage briefing for piece 6 (sculpting brushes; it has a manual review) and ask whether to start it. The run-through ended at piece 5, so the normal per-piece pauses apply unless the user says otherwise. Decisions to raise for piece 6: none are open in the plan; check the builder's look-ahead.
+1. Run the state checks; piece 6 should be uncommitted in the builder's worktree, or its review request should be waiting.
+2. `planner.py ingest 1`. When the review request arrives, give the user the review briefing with the manual review first; relay an approval only when their words say they tried it.
+3. After each commit: verify on origin, tick the issue checklist, `gh issue edit 1`, then the next-stage briefing for the following piece. Normal per-piece pauses apply.
+4. If the builder has been idle a while with uncommitted work and no review request, it may have stalled on a process restart: message it to resume.
 
 ## Don't
 - Don't build in the planner chat, and don't start a second builder for this issue.
