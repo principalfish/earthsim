@@ -160,7 +160,7 @@ earth_sim is a browser-based planet simulator for worldbuilding. The repo holds 
 
 ## Checkpoints
 
-- [ ] 1. Scaffold in place: dev server, build, tests, Biome and type-check all run and pass
+- [x] 1. Scaffold in place: dev server, build, tests, Biome and type-check all run and pass
 - [ ] 2. Cubed-sphere grid passes its geometry and stitching tests at 64, 128 and 256
 - [ ] 3. World model and terrain statistics pass their tests
 - [ ] 4. Continent generator is deterministic and hits the requested land fraction
