@@ -19,7 +19,7 @@ Nothing is pending with the user. On their instruction ("can you continue buildi
 ## What the next session does
 1. Run the state checks (state is `building`; the issue branch `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` gains a commit per piece on origin).
 2. `planner.py ingest 1`, compare `git log --oneline main..<meta.branch>` with the ticked checkpoints in `plan.md`, and tick the issue's `## Plan` checklist for each committed piece (then `gh issue edit 1`).
-3. Piece 1 is committed and pushed (`b22e81a`) and draft PR 2 is open (`meta.pr`). Still to do if `.planner/tools/` has no `setup-worktree.sh` and `coverage-changed.sh`: write them and update `project.md` with the real check commands (`plan.md` Notes), then tell the builder to re-read `project.md`.
+3. Piece 1 is committed and pushed (`b22e81a`) and draft PR 2 is open (`meta.pr`). The worktree-setup and coverage scripts are in `.planner/tools/`, `project.md` has the real commands, and the builder has been told.
 4. When the builder sends piece 5's review request, give the user the review briefing with the manual review first, and relay an approval only when their words say they tried it.
 5. From piece 6 on, the normal per-piece pauses and briefings apply again.
 
