@@ -11,12 +11,12 @@
 - Display: a sphere tinted smoothly by height (values blended between cells) and lit so slopes read as relief, with mountains physically raised from the sphere by an adjustable exaggeration, and a toggle to overlay the cell grid. Later map layers must drape over the raised surface. (2026-11-10)
 - A new world can start as any of three: blank ocean of uniform depth, generated continents from noise, or an Earth preset from real elevation data. All three are in this issue; the user chose this over the recommendation to do blank ocean only and add the Earth preset with temperature. (2026-11-10)
 - Web Worker role: a compute service. The main thread owns the terrain and applies brush strokes instantly; the worker receives a copy and returns computed layers. Proven in this issue with one small real layer: land and sea areas and a few height statistics. (2026-11-10)
+- UI layer: plain TypeScript and DOM with hand-written HTML and CSS panels; no panel library and no UI framework. (2026-11-10)
+- Undo and redo are in this issue, one whole brush stroke per step (Ctrl+Z, Ctrl+Shift+Z), remembering only the cells each stroke changed. (2026-11-10)
+- The current world autosaves to browser storage and is restored on reopen or refresh. File export and import remain the way to keep, back up and share worlds. (2026-11-10)
+- No flat map view in this issue; the globe is the only view. A flat map comes as its own issue around the temperature step. (2026-11-10)
 
 ## Open
-- UI layer for the controls around the globe: plain TypeScript and DOM, a small panel library, or a framework.
-- Whether worlds also autosave to browser storage, besides file export and import.
-- Undo and redo for brush strokes: in or out of this issue.
-- A flat map view alongside the globe: in or out of this issue.
 - Sea level: fixed at zero elevation, or an adjustable setting.
 - Whether an existing world's resolution can be changed after creation (resampling the terrain).
 - Earth preset data: which dataset, and whether Greenland and Antarctica use the ice surface or the bedrock beneath it.
