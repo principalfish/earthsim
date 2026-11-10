@@ -4,7 +4,7 @@
 Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`) is `planned`: `issue.md` and `plan.md` (11 pieces) are written and saved, and the GitHub issue is principalfish/earthsim#1. No builder has been started. The user has been given the next-stage briefing for piece 1 and asked whether to start the builder.
 State checks:
 - `git -C /home/philiph/workspace/earth_sim ls-remote --heads origin` lists `main` and `planner`, and no issue branch yet.
-- `python3 ~/.claude/lib/planner.py meta 1` shows state `planned`, `gh_issue` 1.
+- `python3 ~/.claude/lib/planner.py meta 1` shows state `planned`, `gh_issue` 1, `build_model` `claude-opus-5-5`.
 - `git -C /home/philiph/workspace/earth_sim/.planner status --short` is empty.
 If anything differs, stop and tell the user.
 
