@@ -45,10 +45,22 @@ export const BLANK_OCEAN_ELEVATION_M = -4_000;
  * can be added as new variants. Code that depends on the origin should switch
  * on `kind` rather than assume the variants listed here are the only ones.
  */
-export type WorldOrigin = {
-	/** A uniform ocean with no land. */
-	readonly kind: 'blank';
-};
+export type WorldOrigin =
+	| {
+			/** A uniform ocean with no land. */
+			readonly kind: 'blank';
+	  }
+	| {
+			/** Continents shaped by seeded noise. */
+			readonly kind: 'generated';
+			/**
+			 * The seed the continents came from: an integer from 0 to
+			 * 4,294,967,295.
+			 */
+			readonly seed: number;
+			/** The share of the surface that was asked to be land, 0 to 1. */
+			readonly landFraction: number;
+	  };
 
 /**
  * A world's settings and terrain.
