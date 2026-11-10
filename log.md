@@ -4,3 +4,4 @@
 - 2026-11-10 11:12 · add-globe-cubed-sphere-grid-and-elevation-sculpting (0001) · created (build): Add globe, cubed-sphere grid and elevation sculpting
 - 2026-11-10 11:32 · add-globe-cubed-sphere-grid-and-elevation-sculpting (0001) · GitHub issue #1
 - 2026-11-10 11:32 · add-globe-cubed-sphere-grid-and-elevation-sculpting (0001) · investigating → planned
+- 2026-11-10 11:32 · add-globe-cubed-sphere-grid-and-elevation-sculpting (0001) · build_model = claude-opus-5-5
