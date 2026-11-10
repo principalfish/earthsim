@@ -14,7 +14,7 @@ Not included: any climate or time simulation, a flat map view, and changing a wo
 
 ## Plan
 
-_2026-11-10 · 5 of 11 pieces done · now: piece 6 in progress_
+_2026-11-10 · 5 of 11 pieces done · now: waiting on review of piece 6_
 
 - [x] **1/11 Scaffold tooling and app shell** · `b22e81a`
   An npm project with Vite, Vitest, Biome, TypeScript and Three.js, and an empty page.
@@ -26,7 +26,7 @@ _2026-11-10 · 5 of 11 pieces done · now: piece 6 in progress_
   Noise-shaped continents from a seed and a land fraction.
 - [x] **5/11 Globe renderer with relief and view controls** · `21862d7`
   The lit 3D globe tinted by height, with raised relief, sea-level and exaggeration sliders and a grid overlay.
-- [ ] **6/11 Sculpting brushes** · in progress
+- [ ] **6/11 Sculpting brushes** · waiting on you
   Raise, lower and smooth brushes applied on the globe with the mouse.
 - [ ] **7/11 Undo and redo** · not started
   Step back and forward one brush stroke at a time.

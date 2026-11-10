@@ -14,13 +14,13 @@ The design decisions are all in `decisions.md` and carried into `plan.md` Contex
 2. 2026-11-10 — `main` pushed by the user; planner branch pushed with their agreement; GitHub issue created.
 
 ## The pending decision (exact)
-Nothing is pending with the user. Pieces 1 to 5 are committed and pushed (latest `21862d7`). The build was paused on 2026-11-10 before piece 6 wrote anything, then the user said "resume" and that was relayed: the builder is building piece 6 (sculpting brushes) from the beginning with the choices in `decisions.md`, and will stop uncommitted at its review, which has a manual review. Mid-piece the builder asked what the smooth brush's strength should mean; the user answered "Same feel, plain 1 to 100 (Recommended)" and that was relayed (`decisions.md`).
+Piece 6 (sculpting brushes) is built, checked and **uncommitted** in the builder's worktree; the branch head is `21862d7` (piece 5). The builder sent its review request and the user has been given the review briefing. Waiting on the user for the manual review, then diff approval: from `/home/philiph/workspace/earth_sim/.claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` run `npm run dev` (or reload their own dev server, last seen on port 5176), pick Raise, Lower and Smooth in the Tools section, sculpt across a cube corner, and repeat at `?resolution=256`. Things to judge: whether Smooth's default of 50 is the right speed, and responsiveness at 256 with the 3,000 km brush. Relay an approval only when the user's words say they tried it; a round of tuning is likely.
 
 ## What the next session does
-1. Run the state checks; piece 6 should be uncommitted in the builder's worktree, or its review request should be waiting. The branch head is `21862d7` until piece 6 is approved.
-2. `planner.py ingest 1`. When the review request arrives, give the user the review briefing with the manual review first; relay an approval only when their words say they tried it.
-3. After each commit: verify on origin, tick the issue checklist, `gh issue edit 1`, then the next-stage briefing for the following piece. Normal per-piece pauses apply.
-4. If the builder has been idle a while with uncommitted work and no review request, it may have stalled on a process restart: message it to resume.
+1. Run the state checks; `git -C <worktree> status --short` should still show piece 6 uncommitted.
+2. If the user has not answered, show the briefing again (manual review first) and ask.
+3. Relay the user's verdict to the builder, quoting their words: approval ("Commit and push") or the changes asked for.
+4. After the commit: ingest, verify on origin, tick piece 6 on the issue checklist and `gh issue edit 1`, then the next-stage briefing for piece 7 (undo and redo). Normal per-piece pauses apply.
 
 ## Don't
 - Don't build in the planner chat, and don't start a second builder for this issue.
