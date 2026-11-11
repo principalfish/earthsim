@@ -14,9 +14,7 @@ If anything differs, stop and tell the user.
 All design and run decisions are in `decisions.md` (Settled); each piece's as-built details, checks and review-loop outcome are in `plan.md` Notes. The user tried and approved every manual-review piece (5, 6, 9, 10, 11) with "Tried it, approve"; pieces 1 to 4, 7 and 8 ran without review pauses at their request. The implementation model was `claude-fable-5-2` for this issue only.
 
 ## The pending decision (exact)
-No decision is pending. `/review self` is complete (review file `reviews/01-2026-11-11.md`): all 11 findings fixed in `96588b1`; the re-check confirmed them closed and raised three low findings, of which the user carried one (R1+R3, the statistics set-up decision in `src/app/main.ts`) into issue 0002 and accepted two. The branch head is `96588b1`, state `review`. Next step: `/publish add-globe-cubed-sphere-grid-and-elevation-sculpting` when the user asks; then the user merges, which is what issue 0002's build waits for.
-
-Also open, not blocking: whether to widen `.planner/tools/coverage-changed.sh` to include `scripts/`.
+`/publish` is in progress (the user said "Publish 0001" on 2026-11-11). The final PR text is drafted in `pr.md` and saved; it has been shown to the user and is waiting for their approval. Nothing has been put on GitHub yet. On approval: `gh pr edit 2 --title "<pr.md title>" --body "$(tail -n +2 "$FOLDER/pr.md" | sed '1{/^$/d}')"`, then `planner.py set 1 state=ready`, `planner.py log 1 "PR #2 description final"`, update the issue's `## Plan` status line to `PR #2 ready`, save, `gh issue edit 1`, and cut this file down to a pointer. PR 2 is open against `main` from `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` and GitHub reports it as not a draft. Merging is the user's; issue 0002's build waits for that merge.
 
 ## What the next session does
 1. Run the state checks; `planner.py ingest 1`.
