@@ -14,7 +14,7 @@ If the branch head or `meta` differs, stop and tell the user.
 All design decisions are in `decisions.md` (Settled) and `plan.md` (Context and Notes). The ones that shape how the build runs: the implementation model is `claude-fable-5-2` for this issue only; pieces 1 to 4 and 7 to 8 ran without review pauses at the user's request; pieces 5 and 6 were approved after the user tried them ("Tried it, approve"); the build was paused twice at the user's request and resumed each time on "resume".
 
 ## The pending decision (exact)
-Nothing is pending with the user. Next for them: piece 9's manual review and diff approval, when the builder's review request arrives.
+Piece 9 (new-world dialog) is built, checked and **uncommitted** in the builder's worktree; the branch head is `3ec0f59` (piece 8). The builder sent its review request and the user has been given the review briefing. Waiting on the user for the manual review, then diff approval: from the builder's worktree run `npm run dev` (or reload their own dev server, last seen on http://127.0.0.1:5176/); the page opens on a blank ocean with the New world dialog; create blank and generated worlds at 64, 128 and 256, reuse a seed, try a bad seed, and check a new world resets sea level and undo. Not tried by anyone: Firefox. Relay an approval only when the user's words say they tried it.
 
 ## What the next session does
 1. Run the state checks. `planner.py ingest 1`; if it warns that a file changed in both places, merge by hand (edit the record, save, copy the merged file over the builder's copy in `<worktree>/.planner-outbox/issue/`, ingest again).

@@ -14,7 +14,7 @@ Not included: any climate or time simulation, a flat map view, and changing a wo
 
 ## Plan
 
-_2026-11-11 · 8 of 11 pieces done · now: piece 9 in progress_
+_2026-11-11 · 8 of 11 pieces done · now: waiting on review of piece 9_
 
 - [x] **1/11 Scaffold tooling and app shell** · `b22e81a`
   An npm project with Vite, Vitest, Biome, TypeScript and Three.js, and an empty page.
@@ -32,7 +32,7 @@ _2026-11-11 · 8 of 11 pieces done · now: piece 9 in progress_
   Step back and forward one brush stroke at a time.
 - [x] **8/11 Worker compute service and statistics readout** · `3ec0f59`
   The Web Worker channel, proven with live land and height statistics.
-- [ ] **9/11 New-world dialog** · in progress
+- [ ] **9/11 New-world dialog** · waiting on you
   Create a blank or generated world at a chosen resolution.
 - [ ] **10/11 Save, load and autosave** · not started
   Export and import world files, and restore the current world after a refresh.
