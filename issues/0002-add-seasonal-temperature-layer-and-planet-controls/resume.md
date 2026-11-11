@@ -12,7 +12,9 @@ If anything else differs, stop and tell the user.
 Everything is in `decisions.md` (Settled, with the user's words) and carried into `plan.md` Context. Late additions on 2026-11-11: keep all five manual reviews; build on Opus for this issue only; run pieces 1 to 4 without pauses; star mass is a fifth planet control ("Add star mass as a setting"), with year length from Kepler's third law.
 
 ## The pending decision (exact)
-Nothing is pending with the user. The sun was settled on 2026-11-11 and added to `plan.md` as piece 11 (a sunlight toggle off by default; fixed over longitude 0 and moving with the months; look following the star settings), and the builder was told. The builder is running pieces 1 to 4 and stops with the timing table and first Earth error figures; the next thing for the user is the recalculation trigger.
+Nothing is pending with the user. Piece 1 is committed and pushed (`8390675`) on `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa`, and draft PR 4 is open (`meta.pr`). The builder is running pieces 2 to 4 without pauses and stops with the timing table and first Earth error figures; the next thing for the user is the recalculation trigger. The sun is piece 11 of 11.
+
+Carry into the briefings for pieces 4 and 5 (from the builder's look-ahead after piece 1): `isWorldShaped` only checks that planet fields are numbers, so the solver and the worker must run planet values through `normalisePlanet` before computing; a zero star mass would otherwise reach the year-length formula. Also from piece 1: a file with an out-of-range planet setting or a bad date is refused, not clamped, and shows the existing damaged-file message.
 
 ## What the next session does
 1. Run the state checks. `planner.py ingest 2` on every builder message; `list_sessions` with `linked: true` finds the builder.
