@@ -8,6 +8,7 @@
  * is in effect mean sea level.
  */
 
+import type { PinnedFile } from './pinnedFile';
 import { RASTER_PIXEL_IS_AREA, type TiffLayout } from './tiff';
 
 /** Where the file is downloaded from. */
@@ -23,6 +24,14 @@ export const ETOPO_FILE_BYTES = 465_969_062;
 /** The SHA-256 of the file, in lower-case hexadecimal. */
 export const ETOPO_FILE_SHA256 =
 	'9d27d4b8ea8e76977e2988bca667d7c8fa68b927355feffcddd6b4875a7fd08e';
+
+/** The file, as the download knows it. */
+export const ETOPO_FILE: PinnedFile = {
+	url: ETOPO_URL,
+	name: ETOPO_FILE_NAME,
+	bytes: ETOPO_FILE_BYTES,
+	sha256: ETOPO_FILE_SHA256,
+};
 
 /** Pixels across the file: 360° at 60 to the degree. */
 export const ETOPO_WIDTH = 21_600;
@@ -52,81 +61,6 @@ const GEOREFERENCE_TOLERANCE_DEG = 1e-9;
 const near = (actual: number | undefined, expected: number): boolean =>
 	actual !== undefined &&
 	Math.abs(actual - expected) <= GEOREFERENCE_TOLERANCE_DEG;
-
-/**
- * Says what is wrong with a file's SHA-256, if it is not that of the ETOPO
- * file.
- *
- * @param digest - The SHA-256 of a file, in hexadecimal of either case.
- * @returns `null` if it is {@link ETOPO_FILE_SHA256}; otherwise a sentence
- * that says the file is not the one expected, with both digests.
- */
-export const etopoDigestMismatch = (digest: string): string | null =>
-	digest.toLowerCase() === ETOPO_FILE_SHA256
-		? null
-		: `The file does not match the expected NOAA file ${ETOPO_FILE_NAME}: its SHA-256 is ${digest}, expected ${ETOPO_FILE_SHA256}`;
-
-/**
- * Says what is wrong with a download that would come to a given length, if
- * that is more than the ETOPO file has.
- *
- * @remarks
- * Asked before each part of a response is written, this keeps a server that
- * sends more than the file, or never stops sending, from filling the disk:
- * the length and the SHA-256 of what was written can only be checked once
- * the response has ended.
- *
- * @param bytes - The length the file on disk would have, in bytes.
- * @returns `null` if that is within {@link ETOPO_FILE_BYTES}; otherwise a
- * sentence that says the server sent too much.
- */
-export const downloadOverrun = (bytes: number): string | null =>
-	bytes <= ETOPO_FILE_BYTES
-		? null
-		: `The server sent more than the ${ETOPO_FILE_BYTES} bytes of ${ETOPO_FILE_NAME}`;
-
-/** A `Content-Range` in bytes: the first and last byte sent, then the total. */
-const CONTENT_RANGE_PATTERN = /^bytes (\d+)-(\d+)\/(\d+|\*)$/;
-
-/**
- * Says what is wrong with the `Content-Range` of a partial response, if it
- * is not the rest of the ETOPO file from a given byte.
- *
- * @remarks
- * A download that was cut off is carried on by asking for the bytes from
- * where it stopped and adding them to what is there. A server may answer
- * with another part than the one asked for, which added to the file would
- * make it wrong. The part must start at the byte asked for and end within
- * the file, and the length it gives for the whole file must be the file's;
- * a server may leave that length unsaid, as `*`.
- *
- * @param header - The response's `Content-Range`, or `null` if it has none.
- * @param firstByte - The byte the request asked the part to start at.
- * @returns `null` if the part is the one asked for; otherwise a sentence
- * that says what the server sent instead.
- */
-export const contentRangeProblem = (
-	header: string | null,
-	firstByte: number,
-): string | null => {
-	const wanted = `bytes ${firstByte}-${ETOPO_FILE_BYTES - 1}/${ETOPO_FILE_BYTES}`;
-	if (header === null) {
-		return `The server sent part of a file without a Content-Range, expected "${wanted}"`;
-	}
-	const match = CONTENT_RANGE_PATTERN.exec(header.trim());
-	const first = Number(match?.[1]);
-	const last = Number(match?.[2]);
-	const total = match?.[3];
-	const right =
-		match !== null &&
-		first === firstByte &&
-		last >= first &&
-		last < ETOPO_FILE_BYTES &&
-		(total === '*' || Number(total) === ETOPO_FILE_BYTES);
-	return right
-		? null
-		: `The server sent the part "${header}" of a file, expected "${wanted}"`;
-};
 
 /**
  * Checks that a TIFF image is laid out as the ETOPO file is: its size, the

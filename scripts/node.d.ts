@@ -29,6 +29,39 @@ declare module 'node:fs' {
 	/** Writes the whole of `buffer` at the file's current position. */
 	export const writeSync: (fd: number, buffer: Uint8Array) => number;
 	export const writeFileSync: (path: string, data: Uint8Array) => void;
+	export const readFileSync: (path: string) => Uint8Array;
+	/** Makes a new directory whose name is `prefix` and six random characters. */
+	export const mkdtempSync: (prefix: string) => string;
+	export const rmSync: (
+		path: string,
+		options: { readonly recursive: true; readonly force: true },
+	) => void;
+}
+
+declare module 'node:http' {
+	/** A request as the tests' servers read it. */
+	export type IncomingMessage = {
+		readonly headers: Readonly<Record<string, string | string[] | undefined>>;
+	};
+	/** A response as the tests' servers write it. */
+	export type ServerResponse = {
+		writeHead(
+			status: number,
+			headers?: Readonly<Record<string, string>>,
+		): ServerResponse;
+		write(chunk: Uint8Array): boolean;
+		end(chunk?: Uint8Array): ServerResponse;
+	};
+	export type Server = {
+		listen(port: number, host: string, callback: () => void): Server;
+		/** Where the server listens; an object once it is listening on TCP. */
+		address(): { readonly port: number } | string | null;
+		close(callback: () => void): Server;
+		closeAllConnections(): void;
+	};
+	export const createServer: (
+		handler: (request: IncomingMessage, response: ServerResponse) => void,
+	) => Server;
 }
 
 declare module 'node:zlib' {
@@ -79,6 +112,11 @@ interface ImportMeta {
 	/** The `file:` URL of the module. */
 	readonly url: string;
 }
+
+/** Decodes UTF-8, putting U+FFFD in place of any byte that is not valid. */
+declare const TextDecoder: new () => {
+	decode(input: Uint8Array): string;
+};
 
 /** A response to {@link fetch}, as far as the scripts read one. */
 type ScriptResponse = {

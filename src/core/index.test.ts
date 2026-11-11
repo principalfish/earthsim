@@ -32,4 +32,18 @@ describe('core', () => {
 			expect(core, name).toHaveProperty(name);
 		}
 	});
+
+	it('exports the observed temperature and its regridding', () => {
+		for (const name of [
+			'OBSERVED_BYTES',
+			'OBSERVED_ROWS',
+			'OBSERVED_COLUMNS',
+			'decodeObservedTemperature',
+			'encodeObservedTemperature',
+			'observedTemperature',
+			'observedTemperatureAt',
+		]) {
+			expect(core, name).toHaveProperty(name);
+		}
+	});
 });

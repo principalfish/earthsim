@@ -55,12 +55,14 @@ Requires Node.js and npm. Run `npm install` once, then:
 - `npm run check`: lint and check formatting with Biome.
 - `npm run typecheck`: type-check every part of the source.
 - `npm run build:earth`: rebuild the Earth's elevation data from its source; see [Data](#data).
+- `npm run build:observed-temperature`: rebuild the Earth's observed temperature data from its source; see [Data](#data).
 
 ### Layout
 
 - `src/core/`: the simulation as a pure library, with no DOM, Three.js or worker globals.
   - `src/core/serialize.ts`: the world file format, and the checks a file must pass to be read as a world.
   - `src/core/earth.ts`: reading the Earth data file, and the Earth as a world at each resolution.
+  - `src/core/observed.ts`: reading the observed temperature file, and taking it onto a world's cells.
 - `src/app/`: the page, which imports the core.
   - `src/app/main.ts`: makes the parts of the page from the document, the globe, the worker and the browser's storage, and hands them over to be joined.
   - `src/app/wiring.ts`: joins the parts of the page together: which part hears of what, and in which order.
@@ -80,9 +82,12 @@ Requires Node.js and npm. Run `npm install` once, then:
   - `src/worker/handle.ts`: the message handler, a plain function that answers one request.
   - `src/worker/client.ts`: the page's side of the channel, which runs on the main thread.
 - `public/data/earth-256.bin`: the Earth's elevation, served beside the page as it is.
+- `public/data/earth-temperature-1deg.bin`: the Earth's observed monthly temperature, served the same way.
 - `scripts/`: what builds the data, run with Node rather than in the browser.
   - `scripts/build-earth-data.ts`: downloads the source and writes `public/data/earth-256.bin`.
-  - `scripts/earth/`: the parts of that script that touch no file: what the source file must be and the checks on its download, reading its TIFF format, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data file for the tests.
+  - `scripts/build-observed-temperature.ts`: downloads the source and writes `public/data/earth-temperature-1deg.bin`.
+  - `scripts/download.ts`: downloads a source file into `.cache/` once, checked against the length and SHA-256 pinned for it.
+  - `scripts/earth/`: the parts of those scripts that touch no file: what each source file must be and the checks on its download, reading the TIFF and netCDF formats, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data files for the tests, and `testing/` writes small netCDF files for them.
   - `scripts/run-with-vite.mjs`: runs a TypeScript script through Vite, so that it can import the core.
 
 The core is compiled without the DOM type library, and the worker and its handler with the worker's in place of it, so a `document` or `window` reference in either fails `npm run typecheck`. The project does not depend on Node's type package either, so nothing under `src/` can use a Node API; the scripts are type-checked against the few Node functions they call, declared by hand in `scripts/node.d.ts`.
@@ -101,3 +106,19 @@ It is derived from NOAA's ETOPO 2022 global relief model:
 To rebuild the file, run `npm run build:earth`. It downloads the GeoTIFF, about 466 MB, into `.cache/etopo/`, which is not committed, and reuses it from there afterwards; a download that was cut off carries on where it stopped, and one that would grow past the file's length is stopped and deleted. Each pixel goes to the cell that holds its centre and counts in that cell's mean by its area. The build takes about 40 seconds once the file is there, and gives the same bytes every time.
 
 The script reads the GeoTIFF with its own small reader rather than a library. `npm run build:earth -- --verify-with-gdal` first compares what that reader gives with what [GDAL](https://gdal.org/)'s `gdallocationinfo` gives at about 2,400 pixels (the corners, the edges, the corners where tiles meet, and pixels at random) and stops if any differs; without GDAL installed it says so and carries on. When the file in this repository was built, on 2026-11-11 with GDAL 3.12.2, those pixels matched bit for bit, as did all 233,280,000 pixels in a separate comparison with the whole image as `gdal_translate` decodes it. The cell means were also worked out a second time from GDAL's copy of the image, with separate code: 392,815 cells came out the same to the metre, 3 differed by the rounding of a mean that ends in a half, and 398 lie beside lines between cells that the centres of whole columns of pixels fall exactly on, where rounding decides which cell a pixel goes to; none of those differed by more than 15 m.
+
+### Observed temperature
+
+`public/data/earth-temperature-1deg.bin` holds the Earth's observed temperature, for comparing the simulated one with: the mean air temperature 2 m above the ground or the sea for each month, January to December, averaged over 1981 to 2010. It keeps the source's own grid of points one degree apart, 181 latitudes from 90° N to 90° S and 360 longitudes eastward from 0°, and the core interpolates it onto a world's cells when needed. Each value is one unsigned byte `b` standing for `-80 + 0.5 × b` °C, so the file holds -80 to 47.5 °C in half-degree steps; the source runs from -53.7 to 41.4 °C. The bytes run month by month, then row by row from the north, then column by column from 0° E, with no header (12 × 181 × 360 = 781,920 bytes). Storing a value moves it by at most a quarter of a degree, and the build script stops rather than write a value outside the range.
+
+It is derived from NOAA's Twentieth Century Reanalysis:
+
+- **Product**: NOAA/CIRES/DOE 20th Century Reanalysis (V3), the long-term monthly means of 2 m air temperature (variable `air`, in kelvin, the mean of the 80 ensemble members), as the netCDF-3 file `air.2m.mon.ltm.nc` from <https://downloads.psl.noaa.gov/Datasets/20thC_ReanV3/Derived/Monthlies/2mSI-MO/>. The file is 4,699,840 bytes and its SHA-256 is `38ae70640e246a1e90c1a0bca5a7032bdb20a8431a107f30fd1823409b3a57db`; the build script checks both, at every run, and deletes a file whose SHA-256 differs. Its rows run from the South Pole to the North Pole; the build turns them over.
+- **Caveat**: the reanalysis assimilates only surface pressure observations, with the sea surface temperature and sea ice prescribed, so its temperatures over land are less tightly tied to measurements than those of reanalyses that also assimilate temperatures.
+- **Licence**, as stated in the dataset's record at NOAA PSL, read on 2026-11-11: "These data were produced by NOAA and are not subject to copyright protection in the United States. NOAA waives any potential copyright and related rights in these data worldwide through the Creative Commons Zero 1.0 Universal Public Domain Dedication (CC0-1.0)".
+- **Acknowledgement**, as NOAA asks: data provided by the NOAA PSL, Boulder, Colorado, USA, from their website at <https://psl.noaa.gov>. For papers NOAA also asks for: "Support for the Twentieth Century Reanalysis Project version 3 dataset is provided by the U.S. Department of Energy, Office of Science Biological and Environmental Research (BER), by the National Oceanic and Atmospheric Administration Climate Program Office, and by the NOAA Earth System Research Laboratory Physical Sciences Laboratory."
+- **Reference**: Slivinski, L. C., Compo, G. P., Whitaker, J. S., Sardeshmukh, P. D., et al. (2019), Towards a more reliable historical reanalysis: Improvements for version 3 of the Twentieth Century Reanalysis system. Q J R Meteorol Soc, 145, 2876–2908. https://doi.org/10.1002/qj.3598 .
+
+To rebuild the file, run `npm run build:observed-temperature`. It downloads the source, about 4.7 MB, into `.cache/observed/`, which is not committed, and reuses it from there afterwards, with the same checks on the download as the elevation build. It takes about a second once the file is there, and gives the same bytes every time.
+
+The script reads the netCDF file with its own small reader rather than a library. `npm run build:observed-temperature -- --verify-with-gdal` first compares what that reader gives with what GDAL's `gdallocationinfo` gives at about 2,200 points, every month at each, both with the file's rows as they are and turned north side up, and stops if any differs; without GDAL installed it says so and carries on. When the file in this repository was built, on 2026-11-11 with GDAL 3.12.2, those values matched bit for bit, as did all 781,920 values in a separate comparison with the whole variable as `gdal_translate` decodes it.
