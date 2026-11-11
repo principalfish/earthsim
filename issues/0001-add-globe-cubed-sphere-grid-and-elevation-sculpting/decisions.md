@@ -39,6 +39,7 @@
 - Piece 10: once a saved world exists the page restores it straight away with the dialog closed; with nothing saved it opens on a blank ocean with the dialog, as piece 9 built ("Restore it straight away"). (2026-11-11)
 - Piece 10 saves the world only, in both the exported file and the autosave: terrain, resolution, sea level and how it started. Not the undo history, camera, relief exaggeration, grid toggle or tool settings ("The world only"). (2026-11-11)
 - Piece 10: importing a file replaces the open world with no confirmation ("No confirmation"). (2026-11-11)
+- Piece 10 approved after the user tried saving and importing ("Tried it, approve"), with no changes asked for. (2026-11-11)
 
 ## Open
 
