@@ -307,6 +307,12 @@ export type NewWorldDialogOptions = {
 	 * edited. The dialog closes afterwards, whether or not this throws.
 	 */
 	readonly onWorld: (world: World) => void;
+	/**
+	 * What went wrong that the dialog is opening because of, said under the
+	 * title as plain text for as long as the dialog is open. Left out,
+	 * nothing is said.
+	 */
+	readonly notice?: string;
 	/** Where the dialog is added to the page; the body by default. */
 	readonly parent?: HTMLElement;
 };
@@ -693,8 +699,14 @@ export const openNewWorldDialog = (
 	});
 	dialog.addEventListener('close', () => dialog.remove());
 
+	form.append(title);
+	if (options.notice !== undefined) {
+		const notice = createElement('p', 'dialog__error');
+		notice.setAttribute('role', 'alert');
+		notice.textContent = options.notice;
+		form.append(notice);
+	}
 	form.append(
-		title,
 		resolution.element,
 		kind.element,
 		generated,

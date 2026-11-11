@@ -237,6 +237,29 @@ body {
   overflow-wrap: anywhere;
 }
 
+.world-status {
+  --world-status-line-height: 1.4;
+
+  font-size: var(--font-size-sm);
+  line-height: var(--world-status-line-height);
+}
+
+.world-status__message,
+.world-status__autosave {
+  margin: 0;
+}
+
+.world-status__message {
+  color: var(--color-danger);
+}
+
+/* Room for its one line is kept while it is empty, so that the panel below
+   does not move when the first save is reported. */
+.world-status__autosave {
+  min-height: calc(var(--world-status-line-height) * 1em);
+  color: var(--color-text-muted);
+}
+
 .tool-picker {
   min-width: 0;
   margin: 0;
@@ -294,6 +317,10 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-sm);
+}
+
+.button-row--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .button {

@@ -5,6 +5,8 @@ import {
 	DEFAULT_SEA_LEVEL_M,
 	generateWorld,
 	type History,
+	MAX_ELEVATION_M,
+	MIN_ELEVATION_M,
 	normaliseSeaLevel,
 	type World,
 } from '../core/index';
@@ -324,5 +326,138 @@ describe('replaceWorld', () => {
 		state2.replaceWorld(next);
 		state2.replaceWorld(other);
 		expect(state2.world).toBe(other);
+	});
+});
+
+describe('replaceWorld keeping the sea level', () => {
+	/** The range of a sea-level control narrower than the elevations. */
+	const RANGE = { minM: -6000, maxM: 6000 };
+
+	it('keeps the sea level the world comes with', () => {
+		const state = createAppState({
+			world: createBlankWorld(64),
+			seaLevelRange: RANGE,
+		});
+		const seen: number[] = [];
+		state.addListener((world) => seen.push(world.seaLevel));
+		for (const metres of [0, 250, -1200, 6000, -6000, 0.1]) {
+			const next = generateWorld({ seed: 7, landFraction: 0.3 });
+			next.seaLevel = normaliseSeaLevel(metres);
+			state.replaceWorld(next, { keepSeaLevel: true });
+			expect(state.world).toBe(next);
+			expect(next.seaLevel).toBe(normaliseSeaLevel(metres));
+			// Already settled by the time anything is told.
+			expect(seen.at(-1)).toBe(normaliseSeaLevel(metres));
+		}
+	});
+
+	it('brings a sea level outside the range to its nearer end', () => {
+		const state = createAppState({
+			world: createBlankWorld(64),
+			seaLevelRange: RANGE,
+		});
+		const kept = (metres: number): number => {
+			const next = createBlankWorld(64);
+			next.seaLevel = metres;
+			state.replaceWorld(next, { keepSeaLevel: true });
+			return state.world.seaLevel;
+		};
+		expect(kept(6000.5)).toBe(6000);
+		expect(kept(MAX_ELEVATION_M)).toBe(6000);
+		expect(kept(Infinity)).toBe(6000);
+		expect(kept(-6010)).toBe(-6000);
+		expect(kept(MIN_ELEVATION_M)).toBe(-6000);
+		expect(kept(-Infinity)).toBe(-6000);
+	});
+
+	it('stores the kept sea level in single precision', () => {
+		const state = createAppState({
+			world: createBlankWorld(64),
+			seaLevelRange: RANGE,
+		});
+		const next = createBlankWorld(64);
+		next.seaLevel = 123.456789;
+		state.replaceWorld(next, { keepSeaLevel: true });
+		expect(next.seaLevel).toBe(Math.fround(123.456789));
+	});
+
+	it('keeps any sea level within the elevation limits when given no range', () => {
+		const state = createAppState({ world: createBlankWorld(64) });
+		const kept = (metres: number): number => {
+			const next = createBlankWorld(64);
+			next.seaLevel = metres;
+			state.replaceWorld(next, { keepSeaLevel: true });
+			return state.world.seaLevel;
+		};
+		expect(kept(9000)).toBe(9000);
+		expect(kept(-11_000)).toBe(-11_000);
+		expect(kept(20_000)).toBe(MAX_ELEVATION_M);
+		expect(kept(-20_000)).toBe(MIN_ELEVATION_M);
+	});
+
+	it('resets the sea level unless asked to keep it', () => {
+		const state = createAppState({
+			world: createBlankWorld(64),
+			seaLevelRange: RANGE,
+		});
+		for (const options of [undefined, {}, { keepSeaLevel: false }]) {
+			const next = createBlankWorld(64);
+			next.seaLevel = normaliseSeaLevel(300);
+			state.replaceWorld(next, options);
+			expect(next.seaLevel).toBe(DEFAULT_SEA_LEVEL_M);
+		}
+	});
+
+	it('clears the history and tells every listener, as any replacement does', () => {
+		const first = createBlankWorld(64);
+		const stage = createStage(first);
+		const calls: World[] = [];
+		const state = createAppState({
+			world: first,
+			listeners: [stage.edits.setWorld, (world) => calls.push(world)],
+			seaLevelRange: RANGE,
+		});
+		stroke(first, stage.edits, 10);
+
+		const next = createBlankWorld(128);
+		next.seaLevel = normaliseSeaLevel(450);
+		state.replaceWorld(next, { keepSeaLevel: true });
+		expect(stage.edits.state).toEqual({ canUndo: false, canRedo: false });
+		expect(calls).toEqual([next]);
+		expect(next.seaLevel).toBe(450);
+	});
+
+	it('refuses a sea level that is not a number, changing nothing', () => {
+		const first = createBlankWorld(64);
+		const calls: World[] = [];
+		const state = createAppState({
+			world: first,
+			listeners: [(world) => calls.push(world)],
+			seaLevelRange: RANGE,
+		});
+		const next = createBlankWorld(128);
+		next.seaLevel = Number.NaN;
+		expect(() => state.replaceWorld(next, { keepSeaLevel: true })).toThrow(
+			RangeError,
+		);
+		expect(state.world).toBe(first);
+		expect(next.seaLevel).toBeNaN();
+		expect(calls).toEqual([]);
+	});
+
+	it('refuses a range whose lowest level is not at or below its highest', () => {
+		const world = createBlankWorld(64);
+		for (const seaLevelRange of [
+			{ minM: 1, maxM: 0 },
+			{ minM: Number.NaN, maxM: 0 },
+			{ minM: 0, maxM: Number.NaN },
+		]) {
+			expect(() => createAppState({ world, seaLevelRange })).toThrow(
+				RangeError,
+			);
+		}
+		expect(() =>
+			createAppState({ world, seaLevelRange: { minM: 0, maxM: 0 } }),
+		).not.toThrow();
 	});
 });
