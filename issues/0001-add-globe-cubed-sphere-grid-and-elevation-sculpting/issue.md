@@ -14,7 +14,7 @@ Not included: any climate or time simulation, a flat map view, and changing a wo
 
 ## Plan
 
-_2026-11-11 · 11 of 11 pieces done · now: all done, in review; self review complete_
+_2026-11-11 · 11 of 11 pieces done · now: PR #2 ready_
 
 - [x] **1/11 Scaffold tooling and app shell** · `b22e81a`
   An npm project with Vite, Vitest, Biome, TypeScript and Three.js, and an empty page.
