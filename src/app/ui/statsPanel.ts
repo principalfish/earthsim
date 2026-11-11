@@ -21,14 +21,20 @@ export type StatsPanel = {
 	readonly element: HTMLElement;
 	/**
 	 * Shows statistics in place of whatever the readout showed before.
-	 * They stay on the page until the next call of either method.
+	 * They stay on the page until the next call of any method.
 	 */
 	show(stats: TerrainStats): void;
 	/** Says in place of the figures that there are no statistics to show. */
 	showUnavailable(): void;
+	/**
+	 * Puts the readout back to saying that statistics are being calculated,
+	 * as it does at first: {@link STATS_PENDING_TEXT} in place of the
+	 * figures, and the note hidden.
+	 */
+	showPending(): void;
 };
 
-/** What the readout says until the first statistics arrive. */
+/** What the readout says while it has no statistics for its world yet. */
 export const STATS_PENDING_TEXT = 'Calculating…';
 
 /** What the readout says when statistics cannot be computed. */
@@ -107,7 +113,8 @@ export const statsFigures = (stats: TerrainStats): StatsFigure[] =>
  * @remarks
  * The readout starts by saying that statistics are being calculated. Once
  * it has figures they stay on the page, unchanged, until others replace
- * them, so nothing flickers while newer ones are computed.
+ * them, so nothing flickers while newer ones are computed. Only
+ * `showPending` and `showUnavailable` take them away.
  *
  * What changes is in a polite live region: a screen reader announces new
  * figures and the loss of them when it is next idle, without the focus
@@ -148,6 +155,15 @@ export const createStatsPanel = (panel: HTMLElement): StatsPanel => {
 	section.append(heading, region, note);
 	panel.append(section);
 
+	/** Says something in place of the figures, with the note hidden. */
+	const showStatus = (text: string): void => {
+		status.textContent = text;
+		if (status.parentNode !== region) {
+			region.replaceChildren(status);
+			note.hidden = true;
+		}
+	};
+
 	return {
 		element: section,
 		show: (stats) => {
@@ -162,12 +178,7 @@ export const createStatsPanel = (panel: HTMLElement): StatsPanel => {
 				note.hidden = false;
 			}
 		},
-		showUnavailable: () => {
-			status.textContent = STATS_UNAVAILABLE_TEXT;
-			if (status.parentNode !== region) {
-				region.replaceChildren(status);
-				note.hidden = true;
-			}
-		},
+		showUnavailable: () => showStatus(STATS_UNAVAILABLE_TEXT),
+		showPending: () => showStatus(STATS_PENDING_TEXT),
 	};
 };

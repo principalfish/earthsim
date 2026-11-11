@@ -10,7 +10,12 @@ import {
 	MIN_DRAWN_SEA_LEVEL_M,
 	MIN_EXAGGERATION,
 } from '../globe/material';
-import { createCheckField, createElement, createRangeField } from './fields';
+import {
+	createCheckField,
+	createElement,
+	createRangeField,
+	type RangeScale,
+} from './fields';
 
 /** The step between sea levels the slider can be set to, in metres. */
 export const SEA_LEVEL_SLIDER_STEP_M = 10;
@@ -29,6 +34,22 @@ export type ViewPanelOptions = {
 	readonly onSeaLevel: (metres: number) => void;
 	/** Called when the grid checkbox is ticked or cleared. */
 	readonly onGridVisible: (visible: boolean) => void;
+};
+
+/** The view controls on the page. */
+export type ViewPanel = {
+	/** The section that holds the controls. */
+	readonly element: HTMLElement;
+	/**
+	 * Moves the sea-level slider and rewrites the level beside its label,
+	 * for a sea level that changed without the slider. `onSeaLevel` is not
+	 * called.
+	 *
+	 * @param metres - The level to show, in metres against the datum: one
+	 * the slider can be set to, a whole number of
+	 * {@link SEA_LEVEL_SLIDER_STEP_M} within the drawn range.
+	 */
+	setSeaLevel(metres: number): void;
 };
 
 /**
@@ -55,15 +76,29 @@ export const formatMetres = (metres: number): string => {
  *
  * @param panel - The panel to add the controls to, after what it holds.
  * @param options - The starting values and the callbacks for changes.
- * @returns The section that was added.
+ * @returns The controls that were added.
  */
 export const createViewPanel = (
 	panel: HTMLElement,
 	options: ViewPanelOptions,
-): HTMLElement => {
+): ViewPanel => {
 	const section = createElement('section', 'panel__section');
 	const heading = createElement('h2', 'panel__heading');
 	heading.textContent = 'View';
+
+	const seaLevelScale = (metres: number): RangeScale => ({
+		min: MIN_DRAWN_SEA_LEVEL_M,
+		max: MAX_DRAWN_SEA_LEVEL_M,
+		step: SEA_LEVEL_SLIDER_STEP_M,
+		value: metres,
+		format: formatMetres,
+	});
+	const seaLevel = createRangeField({
+		id: 'view-sea-level',
+		label: 'Sea level',
+		...seaLevelScale(options.seaLevel),
+		onInput: options.onSeaLevel,
+	});
 
 	section.append(
 		heading,
@@ -77,16 +112,7 @@ export const createViewPanel = (
 			format: formatExaggeration,
 			onInput: options.onExaggeration,
 		}).element,
-		createRangeField({
-			id: 'view-sea-level',
-			label: 'Sea level',
-			min: MIN_DRAWN_SEA_LEVEL_M,
-			max: MAX_DRAWN_SEA_LEVEL_M,
-			step: SEA_LEVEL_SLIDER_STEP_M,
-			value: options.seaLevel,
-			format: formatMetres,
-			onInput: options.onSeaLevel,
-		}).element,
+		seaLevel.element,
 		createCheckField({
 			id: 'view-grid',
 			label: 'Show cell grid',
@@ -95,5 +121,8 @@ export const createViewPanel = (
 		}),
 	);
 	panel.append(section);
-	return section;
+	return {
+		element: section,
+		setSeaLevel: (metres) => seaLevel.setScale(seaLevelScale(metres)),
+	};
 };

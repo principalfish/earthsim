@@ -54,6 +54,14 @@ import {
 	TOOLS,
 } from './sculpt';
 
+/**
+ * Time allowed for the test that simulates whole seconds of smoothing on the
+ * finest grid at several frame rates. It takes over a second, and several
+ * times that under coverage instrumentation, which is too near the default
+ * five seconds.
+ */
+const SIMULATED_SECONDS_TIMEOUT_MS = 60_000;
+
 /** What a held smoothing brush is simulated with. */
 type HeldSmoothing = {
 	readonly direction: Vec3;
@@ -891,46 +899,50 @@ describe('sculptFrame', () => {
 		);
 	});
 
-	it('smooths as much in a second whatever the frame rate', () => {
-		// The terrains left by 30, 60 and 144 frames a second, compared by
-		// the largest difference between any two as a share of the largest
-		// change the smoothing made. Measured at the default setting and
-		// the strongest: 0.13% and 0.58% at 64 cells, 0.07% and 0.01% at 256.
-		const direction = latLonToDirection(20, 10);
-		for (const [resolution, radiusKm, smoothSetting] of [
-			[64, 3000, DEFAULT_SMOOTH_SETTING],
-			[64, 3000, MAX_SMOOTH_SETTING],
-			[256, 1500, DEFAULT_SMOOTH_SETTING],
-			[256, 1500, MAX_SMOOTH_SETTING],
-		] as const) {
-			const tolerance = 0.01;
-			const create = (): World => {
-				const world = createBlankWorld(resolution);
-				applyDab(world, {
-					direction,
-					radiusKm: 600,
-					strength: 4000,
-					mode: 'raise',
-				});
-				return world;
-			};
-			const start = create().elevation;
-			const [slow, usual, fast] = [30, 60, 144].map((framesPerSecond) => {
-				const world = create();
-				holdSmoothing(world, {
-					direction,
-					radiusKm,
-					smoothSetting,
-					seconds: 1,
-					framesPerSecond,
-				});
-				return world.elevation;
-			}) as [Float32Array, Float32Array, Float32Array];
-			const done = farthestApart(start, usual);
-			expect(done).toBeGreaterThan(200);
-			expect(farthestApart(slow, usual)).toBeLessThan(tolerance * done);
-			expect(farthestApart(usual, fast)).toBeLessThan(tolerance * done);
-			expect(farthestApart(slow, fast)).toBeLessThan(tolerance * done);
-		}
-	});
+	it(
+		'smooths as much in a second whatever the frame rate',
+		() => {
+			// The terrains left by 30, 60 and 144 frames a second, compared by
+			// the largest difference between any two as a share of the largest
+			// change the smoothing made. Measured at the default setting and
+			// the strongest: 0.13% and 0.58% at 64 cells, 0.07% and 0.01% at 256.
+			const direction = latLonToDirection(20, 10);
+			for (const [resolution, radiusKm, smoothSetting] of [
+				[64, 3000, DEFAULT_SMOOTH_SETTING],
+				[64, 3000, MAX_SMOOTH_SETTING],
+				[256, 1500, DEFAULT_SMOOTH_SETTING],
+				[256, 1500, MAX_SMOOTH_SETTING],
+			] as const) {
+				const tolerance = 0.01;
+				const create = (): World => {
+					const world = createBlankWorld(resolution);
+					applyDab(world, {
+						direction,
+						radiusKm: 600,
+						strength: 4000,
+						mode: 'raise',
+					});
+					return world;
+				};
+				const start = create().elevation;
+				const [slow, usual, fast] = [30, 60, 144].map((framesPerSecond) => {
+					const world = create();
+					holdSmoothing(world, {
+						direction,
+						radiusKm,
+						smoothSetting,
+						seconds: 1,
+						framesPerSecond,
+					});
+					return world.elevation;
+				}) as [Float32Array, Float32Array, Float32Array];
+				const done = farthestApart(start, usual);
+				expect(done).toBeGreaterThan(200);
+				expect(farthestApart(slow, usual)).toBeLessThan(tolerance * done);
+				expect(farthestApart(usual, fast)).toBeLessThan(tolerance * done);
+				expect(farthestApart(slow, fast)).toBeLessThan(tolerance * done);
+			}
+		},
+		SIMULATED_SECONDS_TIMEOUT_MS,
+	);
 });

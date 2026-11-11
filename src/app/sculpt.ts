@@ -609,6 +609,12 @@ export type SculptController = {
 	 */
 	setWorld(world: World): void;
 	/**
+	 * Ends a stroke under way and records it, calling `onStrokeEnd` as any
+	 * end of a stroke does, without a final dab. Does nothing when no stroke
+	 * is under way.
+	 */
+	endStroke(): void;
+	/**
 	 * Whether a stroke is under way: from the press of the main button with
 	 * a brush chosen until the stroke ends. Already false by the time
 	 * `onStrokeEnd` is called.
@@ -848,6 +854,7 @@ export const createSculptController = (
 			showBrush();
 			options.onWorldChange?.(next);
 		},
+		endStroke,
 		isStrokeActive: () => stroke !== null,
 		dispose: () => {
 			endStroke();

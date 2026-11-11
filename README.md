@@ -4,6 +4,17 @@ Browser-based planet simulator for worldbuilding: draw continents and plates, th
 
 ## Using the page
 
+The page opens on a blank ocean, with the New world dialog showing. Pressing **Create world** as it stands gives generated continents on the coarsest grid, from a seed chosen at random, with 30% land; **Cancel** keeps the blank ocean. The **New world** button at the top of the panel brings the dialog back at any time, filled in with the options of the current world. It offers:
+
+- **Resolution**: 64, 128 or 256 cells along each edge of a cube face, which makes cells of about 150, 75 or 40 km.
+- **Start with**: a blank ocean, or generated continents.
+- **Seed**, for generated continents: a whole number from 0 to 4294967295. The same seed and land always give the same continents, and the same seed at another resolution gives the same continents on a finer or coarser grid. Leave the field blank for a seed chosen at random, or press **Random** to fill one in.
+- **Land**, for generated continents: the share of the surface to make land, from 0 to 100%.
+
+The line under the World heading says how the current world started, such as `Generated · 64 · seed 1977 · 30% land` or `Blank ocean · 128`: the resolution, then the seed and the land. To get a world back, type its seed into the dialog and set the same land.
+
+A new world replaces the current one, and the old one cannot be brought back: its strokes are no longer there to undo. The sea level returns to 0 m. The camera, the relief exaggeration, the grid setting and the tool settings stay as they were. Generating the finest grid takes about half a second, during which the button says "Generating…" and the page does not respond; it cannot be cancelled once started.
+
 The Tools panel chooses what the left mouse button does on the globe:
 
 - **Move**: left-drag turns the globe and the wheel zooms.
@@ -16,9 +27,9 @@ The Undo and Redo buttons at the top of the Tools panel step back and forward th
 - **Undo**: Ctrl+Z, or Cmd+Z on a Mac.
 - **Redo**: Ctrl+Shift+Z or Ctrl+Y, or Cmd+Shift+Z on a Mac.
 
-Up to the last 100 strokes can be undone, or fewer once they hold about 64 MB between them, which takes very long strokes on a fine grid. Making a new stroke after an undo discards what could have been redone. The keys do nothing while a stroke is being made or while typing in a text field. Only the terrain is put back: the sea level, the view settings and the tool settings are not part of the history.
+Up to the last 100 strokes can be undone, or fewer once they hold about 64 MB between them, which takes very long strokes on a fine grid. Making a new stroke after an undo discards what could have been redone. The keys do nothing while a stroke is being made, while typing in a text field or while the New world dialog is open. Only the terrain is put back: the sea level, the view settings and the tool settings are not part of the history.
 
-The Statistics readout at the bottom of the panel shows how much of the surface is land, the highest and deepest points, the mean height of the land and the mean depth of the ocean. It follows the terrain and the sea level, a moment after each stroke, undo, redo or move of the Sea level slider. Until the first figures arrive it says "Calculating…", and if the worker that computes them cannot be started or fails it says "Statistics unavailable" and hides the figures, while the rest of the page keeps working. The highest and deepest points are elevations on the scale of the Sea level slider; the two means are measured from the sea level.
+The Statistics readout at the bottom of the panel shows how much of the surface is land, the highest and deepest points, the mean height of the land and the mean depth of the ocean. It follows the terrain and the sea level, a moment after each stroke, undo, redo or move of the Sea level slider. Until the first figures arrive, and again after a new world is made, it says "Calculating…", and if the worker that computes them cannot be started or fails it says "Statistics unavailable" and hides the figures, while the rest of the page keeps working. The highest and deepest points are elevations on the scale of the Sea level slider; the two means are measured from the sea level.
 
 ## Development
 
@@ -30,17 +41,17 @@ Requires Node.js and npm. Run `npm install` once, then:
 - `npm run check`: lint and check formatting with Biome.
 - `npm run typecheck`: type-check every part of the source.
 
-The page opens on a generated world with 64 cells per cube face, seed 1977 and 30% land. The address can choose another: `?resolution=64|128|256&seed=<whole number>&land=<0 to 1>`, where the seed is from 0 to 4294967295 and `land` is the share of the surface to make land. A parameter that is missing or not valid falls back to its default.
-
 ### Layout
 
 - `src/core/`: the simulation as a pure library, with no DOM, Three.js or worker globals.
 - `src/app/`: the page, which imports the core.
+  - `src/app/main.ts`: joins the parts of the page together.
+  - `src/app/appState.ts`: the world being edited, and the one way of replacing it.
   - `src/app/sculpt.ts`: sculpting with the mouse, which turns the cursor's path into dabs of a brush.
   - `src/app/undo.ts`: undo and redo of strokes, and the keys that ask for them.
   - `src/app/refresh.ts`: when to ask the worker again after the world changes.
   - `src/app/globe/`: the globe's renderer, shaders, camera and picking.
-  - `src/app/ui/`: the panels of controls.
+  - `src/app/ui/`: the panels of controls and the New world dialog.
 - `src/worker/`: the Web Worker that computes from a copy of the world and keeps nothing between requests.
   - `src/worker/sim.worker.ts`: the worker itself, which only passes messages to the handler.
   - `src/worker/handle.ts`: the message handler, a plain function that answers one request.
