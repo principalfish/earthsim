@@ -1,12 +1,12 @@
 # Resume point — read this first
 
 ## Where we are
-Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`), state `building`. Pieces 1 to 8 of 11 are committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, latest `3ec0f59`. The user settled piece 9's choices (`decisions.md`, `plan.md` Notes) and said "Start it" on 2026-11-11: the builder is building piece 9 (new-world dialog) and will stop uncommitted at its review, which has a manual review. Pieces 10 (save, load and autosave) and 11 (Earth preset) are not started. GitHub: issue principalfish/earthsim#1 carries the plan checklist; draft PR 2 is open; `main` is still `ffed15a` and nothing is merged.
+Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`), state `building`. Pieces 1 to 9 of 11 are committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, latest `f9aba12`. Pieces 10 (save, load and autosave) and 11 (Earth preset) are not started; the builder is waiting for the user's choices and go-ahead for piece 10. GitHub: issue principalfish/earthsim#1 carries the plan checklist; draft PR 2 is open; `main` is still `ffed15a` and nothing is merged.
 
 State checks (run from `/home/philiph/workspace/earth_sim`):
-- `git log --oneline -1 claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` shows `3ec0f59 … piece 8/11: add worker and statistics readout` until piece 9 is approved, and `git ls-remote --heads origin` shows the same SHA.
+- `git log --oneline -1 claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` shows `f9aba12 … piece 9/11: add new-world dialog` until piece 10 is approved, and `git ls-remote --heads origin` shows the same SHA.
 - `python3 ~/.claude/lib/planner.py meta 1` shows state `building`, `gh_issue` 1, `pr` 2, `build_model` `claude-fable-5-2`.
-- `git -C .claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9 status --short` shows piece 9's uncommitted files while it is being built or awaiting review.
+- `git -C .claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9 status --short` prints nothing until piece 10 is being built; then piece 10's uncommitted files.
 - `git -C .planner status --short` is empty.
 If the branch head or `meta` differs, stop and tell the user.
 

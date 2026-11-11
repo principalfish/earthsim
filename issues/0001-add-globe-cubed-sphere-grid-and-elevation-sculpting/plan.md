@@ -141,7 +141,7 @@ earth_sim is a browser-based planet simulator for worldbuilding. The repo holds 
    - Manual review: the new-world flow. Run `npm run dev`, then create a blank world and a generated one at each resolution, reuse a seed to confirm it reproduces, and cancel once to confirm nothing changes.
 
 10. Save, load and autosave
-    - Files: `src/core/serialize.ts`, `src/core/serialize.test.ts`, `src/app/storage.ts`, `src/app/storage.test.ts`, `src/app/ui/worldPanel.ts`, `src/app/main.ts`
+    - Files: `src/core/serialize.ts`, `src/core/serialize.test.ts`, `src/core/index.ts`, `src/app/storage.ts`, `src/app/storage.test.ts`, `src/app/appState.ts`, `src/app/appState.test.ts`, `src/app/ui/worldPanel.ts`, `src/app/main.ts`, `src/app/styles.css`, `README.md` (and the tests beside any of these)
     - What: a versioned single-file format (a short magic marker, a format version, a JSON header with the world's settings, then the elevation as little-endian 32-bit floats). Export downloads the file; import reads one and replaces the world through `replaceWorld`. Import treats the file as untrusted: it checks the marker, version, resolution, data length and that every value is finite, clamps to the limits, and on any failure shows a clear message and leaves the current world untouched. Autosave writes the same bytes to one IndexedDB slot shortly after any change and when the page is hidden, and restores it on load; a failed or corrupt restore starts a blank world and says so.
     - Functions: `serializeWorld(world)`, `deserializeWorld(bytes)`, `saveCurrent(world)`, `loadCurrent()`, `exportWorldFile(world)`, `importWorldFile(file)`
     - Depends on: 3, 9
