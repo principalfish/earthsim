@@ -6,18 +6,26 @@
 - Planet controls in this issue: axial tilt; star brightness and orbit distance; greenhouse strength. Orbit eccentricity is not included. Year length is worked out from the star and orbit, not set directly. (2026-11-11)
 - A comparison against real Earth is wanted, so each simulated layer can be checked against reality, for this step and the ones after it ("it might be good to have earth as a comparison to see if we're getting it right - for all these next things to build"). Its shape is still open. A flat map view was not asked for and is not in this issue. (2026-11-11)
 - Temperature recalculates automatically, but how long a calculation takes is measured first and the exact trigger is decided from the numbers ("lets say automatically - but lets test how long this takes first"). (2026-11-11)
+- Earth comparison is in the app and in this issue: when the world is the Earth preset the layer can show simulated, observed, or the difference, with summary numbers; built so each later step adds its own observed layer; the same data drives automated tests ("In the app, in this issue"). (2026-11-11)
+- The temperature display has all four of: a month slider with play; a legend; the value under the cursor; and annual summaries (annual average, warmest month, coldest month, seasonal range). Temperature replaces the height colours while relief stays raised and coastlines stay outlined. (2026-11-11)
+- The page shows the world's current date, because later steps may step forward millions of years ("we need a current date on the page somewhere - as we may end up stepping forward millions of years"). What it shows and counts from is still open. (2026-11-11)
+- The temperature model: monthly steps through the year, repeated until it settles, with sunlight by latitude and season, land warming and cooling faster than ocean, heat spreading between neighbouring cells, cooling with height, and snow or ice brightening cold surfaces by a simple temperature rule that step 6's real ice later replaces ("Yes, build that"). (2026-11-11)
+- Building waits until issue 0001 is merged into `main`; this issue branches from `main` then ("After 0001 is merged"). Planning finishes now. (2026-11-11)
 
 ## Open
-- Earth comparison: where it lives (in the app as a compare view, or tests and a report only), what is shown (simulated, observed, difference, summary numbers), which observed dataset, and whether it is part of this issue or its own.
-- Time model and physics: a seasonal cycle of monthly steps repeated until it settles; what is kept (twelve monthly fields and annual summaries); which processes are included (land and ocean heat capacity, heat transport, elevation cooling, reflectivity, a simple snow and ice reflectivity before real ice arrives in step 6).
-- The automatic trigger, once timings are known: only while the temperature layer is showing, or always; and what the globe shows while a result is out of date.
-- How the layer is shown on the globe: colour scale, month selection and animation, legend, a readout under the cursor, annual summaries, how it combines with raised relief and coastlines.
-- What the planet controls look like: ranges, units, defaults and any derived readouts (the user asked "what do planet controls view?").
-- What is saved: planet settings in the world file; whether computed layers are saved or recomputed.
-- Branching: issue 0001 is not merged, so this issue either waits for that merge or is built on top of issue 0001's branch.
+- The date on the page: what it counts from, how it reads now and after millions of years, and how months are named on a planet whose year is not Earth's.
+- The colour scale: fixed, so colours mean the same temperature on every world and month, or fitted to each world.
+- Planet control ranges and defaults.
+- How close to real Earth counts as good enough for this step, given there are no winds or ocean currents yet.
+- Which observed temperature dataset, and its licence (being researched).
+- The automatic trigger, decided after the solver's timings are measured: only while the temperature layer is showing, or always.
 
 ## Assumed
 - Temperature means near-surface air temperature in degrees Celsius, one value per cell per month.
+- Planet settings and the world's date are saved with the world (optional header fields, so existing files load with Earth's values and year zero). Computed layers are not saved; they are recomputed on load.
+- Temperature runs in its own worker, separate from the statistics worker, and results are transferred, not copied.
+- While a result is out of date the previous one stays on screen, marked as out of date, with a progress indicator.
+- Observed and difference views are offered only when the world started as the Earth preset.
 - Rotation rate is not part of this issue: a monthly energy balance does not depend on day length. It arrives with winds in step 3.
 - Ocean currents, winds, rainfall and real ice sheets are later steps; this issue must leave room for them to feed back into temperature.
 
