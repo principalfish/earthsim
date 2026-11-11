@@ -1,7 +1,7 @@
 # Resume point — read this first
 
 ## Where we are
-Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`), state `building`. Pieces 1 to 10 of 11 are committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, latest `0f565b8`. The user settled piece 10's choices (`decisions.md`, `plan.md` Notes) and said "Start it" on 2026-11-11: the builder is building piece 10 (save, load and autosave) and will stop uncommitted at its review, which has a manual review. Piece 11 (Earth preset) is not started. GitHub: issue principalfish/earthsim#1 carries the plan checklist; draft PR 2 is open; `main` is still `ffed15a` and nothing is merged.
+Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`), state `building`. Pieces 1 to 10 of 11 are committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, latest `0f565b8`. The user settled piece 11's choices (`decisions.md`, `plan.md` Notes) and said "Start it" on 2026-11-11: the builder is building piece 11 (Earth preset), the last piece, which downloads 466 MB of NOAA elevation data into a git-ignored cache in its worktree, and will stop uncommitted at its review, which has a manual review. GitHub: issue principalfish/earthsim#1 carries the plan checklist; draft PR 2 is open; `main` is still `ffed15a` and nothing is merged.
 
 State checks (run from `/home/philiph/workspace/earth_sim`):
 - `git log --oneline -1 claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` shows `0f565b8 … piece 10/11: add save, load and autosave` until piece 11 is approved, and `git ls-remote --heads origin` shows the same SHA.
@@ -14,11 +14,11 @@ If the branch head or `meta` differs, stop and tell the user.
 All design decisions are in `decisions.md` (Settled) and `plan.md` (Context and Notes). The ones that shape how the build runs: the implementation model is `claude-fable-5-2` for this issue only; pieces 1 to 4 and 7 to 8 ran without review pauses at the user's request; pieces 5 and 6 were approved after the user tried them ("Tried it, approve"); the build was paused twice at the user's request and resumed each time on "resume".
 
 ## The pending decision (exact)
-Nothing is pending with the user right now. They approved piece 10 after trying it ("Tried it, approve") and that was relayed. The builder is committing and pushing piece 10, then sends a piece-committed note with its look-ahead and choices for piece 11 (Earth preset: the ETOPO source, its redistribution terms, the download and the tooling) and waits. Next for the user: piece 11's choices and go-ahead. Piece 11 is the last piece.
+Nothing is pending with the user. Next for them: piece 11's manual review and diff approval, when the builder's review request arrives. After piece 11 is committed the builder sets state `review`.
 
 ## What the next session does
 1. Run the state checks. `planner.py ingest 1`; if it warns that a file changed in both places, merge by hand (edit the record, save, copy the merged file over the builder's copy in `<worktree>/.planner-outbox/issue/`, ingest again).
-2. The builder is session `local_acf49a6d-c0ef-4a98-8721-d05319ed32de` (`builder: add-globe-cubed-sphere-grid-and-elevation-sculpting`). When its review request for piece 10 arrives, give the user the review briefing with the manual review first; relay an approval only when their words say they tried it.
+2. The builder is session `local_acf49a6d-c0ef-4a98-8721-d05319ed32de` (`builder: add-globe-cubed-sphere-grid-and-elevation-sculpting`). When its review request for piece 11 arrives, give the user the review briefing with the manual review first; relay an approval only when their words say they tried it.
 3. After each commit: verify it on origin, tick the issue's `## Plan` checklist, `gh issue edit 1 --body-file <(tail -n +2 "$FOLDER/issue.md")`, then the next-stage briefing for the following piece with its choices. Piece 11 also has a `Manual review:` line, and needs the ETOPO download and a licence check (`plan.md` piece 11 and Notes). Normal per-piece pauses apply unless the user asks for another run-through.
 4. When all pieces are done the builder sets state `review`: suggest `/review self add-globe-cubed-sphere-grid-and-elevation-sculpting`, then `/publish`. Merging is the user's.
 5. If the builder is idle with uncommitted work and no message, it has stalled (see below): message it to carry on.

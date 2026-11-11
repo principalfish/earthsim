@@ -40,12 +40,17 @@
 - Piece 10 saves the world only, in both the exported file and the autosave: terrain, resolution, sea level and how it started. Not the undo history, camera, relief exaggeration, grid toggle or tool settings ("The world only"). (2026-11-11)
 - Piece 10: importing a file replaces the open world with no confirmation ("No confirmation"). (2026-11-11)
 - Piece 10 approved after the user tried saving and importing ("Tried it, approve"), with no changes asked for. (2026-11-11)
+- Piece 11 data source: ETOPO 2022, 60 arc-second, ice surface, the GeoTIFF `ETOPO_2022_v1_60s_N90W180_surface.tif` (466 MB) from NOAA's server; 0.79 MB committed as `public/data/earth-256.bin`, the download kept in a git-ignored `.cache/etopo/` in the worktree. NOAA's metadata page states the data are CC0-1.0, as the builder read it on 2026-11-11; the user saw the quoted terms before the go-ahead. (2026-11-11)
+- Piece 11 reads the GeoTIFF with a hand-written reader in the build script, no new package, cross-checked against GDAL at sample points ("Hand-written reader"). (2026-11-11)
+- Piece 11's scripted browser checks keep the throwaway browser profile in the session's scratch folder; nothing is written to the Windows temp folder ("No, keep it in the scratch folder"). (2026-11-11)
+- NOAA is credited in the README only, with its own citation text ("README only"). (2026-11-11)
 
 ## Open
 
 _None._
 
 ## Assumed
+- Piece 11: "Earth" is a third start type; choosing it disables the seed and land controls while resolution still applies; the World line reads for example "Earth · 128"; the data is fetched the first time Earth is chosen, with "Loading Earth…" on the button, and kept in memory; a failed load shows a fixed message and leaves the current world untouched; an Earth world saves, exports and imports like any other, and files made before this still load. The user was told and did not object.
 - Piece 10: a saved world that cannot be restored gives a blank ocean with the dialog open and one line saying so; one quiet status line in the World section ("Saved" or "Autosave unavailable"); a loaded sea level is clamped to the slider's ±6,000 m; autosave about one second after the last change and when the page is hidden; exports are named `world.earthsim`; Export and Import buttons sit beside "New world"; importing or restoring clears the undo history; two tabs share one autosave slot and the last to save wins; `fake-indexeddb` is added as a development-only test helper. The user was told and did not object.
 - Piece 9: a "World" section at the top of the panel with the "New world" button and one line describing the current world (start type, resolution, seed, land); the dialog pre-fills from the current world; the land slider runs 0 to 100% in 1% steps, default 30%; a new world resets sea level to zero and the undo history and keeps the camera, relief exaggeration, grid toggle and tool settings; one warning line in the dialog, no second confirmation. The user was told and did not object.
 - Piece 7: Cmd+Z and Cmd+Shift+Z work as well as the Ctrl forms; the shortcuts are ignored while the focus is in a text field; Undo and Redo buttons sit side by side at the top of the Tools section. The user was told and did not object.
@@ -61,7 +66,6 @@ _None._
 - Autosave uses IndexedDB and keeps one slot: the current world only.
 - The save file is a single versioned file holding the world's settings (resolution, sea level, generator seed if any) and its elevation data.
 - The Earth data is committed once at 256 cells per face and averaged down for 128 and 64. A script kept in the repo regenerates it from the ETOPO download.
-- ETOPO 2022's licence has not been checked; the builder verifies it allows redistribution before committing the data, and stops to ask if it does not.
 - Terrain passes between the main thread and the worker as copied or transferred arrays, not shared memory, because shared memory needs server headers a plain static host cannot set.
 - Target is a current desktop Chrome or Firefox with a mouse. Touch and mobile are out of scope.
 - Deployment (for example GitHub Pages) is out of scope; the app runs from the Vite dev server and a static build.
