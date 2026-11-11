@@ -20,6 +20,8 @@
 - The automatic recalculation trigger (only while the temperature layer is showing, or always) is decided by the user after the solver's timings at 64, 128 and 256 are measured and reported. The plan makes the solver and its timing run the first thing built, and stops for that decision. (2026-11-11)
 - Observed temperature data for the Earth comparison: NOAA's 20th Century Reanalysis version 3, 2 m air temperature long-term monthly means, 1981 to 2010, 1 degree grid, global ("20th Century Reanalysis v3"). Source file `https://downloads.psl.noaa.gov/Datasets/20thC_ReanV3/Derived/Monthlies/2mSI-MO/air.2m.mon.ltm.nc`, 4.5 MB, netCDF-3 classic, no login. Terms as read on NOAA PSL's page for the dataset on 2026-11-11: "not subject to copyright protection in the United States. NOAA waives any potential copyright ... through the Creative Commons Zero 1.0 Universal Public Domain Dedication (CC0-1.0)". The user saw the quoted terms and the alternatives (NCEP-DOE Reanalysis 2; ERA5) before choosing. A small derived file is committed; the download is not. (2026-11-11)
 - The ledger is complete: the user confirmed with "That's everything". (2026-11-11)
+- Carried in from issue 0001's self review (finding R1+R3, low), on the user's choice "Carry R1+R3 to step 2, accept the rest": `startStatistics` in `src/app/main.ts` holds an untested decision (no worker, no client, a worker error event) and a `throw` that can never run. This issue's worker piece moves that decision into tested code as it adds the temperature worker. (2026-11-11)
+- The issue text was approved by the user ("Approved"). (2026-11-11)
 
 ## Open
 
