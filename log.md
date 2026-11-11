@@ -21,3 +21,5 @@
 - 2026-11-11 16:30 · add-globe-cubed-sphere-grid-and-elevation-sculpting (0001) · session local_acf49a6d-c0ef-4a98-8721-d05319ed32de removed
 - 2026-11-11 16:31 · add-globe-cubed-sphere-grid-and-elevation-sculpting (0001) · cleanup: removed worktree /home/philiph/workspace/earth_sim/.claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9, branch claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9
 - 2026-11-11 16:36 · add-seasonal-temperature-layer-and-planet-controls (0002) · tracking session local_f46a8d01-2bba-49f0-b178-13cfe0924c9e
+- 2026-11-11 16:37 · add-seasonal-temperature-layer-and-planet-controls (0002) · branch = claude/add-seasonal-temperature-layer-and-planet-controls-f645fa
+- 2026-11-11 16:37 · add-seasonal-temperature-layer-and-planet-controls (0002) · planned → building
