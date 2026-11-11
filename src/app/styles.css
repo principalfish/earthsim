@@ -224,6 +224,42 @@ body {
   opacity: var(--opacity-disabled);
 }
 
+.stats {
+  display: grid;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+.stats__list {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.stats__row {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: space-between;
+}
+
+.stats__value {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  text-align: end;
+}
+
+.stats__status,
+.stats__note {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.stats__note {
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
 /* Utilities */
 .u-visually-hidden {
   position: absolute;

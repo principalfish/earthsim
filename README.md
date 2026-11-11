@@ -18,6 +18,8 @@ The Undo and Redo buttons at the top of the Tools panel step back and forward th
 
 Up to the last 100 strokes can be undone, or fewer once they hold about 64 MB between them, which takes very long strokes on a fine grid. Making a new stroke after an undo discards what could have been redone. The keys do nothing while a stroke is being made or while typing in a text field. Only the terrain is put back: the sea level, the view settings and the tool settings are not part of the history.
 
+The Statistics readout at the bottom of the panel shows how much of the surface is land, the highest and deepest points, the mean height of the land and the mean depth of the ocean. It follows the terrain and the sea level, a moment after each stroke, undo, redo or move of the Sea level slider. Until the first figures arrive it says "Calculating…", and if the worker that computes them cannot be started or fails it says "Statistics unavailable" and hides the figures, while the rest of the page keeps working. The highest and deepest points are elevations on the scale of the Sea level slider; the two means are measured from the sea level.
+
 ## Development
 
 Requires Node.js and npm. Run `npm install` once, then:
@@ -36,7 +38,12 @@ The page opens on a generated world with 64 cells per cube face, seed 1977 and 3
 - `src/app/`: the page, which imports the core.
   - `src/app/sculpt.ts`: sculpting with the mouse, which turns the cursor's path into dabs of a brush.
   - `src/app/undo.ts`: undo and redo of strokes, and the keys that ask for them.
+  - `src/app/refresh.ts`: when to ask the worker again after the world changes.
   - `src/app/globe/`: the globe's renderer, shaders, camera and picking.
   - `src/app/ui/`: the panels of controls.
+- `src/worker/`: the Web Worker that computes from a copy of the world and keeps nothing between requests.
+  - `src/worker/sim.worker.ts`: the worker itself, which only passes messages to the handler.
+  - `src/worker/handle.ts`: the message handler, a plain function that answers one request.
+  - `src/worker/client.ts`: the page's side of the channel, which runs on the main thread.
 
-The core is compiled without the DOM type library, so a `document` or `window` reference there fails `npm run typecheck`.
+The core is compiled without the DOM type library, and the worker and its handler with the worker's in place of it, so a `document` or `window` reference in either fails `npm run typecheck`.

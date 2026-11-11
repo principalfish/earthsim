@@ -1,13 +1,21 @@
 import './styles.css';
-import { CORE_VERSION, generateWorld, normaliseSeaLevel } from '../core/index';
+import {
+	CORE_VERSION,
+	generateWorld,
+	normaliseSeaLevel,
+	type World,
+} from '../core/index';
+import { createSimClient } from '../worker/client';
 import { attachViewInput } from './globe/input';
 import { createGlobe, type Globe } from './globe/renderer';
+import { createRefreshScheduler, STATS_DEBOUNCE_MS } from './refresh';
 import {
 	createSculptController,
 	DEFAULT_TOOL,
 	rotateButtonFor,
 } from './sculpt';
 import { parseStartOptions } from './startOptions';
+import { createStatsPanel, type StatsPanel } from './ui/statsPanel';
 import { createToolPanel } from './ui/toolPanel';
 import { createViewPanel } from './ui/viewPanel';
 import { createUndoController, handleHistoryKey } from './undo';
@@ -52,10 +60,59 @@ const createGlobeOrExplain = (): Globe | null => {
 	}
 };
 
+/**
+ * Starts the simulation worker and has a readout follow the statistics it
+ * computes.
+ *
+ * @remarks
+ * Whatever goes wrong with the worker costs only the statistics: the
+ * readout says there are none, and everything else on the page works.
+ *
+ * @param readout - Where the statistics are shown.
+ * @param currentWorld - The world being edited, at the time it is asked.
+ * @param isStrokeActive - Whether a brush stroke is under way, during which
+ * the statistics are not asked for.
+ * @returns What to call whenever the terrain or the sea level has changed.
+ */
+const startStatistics = (
+	readout: StatsPanel,
+	currentWorld: () => World,
+	isStrokeActive: () => boolean,
+): (() => void) => {
+	let worker: Worker;
+	try {
+		worker = new Worker(new URL('../worker/sim.worker.ts', import.meta.url), {
+			type: 'module',
+		});
+	} catch (error) {
+		console.error(error);
+		readout.showUnavailable();
+		return () => {};
+	}
+	// A worker whose script cannot be loaded says so once, perhaps before
+	// anything has been asked of it, and then never answers.
+	worker.addEventListener('error', readout.showUnavailable);
+	const client = createSimClient(worker);
+	return createRefreshScheduler({
+		request: () => client.latest('terrainStats', currentWorld()),
+		debounceMs: STATS_DEBOUNCE_MS,
+		setTimer: (callback, delayMs) => window.setTimeout(callback, delayMs),
+		clearTimer: (handle: number) => window.clearTimeout(handle),
+		isBusy: isStrokeActive,
+		onResult: readout.show,
+		onError: (error) => {
+			console.error(error);
+			readout.showUnavailable();
+		},
+	}).refresh;
+};
+
 const globe = createGlobeOrExplain();
 if (globe !== null) {
-	const world = generateWorld(parseStartOptions(window.location.search));
-	globe.setWorld(world);
+	// The world being edited. `sculpt.setWorld` replaces it, so whatever
+	// reads or changes the world later goes through this variable.
+	let current = generateWorld(parseStartOptions(window.location.search));
+	globe.setWorld(current);
 	const viewInput = attachViewInput(
 		canvas,
 		globe,
@@ -64,10 +121,14 @@ if (globe !== null) {
 	// The history is cleared from the sculpt controller's own hook, so that
 	// replacing the world through `sculpt.setWorld` can never leave the
 	// strokes of the old one to be undone on the new.
-	const sculpt = createSculptController(globe, world, {
+	const sculpt = createSculptController(globe, current, {
 		canvas,
 		onStrokeEnd: (changes) => edits.commit(changes),
-		onWorldChange: (next) => edits.setWorld(next),
+		onWorldChange: (next) => {
+			edits.setWorld(next);
+			current = next;
+			refreshStatistics();
+		},
 	});
 	const tools = createToolPanel(panel, {
 		onHistory: (action) => edits.perform(action),
@@ -82,21 +143,29 @@ if (globe !== null) {
 		onSmoothSetting: sculpt.setSmoothSetting,
 	});
 	const edits = createUndoController({
-		world,
+		world: current,
 		globe,
 		isStrokeActive: sculpt.isStrokeActive,
+		onTerrainChange: () => refreshStatistics(),
 		onHistoryChange: tools.setHistoryState,
 	});
 	window.addEventListener('keydown', (event) =>
 		handleHistoryKey(event, edits.perform),
 	);
 	createViewPanel(panel, {
-		seaLevel: world.seaLevel,
+		seaLevel: current.seaLevel,
 		onExaggeration: globe.setExaggeration,
 		onSeaLevel: (metres) => {
-			world.seaLevel = normaliseSeaLevel(metres);
-			globe.setSeaLevel(world.seaLevel);
+			current.seaLevel = normaliseSeaLevel(metres);
+			globe.setSeaLevel(current.seaLevel);
+			refreshStatistics();
 		},
 		onGridVisible: globe.setGridVisible,
 	});
+	const refreshStatistics = startStatistics(
+		createStatsPanel(panel),
+		() => current,
+		sculpt.isStrokeActive,
+	);
+	refreshStatistics();
 }

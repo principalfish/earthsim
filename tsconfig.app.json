@@ -5,5 +5,5 @@
     "types": ["vite/client"],
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
   },
-  "include": ["src/app"]
+  "include": ["src/app", "src/worker/client.ts", "src/worker/client.test.ts"]
 }
