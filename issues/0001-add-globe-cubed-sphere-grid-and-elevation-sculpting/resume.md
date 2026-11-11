@@ -14,7 +14,22 @@ If anything differs, stop and tell the user.
 All design and run decisions are in `decisions.md` (Settled); each piece's as-built details, checks and review-loop outcome are in `plan.md` Notes. The user tried and approved every manual-review piece (5, 6, 9, 10, 11) with "Tried it, approve"; pieces 1 to 4, 7 and 8 ran without review pauses at their request. The implementation model was `claude-fable-5-2` for this issue only.
 
 ## The pending decision (exact)
-The user said "Run the review" on 2026-11-11 and `/review self` is in progress in the planner chat: base `main` (`ffed15a`) against `4170dd0`. Four checks (correctness and security on Opus; style and common-mistakes on Sonnet) are running as fresh subagents; the coverage check waits for the builder's whole-branch coverage report. Then a fresh verifier judges the findings, and the user picks which to fix. No review file is written yet (`planner.py next-review` gives its path). If this chat is lost mid-review, re-run `/review self add-globe-cubed-sphere-grid-and-elevation-sculpting` from the start.
+`/review self` round 1 has run on `main` (`ffed15a`) against `4170dd0` (2026-11-11). Checks: correctness and security on Opus, coverage, style and common-mistakes on Sonnet; verifier on Opus. No high findings. The verifier upheld 11 and dropped 4. **The user is choosing which to fix**; no review file is written yet (`planner.py next-review add-globe-cubed-sphere-grid-and-elevation-sculpting` gives its path) and nothing has been sent to the builder.
+
+Verified (id · where · severity · issue · fix):
+- V1 · `src/app/sculpt.ts:667-863` · medium · `createSculptController` has no test (stroke lifecycle, capture and cancel paths, `track` bounds, `setWorld` order) · a fake-canvas harness: one `onStrokeEnd` per stroke, none for move, `setWorld` ends the stroke before `onWorldChange`.
+- C1 · `src/app/main.ts:112,276` · low · after a worker load error, the next world replacement shows "Calculating…" for good · keep a failed flag and show unavailable, or have the client reject requests after a load error.
+- C3 · `src/app/appState.ts:142-146` · low · a kept sea level is only clamped, breaking `ViewPanel.setSeaLevel`'s whole-multiple-of-10 m contract · round to `SEA_LEVEL_SLIDER_STEP_M` in `replaceWorld` when keeping.
+- S1 · `scripts/build-earth-data.ts:194-205` · low · the download has no size cap; size and hash are checked only after the stream ends · stop and delete once `written > ETOPO_FILE_BYTES`; check `Content-Range` on a 206.
+- C2 · `src/app/refresh.ts:91-104` with `main.ts:276-277` · low · an in-flight result from the old world can replace "Calculating…" for up to 150 ms · a generation counter in the scheduler, or request at once on replacement.
+- V3 · `src/app/globe/input.ts:108-193` · low · drag state machine untested · same harness as V1.
+- V2 · `src/app/main.ts:150-339` · low (verifier lowered it from medium) · listener order and the `starting` guard are untested · move the wiring into an injectable function and test call order.
+- V4 · `src/app/ui/toolPanel.ts:262-270` · low · the focus hand-off when a history button becomes disabled is untested · test `setHistoryState` focus moves.
+- Y1 · `README.md:63-70` · low · `src/app/startup.ts` missing from Layout · add a line.
+- Y2 · `README.md:5-40` · low · no paragraph introduces the View panel · add one.
+- Y3 · `src/core/protocol.ts:85`, `serialize.ts:144` · low · two `isRecord` helpers that differ on arrays · rename the serialize one `isPlainObject`, or share one.
+
+Dropped: V5 (`grid.ts:665-666` reset: the wrap needs 2^32 searches and the reset is plainly correct); Y4 (the two clamps do not behave the same); Y5 (acceptable, different needs); Y6 (exports for tests; the guide allows it). Common-mistakes was clean and appended nothing to the guides.
 
 Also open: whether to widen `.planner/tools/coverage-changed.sh` to include `scripts/`.
 
