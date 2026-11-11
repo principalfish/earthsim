@@ -16,3 +16,4 @@
 - 2026-11-11 16:26 · add-seasonal-temperature-layer-and-planet-controls (0002) · build_model = claude-opus-5-5
 - 2026-11-11 16:26 · add-seasonal-temperature-layer-and-planet-controls (0002) · investigating → planned
 - 2026-11-11 16:28 · add-globe-cubed-sphere-grid-and-elevation-sculpting (0001) · review → ready
+- 2026-11-11 16:28 · add-globe-cubed-sphere-grid-and-elevation-sculpting (0001) · PR #2 description final
