@@ -35,6 +35,7 @@
 - Piece 9 first open: with no world to restore, the page opens on a blank ocean with the new-world dialog showing, pre-set to generated continents, 64, a random seed and 30% land ("Blank ocean with the dialog open"). (2026-11-11)
 - Piece 9 removes the `resolution`, `seed` and `land` address parameters; the dialog is the one way to make a world ("Remove them"). (2026-11-11)
 - Piece 9 generates worlds on the page, not in the worker, with a "Generating…" label on the button ("On the page, with a 'Generating…' label"). (2026-11-11)
+- Piece 9 approved after the user tried the new-world dialog ("Tried it, approve"), with no changes asked for. (2026-11-11)
 
 ## Open
 
