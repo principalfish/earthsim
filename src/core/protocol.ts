@@ -10,6 +10,7 @@
  * Every message is plain data that survives a structured clone.
  */
 
+import { PLANET_SETTINGS } from './planet';
 import type { TerrainStats } from './stats';
 import type { World } from './world';
 
@@ -86,6 +87,11 @@ const MAX_ECHOED_KIND_LENGTH = 40;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === 'object' && value !== null;
 
+/** Whether a value holds every planet setting as a number of any value. */
+const isPlanetShaped = (value: unknown): boolean =>
+	isRecord(value) &&
+	PLANET_SETTINGS.every((name) => typeof value[name] === 'number');
+
 /**
  * Whether a value names a kind of request.
  *
@@ -100,8 +106,9 @@ export const isSimKind = (value: unknown): value is SimKind =>
  *
  * @remarks
  * The values are not checked: a resolution that is not supported, a sea
- * level out of range or an elevation array of the wrong length is for
- * whatever computes with the world to refuse.
+ * level or a planet setting out of range, a negative date or an elevation
+ * array of the wrong length is for whatever computes with the world to
+ * refuse.
  *
  * @param value - Anything, such as the `world` of a message just received.
  */
@@ -110,6 +117,8 @@ export const isWorldShaped = (value: unknown): value is World =>
 	typeof value.resolution === 'number' &&
 	typeof value.seaLevel === 'number' &&
 	isRecord(value.origin) &&
+	isPlanetShaped(value.planet) &&
+	typeof value.ageYears === 'number' &&
 	value.elevation instanceof Float32Array;
 
 /**
@@ -157,7 +166,7 @@ export const parseSimRequest = (message: unknown): SimRequest | SimFailure => {
 		return simFailure(
 			id,
 			kind,
-			`A ${kind} request needs a world with a resolution, a sea level, an origin and an elevation array`,
+			`A ${kind} request needs a world with a resolution, a sea level, an origin, planet settings, a date and an elevation array`,
 		);
 	}
 	return { id, kind, world: message.world };

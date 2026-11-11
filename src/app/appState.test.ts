@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
 	createBlankWorld,
 	createHistory,
+	DEFAULT_PLANET,
 	DEFAULT_SEA_LEVEL_M,
 	generateWorld,
 	type History,
 	MAX_ELEVATION_M,
 	MIN_ELEVATION_M,
 	normaliseSeaLevel,
+	PLANET_LIMITS,
+	type PlanetSettings,
 	type World,
 } from '../core/index';
 import { createAppState } from './appState';
@@ -329,7 +332,7 @@ describe('replaceWorld', () => {
 	});
 });
 
-describe('replaceWorld keeping the sea level', () => {
+describe('replaceWorld keeping the settings', () => {
 	/** The range of a sea-level control narrower than the elevations. */
 	const RANGE = { minM: -6000, maxM: 6000 };
 
@@ -343,7 +346,7 @@ describe('replaceWorld keeping the sea level', () => {
 		for (const metres of [0, 250, -1200, 6000, -6000, 0.1]) {
 			const next = generateWorld({ seed: 7, landFraction: 0.3 });
 			next.seaLevel = normaliseSeaLevel(metres);
-			state.replaceWorld(next, { keepSeaLevel: true });
+			state.replaceWorld(next, { keepSettings: true });
 			expect(state.world).toBe(next);
 			expect(next.seaLevel).toBe(normaliseSeaLevel(metres));
 			// Already settled by the time anything is told.
@@ -359,7 +362,7 @@ describe('replaceWorld keeping the sea level', () => {
 		const kept = (metres: number): number => {
 			const next = createBlankWorld(64);
 			next.seaLevel = metres;
-			state.replaceWorld(next, { keepSeaLevel: true });
+			state.replaceWorld(next, { keepSettings: true });
 			return state.world.seaLevel;
 		};
 		expect(kept(6000.5)).toBe(6000);
@@ -377,7 +380,7 @@ describe('replaceWorld keeping the sea level', () => {
 		});
 		const next = createBlankWorld(64);
 		next.seaLevel = 123.456789;
-		state.replaceWorld(next, { keepSeaLevel: true });
+		state.replaceWorld(next, { keepSettings: true });
 		expect(next.seaLevel).toBe(Math.fround(123.456789));
 	});
 
@@ -386,7 +389,7 @@ describe('replaceWorld keeping the sea level', () => {
 		const kept = (metres: number): number => {
 			const next = createBlankWorld(64);
 			next.seaLevel = metres;
-			state.replaceWorld(next, { keepSeaLevel: true });
+			state.replaceWorld(next, { keepSettings: true });
 			return state.world.seaLevel;
 		};
 		expect(kept(9000)).toBe(9000);
@@ -400,7 +403,7 @@ describe('replaceWorld keeping the sea level', () => {
 			world: createBlankWorld(64),
 			seaLevelRange: RANGE,
 		});
-		for (const options of [undefined, {}, { keepSeaLevel: false }]) {
+		for (const options of [undefined, {}, { keepSettings: false }]) {
 			const next = createBlankWorld(64);
 			next.seaLevel = normaliseSeaLevel(300);
 			state.replaceWorld(next, options);
@@ -421,7 +424,7 @@ describe('replaceWorld keeping the sea level', () => {
 
 		const next = createBlankWorld(128);
 		next.seaLevel = normaliseSeaLevel(450);
-		state.replaceWorld(next, { keepSeaLevel: true });
+		state.replaceWorld(next, { keepSettings: true });
 		expect(stage.edits.state).toEqual({ canUndo: false, canRedo: false });
 		expect(calls).toEqual([next]);
 		expect(next.seaLevel).toBe(450);
@@ -437,7 +440,7 @@ describe('replaceWorld keeping the sea level', () => {
 		});
 		const next = createBlankWorld(128);
 		next.seaLevel = Number.NaN;
-		expect(() => state.replaceWorld(next, { keepSeaLevel: true })).toThrow(
+		expect(() => state.replaceWorld(next, { keepSettings: true })).toThrow(
 			RangeError,
 		);
 		expect(state.world).toBe(first);
@@ -462,6 +465,119 @@ describe('replaceWorld keeping the sea level', () => {
 	});
 });
 
+describe('replaceWorld and the planet and date', () => {
+	/** Settings unlike Earth's in every way. */
+	const ALIEN: PlanetSettings = {
+		axialTiltDeg: 60,
+		starBrightness: 2.5,
+		starMass: 0.8,
+		orbitDistanceAu: 1.5,
+		greenhouseStrength: 0.5,
+	};
+
+	/** A world as if read from a file: with settings and a date of its own. */
+	const loadedWorld = (): World => {
+		const world = createBlankWorld(64);
+		world.planet = { ...ALIEN };
+		world.ageYears = 12_000;
+		return world;
+	};
+
+	it('keeps the planet and date of a world read from a file or storage', () => {
+		const state = createAppState({ world: createBlankWorld(64) });
+		const seen: World[] = [];
+		state.addListener((world) => seen.push({ ...world }));
+		const next = loadedWorld();
+		state.replaceWorld(next, { keepSettings: true });
+		expect(state.world.planet).toEqual(ALIEN);
+		expect(state.world.ageYears).toBe(12_000);
+		// Already settled by the time anything is told.
+		expect(seen[0]?.planet).toEqual(ALIEN);
+		expect(seen[0]?.ageYears).toBe(12_000);
+	});
+
+	it('gives a new world Earth’s settings and year zero', () => {
+		const state = createAppState({ world: loadedWorld() });
+		for (const options of [undefined, {}, { keepSettings: false }]) {
+			const next = loadedWorld();
+			state.replaceWorld(next, options);
+			expect(next.planet).toEqual(DEFAULT_PLANET);
+			expect(next.planet).not.toBe(DEFAULT_PLANET);
+			expect(next.ageYears).toBe(0);
+		}
+	});
+
+	it('keeps nothing of the planet and date of the world it replaces', () => {
+		const first = loadedWorld();
+		const state = createAppState({ world: first });
+		const next = createBlankWorld(64);
+		state.replaceWorld(next, { keepSettings: true });
+		expect(state.world.planet).toEqual(DEFAULT_PLANET);
+		expect(state.world.ageYears).toBe(0);
+		expect(first.planet).toEqual(ALIEN);
+	});
+
+	it('brings a kept setting beyond its limits to the limit', () => {
+		const state = createAppState({ world: createBlankWorld(64) });
+		const next = createBlankWorld(64);
+		next.planet = { ...ALIEN, starMass: 50, axialTiltDeg: -5 };
+		state.replaceWorld(next, { keepSettings: true });
+		expect(next.planet).toEqual({
+			...ALIEN,
+			starMass: PLANET_LIMITS.starMass.max,
+			axialTiltDeg: PLANET_LIMITS.axialTiltDeg.min,
+		});
+	});
+
+	it('refuses a kept setting that is not a number, changing nothing', () => {
+		const first = createBlankWorld(64);
+		const calls: World[] = [];
+		const state = createAppState({
+			world: first,
+			listeners: [(world) => calls.push(world)],
+		});
+		const next = loadedWorld();
+		next.seaLevel = normaliseSeaLevel(250);
+		next.planet = { ...ALIEN, starBrightness: Number.NaN };
+		expect(() => state.replaceWorld(next, { keepSettings: true })).toThrow(
+			RangeError,
+		);
+		expect(state.world).toBe(first);
+		expect(next.seaLevel).toBe(250);
+		expect(next.planet.starBrightness).toBeNaN();
+		expect(next.ageYears).toBe(12_000);
+		expect(calls).toEqual([]);
+	});
+
+	it('refuses a kept date that is negative or not finite, changing nothing', () => {
+		const first = createBlankWorld(64);
+		const state = createAppState({ world: first });
+		for (const ageYears of [-1, Number.NaN, Infinity]) {
+			const next = loadedWorld();
+			next.seaLevel = normaliseSeaLevel(250);
+			next.ageYears = ageYears;
+			expect(
+				() => state.replaceWorld(next, { keepSettings: true }),
+				String(ageYears),
+			).toThrow(RangeError);
+			expect(state.world).toBe(first);
+			expect(next.seaLevel).toBe(250);
+			expect(next.planet).toEqual(ALIEN);
+			expect(next.ageYears).toBe(ageYears);
+		}
+	});
+
+	it('resets a new world’s settings even when they are not valid', () => {
+		const state = createAppState({ world: createBlankWorld(64) });
+		const next = createBlankWorld(64);
+		next.planet = { ...ALIEN, starMass: Number.NaN };
+		next.ageYears = -1;
+		state.replaceWorld(next);
+		expect(next.planet).toEqual(DEFAULT_PLANET);
+		expect(next.ageYears).toBe(0);
+	});
+});
+
 describe('replaceWorld keeping the sea level on a control with a step', () => {
 	/** The levels of a sea-level slider: every 10 m from −6,000 to 6,000. */
 	const STEPPED = { minM: -6000, maxM: 6000, stepM: 10 };
@@ -476,7 +592,7 @@ describe('replaceWorld keeping the sea level on a control with a step', () => {
 		return (metres) => {
 			const next = createBlankWorld(64);
 			next.seaLevel = metres;
-			state.replaceWorld(next, { keepSeaLevel: true });
+			state.replaceWorld(next, { keepSettings: true });
 			expect(next.seaLevel).toBe(state.world.seaLevel);
 			return state.world.seaLevel;
 		};
@@ -536,7 +652,7 @@ describe('replaceWorld keeping the sea level on a control with a step', () => {
 		state.addListener((world) => seen.push(world.seaLevel));
 		const next = createBlankWorld(64);
 		next.seaLevel = 123.4;
-		state.replaceWorld(next, { keepSeaLevel: true });
+		state.replaceWorld(next, { keepSettings: true });
 		expect(seen).toEqual([120]);
 	});
 
@@ -556,7 +672,7 @@ describe('replaceWorld keeping the sea level on a control with a step', () => {
 		const state = createAppState({ world: first, seaLevelRange: STEPPED });
 		const next = createBlankWorld(64);
 		next.seaLevel = Number.NaN;
-		expect(() => state.replaceWorld(next, { keepSeaLevel: true })).toThrow(
+		expect(() => state.replaceWorld(next, { keepSettings: true })).toThrow(
 			RangeError,
 		);
 		expect(state.world).toBe(first);

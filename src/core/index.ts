@@ -7,6 +7,7 @@ export * from './generate';
 export * from './grid';
 export * from './history';
 export * from './noise';
+export * from './planet';
 export * from './protocol';
 export * from './serialize';
 export * from './stats';

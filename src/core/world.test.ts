@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RESOLUTION, getGrid, SUPPORTED_RESOLUTIONS } from './grid';
+import { DEFAULT_PLANET } from './planet';
 import {
 	BLANK_OCEAN_ELEVATION_M,
 	clampElevation,
@@ -61,6 +62,21 @@ describe('createBlankWorld', () => {
 		},
 	);
 
+	it('starts with Earth’s planet settings at year zero', () => {
+		for (const n of SUPPORTED_RESOLUTIONS) {
+			const world = createBlankWorld(n);
+			expect(world.planet).toEqual(DEFAULT_PLANET);
+			expect(world.ageYears).toBe(0);
+		}
+	});
+
+	it('gives every world planet settings of its own', () => {
+		const first = createBlankWorld();
+		const second = createBlankWorld();
+		expect(first.planet).not.toBe(second.planet);
+		expect(first.planet).not.toBe(DEFAULT_PLANET);
+	});
+
 	it('gives every world an elevation array of its own', () => {
 		const first = createBlankWorld();
 		const second = createBlankWorld();
@@ -79,6 +95,8 @@ describe('createBlankWorld', () => {
 		const world = createBlankWorld();
 		world.seaLevel = 25;
 		world.elevation[7] = 1234;
+		world.planet = { ...world.planet, axialTiltDeg: 45 };
+		world.ageYears = 12_000;
 		const copy = structuredClone(world);
 		expect(copy).toEqual(world);
 		expect(copy.elevation).not.toBe(world.elevation);

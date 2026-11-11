@@ -20,6 +20,7 @@ import {
 	latLonToDirection,
 	SUPPORTED_RESOLUTIONS,
 } from './grid';
+import { DEFAULT_PLANET } from './planet';
 import { computeTerrainStats } from './stats';
 import {
 	DEFAULT_SEA_LEVEL_M,
@@ -253,6 +254,13 @@ describe('earthWorld', () => {
 			expect(world.elevation).toBeInstanceOf(Float32Array);
 			expect(world.elevation.length).toBe(6 * resolution * resolution);
 		}
+	});
+
+	it('starts with Earth’s planet settings, its own copy, at year zero: today', () => {
+		const world = earthWorld(dataWith(-100), 64);
+		expect(world.planet).toEqual(DEFAULT_PLANET);
+		expect(world.planet).not.toBe(DEFAULT_PLANET);
+		expect(world.ageYears).toBe(0);
 	});
 
 	it('holds the data as it is at the resolution of the data', () => {

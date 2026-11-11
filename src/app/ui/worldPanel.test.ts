@@ -146,6 +146,8 @@ describe('importErrorMessage', () => {
 			'header-too-long',
 			'bad-header',
 			'bad-resolution',
+			'bad-planet',
+			'bad-age',
 			'bad-length',
 			'not-finite',
 		];

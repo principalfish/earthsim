@@ -18,6 +18,7 @@ import {
 	type Resolution,
 	SUPPORTED_RESOLUTIONS,
 } from './grid';
+import { DEFAULT_AGE_YEARS, DEFAULT_PLANET } from './planet';
 import { clampElevations, DEFAULT_SEA_LEVEL_M, type World } from './world';
 
 /** Cells along a face edge of the grid the Earth data is stored on. */
@@ -125,7 +126,8 @@ const averageBlocks = (
  * @param resolution - Cells along a face edge; one of
  * {@link SUPPORTED_RESOLUTIONS}.
  * @returns A world with an elevation array of its own, whose origin says it
- * started as the Earth.
+ * started as the Earth, with Earth's planet settings and a date of year
+ * zero: today.
  * @throws RangeError if `resolution` is not a supported resolution, if the
  * data does not hold {@link EARTH_DATA_CELLS} elevations, or if one of them
  * is NaN.
@@ -151,6 +153,8 @@ export const earthWorld = (data: EarthData, resolution: number): World => {
 		resolution,
 		seaLevel: DEFAULT_SEA_LEVEL_M,
 		origin: { kind: 'earth' },
+		planet: { ...DEFAULT_PLANET },
+		ageYears: DEFAULT_AGE_YEARS,
 		elevation,
 	};
 };

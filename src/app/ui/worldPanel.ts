@@ -122,6 +122,8 @@ export const importErrorMessage = (error: WorldFileError): string => {
 		case 'header-too-long':
 		case 'bad-header':
 		case 'bad-resolution':
+		case 'bad-planet':
+		case 'bad-age':
 		case 'bad-length':
 		case 'not-finite':
 			return DAMAGED_FILE_MESSAGE;

@@ -66,7 +66,7 @@ describe('handleRequest', () => {
 			kind: 'terrainStats',
 			ok: false,
 			error:
-				'A terrainStats request needs a world with a resolution, a sea level, an origin and an elevation array',
+				'A terrainStats request needs a world with a resolution, a sea level, an origin, planet settings, a date and an elevation array',
 		});
 	});
 

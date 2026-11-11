@@ -9,6 +9,7 @@ import {
 	SUPPORTED_RESOLUTIONS,
 } from './grid';
 import { isSeed, MAX_SEED } from './noise';
+import { DEFAULT_PLANET } from './planet';
 import { computeTerrainStats } from './stats';
 import {
 	DEFAULT_SEA_LEVEL_M,
@@ -163,6 +164,13 @@ describe('generateWorld', () => {
 		});
 		expect(world.elevation).toBeInstanceOf(Float32Array);
 		expect(world.elevation.length).toBe(getGrid(128).cellCount);
+	});
+
+	it('starts with Earth’s planet settings, its own copy, at year zero', () => {
+		const world = generateWorld({ seed: SEED, landFraction: 0.3 });
+		expect(world.planet).toEqual(DEFAULT_PLANET);
+		expect(world.planet).not.toBe(DEFAULT_PLANET);
+		expect(world.ageYears).toBe(0);
 	});
 
 	it('uses the default resolution when none is chosen', () => {

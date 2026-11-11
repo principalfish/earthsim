@@ -1,5 +1,6 @@
 /**
- * A world: its settings and the elevation of every cell of its grid.
+ * A world: its settings, its date and the elevation of every cell of its
+ * grid.
  *
  * Elevation is in metres against a fixed zero datum, one value per cell in
  * the grid's cell order (`face * n * n + j * n + i`). Sea level is a setting
@@ -17,6 +18,11 @@ import {
 	type Resolution,
 	SUPPORTED_RESOLUTIONS,
 } from './grid';
+import {
+	DEFAULT_AGE_YEARS,
+	DEFAULT_PLANET,
+	type PlanetSettings,
+} from './planet';
 
 /** Radius of the planet in kilometres: Earth's mean radius. */
 export const PLANET_RADIUS_KM = 6371;
@@ -67,7 +73,7 @@ export type WorldOrigin =
 	  };
 
 /**
- * A world's settings and terrain.
+ * A world's settings, date and terrain.
  *
  * @remarks
  * The resolution, the origin and the elevation array itself are fixed when
@@ -76,7 +82,8 @@ export type WorldOrigin =
  * {@link MIN_ELEVATION_M} and {@link MAX_ELEVATION_M}, which is the
  * responsibility of whatever writes to the array: see {@link clampElevation}.
  * The sea level has the same limits and is written through
- * {@link normaliseSeaLevel}.
+ * {@link normaliseSeaLevel}; the planet is written through
+ * {@link normalisePlanet} and the date through {@link normaliseAgeYears}.
  */
 export type World = {
 	/** Cells along a face edge of the world's grid. */
@@ -94,6 +101,17 @@ export type World = {
 	/** How the terrain started. */
 	readonly origin: WorldOrigin;
 	/**
+	 * The planet's settings: its tilt, its star and its orbit, and its
+	 * greenhouse effect. Replaced whole, never changed in place; every
+	 * write goes through {@link normalisePlanet}.
+	 */
+	planet: PlanetSettings;
+	/**
+	 * The world's date, in years since it began: a finite number from zero
+	 * up. Every write goes through {@link normaliseAgeYears}.
+	 */
+	ageYears: number;
+	/**
 	 * Elevation of each cell in metres against the datum, `6 * n * n` long
 	 * and indexed like the grid's cells.
 	 */
@@ -106,7 +124,8 @@ export type World = {
  * @param resolution - Cells along a face edge; one of
  * {@link SUPPORTED_RESOLUTIONS}.
  * @returns A world whose every cell is at {@link BLANK_OCEAN_ELEVATION_M},
- * with an elevation array of its own.
+ * with an elevation array of its own, Earth's planet settings and a date of
+ * year zero.
  * @throws RangeError if `resolution` is not a supported resolution.
  */
 export const createBlankWorld = (
@@ -121,6 +140,8 @@ export const createBlankWorld = (
 		resolution,
 		seaLevel: DEFAULT_SEA_LEVEL_M,
 		origin: { kind: 'blank' },
+		planet: { ...DEFAULT_PLANET },
+		ageYears: DEFAULT_AGE_YEARS,
 		elevation: new Float32Array(FACE_COUNT * resolution * resolution).fill(
 			BLANK_OCEAN_ELEVATION_M,
 		),

@@ -213,7 +213,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		onImport: (file) =>
 			void runImport(file, {
 				read: parts.importWorld,
-				onWorld: (world) => state.replaceWorld(world, { keepSeaLevel: true }),
+				onWorld: (world) => state.replaceWorld(world, { keepSettings: true }),
 				showMessage: worldPanel.setMessage,
 				logError,
 			}),
@@ -339,7 +339,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		}
 		applyStartup(decideStartup(read), {
 			replaceWorld: (world) =>
-				state.replaceWorld(world, { keepSeaLevel: true }),
+				state.replaceWorld(world, { keepSettings: true }),
 			setAutosaveState: worldPanel.setAutosaveState,
 			startAutosave: autosave.start,
 			openDialog: ({ notice }) => openDialog(FIRST_NEW_WORLD_VALUES, notice),

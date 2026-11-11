@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PLANET_SETTINGS } from './planet';
 import {
 	isSimKind,
 	isSimResponse,
@@ -58,6 +59,14 @@ describe('isWorldShaped', () => {
 				resolution: 7,
 				seaLevel: Number.NaN,
 				origin: {},
+				planet: {
+					axialTiltDeg: -400,
+					starBrightness: Number.NaN,
+					starMass: 0,
+					orbitDistanceAu: Infinity,
+					greenhouseStrength: 99,
+				},
+				ageYears: -5,
 				elevation: new Float32Array(3),
 			}),
 		).toBe(true);
@@ -80,6 +89,32 @@ describe('isWorldShaped', () => {
 		).toBe(false);
 		const { elevation: _elevation, ...rest } = world;
 		expect(isWorldShaped(rest)).toBe(false);
+	});
+
+	it('refuses a world whose planet or date is missing or of the wrong type', () => {
+		const { planet: _planet, ...noPlanet } = world;
+		expect(isWorldShaped(noPlanet)).toBe(false);
+		const { ageYears: _ageYears, ...noAge } = world;
+		expect(isWorldShaped(noAge)).toBe(false);
+		for (const planet of [null, 'earth', 1, []]) {
+			expect(isWorldShaped({ ...world, planet }), String(planet)).toBe(false);
+		}
+		for (const name of PLANET_SETTINGS) {
+			for (const setting of [undefined, null, '1', [1], true]) {
+				expect(
+					isWorldShaped({
+						...world,
+						planet: { ...world.planet, [name]: setting },
+					}),
+					`${name}: ${String(setting)}`,
+				).toBe(false);
+			}
+		}
+		for (const ageYears of [undefined, null, '0', [0]]) {
+			expect(isWorldShaped({ ...world, ageYears }), String(ageYears)).toBe(
+				false,
+			);
+		}
 	});
 });
 
@@ -187,13 +222,15 @@ describe('parseSimRequest', () => {
 			null,
 			'world',
 			{ ...world, elevation: Array.from({ length: 6 }, () => 0) },
+			{ ...world, planet: { ...world.planet, starMass: '1' } },
+			{ ...world, planet: undefined },
 		]) {
 			expect(refusal({ id: 9, kind: 'terrainStats', world: payload })).toEqual({
 				id: 9,
 				kind: 'terrainStats',
 				ok: false,
 				error:
-					'A terrainStats request needs a world with a resolution, a sea level, an origin and an elevation array',
+					'A terrainStats request needs a world with a resolution, a sea level, an origin, planet settings, a date and an elevation array',
 			});
 		}
 	});
