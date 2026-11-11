@@ -36,12 +36,16 @@
 - Piece 9 removes the `resolution`, `seed` and `land` address parameters; the dialog is the one way to make a world ("Remove them"). (2026-11-11)
 - Piece 9 generates worlds on the page, not in the worker, with a "Generating…" label on the button ("On the page, with a 'Generating…' label"). (2026-11-11)
 - Piece 9 approved after the user tried the new-world dialog ("Tried it, approve"), with no changes asked for. (2026-11-11)
+- Piece 10: once a saved world exists the page restores it straight away with the dialog closed; with nothing saved it opens on a blank ocean with the dialog, as piece 9 built ("Restore it straight away"). (2026-11-11)
+- Piece 10 saves the world only, in both the exported file and the autosave: terrain, resolution, sea level and how it started. Not the undo history, camera, relief exaggeration, grid toggle or tool settings ("The world only"). (2026-11-11)
+- Piece 10: importing a file replaces the open world with no confirmation ("No confirmation"). (2026-11-11)
 
 ## Open
 
 _None._
 
 ## Assumed
+- Piece 10: a saved world that cannot be restored gives a blank ocean with the dialog open and one line saying so; one quiet status line in the World section ("Saved" or "Autosave unavailable"); a loaded sea level is clamped to the slider's ±6,000 m; autosave about one second after the last change and when the page is hidden; exports are named `world.earthsim`; Export and Import buttons sit beside "New world"; importing or restoring clears the undo history; two tabs share one autosave slot and the last to save wins; `fake-indexeddb` is added as a development-only test helper. The user was told and did not object.
 - Piece 9: a "World" section at the top of the panel with the "New world" button and one line describing the current world (start type, resolution, seed, land); the dialog pre-fills from the current world; the land slider runs 0 to 100% in 1% steps, default 30%; a new world resets sea level to zero and the undo history and keeps the camera, relief exaggeration, grid toggle and tool settings; one warning line in the dialog, no second confirmation. The user was told and did not object.
 - Piece 7: Cmd+Z and Cmd+Shift+Z work as well as the Ctrl forms; the shortcuts are ignored while the focus is in a text field; Undo and Redo buttons sit side by side at the top of the Tools section. The user was told and did not object.
 - Piece 6: the brush outline is a thin ring on the globe under the cursor, hidden with the move tool and off the globe; the browser's right-click menu is suppressed on the canvas only. The user was told and did not object.
