@@ -9,14 +9,15 @@
   "gh_issue": 1,
   "build_model": "claude-fable-5-2",
   "created": "2026-11-10 11:12",
-  "updated": "2026-11-11 16:29",
+  "updated": "2026-11-11 16:30",
   "done": "2026-11-11 16:29",
   "local": [
     {
       "kind": "session",
       "name": "local_acf49a6d-c0ef-4a98-8721-d05319ed32de",
       "added": "2026-11-10 11:33",
-      "note": "builder: add-globe-cubed-sphere-grid-and-elevation-sculpting"
+      "note": "builder: add-globe-cubed-sphere-grid-and-elevation-sculpting",
+      "removed": "2026-11-11 16:30"
     },
     {
       "kind": "worktree",
