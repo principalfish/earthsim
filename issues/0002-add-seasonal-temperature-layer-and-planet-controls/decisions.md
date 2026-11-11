@@ -27,11 +27,18 @@
 - Pieces 1 to 4 run without review pauses or go-ahead pauses, each committed and pushed once its checks and analysis loop are clean; the builder then stops with the timing table and first Earth error figures ("Run 1 to 4, stop with the timings"). Builder questions still stop the run. (2026-11-11)
 - Star mass is a fifth planet control ("Add star mass as a setting"), chosen over deriving mass from brightness (the planner's recommendation) and over treating every year as Earth-length. Year length follows exactly from Kepler's third law: Earth years equal the square root of orbit distance cubed over star mass, in solar units. The user first asked whether year length matters; it does, because a season's length sets how far land and ocean warm and cool, so a short year blurs the seasons and a long one deepens them. Any brightness can be paired with any mass. (2026-11-11)
 
+- The sun is drawn in the scene (the user, after the builder was started: "as part of this can we render the sun in the background when appropriate"). It is always drawn, and shows whenever it is in view and not hidden by the planet. (2026-11-11)
+- Sunlight is a toggle, off by default: on, the globe is lit from the sun with a day side and a night side whose edge tilts with the seasons; off, the globe stays evenly lit as now ("A sunlight toggle, off by default"). (2026-11-11)
+- The sun sits over one fixed line of longitude and moves north and south through the year as the tilt dictates, following the month on screen; the model has no time of day ("Fixed side, moving with the months"). (2026-11-11)
+- The sun's look follows the star settings: apparent size grows with a bigger star or a closer orbit, colour runs from redder for a cool, dim star to bluer-white for a hot, bright one, worked out from brightness and mass, drawn larger than life with a glow ("Follows the star settings"). (2026-11-11)
+
 ## Open
-- Drawing the sun in the scene (the user, 2026-11-11, after the builder was started: "as part of this can we render the sun in the background when appropriate"). To settle: whether it also lights the globe, leaving a night side; where it sits, given the model has no time of day; how its size and colour follow the star settings; and which piece it becomes.
+
+_None._
 
 ## Assumed
 - Temperature means near-surface air temperature in degrees Celsius, one value per cell per month.
+- For the sun: the fixed longitude is 0 (noon over the prime meridian); the star's radius is estimated from its mass by the main-sequence relation and its surface temperature from brightness and radius; the sunlight toggle is a view setting and is not saved; with sunlight on the night side keeps a little light so it is not black. The user was told these.
 - Planet settings and the world's date are saved with the world (optional header fields, so existing files load with Earth's values and year zero). Computed layers are not saved; they are recomputed on load.
 - Temperature runs in its own worker, separate from the statistics worker, and results are transferred, not copied.
 - While a result is out of date the previous one stays on screen, marked as out of date, with a progress indicator.
