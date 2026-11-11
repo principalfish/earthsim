@@ -14,7 +14,7 @@ Not included: any climate or time simulation, a flat map view, and changing a wo
 
 ## Plan
 
-_2026-11-11 · 10 of 11 pieces done · now: piece 11 in progress_
+_2026-11-11 · 10 of 11 pieces done · now: waiting on review of piece 11_
 
 - [x] **1/11 Scaffold tooling and app shell** · `b22e81a`
   An npm project with Vite, Vitest, Biome, TypeScript and Three.js, and an empty page.
@@ -36,5 +36,5 @@ _2026-11-11 · 10 of 11 pieces done · now: piece 11 in progress_
   Create a blank or generated world at a chosen resolution.
 - [x] **10/11 Save, load and autosave** · `0f565b8`
   Export and import world files, and restore the current world after a refresh.
-- [ ] **11/11 Earth preset** · in progress
+- [ ] **11/11 Earth preset** · waiting on you
   Real Earth elevation from NOAA's ETOPO 2022 as a starting world.

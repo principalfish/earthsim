@@ -14,7 +14,9 @@ If the branch head or `meta` differs, stop and tell the user.
 All design decisions are in `decisions.md` (Settled) and `plan.md` (Context and Notes). The ones that shape how the build runs: the implementation model is `claude-fable-5-2` for this issue only; pieces 1 to 4 and 7 to 8 ran without review pauses at the user's request; pieces 5 and 6 were approved after the user tried them ("Tried it, approve"); the build was paused twice at the user's request and resumed each time on "resume".
 
 ## The pending decision (exact)
-Nothing is pending with the user. Next for them: piece 11's manual review and diff approval, when the builder's review request arrives. After piece 11 is committed the builder sets state `review`.
+Piece 11 (Earth preset), the last piece, is built, checked and **uncommitted** in the builder's worktree; the branch head is `0f565b8` (piece 10). The builder sent its review request and the user has been given the review briefing. Waiting on the user for the manual review, then diff approval: from the builder's worktree run `npm run dev` (or reload their own dev server, last seen on http://127.0.0.1:5176/); New world, Earth, at 64, 128 and 256; check the continents are recognisable, correctly placed and not mirrored, both poles stand high, and Statistics read about 29% land. Known: ice sheets are drawn brown because the globe colours by height. Relay an approval only when the user's words say they tried it. On approval the builder commits, pushes and sets state `review`.
+
+Also raised by the builder, for the planner chat to decide with the user: the coverage script measures `src/` only and reports nothing for `scripts/`; it could be widened in `.planner/tools/coverage-changed.sh`.
 
 ## What the next session does
 1. Run the state checks. `planner.py ingest 1`; if it warns that a file changed in both places, merge by hand (edit the record, save, copy the merged file over the builder's copy in `<worktree>/.planner-outbox/issue/`, ingest again).
