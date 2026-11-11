@@ -11,3 +11,4 @@
 - 2026-11-10 11:34 · add-globe-cubed-sphere-grid-and-elevation-sculpting (0001) · build_model = claude-fable-5-2
 - 2026-11-10 11:49 · add-globe-cubed-sphere-grid-and-elevation-sculpting (0001) · PR #2
 - 2026-11-11 12:58 · add-globe-cubed-sphere-grid-and-elevation-sculpting (0001) · building → review
+- 2026-11-11 15:57 · add-seasonal-temperature-layer-and-planet-controls (0002) · created (build): Add seasonal temperature layer and planet controls

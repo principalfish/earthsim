@@ -1,0 +1,14 @@
+{
+  "id": 2,
+  "slug": "add-seasonal-temperature-layer-and-planet-controls",
+  "title": "Add seasonal temperature layer and planet controls",
+  "mode": "build",
+  "state": "investigating",
+  "branch": "add-seasonal-temperature-layer-and-planet-controls",
+  "base": "main",
+  "gh_issue": null,
+  "build_model": null,
+  "created": "2026-11-11 15:57",
+  "updated": "2026-11-11 15:57",
+  "done": null
+}
