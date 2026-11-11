@@ -21,7 +21,7 @@ The world is saved in the browser as you work: about a second after the last str
 
 **Export** downloads the world as a file named `world.earthsim`. **Import** replaces the current world with the one in such a file, at once and without asking, and like a new world it leaves nothing to undo. A file that is not a world file, or one that is damaged, cut short or made by a newer version, is refused with a message under the buttons, and the current world is left untouched.
 
-What is saved, in the browser and in a file alike, is the world only: its terrain, its resolution, its sea level and how it started. An Earth world is saved with its terrain like any other, so it comes back, and imports, without the elevation data being fetched again. The undo history, the camera, the relief exaggeration, the grid setting and the tool settings are not saved. A sea level beyond the ends of the Sea level slider is brought to the nearer end when a world is imported or brought back.
+What is saved, in the browser and in a file alike, is the world only: its terrain, its resolution, its sea level and how it started. An Earth world is saved with its terrain like any other, so it comes back, and imports, without the elevation data being fetched again. The undo history, the camera, the relief exaggeration, the grid setting and the tool settings are not saved. A sea level that the Sea level slider cannot show is brought to one it can when a world is imported or brought back: to the nearest 10 m, the higher of two equally near, and to the nearer end of the slider if it lies beyond.
 
 The Tools panel chooses what the left mouse button does on the globe:
 
@@ -37,7 +37,13 @@ The Undo and Redo buttons at the top of the Tools panel step back and forward th
 
 Up to the last 100 strokes can be undone, or fewer once they hold about 64 MB between them, which takes very long strokes on a fine grid. Making a new stroke after an undo discards what could have been redone. The keys do nothing while a stroke is being made, while typing in a text field or while the New world dialog is open. Only the terrain is put back: the sea level, the view settings and the tool settings are not part of the history.
 
-The Statistics readout at the bottom of the panel shows how much of the surface is land, the highest and deepest points, the mean height of the land and the mean depth of the ocean. It follows the terrain and the sea level, a moment after each stroke, undo, redo or move of the Sea level slider. Until the first figures arrive, and again after a new world is made, it says "Calculating…", and if the worker that computes them cannot be started or fails it says "Statistics unavailable" and hides the figures, while the rest of the page keeps working. The highest and deepest points are elevations on the scale of the Sea level slider; the two means are measured from the sea level.
+The View panel sets how the world is drawn and where its sea stands:
+
+- **Relief exaggeration**, from 1× (true scale) to 100×: how many times taller than it is the land is drawn above the sea, and how much steeper its slopes are shaded. A new page starts at 40×. Only the drawing changes: the terrain, the brushes and the statistics are the same at every setting.
+- **Sea level**, from −6,000 to 6,000 m in steps of 10 m: the height the sea stands at on the scale the terrain is measured on. Land is whatever stands above it, so raising it floods the low ground and lowering it lays the sea floor bare. The level is part of the world, and the statistics follow it.
+- **Show cell grid**: draws the outlines of the grid's cells over the globe. It starts off.
+
+The Statistics readout at the bottom of the panel shows how much of the surface is land, the highest and deepest points, the mean height of the land and the mean depth of the ocean. It follows the terrain and the sea level, a moment after each stroke, undo, redo or move of the Sea level slider. Until the first figures arrive, and again after a new world is made, it says "Calculating…", and if the worker that computes them cannot be started or fails it says "Statistics unavailable" and hides the figures, while the rest of the page keeps working. Once the worker itself is gone it goes on saying so, for later worlds too, until the page is reloaded. The highest and deepest points are elevations on the scale of the Sea level slider; the two means are measured from the sea level.
 
 ## Development
 
@@ -56,7 +62,9 @@ Requires Node.js and npm. Run `npm install` once, then:
   - `src/core/serialize.ts`: the world file format, and the checks a file must pass to be read as a world.
   - `src/core/earth.ts`: reading the Earth data file, and the Earth as a world at each resolution.
 - `src/app/`: the page, which imports the core.
-  - `src/app/main.ts`: joins the parts of the page together.
+  - `src/app/main.ts`: makes the parts of the page from the document, the globe, the worker and the browser's storage, and hands them over to be joined.
+  - `src/app/wiring.ts`: joins the parts of the page together: which part hears of what, and in which order.
+  - `src/app/startup.ts`: what the page does once it knows what was saved before: bring the saved world back, or open the New world dialog.
   - `src/app/appState.ts`: the world being edited, and the one way of replacing it.
   - `src/app/sculpt.ts`: sculpting with the mouse, which turns the cursor's path into dabs of a brush.
   - `src/app/undo.ts`: undo and redo of strokes, and the keys that ask for them.
@@ -66,6 +74,7 @@ Requires Node.js and npm. Run `npm install` once, then:
   - `src/app/earthData.ts`: fetching the Earth data file the first time it is needed.
   - `src/app/globe/`: the globe's renderer, shaders, camera and picking.
   - `src/app/ui/`: the panels of controls and the New world dialog.
+  - `src/app/testing/`: stand-ins for the canvas and the browser's animation frames, which only the tests use.
 - `src/worker/`: the Web Worker that computes from a copy of the world and keeps nothing between requests.
   - `src/worker/sim.worker.ts`: the worker itself, which only passes messages to the handler.
   - `src/worker/handle.ts`: the message handler, a plain function that answers one request.
@@ -73,7 +82,7 @@ Requires Node.js and npm. Run `npm install` once, then:
 - `public/data/earth-256.bin`: the Earth's elevation, served beside the page as it is.
 - `scripts/`: what builds the data, run with Node rather than in the browser.
   - `scripts/build-earth-data.ts`: downloads the source and writes `public/data/earth-256.bin`.
-  - `scripts/earth/`: the parts of that script that touch no file: reading the source's TIFF format, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data file for the tests.
+  - `scripts/earth/`: the parts of that script that touch no file: what the source file must be and the checks on its download, reading its TIFF format, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data file for the tests.
   - `scripts/run-with-vite.mjs`: runs a TypeScript script through Vite, so that it can import the core.
 
 The core is compiled without the DOM type library, and the worker and its handler with the worker's in place of it, so a `document` or `window` reference in either fails `npm run typecheck`. The project does not depend on Node's type package either, so nothing under `src/` can use a Node API; the scripts are type-checked against the few Node functions they call, declared by hand in `scripts/node.d.ts`.
@@ -89,6 +98,6 @@ It is derived from NOAA's ETOPO 2022 global relief model:
 - **Citation**: NOAA National Centers for Environmental Information. 2022: ETOPO 2022 15 Arc-Second Global Relief Model. NOAA National Centers for Environmental Information. https://doi.org/10.25921/fd45-gt74 . Accessed 2026-11-11.
 - **Licence**, as stated on NOAA's metadata page for that DOI, read on 2026-11-11: "These data were produced by NOAA and are not subject to copyright protection in the United States. NOAA waives any potential copyright and related rights in these data worldwide through the Creative Commons Zero 1.0 Universal Public Domain Dedication (CC0-1.0)." The same page says: "Not to be used for navigation."
 
-To rebuild the file, run `npm run build:earth`. It downloads the GeoTIFF, about 466 MB, into `.cache/etopo/`, which is not committed, and reuses it from there afterwards; a download that was cut off carries on where it stopped. Each pixel goes to the cell that holds its centre and counts in that cell's mean by its area. The build takes about 40 seconds once the file is there, and gives the same bytes every time.
+To rebuild the file, run `npm run build:earth`. It downloads the GeoTIFF, about 466 MB, into `.cache/etopo/`, which is not committed, and reuses it from there afterwards; a download that was cut off carries on where it stopped, and one that would grow past the file's length is stopped and deleted. Each pixel goes to the cell that holds its centre and counts in that cell's mean by its area. The build takes about 40 seconds once the file is there, and gives the same bytes every time.
 
 The script reads the GeoTIFF with its own small reader rather than a library. `npm run build:earth -- --verify-with-gdal` first compares what that reader gives with what [GDAL](https://gdal.org/)'s `gdallocationinfo` gives at about 2,400 pixels (the corners, the edges, the corners where tiles meet, and pixels at random) and stops if any differs; without GDAL installed it says so and carries on. When the file in this repository was built, on 2026-11-11 with GDAL 3.12.2, those pixels matched bit for bit, as did all 233,280,000 pixels in a separate comparison with the whole image as `gdal_translate` decodes it. The cell means were also worked out a second time from GDAL's copy of the image, with separate code: 392,815 cells came out the same to the metre, 3 differed by the rounding of a mean that ends in a half, and 398 lie beside lines between cells that the centres of whole columns of pixels fall exactly on, where rounding decides which cell a pixel goes to; none of those differed by more than 15 m.

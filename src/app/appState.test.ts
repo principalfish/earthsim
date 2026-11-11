@@ -461,3 +461,116 @@ describe('replaceWorld keeping the sea level', () => {
 		).not.toThrow();
 	});
 });
+
+describe('replaceWorld keeping the sea level on a control with a step', () => {
+	/** The levels of a sea-level slider: every 10 m from −6,000 to 6,000. */
+	const STEPPED = { minM: -6000, maxM: 6000, stepM: 10 };
+
+	const createKeeper = (
+		seaLevelRange = STEPPED,
+	): ((metres: number) => number) => {
+		const state = createAppState({
+			world: createBlankWorld(64),
+			seaLevelRange,
+		});
+		return (metres) => {
+			const next = createBlankWorld(64);
+			next.seaLevel = metres;
+			state.replaceWorld(next, { keepSeaLevel: true });
+			expect(next.seaLevel).toBe(state.world.seaLevel);
+			return state.world.seaLevel;
+		};
+	};
+
+	it('rounds the sea level to the nearest level the control has', () => {
+		const kept = createKeeper();
+		expect(kept(123.4)).toBe(120);
+		expect(kept(126)).toBe(130);
+		expect(kept(-123.4)).toBe(-120);
+		expect(kept(-126)).toBe(-130);
+		expect(kept(4.9)).toBe(0);
+	});
+
+	it('rounds a sea level halfway between two levels to the higher', () => {
+		const kept = createKeeper();
+		expect(kept(125)).toBe(130);
+		expect(kept(5)).toBe(10);
+		expect(kept(-125)).toBe(-120);
+		expect(kept(-5)).toBe(0);
+	});
+
+	it('leaves a sea level that is already one of the levels as it is', () => {
+		const kept = createKeeper();
+		for (const metres of [0, 10, -10, 120, 1250, -3330, 6000, -6000]) {
+			expect(kept(metres)).toBe(metres);
+		}
+	});
+
+	it('brings a sea level outside the range to its nearer end', () => {
+		const kept = createKeeper();
+		expect(kept(-6004)).toBe(-6000);
+		expect(kept(-6010)).toBe(-6000);
+		expect(kept(MIN_ELEVATION_M)).toBe(-6000);
+		expect(kept(-Infinity)).toBe(-6000);
+		expect(kept(6004)).toBe(6000);
+		expect(kept(MAX_ELEVATION_M)).toBe(6000);
+		expect(kept(Infinity)).toBe(6000);
+	});
+
+	it('counts the levels from the lowest of the range', () => {
+		const kept = createKeeper({ minM: -5, maxM: 100, stepM: 10 });
+		expect(kept(0)).toBe(5);
+		expect(kept(-1)).toBe(-5);
+		expect(kept(52)).toBe(55);
+		// The highest level is the end of the range, on a step or not.
+		expect(kept(99)).toBe(95);
+		expect(kept(104)).toBe(100);
+	});
+
+	it('tells the listeners the rounded level', () => {
+		const state = createAppState({
+			world: createBlankWorld(64),
+			seaLevelRange: STEPPED,
+		});
+		const seen: number[] = [];
+		state.addListener((world) => seen.push(world.seaLevel));
+		const next = createBlankWorld(64);
+		next.seaLevel = 123.4;
+		state.replaceWorld(next, { keepSeaLevel: true });
+		expect(seen).toEqual([120]);
+	});
+
+	it('still resets the sea level of a new world to the default', () => {
+		const state = createAppState({
+			world: createBlankWorld(64),
+			seaLevelRange: STEPPED,
+		});
+		const next = createBlankWorld(64);
+		next.seaLevel = normaliseSeaLevel(123.4);
+		state.replaceWorld(next);
+		expect(next.seaLevel).toBe(DEFAULT_SEA_LEVEL_M);
+	});
+
+	it('refuses a sea level that is not a number, changing nothing', () => {
+		const first = createBlankWorld(64);
+		const state = createAppState({ world: first, seaLevelRange: STEPPED });
+		const next = createBlankWorld(64);
+		next.seaLevel = Number.NaN;
+		expect(() => state.replaceWorld(next, { keepSeaLevel: true })).toThrow(
+			RangeError,
+		);
+		expect(state.world).toBe(first);
+	});
+
+	it('refuses a step that is not a positive finite number', () => {
+		const world = createBlankWorld(64);
+		for (const stepM of [0, -10, Number.NaN, Infinity]) {
+			expect(() =>
+				createAppState({
+					world,
+					seaLevelRange: { minM: -6000, maxM: 6000, stepM },
+				}),
+			).toThrow(RangeError);
+		}
+	});
+});

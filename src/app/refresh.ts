@@ -37,6 +37,17 @@ export type RefreshOptions<T, H> = {
 	readonly onResult: (result: T) => void;
 	/** Called with what went wrong when a request fails. */
 	readonly onError: (error: unknown) => void;
+	/**
+	 * Called when `reset` leaves the result on show describing something
+	 * that is no longer there, with the next result still to come. Left out,
+	 * nobody is told.
+	 */
+	readonly onPending?: () => void;
+	/**
+	 * Called when `markUnavailable` says that no request can be answered
+	 * any more, and again for every `refresh` after that.
+	 */
+	readonly onUnavailable: () => void;
 };
 
 /** Keeps a computed result up to date with what it is computed from. */
@@ -48,8 +59,25 @@ export type RefreshScheduler = {
 	 */
 	refresh(): void;
 	/**
-	 * Cancels a request that is waiting to be made and stops reporting:
-	 * neither callback is called again, and `refresh` does nothing.
+	 * Says that what the result is computed from has been replaced by
+	 * something else, as a world is by another. The answer to a request
+	 * already made, whether a result or an error, is dropped when it
+	 * arrives, and `onPending` is called. A request that is waiting to be
+	 * made still is: it describes things as they are when it is made. Once
+	 * marked unavailable, this does nothing.
+	 */
+	reset(): void;
+	/**
+	 * Says that no request can be answered from now on, as when the worker
+	 * that answers them is gone. `onUnavailable` is called, now and for
+	 * every `refresh` afterwards, and no request is made again; one that is
+	 * waiting to be made is cancelled, and a result still on its way is
+	 * dropped. There is no way back.
+	 */
+	markUnavailable(): void;
+	/**
+	 * Cancels a request that is waiting to be made and stops reporting: no
+	 * callback is called again, and the other methods do nothing.
 	 */
 	dispose(): void;
 };
@@ -75,6 +103,9 @@ export type RefreshScheduler = {
  * and the earlier one comes back superseded, which is not an error and is
  * reported to nobody. A result is therefore never replaced by an older one.
  *
+ * A request that fails is reported and forgotten: the next `refresh` asks
+ * again. Only `markUnavailable` stops the asking for good.
+ *
  * @param options - The request, the wait, the timers and the callbacks.
  * @returns The scheduler.
  */
@@ -83,20 +114,25 @@ export const createRefreshScheduler = <T, H>(
 ): RefreshScheduler => {
 	let timer: { readonly handle: H } | null = null;
 	let disposed = false;
+	let unavailable = false;
+	/** Counts the calls of `reset`: an answer is wanted only by its own. */
+	let generation = 0;
 
 	// As an async function, so that a request that throws instead of
 	// returning a promise is reported like one that rejects.
 	const ask = async (): Promise<LatestOutcome<T>> => options.request();
 
 	const send = (): void => {
+		const asked = generation;
+		const wanted = (): boolean => !disposed && asked === generation;
 		ask().then(
 			(outcome) => {
-				if (!disposed && !outcome.superseded) {
+				if (wanted() && !unavailable && !outcome.superseded) {
 					options.onResult(outcome.result);
 				}
 			},
 			(error: unknown) => {
-				if (!disposed) {
+				if (wanted()) {
 					options.onError(error);
 				}
 			},
@@ -128,8 +164,27 @@ export const createRefreshScheduler = <T, H>(
 			if (disposed) {
 				return;
 			}
+			if (unavailable) {
+				options.onUnavailable();
+				return;
+			}
 			cancel();
 			arm();
+		},
+		reset: () => {
+			if (disposed || unavailable) {
+				return;
+			}
+			generation++;
+			options.onPending?.();
+		},
+		markUnavailable: () => {
+			if (disposed) {
+				return;
+			}
+			unavailable = true;
+			cancel();
+			options.onUnavailable();
 		},
 		dispose: () => {
 			disposed = true;

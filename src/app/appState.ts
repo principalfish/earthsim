@@ -24,6 +24,12 @@ export type SeaLevelRange = {
 	readonly minM: number;
 	/** The highest sea level; not below the lowest. */
 	readonly maxM: number;
+	/**
+	 * How far apart the levels that can be shown and set are, counted from
+	 * the lowest, in metres: the step of the control that sets the sea
+	 * level. Left out, every level within the range can be.
+	 */
+	readonly stepM?: number;
 };
 
 /** What an app state starts with. */
@@ -36,9 +42,10 @@ export type AppStateOptions = {
 	/** Listeners to start with, as if each had been added in this order. */
 	readonly listeners?: readonly WorldListener[];
 	/**
-	 * The range a sea level that is kept is brought within: that of the
+	 * The levels a sea level that is kept is brought to: those of the
 	 * control that sets the sea level, so that the control can show every
-	 * world's own. Left out, it is the range of elevations a cell can hold.
+	 * world's own. Left out, it is the range of elevations a cell can hold,
+	 * with no step.
 	 */
 	readonly seaLevelRange?: SeaLevelRange;
 };
@@ -75,8 +82,9 @@ export type AppState = {
 	 *    through {@link normaliseSeaLevel}: a new world starts from the
 	 *    default whatever the page's sea level was, and whatever the world
 	 *    was given. With `keepSeaLevel`, the world's own sea level is
-	 *    brought within the app state's sea-level range instead, to the
-	 *    nearer end if it lies outside, and through
+	 *    instead rounded to the nearest level the app state's sea-level
+	 *    range has a step on, the higher of two equally near, then brought
+	 *    to the nearer end of the range if it lies outside, and put through
 	 *    {@link normaliseSeaLevel}.
 	 * 2. The new world becomes {@link AppState.world}.
 	 * 3. Every listener is called with the new world, in the order they
@@ -109,18 +117,33 @@ export type AppState = {
  * of sea levels.
  * @returns The app state.
  * @throws RangeError if the sea-level range has a lowest level that is not
- * at or below its highest.
+ * at or below its highest, or a step that is not a positive finite number.
  */
 export const createAppState = (options: AppStateOptions): AppState => {
-	const { minM, maxM } = options.seaLevelRange ?? {
+	const range: SeaLevelRange = options.seaLevelRange ?? {
 		minM: MIN_ELEVATION_M,
 		maxM: MAX_ELEVATION_M,
 	};
+	const { minM, maxM, stepM } = range;
 	if (!(minM <= maxM)) {
 		throw new RangeError(
 			`A sea-level range needs a lowest level at or below its highest; got ${minM} to ${maxM}`,
 		);
 	}
+	if (stepM !== undefined && !(stepM > 0 && Number.isFinite(stepM))) {
+		throw new RangeError(
+			`A sea-level range needs a step that is a positive finite number; got ${stepM}`,
+		);
+	}
+	/** The level the control shows for a sea level a world comes with. */
+	const shownLevel = (metres: number): number => {
+		// Halves go to the higher level, as a slider's own rounding does.
+		const stepped =
+			stepM === undefined
+				? metres
+				: minM + Math.round((metres - minM) / stepM) * stepM;
+		return Math.min(maxM, Math.max(minM, stepped));
+	};
 	const listeners: WorldListener[] = [...(options.listeners ?? [])];
 	let current = options.world;
 	let announcing = false;
@@ -138,11 +161,10 @@ export const createAppState = (options: AppStateOptions): AppState => {
 					'The world cannot be replaced while a replacement is being announced',
 				);
 			}
-			// A NaN passes through the range unchanged and is then refused.
+			// A NaN passes through the step and the range unchanged and is
+			// then refused.
 			world.seaLevel = normaliseSeaLevel(
-				keepSeaLevel
-					? Math.min(maxM, Math.max(minM, world.seaLevel))
-					: DEFAULT_SEA_LEVEL_M,
+				keepSeaLevel ? shownLevel(world.seaLevel) : DEFAULT_SEA_LEVEL_M,
 			);
 			current = world;
 

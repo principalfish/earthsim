@@ -64,6 +64,8 @@ type Harness = {
 	readonly asked: Asked[];
 	readonly results: number[];
 	readonly errors: unknown[];
+	/** What the scheduler said besides, in order. */
+	readonly notices: ('pending' | 'unavailable')[];
 };
 
 const DEBOUNCE_MS = 150;
@@ -75,6 +77,7 @@ const createHarness = (
 	const asked: Asked[] = [];
 	const results: number[] = [];
 	const errors: unknown[] = [];
+	const notices: ('pending' | 'unavailable')[] = [];
 	const scheduler = createRefreshScheduler<number, number>({
 		request: () =>
 			new Promise((resolve, reject) => {
@@ -85,9 +88,11 @@ const createHarness = (
 		clearTimer: timers.clearTimer,
 		onResult: (result) => results.push(result),
 		onError: (error) => errors.push(error),
+		onPending: () => notices.push('pending'),
+		onUnavailable: () => notices.push('unavailable'),
 		...options,
 	});
-	return { scheduler, timers, asked, results, errors };
+	return { scheduler, timers, asked, results, errors, notices };
 };
 
 /** Lets every promise that is already settled run its reactions. */
@@ -174,6 +179,7 @@ describe('createRefreshScheduler', () => {
 			clearTimer: timers.clearTimer,
 			onResult: () => {},
 			onError: () => {},
+			onUnavailable: () => {},
 		});
 
 		scheduler.refresh();
@@ -247,6 +253,7 @@ describe('createRefreshScheduler', () => {
 			clearTimer: timers.clearTimer,
 			onResult: () => {},
 			onError: (error) => errors.push(error),
+			onUnavailable: () => {},
 		});
 
 		scheduler.refresh();
@@ -394,5 +401,204 @@ describe('createRefreshScheduler told when a change is under way', () => {
 		expect(asked).toHaveLength(1);
 		expect(timers.started()).toBe(1);
 		expect(timers.pending()).toBe(0);
+	});
+});
+
+describe('createRefreshScheduler told that its subject was replaced', () => {
+	it('drops a result that arrives after the reset', async () => {
+		const { scheduler, timers, asked, results, errors, notices } =
+			createHarness();
+		scheduler.refresh();
+		timers.advance(DEBOUNCE_MS);
+		await settle();
+
+		scheduler.reset();
+		expect(notices).toEqual(['pending']);
+		asked[0]?.resolve(done(1));
+		await settle();
+
+		expect(results).toEqual([]);
+		expect(errors).toEqual([]);
+	});
+
+	it('shows the result of the request made after the reset', async () => {
+		const { scheduler, timers, asked, results } = createHarness();
+		scheduler.refresh();
+		timers.advance(DEBOUNCE_MS);
+		await settle();
+
+		scheduler.reset();
+		scheduler.refresh();
+		// The old answer lands inside the wait for the new request.
+		timers.advance(DEBOUNCE_MS - 1);
+		asked[0]?.resolve(done(1));
+		await settle();
+		expect(results).toEqual([]);
+
+		timers.advance(1);
+		await settle();
+		expect(asked).toHaveLength(2);
+		asked[1]?.resolve(done(2));
+		await settle();
+		expect(results).toEqual([2]);
+	});
+
+	it('drops an error that arrives after the reset', async () => {
+		const { scheduler, timers, asked, results, errors } = createHarness();
+		scheduler.refresh();
+		timers.advance(DEBOUNCE_MS);
+		await settle();
+
+		scheduler.reset();
+		asked[0]?.reject(new Error('too late'));
+		await settle();
+
+		expect(errors).toEqual([]);
+		expect(results).toEqual([]);
+	});
+
+	it('still makes a request that was waiting, and shows its result', async () => {
+		const { scheduler, timers, asked, results } = createHarness();
+		scheduler.refresh();
+		scheduler.reset();
+		timers.advance(DEBOUNCE_MS);
+		await settle();
+
+		expect(asked).toHaveLength(1);
+		asked[0]?.resolve(done(7));
+		await settle();
+		expect(results).toEqual([7]);
+	});
+
+	it('says the result is pending each time, and only then', async () => {
+		const { scheduler, timers, notices } = createHarness();
+		scheduler.refresh();
+		timers.advance(DEBOUNCE_MS);
+		await settle();
+		expect(notices).toEqual([]);
+
+		scheduler.reset();
+		scheduler.reset();
+		expect(notices).toEqual(['pending', 'pending']);
+	});
+
+	it('needs nobody to tell that the result is pending', () => {
+		const timers = createFakeTimers();
+		const scheduler = createRefreshScheduler<number, number>({
+			request: () => new Promise(() => {}),
+			debounceMs: DEBOUNCE_MS,
+			setTimer: timers.setTimer,
+			clearTimer: timers.clearTimer,
+			onResult: () => {},
+			onError: () => {},
+			onUnavailable: () => {},
+		});
+		expect(() => scheduler.reset()).not.toThrow();
+	});
+
+	it('does nothing once disposed', async () => {
+		const { scheduler, notices } = createHarness();
+		scheduler.dispose();
+		scheduler.reset();
+		expect(notices).toEqual([]);
+	});
+});
+
+describe('createRefreshScheduler marked unavailable', () => {
+	it('says so at once', () => {
+		const { scheduler, notices } = createHarness();
+		scheduler.markUnavailable();
+		expect(notices).toEqual(['unavailable']);
+	});
+
+	it('asks for nothing afterwards, and says so again at every change', async () => {
+		const { scheduler, timers, asked, notices } = createHarness();
+		scheduler.markUnavailable();
+
+		scheduler.refresh();
+		expect(notices).toEqual(['unavailable', 'unavailable']);
+		expect(timers.pending()).toBe(0);
+		timers.advance(10_000);
+		await settle();
+		expect(asked).toHaveLength(0);
+
+		scheduler.refresh();
+		expect(notices).toEqual(['unavailable', 'unavailable', 'unavailable']);
+		expect(timers.started()).toBe(0);
+	});
+
+	it('does not say the result is pending when its subject is replaced', async () => {
+		const { scheduler, timers, asked, notices } = createHarness();
+		scheduler.markUnavailable();
+
+		scheduler.reset();
+		scheduler.refresh();
+		timers.advance(10_000);
+		await settle();
+
+		expect(notices).toEqual(['unavailable', 'unavailable']);
+		expect(asked).toHaveLength(0);
+	});
+
+	it('cancels a request that was waiting to be made', async () => {
+		const { scheduler, timers, asked } = createHarness();
+		scheduler.refresh();
+		scheduler.markUnavailable();
+		expect(timers.pending()).toBe(0);
+		timers.advance(10_000);
+		await settle();
+		expect(asked).toHaveLength(0);
+	});
+
+	it('drops a result still on its way, and reports an error', async () => {
+		const first = createHarness();
+		first.scheduler.refresh();
+		first.timers.advance(DEBOUNCE_MS);
+		await settle();
+		first.scheduler.markUnavailable();
+		first.asked[0]?.resolve(done(3));
+		await settle();
+		expect(first.results).toEqual([]);
+		expect(first.errors).toEqual([]);
+
+		const second = createHarness();
+		second.scheduler.refresh();
+		second.timers.advance(DEBOUNCE_MS);
+		await settle();
+		second.scheduler.markUnavailable();
+		const failure = new Error('the worker is gone');
+		second.asked[0]?.reject(failure);
+		await settle();
+		expect(second.errors).toEqual([failure]);
+		expect(second.results).toEqual([]);
+	});
+
+	it('is not what a request that fails does: the next change asks again', async () => {
+		const { scheduler, timers, asked, results, errors, notices } =
+			createHarness();
+		scheduler.refresh();
+		timers.advance(DEBOUNCE_MS);
+		await settle();
+		asked[0]?.reject(new Error('could not compute'));
+		await settle();
+		expect(errors).toHaveLength(1);
+
+		scheduler.refresh();
+		timers.advance(DEBOUNCE_MS);
+		await settle();
+		expect(asked).toHaveLength(2);
+		asked[1]?.resolve(done(9));
+		await settle();
+
+		expect(results).toEqual([9]);
+		expect(notices).toEqual([]);
+	});
+
+	it('does nothing once disposed', () => {
+		const { scheduler, notices } = createHarness();
+		scheduler.dispose();
+		scheduler.markUnavailable();
+		scheduler.refresh();
+		expect(notices).toEqual([]);
 	});
 });

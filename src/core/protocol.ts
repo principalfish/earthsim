@@ -82,6 +82,7 @@ const KINDS: { readonly [K in SimKind]: true } = { terrainStats: true };
 /** The most characters of an unknown kind that an error message repeats. */
 const MAX_ECHOED_KIND_LENGTH = 40;
 
+/** Whether a value's fields can be read by name: any object, arrays included. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === 'object' && value !== null;
 

@@ -183,6 +183,34 @@ export const strengthScale = (
 				format: (value) => formatStrength(tool, value),
 			};
 
+/**
+ * Which of the undo and redo buttons should take the keyboard's focus when
+ * what can be undone and redone changes.
+ *
+ * @remarks
+ * A button with nothing to do is disabled, and a button disabled while it
+ * has the focus drops the focus to the page. The other button takes it
+ * instead, if it is still enabled, so that the keyboard keeps its place.
+ *
+ * @param focused - The button that has the focus as the change is made, or
+ * null if neither has.
+ * @param state - What can be undone and redone from now on.
+ * @returns The button to give the focus to, or null to leave the focus
+ * where it is.
+ */
+export const historyFocusAfter = (
+	focused: HistoryAction | null,
+	state: HistoryState,
+): HistoryAction | null => {
+	if (focused === 'undo' && !state.canUndo && state.canRedo) {
+		return 'redo';
+	}
+	if (focused === 'redo' && !state.canRedo && state.canUndo) {
+		return 'undo';
+	}
+	return null;
+};
+
 /** What a group of radio buttons choosing the tool is built from. */
 type ToolPickerOptions = {
 	readonly tool: Tool;
@@ -258,16 +286,17 @@ export const createToolPanel = (
 	const redo = historyButton('redo');
 	const historyRow = createElement('div', 'button-row');
 	historyRow.append(undo, redo);
+	const buttons = { undo, redo };
 	const setHistoryState = (state: HistoryState): void => {
-		// A button disabled while it has the focus drops the focus to the
-		// page; the other button takes it so the keyboard keeps its place.
-		const focused = document.activeElement;
+		// Read before either button is disabled, which is what moves the
+		// focus away.
+		const active = document.activeElement;
+		const focused = active === undo ? 'undo' : active === redo ? 'redo' : null;
 		undo.disabled = !state.canUndo;
 		redo.disabled = !state.canRedo;
-		if (focused === undo && undo.disabled && !redo.disabled) {
-			redo.focus();
-		} else if (focused === redo && redo.disabled && !undo.disabled) {
-			undo.focus();
+		const next = historyFocusAfter(focused, state);
+		if (next !== null) {
+			buttons[next].focus();
 		}
 	};
 	setHistoryState(options.history ?? { canUndo: false, canRedo: false });

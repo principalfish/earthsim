@@ -157,7 +157,11 @@ export const createStatsPanel = (panel: HTMLElement): StatsPanel => {
 
 	/** Says something in place of the figures, with the note hidden. */
 	const showStatus = (text: string): void => {
-		status.textContent = text;
+		// Rewritten only if it differs, as the figures are: the same words
+		// set again would be announced again.
+		if (status.textContent !== text) {
+			status.textContent = text;
+		}
 		if (status.parentNode !== region) {
 			region.replaceChildren(status);
 			note.hidden = true;

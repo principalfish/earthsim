@@ -50,6 +50,8 @@ import {
 } from './earth/cells';
 import {
 	assertEtopoLayout,
+	contentRangeProblem,
+	downloadOverrun,
 	ETOPO_FILE_BYTES,
 	ETOPO_FILE_NAME,
 	ETOPO_NO_DATA,
@@ -156,10 +158,17 @@ const assertSourceDigest = (path: string): void => {
  * file and is replaced. A finished download has its SHA-256 checked too,
  * which also catches a file put together from the wrong parts.
  *
+ * Nothing is written past the file's full length: a server that sends more
+ * is cut off there and what was written is deleted. A server that answers
+ * the request for the rest of the file with some other part is refused
+ * before anything is written, and what is there is left as it was.
+ *
  * @returns The path of the file.
- * @throws Error if the server refuses, if the file is not its full length
- * once the download ends, or if its SHA-256 is not the one pinned, in which
- * case the file is deleted.
+ * @throws Error if the server refuses, if it sends another part of the file
+ * than the one asked for, if it sends more than the file's length, in which
+ * case the file is deleted, if the file is not its full length once the
+ * download ends, or if its SHA-256 is not the one pinned, in which case the
+ * file is deleted.
  */
 const ensureSource = async (): Promise<string> => {
 	mkdirSync(CACHE_DIRECTORY, { recursive: true });
@@ -186,14 +195,32 @@ const ensureSource = async (): Promise<string> => {
 	// 206 says the server sent only the part asked for; anything else that
 	// is a success is the whole file from its start.
 	const appending = resumeFrom > 0 && response.status === 206;
+	if (appending) {
+		const problem = contentRangeProblem(
+			response.headers.get('content-range'),
+			resumeFrom,
+		);
+		if (problem !== null) {
+			await response.body.cancel();
+			throw new Error(
+				`${problem}; delete ${path} to download the file from its start`,
+			);
+		}
+	}
 	let written = appending ? resumeFrom : 0;
 	let nextReport = written + DOWNLOAD_REPORT_BYTES;
+	let overrun: string | null = null;
 	const file = openSync(path, appending ? 'a' : 'w');
 	try {
 		const reader = response.body.getReader();
 		for (;;) {
 			const { done, value } = await reader.read();
 			if (done || value === undefined) {
+				break;
+			}
+			overrun = downloadOverrun(written + value.length);
+			if (overrun !== null) {
+				await reader.cancel();
 				break;
 			}
 			writeSync(file, value);
@@ -205,6 +232,12 @@ const ensureSource = async (): Promise<string> => {
 		}
 	} finally {
 		closeSync(file);
+	}
+	if (overrun !== null) {
+		unlinkSync(path);
+		throw new Error(
+			`${overrun}; the download was stopped and what was written was deleted`,
+		);
 	}
 	const size = fileSize(path);
 	if (size !== ETOPO_FILE_BYTES) {

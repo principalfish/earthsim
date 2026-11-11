@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
 	assertEtopoLayout,
+	contentRangeProblem,
+	downloadOverrun,
 	ETOPO_FILE_BYTES,
 	ETOPO_FILE_NAME,
 	ETOPO_FILE_SHA256,
@@ -166,5 +168,123 @@ describe('assertEtopoLayout', () => {
 		).toThrow(
 			/^The file is not laid out as ETOPO 2022 at 60 arc-seconds: the image is .*; the pixel size is .*; the tiepoint is .*; the raster type is .*; the no-data value is /,
 		);
+	});
+});
+
+describe('downloadOverrun', () => {
+	it('allows a download up to the length of the file', () => {
+		expect(downloadOverrun(0)).toBeNull();
+		expect(downloadOverrun(ETOPO_FILE_BYTES - 1)).toBeNull();
+		expect(downloadOverrun(ETOPO_FILE_BYTES)).toBeNull();
+	});
+
+	it('refuses a download as soon as it is longer than the file', () => {
+		expect(downloadOverrun(ETOPO_FILE_BYTES + 1)).toBe(
+			`The server sent more than the 465969062 bytes of ${ETOPO_FILE_NAME}`,
+		);
+		expect(downloadOverrun(ETOPO_FILE_BYTES * 4)).not.toBeNull();
+		expect(downloadOverrun(Infinity)).not.toBeNull();
+	});
+
+	it('stops a server that never stops sending at the first part too many', () => {
+		// A response of 64 KiB parts with no end, written as the script does.
+		const part = 65_536;
+		let written = 0;
+		let parts = 0;
+		while (downloadOverrun(written + part) === null) {
+			written += part;
+			parts++;
+		}
+		expect(written).toBeLessThanOrEqual(ETOPO_FILE_BYTES);
+		expect(written + part).toBeGreaterThan(ETOPO_FILE_BYTES);
+		expect(parts).toBe(Math.floor(ETOPO_FILE_BYTES / part));
+	});
+
+	it('counts what a resumed download already has', () => {
+		const have = ETOPO_FILE_BYTES - 100;
+		expect(downloadOverrun(have + 100)).toBeNull();
+		expect(downloadOverrun(have + 101)).not.toBeNull();
+	});
+});
+
+describe('contentRangeProblem', () => {
+	const LAST = ETOPO_FILE_BYTES - 1;
+
+	it('accepts the rest of the file from the byte asked for', () => {
+		expect(
+			contentRangeProblem(`bytes 1000-${LAST}/${ETOPO_FILE_BYTES}`, 1000),
+		).toBeNull();
+		expect(
+			contentRangeProblem(`bytes ${LAST}-${LAST}/${ETOPO_FILE_BYTES}`, LAST),
+		).toBeNull();
+	});
+
+	it('accepts a part that stops before the end of the file', () => {
+		expect(
+			contentRangeProblem(`bytes 1000-1999/${ETOPO_FILE_BYTES}`, 1000),
+		).toBeNull();
+	});
+
+	it('accepts a part that leaves the length of the file unsaid', () => {
+		expect(contentRangeProblem(`bytes 1000-${LAST}/*`, 1000)).toBeNull();
+	});
+
+	it('allows white space around the value', () => {
+		expect(
+			contentRangeProblem(` bytes 1000-${LAST}/${ETOPO_FILE_BYTES} `, 1000),
+		).toBeNull();
+	});
+
+	it('refuses a part that starts anywhere else', () => {
+		for (const first of [0, 999, 1001]) {
+			const header = `bytes ${first}-${LAST}/${ETOPO_FILE_BYTES}`;
+			expect(contentRangeProblem(header, 1000)).toBe(
+				`The server sent the part "${header}" of a file, expected "bytes 1000-${LAST}/${ETOPO_FILE_BYTES}"`,
+			);
+		}
+	});
+
+	it('refuses a part of a file of another length', () => {
+		expect(
+			contentRangeProblem(`bytes 1000-${LAST}/${ETOPO_FILE_BYTES + 1}`, 1000),
+		).not.toBeNull();
+		expect(contentRangeProblem('bytes 1000-1999/2000', 1000)).not.toBeNull();
+	});
+
+	it('refuses a part that runs past the end of the file', () => {
+		expect(
+			contentRangeProblem(`bytes 1000-${LAST + 1}/${ETOPO_FILE_BYTES}`, 1000),
+		).not.toBeNull();
+		expect(
+			contentRangeProblem(`bytes 1000-${LAST + 1}/*`, 1000),
+		).not.toBeNull();
+	});
+
+	it('refuses a part that ends before it starts', () => {
+		expect(
+			contentRangeProblem(`bytes 1000-999/${ETOPO_FILE_BYTES}`, 1000),
+		).not.toBeNull();
+	});
+
+	it('refuses a response with no Content-Range', () => {
+		expect(contentRangeProblem(null, 1000)).toBe(
+			`The server sent part of a file without a Content-Range, expected "bytes 1000-${LAST}/${ETOPO_FILE_BYTES}"`,
+		);
+	});
+
+	it('refuses a Content-Range it cannot read', () => {
+		for (const header of [
+			'',
+			'bytes',
+			`bytes */${ETOPO_FILE_BYTES}`,
+			`items 1000-${LAST}/${ETOPO_FILE_BYTES}`,
+			`bytes=1000-${LAST}/${ETOPO_FILE_BYTES}`,
+			`bytes 1000-${LAST}`,
+			`bytes -1000-${LAST}/${ETOPO_FILE_BYTES}`,
+			`bytes 1000.5-${LAST}/${ETOPO_FILE_BYTES}`,
+			`bytes 1000-${LAST}/${ETOPO_FILE_BYTES} and more`,
+		]) {
+			expect(contentRangeProblem(header, 1000)).not.toBeNull();
+		}
 	});
 });

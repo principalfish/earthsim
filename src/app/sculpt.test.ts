@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	angleBetween,
 	applyDab,
@@ -20,8 +20,10 @@ import {
 	type World,
 } from '../core/index';
 import { MAIN_BUTTON, SECONDARY_BUTTON } from './globe/input';
+import type { Globe, WindowPoint } from './globe/renderer';
 import {
 	clampSetting,
+	createSculptController,
 	createStrokeRecord,
 	DAB_SPACING,
 	DEFAULT_BRUSH_RADIUS_KM,
@@ -48,11 +50,19 @@ import {
 	normaliseSmoothSetting,
 	planDabs,
 	rotateButtonFor,
+	type SculptController,
 	SMOOTH_REFERENCE_RESOLUTION,
+	type StrokeChanges,
 	sculptFrame,
 	smoothRate,
 	TOOLS,
 } from './sculpt';
+import {
+	createFakeCanvas,
+	createFakeFrames,
+	type FakeCanvas,
+	type FakeFrames,
+} from './testing/fakeCanvas';
 
 /**
  * Time allowed for the test that simulates whole seconds of smoothing on the
@@ -945,4 +955,634 @@ describe('sculptFrame', () => {
 		},
 		SIMULATED_SECONDS_TIMEOUT_MS,
 	);
+});
+
+describe('createSculptController', () => {
+	/** The class the canvas carries while a brush is chosen. */
+	const BRUSH = 'globe--brush';
+
+	/** The main button's bit among the buttons held. */
+	const MAIN_HELD = 1;
+
+	/** The time between two frames of the tests, in milliseconds. */
+	const FRAME_MS = 16;
+
+	/**
+	 * Where the stand-in globe ends: a point of the window further right
+	 * than this is over the canvas but off the globe.
+	 */
+	const GLOBE_EDGE_PX = 400;
+
+	/** The direction under a point of the window: a degree every 10 pixels. */
+	const directionAt = (clientX: number): Vec3 =>
+		latLonToDirection(0, clientX / 10);
+
+	/** A sculpt controller on a stand-in canvas and globe. */
+	type Stage = {
+		readonly fake: FakeCanvas;
+		readonly frames: FakeFrames;
+		readonly world: World;
+		readonly controller: SculptController;
+		/** What the controller told the page, in order. */
+		readonly events: string[];
+		/** What each stroke that ended was said to have changed. */
+		readonly strokes: StrokeChanges[];
+		/** The faces of each upload the globe was asked for. */
+		readonly uploads: (readonly number[])[];
+		/** Every brush outline the globe was asked to show; null hides it. */
+		readonly brushes: ({ cursor: WindowPoint; radius: number } | null)[];
+		/**
+		 * How many times the globe was asked what lies under the cursor,
+		 * and how many times to draw at once.
+		 */
+		readonly counts: { picks: number; draws: number };
+		/** Whether a stroke was under way each time one was said to end. */
+		readonly activeAtEnd: boolean[];
+		/** Presses the main button at a point of the canvas. */
+		press(clientX: number, pointerId?: number): void;
+		/** Moves the pointer with the main button held. */
+		drag(clientX: number, pointerId?: number): void;
+		/** Whether the cell under a point of the window was raised. */
+		raisedAt(clientX: number, world?: World): boolean;
+	};
+
+	let frames: FakeFrames;
+
+	beforeEach(() => {
+		frames = createFakeFrames();
+		vi.stubGlobal('requestAnimationFrame', frames.request);
+		vi.stubGlobal('cancelAnimationFrame', frames.cancel);
+		vi.stubGlobal('performance', { now: frames.now });
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const createStage = (world: World = createBlankWorld(64)): Stage => {
+		const fake = createFakeCanvas(800, 600);
+		const events: string[] = [];
+		const strokes: StrokeChanges[] = [];
+		const activeAtEnd: boolean[] = [];
+		const uploads: (readonly number[])[] = [];
+		const brushes: Stage['brushes'] = [];
+		const counts = { picks: 0, draws: 0 };
+		// The controller shows the brush while it is being made, so what
+		// the globe records is ready before it.
+		const controller: SculptController = createSculptController(
+			{
+				pick: (clientX: number) => {
+					counts.picks++;
+					return clientX > GLOBE_EDGE_PX ? null : directionAt(clientX);
+				},
+				updateElevation: (faces: readonly number[] = []) => {
+					uploads.push(faces);
+				},
+				setBrush: (cursor: WindowPoint | null, radius = 0) => {
+					brushes.push(cursor === null ? null : { cursor, radius });
+				},
+				draw: () => {
+					counts.draws++;
+				},
+			} as unknown as Globe,
+			world,
+			{
+				canvas: fake.canvas,
+				onStrokeStart: () => events.push('start'),
+				onStrokeEnd: (changes) => {
+					events.push('end');
+					strokes.push(changes);
+					activeAtEnd.push(controller.isStrokeActive());
+				},
+				onWorldChange: (next) => events.push(`world ${next.resolution}`),
+			},
+		);
+		return {
+			fake,
+			frames,
+			world,
+			controller,
+			events,
+			strokes,
+			uploads,
+			brushes,
+			counts,
+			activeAtEnd,
+			press: (clientX, pointerId = 1) => {
+				fake.dispatch('pointerdown', {
+					pointerId,
+					button: MAIN_BUTTON,
+					buttons: MAIN_HELD,
+					clientX,
+					clientY: 100,
+				});
+			},
+			drag: (clientX, pointerId = 1) => {
+				fake.dispatch('pointermove', {
+					pointerId,
+					buttons: MAIN_HELD,
+					clientX,
+					clientY: 100,
+				});
+			},
+			raisedAt: (clientX, where = world) =>
+				(where.elevation[
+					cellAt(getGrid(where.resolution), directionAt(clientX))
+				] as number) > BLANK_OCEAN_ELEVATION_M,
+		};
+	};
+
+	/** A stage with the raise brush chosen and nothing yet recorded. */
+	const createRaisingStage = (world?: World): Stage => {
+		const stage = createStage(world);
+		stage.controller.setTool('raise');
+		stage.brushes.length = 0;
+		return stage;
+	};
+
+	/** The ways a stroke can end, each from a stroke with one frame run. */
+	const ENDINGS: readonly (readonly [string, (stage: Stage) => void])[] = [
+		[
+			'the button being let go',
+			(stage) =>
+				stage.fake.dispatch('pointerup', { pointerId: 1, clientX: 100 }),
+		],
+		[
+			'the pointer being cancelled',
+			(stage) => stage.fake.dispatch('pointercancel', { pointerId: 1 }),
+		],
+		['the canvas losing the pointer', (stage) => stage.fake.loseCapture(1)],
+		['endStroke', (stage) => stage.controller.endStroke()],
+		['a change of tool', (stage) => stage.controller.setTool('lower')],
+		['dispose', (stage) => stage.controller.dispose()],
+	];
+
+	it.each(ENDINGS)(
+		'starts and ends a stroke once, ended by %s',
+		(_name, end) => {
+			const stage = createRaisingStage();
+			stage.press(100);
+			expect(stage.events).toEqual(['start']);
+			expect(stage.controller.isStrokeActive()).toBe(true);
+			expect(stage.fake.captured.has(1)).toBe(true);
+			frames.runFrame(FRAME_MS);
+
+			end(stage);
+			expect(stage.events).toEqual(['start', 'end']);
+			expect(stage.controller.isStrokeActive()).toBe(false);
+			expect(stage.activeAtEnd).toEqual([false]);
+			expect(stage.fake.captured.size).toBe(0);
+			expect(frames.pending()).toBe(0);
+			expect(stage.strokes[0]?.cells.length).toBeGreaterThan(0);
+
+			// Whatever the browser or the page says of the pointer afterwards
+			// ends nothing a second time.
+			stage.fake.dispatch('pointerup', { pointerId: 1, clientX: 100 });
+			stage.fake.dispatch('pointercancel', { pointerId: 1 });
+			stage.fake.loseCapture(1);
+			stage.controller.endStroke();
+			frames.runFrame(FRAME_MS);
+			expect(stage.events).toEqual(['start', 'end']);
+		},
+	);
+
+	it('starts no stroke with the move tool', () => {
+		const stage = createStage();
+		stage.press(100);
+		frames.runFrame(FRAME_MS);
+		stage.fake.dispatch('pointerup', { pointerId: 1, clientX: 100 });
+
+		expect(stage.events).toEqual([]);
+		expect(stage.controller.isStrokeActive()).toBe(false);
+		expect(stage.fake.captured.size).toBe(0);
+		expect(frames.pending()).toBe(0);
+		expect(stage.uploads).toEqual([]);
+		expect(stage.raisedAt(100)).toBe(false);
+	});
+
+	it('starts no stroke with a button other than the main one', () => {
+		const stage = createRaisingStage();
+		stage.fake.dispatch('pointerdown', {
+			pointerId: 1,
+			button: SECONDARY_BUTTON,
+			buttons: 2,
+			clientX: 100,
+		});
+		frames.runFrame(FRAME_MS);
+
+		expect(stage.events).toEqual([]);
+		expect(stage.fake.captured.size).toBe(0);
+		expect(frames.pending()).toBe(0);
+		expect(stage.raisedAt(100)).toBe(false);
+	});
+
+	it('keeps to the pointer that began the stroke', () => {
+		const stage = createRaisingStage();
+		stage.press(100);
+		stage.press(300, 2);
+		expect(stage.events).toEqual(['start']);
+		expect([...stage.fake.captured]).toEqual([1]);
+
+		stage.fake.dispatch('pointerup', { pointerId: 2, clientX: 300 });
+		stage.fake.dispatch('pointercancel', { pointerId: 2 });
+		stage.fake.loseCapture(2);
+		// Another pointer with no button held is not the stroke's button
+		// being let go.
+		stage.fake.dispatch('pointermove', { pointerId: 2, buttons: 0 });
+		expect(stage.events).toEqual(['start']);
+		expect(stage.controller.isStrokeActive()).toBe(true);
+	});
+
+	it('edits the world under the cursor each frame and has the globe show it', () => {
+		const stage = createRaisingStage();
+		stage.press(100);
+		expect(stage.raisedAt(100)).toBe(false);
+
+		frames.runFrame(FRAME_MS);
+		expect(stage.raisedAt(100)).toBe(true);
+		// The equator at 10° east lies on one face, away from its edges.
+		expect(stage.uploads).toHaveLength(1);
+		expect(stage.uploads[0]).toHaveLength(1);
+		expect(stage.counts.draws).toBe(1);
+		expect(frames.pending()).toBe(1);
+
+		const cell = cellAt(getGrid(64), directionAt(100));
+		const afterOne = stage.world.elevation[cell] as number;
+		frames.runFrame(FRAME_MS);
+		expect(stage.world.elevation[cell]).toBeGreaterThan(afterOne);
+		expect(stage.uploads).toHaveLength(2);
+		expect(stage.counts.draws).toBe(2);
+	});
+
+	it('uploads every face a dab on a cube corner changes', () => {
+		const stage = createRaisingStage();
+		const corner: Vec3 = [1, 1, 1].map((part) => part / Math.sqrt(3)) as [
+			number,
+			number,
+			number,
+		];
+		const globe = {
+			pick: () => corner,
+			updateElevation: (faces: readonly number[] = []) => {
+				stage.uploads.push(faces);
+			},
+			setBrush: () => {},
+			draw: () => {},
+		} as unknown as Globe;
+		const events: string[] = [];
+		const controller = createSculptController(globe, stage.world, {
+			canvas: stage.fake.canvas,
+			tool: 'raise',
+			onStrokeEnd: () => events.push('end'),
+		});
+		// Both controllers hear the press; only the second one's globe
+		// picks the corner.
+		stage.press(100);
+		stage.uploads.length = 0;
+		frames.runFrame(FRAME_MS);
+
+		const corners = stage.uploads.filter((faces) => faces.length === 3);
+		expect(corners).toHaveLength(1);
+		controller.dispose();
+		expect(events).toEqual(['end']);
+	});
+
+	it('leaves a mark for a click shorter than a frame', () => {
+		const stage = createRaisingStage();
+		stage.press(100);
+		frames.advance(5);
+		stage.fake.dispatch('pointerup', { pointerId: 1, clientX: 100 });
+
+		expect(stage.raisedAt(100)).toBe(true);
+		expect(stage.uploads).toHaveLength(1);
+		expect(stage.strokes[0]?.cells.length).toBeGreaterThan(0);
+	});
+
+	it('reports what the stroke changed, with the values from before it', () => {
+		const stage = createRaisingStage();
+		stage.press(100);
+		frames.runFrame(FRAME_MS);
+		stage.drag(140);
+		frames.runFrame(FRAME_MS);
+		stage.fake.dispatch('pointerup', { pointerId: 1, clientX: 140 });
+
+		const { cells, before } = stage.strokes[0] as StrokeChanges;
+		expect(new Set(cells).size).toBe(cells.length);
+		for (let k = 0; k < cells.length; k++) {
+			expect(before[k]).toBe(BLANK_OCEAN_ELEVATION_M);
+			expect(stage.world.elevation[cells[k] as number]).toBeGreaterThan(
+				BLANK_OCEAN_ELEVATION_M,
+			);
+		}
+		const raised = stage.world.elevation.filter(
+			(metres) => metres > BLANK_OCEAN_ELEVATION_M,
+		);
+		expect(raised.length).toBe(cells.length);
+	});
+
+	it('reports nothing changed for a stroke that never touched the globe', () => {
+		const stage = createRaisingStage();
+		stage.press(GLOBE_EDGE_PX + 100);
+		frames.runFrame(FRAME_MS);
+		stage.fake.dispatch('pointerup', {
+			pointerId: 1,
+			clientX: GLOBE_EDGE_PX + 100,
+		});
+
+		expect(stage.events).toEqual(['start', 'end']);
+		expect(stage.strokes[0]?.cells.length).toBe(0);
+		expect(stage.uploads).toEqual([]);
+	});
+
+	it('pauses while the cursor is off the globe and starts afresh when it is back', () => {
+		const stage = createRaisingStage();
+		stage.press(100);
+		frames.runFrame(FRAME_MS);
+
+		stage.drag(GLOBE_EDGE_PX + 100);
+		const paused = Float32Array.from(stage.world.elevation);
+		const uploads = stage.uploads.length;
+		for (let frame = 0; frame < 3; frame++) {
+			frames.runFrame(FRAME_MS);
+		}
+		expect(stage.world.elevation).toEqual(paused);
+		expect(stage.uploads).toHaveLength(uploads);
+		expect(stage.controller.isStrokeActive()).toBe(true);
+		expect(stage.events).toEqual(['start']);
+		expect(frames.pending()).toBe(1);
+
+		stage.drag(300);
+		frames.runFrame(FRAME_MS);
+		expect(stage.raisedAt(300)).toBe(true);
+		// No line is drawn across from where the cursor left the globe.
+		expect(stage.raisedAt(200)).toBe(false);
+		expect(stage.events).toEqual(['start']);
+
+		stage.fake.dispatch('pointerup', { pointerId: 1, clientX: 300 });
+		expect(stage.events).toEqual(['start', 'end']);
+	});
+
+	it('pauses while a captured pointer is outside the canvas, without asking the globe', () => {
+		const stage = createRaisingStage();
+		stage.press(100);
+		frames.runFrame(FRAME_MS);
+
+		// Outside the canvas, at a point of the window the globe would pick.
+		stage.fake.dispatch('pointermove', {
+			pointerId: 1,
+			buttons: MAIN_HELD,
+			clientX: 300,
+			clientY: 100,
+			offsetX: 300,
+			offsetY: -1,
+		});
+		expect(stage.brushes.at(-1)).toBeNull();
+		const picks = stage.counts.picks;
+		const paused = Float32Array.from(stage.world.elevation);
+		frames.runFrame(FRAME_MS);
+		frames.runFrame(FRAME_MS);
+		expect(stage.counts.picks).toBe(picks);
+		expect(stage.world.elevation).toEqual(paused);
+		expect(stage.controller.isStrokeActive()).toBe(true);
+
+		stage.drag(300);
+		frames.runFrame(FRAME_MS);
+		expect(stage.raisedAt(300)).toBe(true);
+		expect(stage.raisedAt(200)).toBe(false);
+		expect(stage.events).toEqual(['start']);
+	});
+
+	it('takes the cursor to be over the canvas only within its edges', () => {
+		const stage = createRaisingStage();
+		const shownAt = (offsetX: number, offsetY: number): boolean => {
+			stage.fake.dispatch('pointermove', {
+				clientX: 50,
+				clientY: 50,
+				offsetX,
+				offsetY,
+			});
+			return stage.brushes.at(-1) !== null;
+		};
+		expect(shownAt(0, 0)).toBe(true);
+		expect(shownAt(799, 599)).toBe(true);
+		expect(shownAt(-1, 0)).toBe(false);
+		expect(shownAt(0, -1)).toBe(false);
+		expect(shownAt(800, 0)).toBe(false);
+		expect(shownAt(0, 600)).toBe(false);
+	});
+
+	it('ends the stroke, with a last dab, at a move that no longer reports the main button', () => {
+		const stage = createRaisingStage();
+		stage.press(100);
+		frames.runFrame(FRAME_MS);
+		frames.advance(FRAME_MS);
+
+		// The secondary button was pressed too, and then the main one let go.
+		stage.fake.dispatch('pointermove', {
+			pointerId: 1,
+			buttons: 3,
+			clientX: 100,
+			clientY: 100,
+		});
+		expect(stage.events).toEqual(['start']);
+		const uploads = stage.uploads.length;
+		stage.fake.dispatch('pointermove', {
+			pointerId: 1,
+			buttons: 2,
+			clientX: 100,
+			clientY: 100,
+		});
+
+		expect(stage.events).toEqual(['start', 'end']);
+		expect(stage.uploads).toHaveLength(uploads + 1);
+		expect(stage.controller.isStrokeActive()).toBe(false);
+		expect(stage.fake.captured.size).toBe(0);
+		expect(frames.pending()).toBe(0);
+	});
+
+	it('stops sculpting once the stroke has ended', () => {
+		const stage = createRaisingStage();
+		stage.press(100);
+		frames.runFrame(FRAME_MS);
+		stage.fake.dispatch('pointerup', { pointerId: 1, clientX: 100 });
+		const ended = Float32Array.from(stage.world.elevation);
+
+		stage.fake.dispatch('pointermove', { pointerId: 1, clientX: 200 });
+		frames.runFrame(FRAME_MS);
+		expect(stage.world.elevation).toEqual(ended);
+	});
+
+	it('ends a stroke on the old world before it says the world has changed', () => {
+		const stage = createRaisingStage();
+		stage.press(100);
+		frames.runFrame(FRAME_MS);
+		const next = createBlankWorld(128);
+
+		stage.controller.setWorld(next);
+		expect(stage.events).toEqual(['start', 'end', 'world 128']);
+		expect(stage.activeAtEnd).toEqual([false]);
+		expect(frames.pending()).toBe(0);
+		expect(stage.fake.captured.size).toBe(0);
+
+		// What the stroke changed is told of the world it was made on.
+		const { cells, before } = stage.strokes[0] as StrokeChanges;
+		expect(cells.length).toBeGreaterThan(0);
+		for (let k = 0; k < cells.length; k++) {
+			expect(cells[k]).toBeLessThan(stage.world.elevation.length);
+			expect(before[k]).toBe(BLANK_OCEAN_ELEVATION_M);
+			expect(stage.world.elevation[cells[k] as number]).toBeGreaterThan(
+				BLANK_OCEAN_ELEVATION_M,
+			);
+		}
+		expect(
+			next.elevation.every((metres) => metres === BLANK_OCEAN_ELEVATION_M),
+		).toBe(true);
+	});
+
+	it('sculpts the new world from then on, and shows the brush at its size', () => {
+		const stage = createRaisingStage();
+		stage.fake.dispatch('pointermove', { clientX: 100, clientY: 100 });
+		const next = createBlankWorld(128);
+		stage.controller.setWorld(next);
+		expect(stage.events).toEqual(['world 128']);
+		expect(stage.brushes.at(-1)).toEqual({
+			cursor: { clientX: 100, clientY: 100 },
+			radius: dabRadius(128, DEFAULT_BRUSH_RADIUS_KM),
+		});
+
+		const before = Float32Array.from(stage.world.elevation);
+		stage.press(300);
+		frames.runFrame(FRAME_MS);
+		stage.fake.dispatch('pointerup', { pointerId: 1, clientX: 300 });
+
+		expect(stage.raisedAt(300, next)).toBe(true);
+		expect(stage.world.elevation).toEqual(before);
+		const { cells } = stage.strokes[0] as StrokeChanges;
+		expect(cells.length).toBeGreaterThan(0);
+		for (const cell of cells) {
+			expect(next.elevation[cell]).toBeGreaterThan(BLANK_OCEAN_ELEVATION_M);
+		}
+	});
+
+	it('shows the outline of a brush under the cursor, and none for the move tool', () => {
+		const stage = createStage();
+		expect(stage.fake.classes.has(BRUSH)).toBe(false);
+		stage.fake.dispatch('pointermove', { clientX: 120, clientY: 80 });
+		expect(stage.brushes.at(-1)).toBeNull();
+
+		stage.controller.setTool('smooth');
+		expect(stage.fake.classes.has(BRUSH)).toBe(true);
+		expect(stage.brushes.at(-1)).toEqual({
+			cursor: { clientX: 120, clientY: 80 },
+			radius: dabRadius(64, DEFAULT_BRUSH_RADIUS_KM),
+		});
+
+		stage.controller.setRadiusKm(2000);
+		expect(stage.brushes.at(-1)).toEqual({
+			cursor: { clientX: 120, clientY: 80 },
+			radius: dabRadius(64, 2000),
+		});
+
+		stage.fake.dispatch('pointerleave');
+		expect(stage.brushes.at(-1)).toBeNull();
+
+		stage.fake.dispatch('pointermove', { clientX: 10, clientY: 20 });
+		stage.controller.setTool('move');
+		expect(stage.fake.classes.has(BRUSH)).toBe(false);
+		expect(stage.brushes.at(-1)).toBeNull();
+	});
+
+	it('starts with the tool and the settings it is given', () => {
+		const fake = createFakeCanvas();
+		const world = createBlankWorld(64);
+		const brushes: number[] = [];
+		const controller = createSculptController(
+			{
+				pick: (clientX: number) => directionAt(clientX),
+				updateElevation: () => {},
+				setBrush: (cursor: WindowPoint | null, radius = 0) => {
+					if (cursor !== null) {
+						brushes.push(radius);
+					}
+				},
+				draw: () => {},
+			} as unknown as Globe,
+			world,
+			{ canvas: fake.canvas, tool: 'raise', radiusKm: 1500, strength: 4000 },
+		);
+		expect(fake.classes.has(BRUSH)).toBe(true);
+		fake.dispatch('pointermove', { clientX: 100, clientY: 100 });
+		expect(brushes).toEqual([dabRadius(64, 1500)]);
+
+		fake.dispatch('pointerdown', {
+			pointerId: 1,
+			buttons: MAIN_HELD,
+			clientX: 100,
+			clientY: 100,
+		});
+		frames.runFrame(FRAME_MS);
+		controller.endStroke();
+		const cell = cellAt(getGrid(64), directionAt(100));
+		// 4,000 m/s for 16 ms is 64 m at the brush's centre, which the
+		// cell's own centre lies close to; the default strength gives 16 m.
+		const raised = (world.elevation[cell] as number) - BLANK_OCEAN_ELEVATION_M;
+		expect(raised).toBeGreaterThan(50);
+		expect(raised).toBeLessThanOrEqual(64);
+	});
+
+	it('works at the strength it is set to', () => {
+		const raisedBy = (strength: number): number => {
+			const stage = createRaisingStage();
+			stage.controller.setStrength(strength);
+			stage.press(100);
+			frames.runFrame(FRAME_MS);
+			stage.controller.endStroke();
+			const cell = cellAt(getGrid(64), directionAt(100));
+			return (stage.world.elevation[cell] as number) - BLANK_OCEAN_ELEVATION_M;
+		};
+		const weak = raisedBy(500);
+		expect(weak).toBeGreaterThan(0);
+		expect(raisedBy(2000)).toBeCloseTo(weak * 4, 3);
+	});
+
+	it('smooths at the setting it is set to', () => {
+		const smoothedBy = (setting: number): number => {
+			const world = createBlankWorld(64);
+			const cell = cellAt(getGrid(64), directionAt(100));
+			world.elevation[cell] = 3000;
+			const stage = createStage(world);
+			stage.controller.setTool('smooth');
+			stage.controller.setSmoothSetting(setting);
+			stage.press(100);
+			frames.runFrame(FRAME_MS);
+			stage.controller.endStroke();
+			return 3000 - (world.elevation[cell] as number);
+		};
+		const gentle = smoothedBy(MIN_SMOOTH_SETTING);
+		expect(gentle).toBeGreaterThan(0);
+		expect(smoothedBy(MAX_SMOOTH_SETTING)).toBeGreaterThan(gentle);
+	});
+
+	it('stops listening to the canvas and hides the brush when disposed', () => {
+		const stage = createRaisingStage();
+		stage.fake.dispatch('pointermove', { clientX: 100, clientY: 100 });
+		stage.controller.dispose();
+		expect(stage.fake.classes.has(BRUSH)).toBe(false);
+		expect(stage.brushes.at(-1)).toBeNull();
+		const shown = stage.brushes.length;
+
+		stage.fake.dispatch('pointermove', { clientX: 150, clientY: 100 });
+		stage.fake.dispatch('pointerleave');
+		stage.press(100);
+		frames.runFrame(FRAME_MS);
+		stage.fake.dispatch('pointerup', { pointerId: 1, clientX: 100 });
+		stage.fake.dispatch('pointercancel', { pointerId: 1 });
+		stage.fake.loseCapture(1);
+
+		expect(stage.events).toEqual([]);
+		expect(stage.brushes).toHaveLength(shown);
+		expect(stage.fake.captured.size).toBe(0);
+		expect(frames.pending()).toBe(0);
+		expect(stage.raisedAt(100)).toBe(false);
+	});
 });

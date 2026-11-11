@@ -141,7 +141,8 @@ const failure = (error: WorldFileError): WorldFileFailure => ({
 	error,
 });
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+/** Whether a parsed JSON value is an object with named fields: no array is. */
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 	typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
@@ -174,7 +175,7 @@ const originRecord = (origin: WorldOrigin): WorldOrigin => {
  * value is not an origin of a known kind with valid fields.
  */
 const parseOrigin = (value: unknown): WorldOrigin | null => {
-	if (!isRecord(value)) {
+	if (!isPlainObject(value)) {
 		return null;
 	}
 	const kind = ownField(value, 'kind');
@@ -221,7 +222,7 @@ const parseHeader = (bytes: Uint8Array): Header | WorldFileFailure => {
 	} catch {
 		return failure('bad-header');
 	}
-	if (!isRecord(parsed)) {
+	if (!isPlainObject(parsed)) {
 		return failure('bad-header');
 	}
 	const resolution = ownField(parsed, 'resolution');

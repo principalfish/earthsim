@@ -84,12 +84,17 @@ interface ImportMeta {
 type ScriptResponse = {
 	readonly ok: boolean;
 	readonly status: number;
+	readonly headers: { get(name: string): string | null };
 	readonly body: {
+		/** Tells the server that no more of the response is wanted. */
+		cancel(): Promise<void>;
 		getReader(): {
 			read(): Promise<{
 				readonly done: boolean;
 				readonly value?: Uint8Array;
 			}>;
+			/** As the body's own `cancel`, for a body that is being read. */
+			cancel(): Promise<void>;
 		};
 	} | null;
 };

@@ -19,6 +19,7 @@ import {
 	formatStrength,
 	HISTORY_LABELS,
 	HISTORY_TITLES,
+	historyFocusAfter,
 	SMOOTH_SETTING_SLIDER_STEP,
 	strengthScale,
 	TOOL_LABELS,
@@ -148,5 +149,38 @@ describe('the brush sliders', () => {
 		expect(Number.isInteger(MIN_SMOOTH_SETTING)).toBe(true);
 		expect(Number.isInteger(MAX_SMOOTH_SETTING)).toBe(true);
 		expect(Number.isInteger(DEFAULT_SMOOTH_SETTING)).toBe(true);
+	});
+});
+
+describe('historyFocusAfter', () => {
+	const BOTH = { canUndo: true, canRedo: true };
+	const ONLY_UNDO = { canUndo: true, canRedo: false };
+	const ONLY_REDO = { canUndo: false, canRedo: true };
+	const NEITHER = { canUndo: false, canRedo: false };
+
+	it('moves the focus to redo when the focused undo button is disabled', () => {
+		expect(historyFocusAfter('undo', ONLY_REDO)).toBe('redo');
+	});
+
+	it('moves the focus to undo when the focused redo button is disabled', () => {
+		expect(historyFocusAfter('redo', ONLY_UNDO)).toBe('undo');
+	});
+
+	it('moves the focus nowhere when both buttons are disabled', () => {
+		expect(historyFocusAfter('undo', NEITHER)).toBeNull();
+		expect(historyFocusAfter('redo', NEITHER)).toBeNull();
+	});
+
+	it('leaves the focus on a button that stays enabled', () => {
+		expect(historyFocusAfter('undo', BOTH)).toBeNull();
+		expect(historyFocusAfter('undo', ONLY_UNDO)).toBeNull();
+		expect(historyFocusAfter('redo', BOTH)).toBeNull();
+		expect(historyFocusAfter('redo', ONLY_REDO)).toBeNull();
+	});
+
+	it('leaves a focus that is elsewhere where it is, whatever is disabled', () => {
+		for (const state of [BOTH, ONLY_UNDO, ONLY_REDO, NEITHER]) {
+			expect(historyFocusAfter(null, state)).toBeNull();
+		}
 	});
 });
