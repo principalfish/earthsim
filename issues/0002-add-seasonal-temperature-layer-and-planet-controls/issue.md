@@ -14,7 +14,7 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 
 ## Plan
 
-_2026-11-11 · 3 of 11 pieces done · now: piece 4 in progress_
+_2026-11-11 · 3 of 11 pieces done · now: paused at the user's request after piece 3_
 
 - [x] **1/11 Planet settings and date on the world** · `8390675`
   Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
@@ -22,7 +22,7 @@ _2026-11-11 · 3 of 11 pieces done · now: piece 4 in progress_
   Exact daily and monthly sunlight for any tilt from 0 to 90 degrees.
 - [x] **3/11 Observed Earth temperature data** · `4a1e290`
   NOAA's 20th Century Reanalysis v3 monthly climatology, processed into a small committed file and regridded to the world's cells.
-- [ ] **4/11 Temperature solver, timing run and first error figures** · in progress
+- [ ] **4/11 Temperature solver, timing run and first error figures** · paused, just started
   The seasonal energy-balance solver, a table of how long it takes at each resolution, and how far the simulated Earth is from the observed one.
 - [ ] **5/11 Temperature worker and recalculation** · not started
   Temperature calculated in its own Web Worker and recalculated automatically after edits.

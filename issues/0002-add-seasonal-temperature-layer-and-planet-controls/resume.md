@@ -12,11 +12,11 @@ If anything else differs, stop and tell the user.
 Everything is in `decisions.md` (Settled, with the user's words) and carried into `plan.md` Context. Late additions on 2026-11-11: keep all five manual reviews; build on Opus for this issue only; run pieces 1 to 4 without pauses; star mass is a fifth planet control ("Add star mass as a setting"), with year length from Kepler's third law.
 
 ## The pending decision (exact)
-Nothing is pending with the user. Pieces 1 (`8390675`), 2 (`0c19852`) and 3 (`4a1e290`) are committed and pushed on `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa`, and draft PR 4 is open (`meta.pr`). The builder is running piece 4 without a pause and stops with the timing table and first Earth error figures; the next thing for the user is the recalculation trigger. The sun is piece 11 of 11.
+The build is **paused at the user's request**: "pause after piece 3 is done" (2026-11-11). Pieces 1 (`8390675`), 2 (`0c19852`) and 3 (`4a1e290`) are committed and pushed on `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa`; draft PR 4 is open. Piece 4 (the solver) had just started when the pause arrived; the builder was told to stop its subagent, leave the worktree as it is, report what exists and wait. Any piece 4 files are uncommitted and unverified in the builder's worktree. Nothing resumes until the user says so.
 
-Told to the user after piece 3, as a note: the downloaded source file's own `license` attribute says "available free of charge under the PSD data policy", older and weaker wording than the CC0 statement on NOAA PSL's dataset record, which is what the plan quotes and the README records. The user has not objected.
+On the user's word to resume: relay it to the builder, quoting it. Piece 4 continues under "Run 1 to 4, stop with the timings": it is committed without a review pause once clean, and the builder then stops with the timing table and first Earth error figures for the recalculation-trigger decision. The builder must run planet values through `normalisePlanet` inside the solver.
 
-Carry into the briefings for pieces 4 and 5 (from the builder's look-ahead after piece 1): `isWorldShaped` only checks that planet fields are numbers, so the solver and the worker must run planet values through `normalisePlanet` before computing; a zero star mass would otherwise reach the year-length formula. Also from piece 1: a file with an out-of-range planet setting or a bad date is refused, not clamped, and shows the existing damaged-file message.
+Told to the user, not objected to: the source file's own `license` attribute has older, weaker wording than the CC0 statement on NOAA PSL's dataset record, which is what the README records.
 
 ## What the next session does
 1. Run the state checks. `planner.py ingest 2` on every builder message; `list_sessions` with `linked: true` finds the builder.
