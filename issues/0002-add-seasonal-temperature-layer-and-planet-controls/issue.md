@@ -11,3 +11,28 @@ On the globe, temperature replaces the height colours while relief and coastline
 When the world is the Earth preset, the layer can show the simulated temperature, the observed one, or the difference, with summary error figures. The observed data is NOAA's 20th Century Reanalysis v3 monthly climatology (CC0). This comparison is built so each later step can add its own observed layer. With no winds or ocean currents yet, the aim here is the right broad pattern, with the error recorded as a baseline for later steps to improve.
 
 Not included: orbit eccentricity, rotation rate, a flat map view, winds, currents, rainfall and real ice sheets.
+
+## Plan
+
+_2026-11-11 · 0 of 10 pieces done · now: not started; building waits for issue 1 to be merged_
+
+- [ ] **1/10 Planet settings and date on the world** · not started
+  Worlds carry axial tilt, star brightness, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
+- [ ] **2/10 Sunlight by latitude and season** · not started
+  Exact daily and monthly sunlight for any tilt from 0 to 90 degrees.
+- [ ] **3/10 Observed Earth temperature data** · not started
+  NOAA's 20th Century Reanalysis v3 monthly climatology, processed into a small committed file and regridded to the world's cells.
+- [ ] **4/10 Temperature solver, timing run and first error figures** · not started
+  The seasonal energy-balance solver, a table of how long it takes at each resolution, and how far the simulated Earth is from the observed one.
+- [ ] **5/10 Temperature worker and recalculation** · not started
+  Temperature calculated in its own Web Worker and recalculated automatically after edits.
+- [ ] **6/10 Temperature layer on the globe** · not started
+  The globe coloured by temperature with relief and coastlines kept, a Terrain or Temperature picker, and a legend.
+- [ ] **7/10 Month slider, annual summaries and date** · not started
+  Step or play through the twelve months, view annual summaries, and see the world's date.
+- [ ] **8/10 Planet panel** · not started
+  Sliders for tilt, star, orbit and greenhouse strength, with sunlight received and year length shown.
+- [ ] **9/10 Value under the cursor** · not started
+  A readout of position, elevation and temperature at the point under the pointer.
+- [ ] **10/10 Earth comparison view and error baseline** · not started
+  On the Earth preset: simulated, observed or difference, with error figures and a committed baseline.
