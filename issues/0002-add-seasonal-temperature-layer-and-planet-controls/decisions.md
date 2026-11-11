@@ -15,11 +15,12 @@
 - Months are named January to December on every world, with northern midsummer in late June as on Earth, although the year is divided into twelve equal parts whatever its length ("January to December"). (2026-11-11)
 - The temperature colour scale is fitted to each world, not fixed: it stretches to the coldest and hottest values of the world on screen ("Fitted to each world"). The user chose this over the recommended fixed scale. (2026-11-11)
 - Good enough for this step is the right broad pattern, with the error against observed Earth measured and stored as a baseline that later steps must improve, not a target to hit now ("Right pattern, errors recorded"). Tests require a sensible global average, a warm equator and cold poles, strong seasons inland and mild ones at sea, and colder mountains. (2026-11-11)
+- Planet control ranges: axial tilt 0 to 90 degrees (default 23.4); star brightness 0.1 to 10 times the Sun (default 1); orbit distance 0.3 to 3 Earth-Sun distances (default 1), with read-only lines for sunlight received compared with Earth and for year length. A note appears when sunlight received is far from Earth's, saying results there are rough; where the note starts is settled from the first runs ("Wide, with a warning"). (2026-11-11)
+- Greenhouse strength is a slider relative to Earth, 0 (none) to 3 times, default 1 ("Relative to Earth"). (2026-11-11)
+- The automatic recalculation trigger (only while the temperature layer is showing, or always) is decided by the user after the solver's timings at 64, 128 and 256 are measured and reported. The plan makes the solver and its timing run the first thing built, and stops for that decision. (2026-11-11)
 
 ## Open
-- Planet control ranges and defaults.
-- Which observed temperature dataset, and its licence (being researched).
-- The automatic trigger, decided after the solver's timings are measured: only while the temperature layer is showing, or always.
+- Which observed temperature dataset, and its licence (being researched from the providers' own pages).
 
 ## Assumed
 - Temperature means near-surface air temperature in degrees Celsius, one value per cell per month.
