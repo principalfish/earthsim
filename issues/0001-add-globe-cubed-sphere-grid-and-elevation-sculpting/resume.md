@@ -1,7 +1,7 @@
 # Resume point — read this first
 
 ## Where we are
-Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`), state `building`, is **paused at the user's request** (2026-11-10, about 22:55): "ok we're gonna need to just pause now im afraid, can you generate a resumption hand off". Nothing resumes until the user says so.
+Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`), state `building`, is **running again**. It was paused at the user's request on 2026-11-10 at about 22:55 mid-piece 8; on 2026-11-11 at about 08:27 the user said "resume" and that was relayed. The builder is finishing piece 8 and commits it without a review pause, then sends piece 9's look-ahead and waits.
 
 - **Done:** pieces 1 to 7 of 11 are committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, latest `8bfa67b`. The user tried and approved the two manual-review pieces so far (5, the globe; 6, sculpting).
 - **Stopped mid-piece:** piece 8 (worker compute service and statistics readout) was being written by a Fable subagent when the builder was told to stop. Its partial files are **uncommitted** in the builder's worktree. No check, coverage run or analysis loop has run on them.
@@ -32,7 +32,7 @@ All design decisions are in `decisions.md` (Settled) and `plan.md` (Context and 
 6. 2026-11-10 — Pause requested, first "After piece 8 is committed", then "pause now": the builder was told to stop piece 8 immediately and leave the worktree as it is.
 
 ## The pending decision (exact)
-The user's word to resume. Nothing else is open for piece 8: its approval to commit without a review pause ("Run 7 and 8, stop at 9's review") still stands once it is finished and its checks and analysis loop are clean.
+Nothing is pending with the user until piece 8 is committed. Piece 8's approval to commit without a review pause ("Run 7 and 8, stop at 9's review") stands. The user's "resume" covers piece 8 only; piece 9 needs their answers to its choices and their go-ahead.
 
 Choices to put to the user before piece 9 is built (not yet asked):
 - The builder's own look-ahead for piece 9, which it has not sent yet.
@@ -42,7 +42,7 @@ Choices to put to the user before piece 9 is built (not yet asked):
 ## What the next session does
 1. Run the state checks. `planner.py ingest 1`; if it warns that `plan.md` changed in both places, merge by hand (edit the record, save, copy the merged file over `<worktree>/.planner-outbox/issue/plan.md`, ingest again).
 2. Find the builder: `list_sessions` for `builder: add-globe-cubed-sphere-grid-and-elevation-sculpting` (session `local_acf49a6d-c0ef-4a98-8721-d05319ed32de`, name `b-add-globe-cubed-sphere`). Read its last message for its stop report: which piece 8 files are finished, part-written or not started.
-3. Wait for the user's word to resume, then relay it to the builder with `SendMessage`, quoting it: assess the partial piece 8 files against `plan.md`'s piece 8 entry, finish or rewrite them on `claude-fable-5-2`, run the checks, coverage and the full analysis loop, commit and push, then send piece 9's look-ahead and wait.
+3. The user's "resume" was relayed on 2026-11-11: the builder assesses the partial piece 8 files, finishes or rewrites them on `claude-fable-5-2`, runs the checks, coverage and the full analysis loop, commits and pushes, then sends piece 9's look-ahead and waits. If it is idle with piece 8 uncommitted and no message, it has stalled: message it to carry on with piece 8.
 4. After piece 8's commit: verify it on origin, tick piece 8 on the issue's `## Plan` checklist, `gh issue edit 1 --body-file <(tail -n +2 "$FOLDER/issue.md")`, report to the user, and put piece 9's choices to them.
 5. Pieces 9, 10 and 11 each have a `Manual review:` line: give the review briefing with the manual review first, and relay an approval only when the user's words say they tried it. Normal per-piece pauses apply unless the user asks for another run-through.
 6. When all pieces are done the builder sets state `review`: suggest `/review self add-globe-cubed-sphere-grid-and-elevation-sculpting`, then `/publish`. Merging is the user's.
