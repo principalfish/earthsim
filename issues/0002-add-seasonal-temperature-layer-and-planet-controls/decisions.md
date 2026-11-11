@@ -18,9 +18,12 @@
 - Planet control ranges: axial tilt 0 to 90 degrees (default 23.4); star brightness 0.1 to 10 times the Sun (default 1); orbit distance 0.3 to 3 Earth-Sun distances (default 1), with read-only lines for sunlight received compared with Earth and for year length. A note appears when sunlight received is far from Earth's, saying results there are rough; where the note starts is settled from the first runs ("Wide, with a warning"). (2026-11-11)
 - Greenhouse strength is a slider relative to Earth, 0 (none) to 3 times, default 1 ("Relative to Earth"). (2026-11-11)
 - The automatic recalculation trigger (only while the temperature layer is showing, or always) is decided by the user after the solver's timings at 64, 128 and 256 are measured and reported. The plan makes the solver and its timing run the first thing built, and stops for that decision. (2026-11-11)
+- Observed temperature data for the Earth comparison: NOAA's 20th Century Reanalysis version 3, 2 m air temperature long-term monthly means, 1981 to 2010, 1 degree grid, global ("20th Century Reanalysis v3"). Source file `https://downloads.psl.noaa.gov/Datasets/20thC_ReanV3/Derived/Monthlies/2mSI-MO/air.2m.mon.ltm.nc`, 4.5 MB, netCDF-3 classic, no login. Terms as read on NOAA PSL's page for the dataset on 2026-11-11: "not subject to copyright protection in the United States. NOAA waives any potential copyright ... through the Creative Commons Zero 1.0 Universal Public Domain Dedication (CC0-1.0)". The user saw the quoted terms and the alternatives (NCEP-DOE Reanalysis 2; ERA5) before choosing. A small derived file is committed; the download is not. (2026-11-11)
+- The ledger is complete: the user confirmed with "That's everything". (2026-11-11)
 
 ## Open
-- Which observed temperature dataset, and its licence (being researched from the providers' own pages).
+
+_None._
 
 ## Assumed
 - Temperature means near-surface air temperature in degrees Celsius, one value per cell per month.
@@ -28,6 +31,8 @@
 - Temperature runs in its own worker, separate from the statistics worker, and results are transferred, not copied.
 - While a result is out of date the previous one stays on screen, marked as out of date, with a progress indicator.
 - Observed and difference views are offered only when the world started as the Earth preset.
+- The observed data is read by a small hand-written netCDF-3 reader in a build script, cross-checked against GDAL, with NOAA's citation and the licence statement in the README, as was done for the elevation data. The builder re-reads the terms on the source page before committing the data and stops to ask if they differ from the quote above.
+- An unconfirmed caveat on the chosen dataset, from the research and not verified: it assimilates only surface pressure observations, so its land temperatures are less tightly tied to measurements than other reanalyses. Judged not to matter at this step's accuracy.
 - The fitted colour scale spans the whole year for the world on screen, so a colour means the same temperature in every month of that world and the month animation does not rescale. In the Earth comparison, simulated and observed share one scale; the difference view has its own scale centred on zero. Because the scale is fitted, two worlds of very different temperature can look alike in colour; the legend's numbers are how they are told apart.
 - Rotation rate is not part of this issue: a monthly energy balance does not depend on day length. It arrives with winds in step 3.
 - Ocean currents, winds, rainfall and real ice sheets are later steps; this issue must leave room for them to feed back into temperature.
