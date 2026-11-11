@@ -32,12 +32,16 @@
 - Piece 7 undo history: up to 100 strokes and about 64 MB in total, dropping the oldest first ("100 strokes and 64 MB"). (2026-11-10)
 - Piece 7: Ctrl+Z pressed mid-stroke is ignored until the mouse button is released ("Ignore it"). (2026-11-10)
 - Pieces 7 and 8 run without pauses and piece 9 stops uncommitted at its review ("Run 7 and 8, stop at 9's review"). Builder questions still stop the run. (2026-11-10)
+- Piece 9 first open: with no world to restore, the page opens on a blank ocean with the new-world dialog showing, pre-set to generated continents, 64, a random seed and 30% land ("Blank ocean with the dialog open"). (2026-11-11)
+- Piece 9 removes the `resolution`, `seed` and `land` address parameters; the dialog is the one way to make a world ("Remove them"). (2026-11-11)
+- Piece 9 generates worlds on the page, not in the worker, with a "Generating…" label on the button ("On the page, with a 'Generating…' label"). (2026-11-11)
 
 ## Open
 
 _None._
 
 ## Assumed
+- Piece 9: a "World" section at the top of the panel with the "New world" button and one line describing the current world (start type, resolution, seed, land); the dialog pre-fills from the current world; the land slider runs 0 to 100% in 1% steps, default 30%; a new world resets sea level to zero and the undo history and keeps the camera, relief exaggeration, grid toggle and tool settings; one warning line in the dialog, no second confirmation. The user was told and did not object.
 - Piece 7: Cmd+Z and Cmd+Shift+Z work as well as the Ctrl forms; the shortcuts are ignored while the focus is in a text field; Undo and Redo buttons sit side by side at the top of the Tools section. The user was told and did not object.
 - Piece 6: the brush outline is a thin ring on the globe under the cursor, hidden with the move tool and off the globe; the browser's right-click menu is suppressed on the canvas only. The user was told and did not object.
 - "Pauseable" means the later run through time (drift, ice ages) can be stopped at any point, the terrain sculpted and other inputs changed, and the run resumed from the edited state. Which inputs are editable while paused, and whether editing is locked while a run is in progress, are decided in the issues that add those runs.
