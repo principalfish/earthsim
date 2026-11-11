@@ -1,5 +1,8 @@
 # Resume point — read this first
 
+## Builder state on 2026-11-11 (written by the builder)
+All eleven pieces are committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`; the head is `4170dd0` (piece 11, Earth preset). The builder's worktree is clean apart from the git-ignored `.cache/etopo/` download (466 MB). The state is `review`. Nothing is pending with the user from the builder. Next: `/review self` in the planner chat; any fixes it chooses go back to the builder.
+
 ## Where we are
 Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`), state `building`. Pieces 1 to 10 of 11 are committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, latest `0f565b8`. The user settled piece 11's choices (`decisions.md`, `plan.md` Notes) and said "Start it" on 2026-11-11: the builder is building piece 11 (Earth preset), the last piece, which downloads 466 MB of NOAA elevation data into a git-ignored cache in its worktree, and will stop uncommitted at its review, which has a manual review. GitHub: issue principalfish/earthsim#1 carries the plan checklist; draft PR 2 is open; `main` is still `ffed15a` and nothing is merged.
 
