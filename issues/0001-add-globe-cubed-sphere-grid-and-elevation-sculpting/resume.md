@@ -1,46 +1,42 @@
 # Resume point — read this first
 
-## Builder state on 2026-11-11 (written by the builder)
-All eleven pieces are committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`; the head is `4170dd0` (piece 11, Earth preset). The builder's worktree is clean apart from the git-ignored `.cache/etopo/` download (466 MB). The state is `review`. Nothing is pending with the user from the builder. Next: `/review self` in the planner chat; any fixes it chooses go back to the builder.
-
 ## Where we are
-Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`), state `building`. Pieces 1 to 10 of 11 are committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, latest `0f565b8`. The user settled piece 11's choices (`decisions.md`, `plan.md` Notes) and said "Start it" on 2026-11-11: the builder is building piece 11 (Earth preset), the last piece, which downloads 466 MB of NOAA elevation data into a git-ignored cache in its worktree, and will stop uncommitted at its review, which has a manual review. GitHub: issue principalfish/earthsim#1 carries the plan checklist; draft PR 2 is open; `main` is still `ffed15a` and nothing is merged.
+Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`) is in state `review`: all 11 pieces are built, approved by the user, committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, head `4170dd0` (piece 11, Earth preset). Eleven commits on `main`, 97 files, about 28,700 lines. GitHub: issue principalfish/earthsim#1 has every piece ticked; draft PR 2 is open; `main` is still `ffed15a` and nothing is merged. The builder session (`local_acf49a6d-c0ef-4a98-8721-d05319ed32de`) is idle with a clean worktree, waiting to apply any fixes a review chooses.
 
 State checks (run from `/home/philiph/workspace/earth_sim`):
-- `git log --oneline -1 claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` shows `0f565b8 … piece 10/11: add save, load and autosave` until piece 11 is approved, and `git ls-remote --heads origin` shows the same SHA.
-- `python3 ~/.claude/lib/planner.py meta 1` shows state `building`, `gh_issue` 1, `pr` 2, `build_model` `claude-fable-5-2`.
-- `git -C .claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9 status --short` prints nothing until piece 10 is being built; then piece 10's uncommitted files.
+- `git log --oneline -1 claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` shows `4170dd0 … piece 11/11: add Earth preset`, and `git ls-remote --heads origin` shows the same SHA for that branch.
+- `python3 ~/.claude/lib/planner.py meta 1` shows state `review`, `gh_issue` 1, `pr` 2.
+- `git -C .claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9 status --short` prints nothing.
 - `git -C .planner status --short` is empty.
-If the branch head or `meta` differs, stop and tell the user.
+If anything differs, stop and tell the user.
 
-## How it got here — decisions already answered, in order
-All design decisions are in `decisions.md` (Settled) and `plan.md` (Context and Notes). The ones that shape how the build runs: the implementation model is `claude-fable-5-2` for this issue only; pieces 1 to 4 and 7 to 8 ran without review pauses at the user's request; pieces 5 and 6 were approved after the user tried them ("Tried it, approve"); the build was paused twice at the user's request and resumed each time on "resume".
+## How it got here
+All design and run decisions are in `decisions.md` (Settled); each piece's as-built details, checks and review-loop outcome are in `plan.md` Notes. The user tried and approved every manual-review piece (5, 6, 9, 10, 11) with "Tried it, approve"; pieces 1 to 4, 7 and 8 ran without review pauses at their request. The implementation model was `claude-fable-5-2` for this issue only.
 
 ## The pending decision (exact)
-Nothing is pending with the user right now. They approved piece 11, the last piece, after trying it ("Tried it, approve") and that was relayed. The builder is committing and pushing piece 11, then sets state `review` and sends the all-pieces-done note. Next for the user: whether to run `/review self add-globe-cubed-sphere-grid-and-elevation-sculpting`, and whether to widen the coverage script to include `scripts/`.
+No design decision is pending. The user has been given the all-pieces-done recap and offered:
+1. `/review self add-globe-cubed-sphere-grid-and-elevation-sculpting` in the planner chat, to check the whole branch; the user picks findings and the builder applies them as a review-fixes commit. Then `/publish` for the final PR text. Merging is the user's.
+2. Widening `.planner/tools/coverage-changed.sh` to include `scripts/` (it measures `src/` only today). Not done; awaiting their word.
 
 ## What the next session does
-1. Run the state checks. `planner.py ingest 1`; if it warns that a file changed in both places, merge by hand (edit the record, save, copy the merged file over the builder's copy in `<worktree>/.planner-outbox/issue/`, ingest again).
-2. The builder is session `local_acf49a6d-c0ef-4a98-8721-d05319ed32de` (`builder: add-globe-cubed-sphere-grid-and-elevation-sculpting`). When its review request for piece 11 arrives, give the user the review briefing with the manual review first; relay an approval only when their words say they tried it.
-3. After each commit: verify it on origin, tick the issue's `## Plan` checklist, `gh issue edit 1 --body-file <(tail -n +2 "$FOLDER/issue.md")`, then the next-stage briefing for the following piece with its choices. Piece 11 also has a `Manual review:` line, and needs the ETOPO download and a licence check (`plan.md` piece 11 and Notes). Normal per-piece pauses apply unless the user asks for another run-through.
-4. When all pieces are done the builder sets state `review`: suggest `/review self add-globe-cubed-sphere-grid-and-elevation-sculpting`, then `/publish`. Merging is the user's.
-5. If the builder is idle with uncommitted work and no message, it has stalled (see below): message it to carry on.
+1. Run the state checks; `planner.py ingest 1`.
+2. On the user's word, run `/review self` for this issue (the review skill), relay the chosen findings to the builder, and after its review-fixes commit add `- [x] **Review fixes (round <r>)** · <shas>` to the issue's `## Plan` checklist and `gh issue edit 1`.
+3. Then `/publish add-globe-cubed-sphere-grid-and-elevation-sculpting` when the user asks.
+4. After the PR is merged (the user's step): `/issues` or `planner.py sync` marks the issue done; then offer the cleanup in the planner skill's "Cleaning up a finished issue".
 
-### If the builder session is gone
-Run `python3 ~/.claude/lib/planner.py check-builder 1` before anything is archived or replaced; uncommitted work exists only in its worktree. A new builder is started as the planner skill's "Starting the builder" describes, only after the old worktree has let go of the branch.
+## Left for the review to weigh (from the builder's all-done note)
+- Within each piece, security, coverage, style and common-mistakes were usually run in round 1 only and not re-run after fixes; correctness was. Small fixes the builder made after a verifier's ruling were sometimes not re-reviewed (pieces 2, 4, 7, and a comment in 11).
+- Page code with no automated tests: `renderer.ts`, `main.ts`, and the DOM parts of the panels, dialog, input and sculpt controller. Exercised by scripted headless-Edge runs and the user's manual reviews. Firefox was never tried.
+- Known and accepted, each in `plan.md` Notes: picking ignores relief; a worker that never answers has no timeout; old statistics can show briefly after a world is replaced; a page killed without warning can lose the last second of edits; blocked storage reads as "could not be restored"; three seam pixels shift one colour level on the first redraw after a stroke; a `favicon.ico` 404.
+- `README.md` grew piece by piece and has not been read as a whole.
+- `public/data/earth-256.bin` (0.79 MB binary) is in the branch.
 
-## Things the next session should know
-- **The builder stalls if the Claude Code process restarts mid-check.** It happened once (2026-11-10, about 12:50): it sat idle 35 minutes with uncommitted work. If it is idle with no message, send it a message to resume.
-- **Tools:** `.planner/tools/setup-worktree.sh` and `.planner/tools/coverage-changed.sh` exist and `project.md` has the real commands. The coverage report does not see untracked files; the builder marks new files with `git add -N` first.
-- **Verification gaps the user has been told about:** for pieces 6 and 7 the headless-browser gesture scripts were not re-run on the final builds after review fixes; the user's manual reviews of 5 and 6 are the real check. Piece 7 noted three seam pixels shifting by one colour level on the first redraw after a stroke; left alone.
-- **Carried forward to piece 10 (from security checks):** show error messages as text, never HTML (grid errors carry the raw rejected value); validate a whole elevation array before writing any of it; reject non-numeric elevations; sea level must go through `normaliseSeaLevel` (single precision, within ±12,000 m), as must piece 9's reset.
-- **Piece 8 adds `tsconfig.worker.json`**, which piece 1 deferred; the README's layout section gains `src/worker` then.
-- **The user's own dev server** may still be running from the builder's worktree (last seen on http://127.0.0.1:5176/). It is theirs; leave it.
-- **Roadmap:** temperature, winds, rainfall, currents, ice, storms and tectonics are later issues, in `investigations/2026-11-10-simulator-design-and-roadmap.md`. None is planned. The simulation must be pauseable with the map editable while paused.
+## Housekeeping, not yet done
+- The builder's worktree holds a git-ignored 445 MB NOAA download in `.cache/etopo/`, and its session scratch folder under `/tmp` holds about 1.2 GB of check artefacts. Both go when the worktree and session are cleaned up; don't remove them from the planner chat.
+- The user's own dev server may be running from the builder's worktree; it is theirs.
+- Later roadmap steps (temperature, winds, rainfall, currents, ice, storms, tectonics) are in `investigations/2026-11-10-simulator-design-and-roadmap.md`; none is planned. The user was offered planning temperature next.
 
 ## Don't
-- Don't resume, or let the builder resume, without the user's word.
-- Don't commit, revert or tidy anything in the builder's worktree from the planner chat, and don't archive the builder session while piece 8 is uncommitted.
-- Don't build in the planner chat, and don't start a second builder for this issue while the first holds the branch.
-- Don't change `models.md`: Fable is for this issue only.
+- Don't archive the builder session or remove its worktree before the review fixes are applied and the PR is merged; run `planner.py check-builder 1` first.
 - Don't push `main` or merge anything: those are the user's.
+- Don't change `models.md`: Fable was for this issue only.
