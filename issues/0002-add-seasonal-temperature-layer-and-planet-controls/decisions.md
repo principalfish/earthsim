@@ -22,10 +22,12 @@
 - The ledger is complete: the user confirmed with "That's everything". (2026-11-11)
 - Carried in from issue 0001's self review (finding R1+R3, low), on the user's choice "Carry R1+R3 to step 2, accept the rest": `startStatistics` in `src/app/main.ts` holds an untested decision (no worker, no client, a worker error event) and a `throw` that can never run. This issue's worker piece moves that decision into tested code as it adds the temperature worker. (2026-11-11)
 - The issue text was approved by the user ("Approved"). (2026-11-11)
+- Manual reviews: all five proposed are kept, for pieces 6, 7, 8, 9 and 10 ("Keep all five"). (2026-11-11)
+- Implementation model for this issue is `claude-opus-5-5` ("Opus"; "lets try building with opus"). It overrides the "Builder on Sonnet" experiment in `models.md` for this issue only; `models.md` is unchanged. (2026-11-11)
+- Pieces 1 to 4 run without review pauses or go-ahead pauses, each committed and pushed once its checks and analysis loop are clean; the builder then stops with the timing table and first Earth error figures ("Run 1 to 4, stop with the timings"). Builder questions still stop the run. (2026-11-11)
 
 ## Open
-
-_None._
+- How year length is worked out, or whether it is used at all. The user asked "does it matter? surely each year is just done with month steps and the actual length of that month is irrelevant". It does affect the model (the length of a season sets how far land and ocean warm and cool), so the question was put back to them with that explained. Piece 1 waits on the answer.
 
 ## Assumed
 - Temperature means near-surface air temperature in degrees Celsius, one value per cell per month.

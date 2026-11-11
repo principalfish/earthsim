@@ -1,6 +1,6 @@
 # Plan: add-seasonal-temperature-layer-and-planet-controls
 
-**Build model:** claude-opus-5-5 — the solver's numerics, the sunlight geometry and the shader work are easy to get subtly wrong, and every later climate layer builds on them. No piece is purely mechanical.
+**Build model:** claude-opus-5-5 — the solver's numerics, the sunlight geometry and the shader work are easy to get subtly wrong, and every later climate layer builds on them. No piece is purely mechanical. The user confirmed it for this issue (2026-11-11: "Opus"; "lets try building with opus"); for this issue it overrides the "Builder on Sonnet" experiment in `models.md`, so implementation subagents and review fixes run on it. The checks keep their `models.md` tiers.
 
 ## Context
 
@@ -180,6 +180,7 @@ Test strategy: the solver, sunlight, observed-data and comparison logic live in 
 
 ## Notes
 
+- 2026-11-11: Run-through. The user chose "Run 1 to 4, stop with the timings": pieces 1 to 4 are committed and pushed once their checks and analysis loop are clean, with no review pause and no go-ahead pause. Questions still stop the run. All five manual reviews (pieces 6 to 10) are kept ("Keep all five").
 - 2026-11-11: Stop after piece 4. The builder sends the timing table (64, 128, 256; cold and warm) and the first Earth error figures, and waits. The planner chat puts the recalculation trigger to the user (only while the temperature layer is showing, or always), and whether a determinate progress indicator is worth building given the times, before piece 5 starts.
 - 2026-11-11: Solver constants. Published simple energy-balance models give starting points (outgoing heat linear in temperature, a diffusion coefficient, a mixed-layer ocean depth of tens of metres, land heat capacity far smaller, a lapse rate near 6.5 °C per km, reflectivity rising below freezing). The planner did not verify specific values; the builder takes them from a cited source, records the source in a code comment, and treats them as tuning parameters.
 - 2026-11-11: Not asked of the user, chosen as defaults; the planner chat raises each in its piece's briefing: year length uses the main-sequence relation between a star's brightness and mass (piece 1); the observed file is about 0.8 MB at one byte per value in half-degree steps, where the user was told "well under 1 MB" (piece 3); the layer shows July until the month slider exists (piece 6); the date line's wording and placement (piece 7); logarithmic sliders for brightness and distance and a reset-to-Earth button (piece 8); planet-setting changes are not undoable with Ctrl+Z (piece 8); the readout is a line in the panel, not a tooltip at the cursor (piece 9).

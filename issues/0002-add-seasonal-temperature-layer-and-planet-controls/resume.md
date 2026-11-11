@@ -1,29 +1,27 @@
 # Resume point — read this first
 
 ## Where we are
-Issue 0002 (`add-seasonal-temperature-layer-and-planet-controls`), roadmap step 2, is `planned`: `issue.md` (GitHub issue principalfish/earthsim#3) and `plan.md` (10 pieces) are written and saved. No builder is started, and none may be until issue 0001 is merged into `main`, because `main` has none of the code this builds on. This chat (`planner: earth-sim`) also owns issue 0001; read its own `resume.md` for that.
+Issue 0002 (`add-seasonal-temperature-layer-and-planet-controls`), roadmap step 2, is `planned`: `issue.md` (GitHub issue principalfish/earthsim#3) and `plan.md` (10 pieces) are written and saved. No builder is started yet. Issue 0001 is merged, so `main` has the code this builds on. This chat (`planner: earth-sim`) also owns issue 0001; read its own `resume.md` for that.
 State checks (run from `/home/philiph/workspace/earth_sim`):
 - `python3 ~/.claude/lib/planner.py meta 2` shows state `planned`, `gh_issue` 3, base `main`, `build_model` `claude-opus-5-5`.
 - `git -C .planner status --short` is empty.
-- `git ls-remote --heads origin main` is `ffed15a…` until the user merges issue 0001. After the merge it moves, and `git show origin/main:src/core/world.ts` exists.
+- `git ls-remote --heads origin main` is `c866185…` or later, and `git show origin/main:src/core/world.ts` exists.
 If anything else differs, stop and tell the user.
 
 ## How it got here — decisions already answered, in order
 Everything is in `decisions.md` (Settled, with the user's words) and carried into `plan.md` Context. The discussion ended with "That's everything"; the issue text was approved with "Approved".
 
 ## The pending decision (exact)
-The user has been shown the plan and asked two things:
-1. Which proposed manual reviews to keep: piece 6 (the temperature layer's look), piece 7 (playing through the year), piece 8 (the planet controls), piece 9 (the cursor readout), piece 10 (the comparison with real Earth). Only the ones they confirm stay in `plan.md`; remove the `Manual review:` line and the "manual review done" wording of the checkpoint for any they decline.
-2. Which model implements this issue. `plan.md` names `claude-opus-5-5`; while `models.md`'s "Builder on Sonnet" experiment is on, the builder implements on `claude-sonnet-5-5` regardless. Issue 0001 used `claude-fable-5-2` on the user's one-time instruction. Record their answer in `decisions.md` and `plan.md`'s Build model line.
-Also told to the user, not blocking: the defaults listed in `plan.md` Notes (the mass-brightness relation for year length; the observed file is about 0.8 MB, not "well under 1 MB"; and the others).
+One question blocks the builder's start, because piece 1 implements it: how year length is worked out. The user asked "does it matter? surely each year is just done with month steps and the actual length of that month is irrelevant". The planner chat explained that it does (a season's length sets how far land and ocean warm and cool before the sun moves on) and asked again, with three options: derive the star's mass from its brightness by the main-sequence relation and compute the year from that and the orbit (recommended); add star mass as a fifth control; or treat every year as Earth-length, dropping the year-length readout and that effect.
+
+Already answered on 2026-11-11: keep all five manual reviews; build on `claude-opus-5-5` for this issue only; run pieces 1 to 4 without pauses and stop with the timing table. Issue 0001 is merged (`main` at `c866185`) and cleaned up.
 
 ## What the next session does
 1. Run the state checks.
-2. Apply the user's answers on manual reviews and the model to `plan.md`, save.
-3. Wait for issue 0001 to be merged (`/publish` for it first, then the user merges). Then check `plan.md`'s "What the code offers" against `main`, give the next-stage briefing for piece 1, and start the builder on the user's go-ahead (planner skill, "Starting the builder"): branch from `main`, `python3 ~/.claude/lib/planner.py track` its session.
+2. Settle the year-length question, record it in `decisions.md` and `plan.md` (piece 1's What and Tests, and Approach), save.
+3. Start the builder (planner skill, "Starting the builder"): branch from `main`, session model `claude-sonnet-5-5` for the shell per `models.md`, with the brief saying implementation runs on `claude-opus-5-5` and pieces 1 to 4 run without pauses; then `python3 ~/.claude/lib/planner.py track` its session and mark piece 1 in progress on the issue checklist.
 4. After piece 4 is committed the builder stops with a timing table and Earth error figures: put the recalculation trigger to the user before piece 5.
 
 ## Don't
-- Don't start a builder for this issue before issue 0001 is merged into `main`.
 - Don't build in the planner chat.
 - Don't push `main` or merge anything: those are the user's.
