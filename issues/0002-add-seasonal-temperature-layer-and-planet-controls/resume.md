@@ -12,7 +12,7 @@ If anything else differs, stop and tell the user.
 Everything is in `decisions.md` (Settled, with the user's words) and carried into `plan.md` Context. Late additions on 2026-11-11: keep all five manual reviews; build on Opus for this issue only; run pieces 1 to 4 without pauses; star mass is a fifth planet control ("Add star mass as a setting"), with year length from Kepler's third law.
 
 ## The pending decision (exact)
-Nothing is pending with the user. Piece 1 is committed and pushed (`8390675`) on `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa`, and draft PR 4 is open (`meta.pr`). The builder is running pieces 2 to 4 without pauses and stops with the timing table and first Earth error figures; the next thing for the user is the recalculation trigger. The sun is piece 11 of 11.
+Nothing is pending with the user. Pieces 1 (`8390675`) and 2 (`0c19852`) are committed and pushed on `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa`, and draft PR 4 is open (`meta.pr`). The builder is running pieces 3 and 4 without pauses and stops with the timing table and first Earth error figures; the next thing for the user is the recalculation trigger. The sun is piece 11 of 11.
 
 Carry into the briefings for pieces 4 and 5 (from the builder's look-ahead after piece 1): `isWorldShaped` only checks that planet fields are numbers, so the solver and the worker must run planet values through `normalisePlanet` before computing; a zero star mass would otherwise reach the year-length formula. Also from piece 1: a file with an out-of-range planet setting or a bad date is refused, not clamped, and shows the existing damaged-file message.
 
