@@ -66,6 +66,16 @@ describe('describeWorld', () => {
 		}
 	});
 
+	it('describes an Earth world by its resolution', () => {
+		for (const resolution of SUPPORTED_RESOLUTIONS) {
+			const world: World = {
+				...createBlankWorld(resolution),
+				origin: { kind: 'earth' },
+			};
+			expect(describeWorld(world)).toBe(`Earth · ${resolution}`);
+		}
+	});
+
 	it('describes a generated world by its resolution, seed and land', () => {
 		expect(
 			describeWorld(generateWorld({ seed: 1977, landFraction: 0.3 })),

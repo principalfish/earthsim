@@ -2,6 +2,7 @@
 export const CORE_VERSION = '0.0.0';
 
 export * from './brush';
+export * from './earth';
 export * from './generate';
 export * from './grid';
 export * from './history';

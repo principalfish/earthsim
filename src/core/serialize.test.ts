@@ -233,6 +233,16 @@ describe('serializeWorld', () => {
 		});
 	});
 
+	it('writes that a world started as the Earth into the header', () => {
+		const world: World = {
+			...createBlankWorld(128),
+			origin: { kind: 'earth' },
+		};
+		expect(headerText(serializeWorld(world))).toBe(
+			'{"resolution":128,"seaLevel":0,"origin":{"kind":"earth"}}',
+		);
+	});
+
 	it('writes only the fields an origin of its kind has', () => {
 		const origin = {
 			kind: 'blank',
@@ -241,6 +251,15 @@ describe('serializeWorld', () => {
 		} as unknown as WorldOrigin;
 		const bytes = serializeWorld({ ...createBlankWorld(64), origin });
 		expect(headerText(bytes)).toBe(BLANK_HEADER);
+
+		const earth = {
+			kind: 'earth',
+			seed: 5,
+			landFraction: 0.29,
+		} as unknown as WorldOrigin;
+		expect(
+			headerText(serializeWorld({ ...createBlankWorld(64), origin: earth })),
+		).toBe('{"resolution":64,"seaLevel":0,"origin":{"kind":"earth"}}');
 	});
 
 	it('keeps the header far below the cap for the longest values there are', () => {
@@ -402,6 +421,35 @@ describe('deserializeWorld', () => {
 			expect(firstDifference(read.elevation, world.elevation)).toBe(-1);
 			expect(read.seaLevel).toBe(world.seaLevel);
 		}
+	});
+
+	it.each(SUPPORTED_RESOLUTIONS)(
+		'gives back a world that started as the Earth at %i',
+		(resolution) => {
+			const world: World = {
+				...createBlankWorld(resolution),
+				seaLevel: normaliseSeaLevel(-75.5),
+				origin: { kind: 'earth' },
+			};
+			world.elevation.set([8848, -10_935, Math.fround(0.1), -0]);
+			const read = worldOf(serializeWorld(world));
+			expect(read.origin).toEqual({ kind: 'earth' });
+			expect(read.resolution).toBe(resolution);
+			expect(read.seaLevel).toBe(world.seaLevel);
+			expect(firstDifference(read.elevation, world.elevation)).toBe(-1);
+		},
+	);
+
+	it('reads an Earth origin as that alone, whatever else it holds', () => {
+		const read = worldOf(
+			fileWithHeader({
+				resolution: 64,
+				seaLevel: 0,
+				origin: { seed: 'x', kind: 'earth', landFraction: 2 },
+			}),
+		);
+		expect(read.origin).toEqual({ kind: 'earth' });
+		expect(Object.keys(read.origin)).toEqual(['kind']);
 	});
 
 	it('ignores header fields it does not know, their order and the spacing', () => {
@@ -633,6 +681,9 @@ describe('a file that is refused', () => {
 			{},
 			{ kind: 'plates' },
 			{ kind: 'Blank' },
+			{ kind: 'Earth' },
+			{ kind: 'mars' },
+			{ kind: ' earth' },
 			{ kind: 7 },
 			{ kind: null },
 			{ kind: ['blank'] },
@@ -805,7 +856,7 @@ describe('bytes of any kind', () => {
 			FACE_COUNT * world.resolution * world.resolution,
 		);
 		expect(world.seaLevel).toBe(normaliseSeaLevel(world.seaLevel));
-		expect(['blank', 'generated']).toContain(world.origin.kind);
+		expect(['blank', 'generated', 'earth']).toContain(world.origin.kind);
 		expect(
 			world.elevation.every(
 				(value) => value >= MIN_ELEVATION_M && value <= MAX_ELEVATION_M,

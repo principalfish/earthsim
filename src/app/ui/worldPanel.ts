@@ -201,8 +201,8 @@ export const formatLandPercent = (landFraction: number): string => {
 };
 
 /**
- * One line saying how a world started: `Blank ocean · 128`, or
- * `Generated · 64 · seed 1977 · 30% land`.
+ * One line saying how a world started: `Blank ocean · 128`, `Earth · 128`,
+ * or `Generated · 64 · seed 1977 · 30% land`.
  *
  * @remarks
  * The number after the first part is the resolution, in cells along a face
@@ -224,6 +224,8 @@ export const describeWorld = (world: World): string => {
 				`seed ${origin.seed}`,
 				`${formatLandPercent(origin.landFraction)} land`,
 			].join(PART_SEPARATOR);
+		case 'earth':
+			return ['Earth', resolution].join(PART_SEPARATOR);
 	}
 };
 

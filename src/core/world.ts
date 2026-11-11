@@ -60,6 +60,10 @@ export type WorldOrigin =
 			readonly seed: number;
 			/** The share of the surface that was asked to be land, 0 to 1. */
 			readonly landFraction: number;
+	  }
+	| {
+			/** The real Earth, from its measured elevation. */
+			readonly kind: 'earth';
 	  };
 
 /**

@@ -11,6 +11,8 @@
 import {
 	createBlankWorld,
 	DEFAULT_RESOLUTION,
+	type EarthData,
+	earthWorld,
 	generateWorld,
 	isSeed,
 	MAX_SEED,
@@ -40,7 +42,7 @@ export const DEFAULT_LAND_PERCENT = 30;
 export type NewWorldValues = {
 	/** The chosen resolution, as the text of a whole number. */
 	readonly resolution: string;
-	/** How the world starts: `blank` or `generated`. */
+	/** How the world starts: `blank`, `generated` or `earth`. */
 	readonly kind: string;
 	/** What the seed field holds; blank for a seed chosen at random. */
 	readonly seed: string;
@@ -65,6 +67,12 @@ export type NewWorldChoice =
 			readonly seed: number;
 			/** Share of the surface to make land, 0 to 1. */
 			readonly landFraction: number;
+	  }
+	| {
+			/** The real Earth, from its measured elevation. */
+			readonly kind: 'earth';
+			/** Cells along a face edge of the grid. */
+			readonly resolution: Resolution;
 	  };
 
 /** The control of the dialog a rejected value belongs to. */
@@ -106,7 +114,7 @@ export const FIRST_NEW_WORLD_VALUES: NewWorldValues = {
 /** Said when no supported resolution is chosen. */
 export const RESOLUTION_MESSAGE = 'Choose one of the resolutions.';
 
-/** Said when neither way of starting a world is chosen. */
+/** Said when no way of starting a world is chosen. */
 export const KIND_MESSAGE = 'Choose how the world starts.';
 
 /**
@@ -128,6 +136,13 @@ export const CONFIRM_LABEL = 'Create world';
 /** What the confirm button says while continents are being generated. */
 export const GENERATING_LABEL = 'Generating…';
 
+/** What the confirm button says while the Earth's data is being fetched. */
+export const LOADING_EARTH_LABEL = 'Loading Earth…';
+
+/** Said in the dialog when the Earth's data could not be fetched. */
+export const EARTH_FAILED_MESSAGE =
+	"Earth's elevation data could not be loaded. Check your connection and try again. The current world has not been changed.";
+
 /** How large a cell of each resolution is, as the dialog says it. */
 export const RESOLUTION_HINTS: Readonly<Record<Resolution, string>> = {
 	64: 'about 150 km cells',
@@ -139,6 +154,24 @@ export const RESOLUTION_HINTS: Readonly<Record<Resolution, string>> = {
 export const START_LABELS: Readonly<Record<NewWorldChoice['kind'], string>> = {
 	blank: 'Blank ocean',
 	generated: 'Generated continents',
+	earth: 'Earth',
+};
+
+/** What the dialog says after the name of the Earth start. */
+export const EARTH_HINT = 'real elevation';
+
+/** What the confirm button says while a world of each kind is made. */
+const BUSY_LABELS: Readonly<Record<NewWorldChoice['kind'], string>> = {
+	blank: CONFIRM_LABEL,
+	generated: GENERATING_LABEL,
+	earth: LOADING_EARTH_LABEL,
+};
+
+/** What the dialog says when a world of each kind could not be made. */
+const FAILURE_MESSAGES: Readonly<Record<NewWorldChoice['kind'], string>> = {
+	blank: CREATE_FAILED_MESSAGE,
+	generated: CREATE_FAILED_MESSAGE,
+	earth: EARTH_FAILED_MESSAGE,
 };
 
 /** Digits 0 to 9 and nothing else: no sign, point, exponent or prefix. */
@@ -167,8 +200,8 @@ const landPercentOf = (value: string | number): number => {
  *
  * @remarks
  * The resolution must be the text of a supported resolution exactly. For a
- * blank world nothing else is read, so whatever the seed field and the
- * slider were left holding cannot stand in the way.
+ * blank world and for the Earth nothing else is read, so whatever the seed
+ * field and the slider were left holding cannot stand in the way.
  *
  * For a generated world the seed is the field's text without the white
  * space around it: digits 0 to 9 only, standing for a whole number from 0
@@ -195,8 +228,8 @@ export const parseNewWorldValues = (
 	if (resolution === undefined) {
 		return reject('resolution', RESOLUTION_MESSAGE);
 	}
-	if (values.kind === 'blank') {
-		return { ok: true, choice: { kind: 'blank', resolution } };
+	if (values.kind === 'blank' || values.kind === 'earth') {
+		return { ok: true, choice: { kind: values.kind, resolution } };
 	}
 	if (values.kind !== 'generated') {
 		return reject('kind', KIND_MESSAGE);
@@ -232,7 +265,7 @@ export const parseNewWorldValues = (
  * would start that world again.
  *
  * @remarks
- * A blank world leaves the seed blank and the land at
+ * A blank world and an Earth world leave the seed blank and the land at
  * {@link DEFAULT_LAND_PERCENT}, ready for a change to generated continents.
  * The land of a generated world is shown to the slider's nearest step.
  *
@@ -243,9 +276,10 @@ export const newWorldValuesFor = (world: World): NewWorldValues => {
 	const resolution = String(world.resolution);
 	switch (origin.kind) {
 		case 'blank':
+		case 'earth':
 			return {
 				resolution,
-				kind: 'blank',
+				kind: origin.kind,
 				seed: '',
 				landPercent: DEFAULT_LAND_PERCENT,
 			};
@@ -262,24 +296,45 @@ export const newWorldValuesFor = (world: World): NewWorldValues => {
 	}
 };
 
+/** Where the worlds that are not worked out on the spot come from. */
+export type WorldSources = {
+	/** Gives the Earth's elevation data, fetching it if need be. */
+	readonly loadEarth: () => Promise<EarthData>;
+};
+
 /**
  * Builds the world a choice asks for.
  *
  * @remarks
  * Generating continents takes time in proportion to the number of cells:
- * about half a second at the highest resolution.
+ * about half a second at the highest resolution. The Earth takes as long as
+ * its data takes to arrive the first time, and a few milliseconds after
+ * that.
  *
- * @param choice - A blank ocean or generated continents, and its options.
- * @returns A new world with the default sea level.
+ * @param choice - A blank ocean, generated continents or the Earth, and its
+ * options.
+ * @param sources - Where the Earth's data comes from. It is asked only for
+ * an Earth world.
+ * @returns A promise of a new world with the default sea level. It rejects
+ * if the Earth's data cannot be had.
  */
-export const worldFromChoice = (choice: NewWorldChoice): World =>
-	choice.kind === 'blank'
-		? createBlankWorld(choice.resolution)
-		: generateWorld({
+export const worldFromChoice = async (
+	choice: NewWorldChoice,
+	sources: WorldSources,
+): Promise<World> => {
+	switch (choice.kind) {
+		case 'blank':
+			return createBlankWorld(choice.resolution);
+		case 'generated':
+			return generateWorld({
 				resolution: choice.resolution,
 				seed: choice.seed,
 				landFraction: choice.landFraction,
 			});
+		case 'earth':
+			return earthWorld(await sources.loadEarth(), choice.resolution);
+	}
+};
 
 /**
  * A land percentage as the dialog shows it, such as `30%`.
@@ -297,14 +352,16 @@ export type NewWorldDialogOptions = {
 	 */
 	readonly values: NewWorldValues;
 	/**
-	 * Builds the world that was chosen. Called once the confirm button has
-	 * been seen to change, since it may take a while. If it throws, the
-	 * dialog stays open and says the world could not be created.
+	 * Builds the world that was chosen, at once or in a while. Called once
+	 * the confirm button has been seen to change, since it may take a while.
+	 * If it throws or rejects, the dialog stays open and says that there is
+	 * no new world.
 	 */
-	readonly createWorld: (choice: NewWorldChoice) => World;
+	readonly createWorld: (choice: NewWorldChoice) => World | Promise<World>;
 	/**
 	 * Called with the new world, for the page to make it the one being
-	 * edited. The dialog closes afterwards, whether or not this throws.
+	 * edited. The dialog closes afterwards, whether or not this throws. Not
+	 * called if the dialog closed while the world was being built.
 	 */
 	readonly onWorld: (world: World) => void;
 	/**
@@ -402,8 +459,8 @@ const afterNextPaint = (): Promise<void> =>
 
 /** What {@link runCreate} does to the dialog and the page, step by step. */
 export type CreateSteps = {
-	/** Builds the world that was chosen; may throw. */
-	createWorld(choice: NewWorldChoice): World;
+	/** Builds the world that was chosen; may throw or reject. */
+	createWorld(choice: NewWorldChoice): World | Promise<World>;
 	/** Hands the new world over to the page; may throw. */
 	onWorld(world: World): void;
 	/** Resolves when the page has drawn what it shows now. */
@@ -427,37 +484,38 @@ export type CreateSteps = {
  *
  * @remarks
  * The controls are disabled, with the confirm button saying
- * {@link GENERATING_LABEL} for generated continents and
- * {@link CONFIRM_LABEL} for a blank ocean, and that is drawn before the
- * world is built. The new world is handed over, one more drawing is waited
- * for, and the dialog is closed.
+ * {@link GENERATING_LABEL} for generated continents,
+ * {@link LOADING_EARTH_LABEL} for the Earth and {@link CONFIRM_LABEL} for a
+ * blank ocean, and that is drawn before the world is built. Building may
+ * take a while without holding the page up, as fetching the Earth's data
+ * does; the controls stay disabled until it is over. The new world is
+ * handed over, one more drawing is waited for, and the dialog is closed.
  *
- * If building the world throws, the error is logged, the controls come
- * back under {@link CONFIRM_LABEL}, {@link CREATE_FAILED_MESSAGE} is said,
- * and nothing is handed over or closed. If handing the world over throws,
- * the error is logged and the dialog still closes after the drawing.
+ * If building the world fails, the error is logged, the controls come back
+ * under {@link CONFIRM_LABEL}, and the dialog says
+ * {@link EARTH_FAILED_MESSAGE} for the Earth, whose data did not arrive,
+ * and {@link CREATE_FAILED_MESSAGE} otherwise; nothing is handed over or
+ * closed. If handing the world over throws, the error is logged and the
+ * dialog still closes after the drawing.
  *
  * @param choice - The world to build.
  * @param steps - What each step does.
  * @returns A promise that resolves when the last step is done; it never
- * rejects because `createWorld` or `onWorld` threw.
+ * rejects because `createWorld` or `onWorld` failed.
  */
 export const runCreate = async (
 	choice: NewWorldChoice,
 	steps: CreateSteps,
 ): Promise<void> => {
-	steps.setBusy(
-		true,
-		choice.kind === 'generated' ? GENERATING_LABEL : CONFIRM_LABEL,
-	);
+	steps.setBusy(true, BUSY_LABELS[choice.kind]);
 	await steps.afterPaint();
 	let world: World;
 	try {
-		world = steps.createWorld(choice);
+		world = await steps.createWorld(choice);
 	} catch (error) {
 		steps.logError(error);
 		steps.setBusy(false, CONFIRM_LABEL);
-		steps.fail(CREATE_FAILED_MESSAGE);
+		steps.fail(FAILURE_MESSAGES[choice.kind]);
 		return;
 	}
 	try {
@@ -470,6 +528,40 @@ export const runCreate = async (
 };
 
 /**
+ * The steps for a dialog that may close while its world is being built: once
+ * it has closed, the world is not handed over and a failure is not said.
+ *
+ * @remarks
+ * A browser may close a dialog that asked to stay open, as a Chromium
+ * browser does at a second Escape, and fetching the Earth's data can take a
+ * minute. Whoever
+ * closed the dialog takes the current world to be staying, so a world that
+ * arrives afterwards is dropped; and a failure has no dialog left to be
+ * said in.
+ *
+ * @param steps - The steps to take while the dialog is open.
+ * @param isClosed - Whether the dialog has closed.
+ * @returns `steps`, but with an `onWorld` and a `fail` that do nothing once
+ * `isClosed` gives true.
+ */
+export const stepsUntilClosed = (
+	steps: CreateSteps,
+	isClosed: () => boolean,
+): CreateSteps => ({
+	...steps,
+	onWorld: (world) => {
+		if (!isClosed()) {
+			steps.onWorld(world);
+		}
+	},
+	fail: (message) => {
+		if (!isClosed()) {
+			steps.fail(message);
+		}
+	},
+});
+
+/**
  * Opens the dialog that starts a new world.
  *
  * @remarks
@@ -479,22 +571,27 @@ export const runCreate = async (
  * which the focus is back where it was.
  *
  * The seed, its Random button and the land slider belong to generated
- * continents and are disabled while a blank ocean is chosen. Random fills
- * the seed field with a fresh seed.
+ * continents and are disabled while a blank ocean or the Earth is chosen.
+ * Random fills the seed field with a fresh seed.
  *
  * Confirming, by the button or by Enter in any control, reads the form
  * with {@link parseNewWorldValues}. A value that is rejected is explained
  * beside the seed field or above the buttons, as text, and the dialog stays
  * open with the focus on the seed field when the seed is at fault.
  * Otherwise every control is disabled, the confirm button says
- * {@link GENERATING_LABEL} for generated continents, and the world is built
- * only after the page has drawn that, because building it keeps the page
- * from drawing anything until it is done.
+ * {@link GENERATING_LABEL} for generated continents or
+ * {@link LOADING_EARTH_LABEL} for the Earth, and the world is built only
+ * after the page has drawn that, because generating keeps the page from
+ * drawing anything until it is done. The Earth's data is fetched the first
+ * time an Earth world is made; if it does not arrive, the dialog says so
+ * above the buttons and its controls come back for another try.
  *
  * Cancel and Escape close the dialog with nothing changed. Once the world
  * is being built there is no cancelling: Escape is ignored and the buttons
  * are disabled until the dialog closes on the new world. Should the browser
- * close the dialog all the same, the world is still built and handed over.
+ * close the dialog all the same, as it may at a second Escape, the world
+ * being built is dropped when it arrives and the current world stays; if
+ * building it fails, the error is logged and nothing is said.
  * The dialog stays open, and the page behind it out of reach, for one more
  * frame after the world is handed over, so that clicks and keys made while
  * the page was busy land on the dialog and not on the new world.
@@ -507,6 +604,7 @@ export const openNewWorldDialog = (
 ): HTMLDialogElement => {
 	const { values } = options;
 	let busy = false;
+	let closed = false;
 
 	const dialog = createElement('dialog', 'dialog');
 	dialog.setAttribute('aria-labelledby', TITLE_ID);
@@ -534,6 +632,7 @@ export const openNewWorldDialog = (
 		options: [
 			{ value: 'blank', label: START_LABELS.blank },
 			{ value: 'generated', label: START_LABELS.generated },
+			{ value: 'earth', label: START_LABELS.earth, hint: EARTH_HINT },
 		],
 		value: values.kind,
 	});
@@ -656,18 +755,21 @@ export const openNewWorldDialog = (
 		}
 	};
 
-	const steps: CreateSteps = {
-		createWorld: options.createWorld,
-		onWorld: options.onWorld,
-		afterPaint: afterNextPaint,
-		setBusy,
-		fail: (message) => {
-			setFailure(message);
-			confirm.focus();
+	const steps = stepsUntilClosed(
+		{
+			createWorld: options.createWorld,
+			onWorld: options.onWorld,
+			afterPaint: afterNextPaint,
+			setBusy,
+			fail: (message) => {
+				setFailure(message);
+				confirm.focus();
+			},
+			close: () => dialog.close(),
+			logError: (error) => console.error(error),
 		},
-		close: () => dialog.close(),
-		logError: (error) => console.error(error),
-	};
+		() => closed,
+	);
 
 	form.addEventListener('submit', (event) => {
 		// The dialog closes only once the world has been made, not on submit.
@@ -697,7 +799,10 @@ export const openNewWorldDialog = (
 			event.preventDefault();
 		}
 	});
-	dialog.addEventListener('close', () => dialog.remove());
+	dialog.addEventListener('close', () => {
+		closed = true;
+		dialog.remove();
+	});
 
 	form.append(title);
 	if (options.notice !== undefined) {

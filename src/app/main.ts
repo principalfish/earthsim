@@ -8,6 +8,7 @@ import {
 import { createSimClient } from '../worker/client';
 import { createAppState } from './appState';
 import { AUTOSAVE_DELAY_MS, createAutosave } from './autosave';
+import { loadEarthData } from './earthData';
 import { attachViewInput } from './globe/input';
 import { MAX_DRAWN_SEA_LEVEL_M, MIN_DRAWN_SEA_LEVEL_M } from './globe/material';
 import { createGlobe, type Globe } from './globe/renderer';
@@ -154,7 +155,8 @@ if (globe !== null) {
 		sculpt.endStroke();
 		openNewWorldDialog({
 			values,
-			createWorld: worldFromChoice,
+			createWorld: (choice) =>
+				worldFromChoice(choice, { loadEarth: loadEarthData }),
 			onWorld: state.replaceWorld,
 			notice,
 		});

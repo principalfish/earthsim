@@ -162,6 +162,8 @@ const originRecord = (origin: WorldOrigin): WorldOrigin => {
 				seed: origin.seed,
 				landFraction: origin.landFraction,
 			};
+		case 'earth':
+			return { kind: 'earth' };
 	}
 };
 
@@ -178,6 +180,9 @@ const parseOrigin = (value: unknown): WorldOrigin | null => {
 	const kind = ownField(value, 'kind');
 	if (kind === 'blank') {
 		return { kind: 'blank' };
+	}
+	if (kind === 'earth') {
+		return { kind: 'earth' };
 	}
 	if (kind !== 'generated') {
 		return null;
@@ -316,8 +321,9 @@ export const serializeWorld = (world: World): Uint8Array<ArrayBuffer> => {
  * The header is read field by field. The resolution must be a supported
  * one. The sea level must be a finite number, and is brought within the
  * elevation limits and to single precision by {@link normaliseSeaLevel}.
- * The origin must be of a known kind: a generated one needs a seed that is
- * an integer from 0 to 4,294,967,295 and a land fraction from 0 to 1.
+ * The origin must be of a known kind: blank, generated or the Earth. A
+ * generated one needs a seed that is an integer from 0 to 4,294,967,295 and
+ * a land fraction from 0 to 1.
  * Nothing is converted from another type. Fields this version does not
  * know are ignored, and so is anything the parsed objects inherit rather
  * than hold.

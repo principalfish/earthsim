@@ -5,6 +5,10 @@ import {
 	createBlankWorld,
 	DEFAULT_RESOLUTION,
 	DEFAULT_SEA_LEVEL_M,
+	EARTH_DATA_CELLS,
+	EARTH_DATA_RESOLUTION,
+	type EarthData,
+	earthWorld,
 	FACE_COUNT,
 	generateWorld,
 	isSeed,
@@ -16,12 +20,15 @@ import {
 	CREATE_FAILED_MESSAGE,
 	type CreateSteps,
 	DEFAULT_LAND_PERCENT,
+	EARTH_FAILED_MESSAGE,
+	EARTH_HINT,
 	FIRST_NEW_WORLD_VALUES,
 	formatPercent,
 	GENERATING_LABEL,
 	KIND_MESSAGE,
 	LAND_MESSAGE,
 	LAND_SLIDER_STEP_PERCENT,
+	LOADING_EARTH_LABEL,
 	MAX_LAND_PERCENT,
 	MIN_LAND_PERCENT,
 	type NewWorldChoice,
@@ -33,6 +40,8 @@ import {
 	runCreate,
 	SEED_MESSAGE,
 	START_LABELS,
+	stepsUntilClosed,
+	type WorldSources,
 	worldFromChoice,
 } from './newWorldDialog';
 import { describeWorld } from './worldPanel';
@@ -41,6 +50,22 @@ import { describeWorld } from './worldPanel';
 const noRandom = (): number => {
 	throw new Error('no random seed was expected');
 };
+
+/** A source of the Earth's data that must not be asked. */
+const noEarth: WorldSources = {
+	loadEarth: () => {
+		throw new Error('no Earth data was expected');
+	},
+};
+
+/** Earth data that slopes from cell to cell, without the cost of the real file. */
+const slopingEarth = (): EarthData => ({
+	resolution: EARTH_DATA_RESOLUTION,
+	elevation: Float32Array.from(
+		{ length: EARTH_DATA_CELLS },
+		(_, cell) => (cell % 9001) - 4500,
+	),
+});
 
 const generatedValues = (
 	overrides: Partial<NewWorldValues> = {},
@@ -93,6 +118,39 @@ describe('parseNewWorldValues', () => {
 				choice: { kind: 'generated', resolution, seed: 7, landFraction: 0.3 },
 			});
 		}
+	});
+
+	it('reads the Earth at each resolution', () => {
+		for (const resolution of SUPPORTED_RESOLUTIONS) {
+			expect(
+				parseNewWorldValues(
+					{
+						resolution: String(resolution),
+						kind: 'earth',
+						seed: '',
+						landPercent: 30,
+					},
+					{ randomSeed: noRandom },
+				),
+			).toEqual({ ok: true, choice: { kind: 'earth', resolution } });
+		}
+	});
+
+	it('reads nothing but the resolution for the Earth', () => {
+		expect(
+			choiceOf({
+				resolution: '256',
+				kind: 'earth',
+				seed: 'not a seed',
+				landPercent: 400,
+			}),
+		).toEqual({ kind: 'earth', resolution: 256 });
+		expect(
+			parseNewWorldValues(
+				{ resolution: '100', kind: 'earth', seed: '', landPercent: 30 },
+				{ randomSeed: noRandom },
+			),
+		).toEqual({ ok: false, field: 'resolution', message: RESOLUTION_MESSAGE });
 	});
 
 	it('reads nothing but the resolution for a blank world', () => {
@@ -278,7 +336,14 @@ describe('parseNewWorldValues', () => {
 	});
 
 	it('rejects an unknown way of starting, with a message', () => {
-		for (const kind of ['', 'Blank', 'random', 'generated ']) {
+		for (const kind of [
+			'',
+			'Blank',
+			'random',
+			'generated ',
+			'Earth',
+			' earth',
+		]) {
 			expect(
 				parseNewWorldValues(generatedValues({ kind }), {
 					randomSeed: noRandom,
@@ -347,6 +412,20 @@ describe('newWorldValuesFor', () => {
 		}
 	});
 
+	it('starts an Earth world again, with the generated options at rest', () => {
+		const data = slopingEarth();
+		for (const resolution of SUPPORTED_RESOLUTIONS) {
+			const values = newWorldValuesFor(earthWorld(data, resolution));
+			expect(values).toEqual({
+				resolution: String(resolution),
+				kind: 'earth',
+				seed: '',
+				landPercent: DEFAULT_LAND_PERCENT,
+			});
+			expect(choiceOf(values)).toEqual({ kind: 'earth', resolution });
+		}
+	});
+
 	it('starts a generated world again from its seed and land', () => {
 		const world = generateWorld({ seed: 1977, landFraction: 0.3 });
 		const values = newWorldValuesFor(world);
@@ -393,9 +472,12 @@ describe('newWorldValuesFor', () => {
 });
 
 describe('worldFromChoice', () => {
-	it('makes a blank ocean at each resolution', () => {
+	it('makes a blank ocean at each resolution', async () => {
 		for (const resolution of SUPPORTED_RESOLUTIONS) {
-			const world = worldFromChoice({ kind: 'blank', resolution });
+			const world = await worldFromChoice(
+				{ kind: 'blank', resolution },
+				noEarth,
+			);
 			expect(world.resolution).toBe(resolution);
 			expect(world.origin).toEqual({ kind: 'blank' });
 			expect(world.seaLevel).toBe(DEFAULT_SEA_LEVEL_M);
@@ -408,15 +490,13 @@ describe('worldFromChoice', () => {
 		}
 	});
 
-	it('generates continents on the grid asked for, with the land asked for', () => {
+	it('generates continents on the grid asked for, with the land asked for', async () => {
 		// The finest grid goes through the same code and costs seconds here.
 		for (const resolution of [64, 128] as const) {
-			const world = worldFromChoice({
-				kind: 'generated',
-				resolution,
-				seed: 2024,
-				landFraction: 0.4,
-			});
+			const world = await worldFromChoice(
+				{ kind: 'generated', resolution, seed: 2024, landFraction: 0.4 },
+				noEarth,
+			);
 			expect(world.resolution).toBe(resolution);
 			expect(world.origin).toEqual({
 				kind: 'generated',
@@ -431,36 +511,82 @@ describe('worldFromChoice', () => {
 		}
 	});
 
-	it('makes the world the generator makes from the same options', () => {
-		const world = worldFromChoice({
-			kind: 'generated',
-			resolution: 64,
-			seed: 1977,
-			landFraction: 0.3,
-		});
+	it('makes the world the generator makes from the same options', async () => {
+		const world = await worldFromChoice(
+			{ kind: 'generated', resolution: 64, seed: 1977, landFraction: 0.3 },
+			noEarth,
+		);
 		expect(world).toEqual(
 			generateWorld({ resolution: 64, seed: 1977, landFraction: 0.3 }),
 		);
 	});
 
-	it('reproduces a world from what the panel says about it', () => {
-		const first = worldFromChoice(
+	it('reproduces a world from what the panel says about it', async () => {
+		const first = await worldFromChoice(
 			choiceOf(generatedValues({ seed: '', landPercent: 30 }), () => 31337),
+			noEarth,
 		);
 		expect(describeWorld(first)).toBe('Generated · 64 · seed 31337 · 30% land');
 
 		// Typed back in from the description, and from the pre-filled dialog.
-		const typed = worldFromChoice(
+		const typed = await worldFromChoice(
 			choiceOf(generatedValues({ seed: '31337', landPercent: '30' })),
+			noEarth,
 		);
-		const prefilled = worldFromChoice(choiceOf(newWorldValuesFor(first)));
+		const prefilled = await worldFromChoice(
+			choiceOf(newWorldValuesFor(first)),
+			noEarth,
+		);
 		expect(typed.elevation).toEqual(first.elevation);
 		expect(prefilled.elevation).toEqual(first.elevation);
 
-		const other = worldFromChoice(
+		const other = await worldFromChoice(
 			choiceOf(generatedValues({ seed: '31338', landPercent: 30 })),
+			noEarth,
 		);
 		expect(other.elevation).not.toEqual(first.elevation);
+	});
+
+	it('makes the Earth on the grid asked for, from the data it is given', async () => {
+		const data = slopingEarth();
+		let asked = 0;
+		const sources: WorldSources = {
+			loadEarth: async () => {
+				asked++;
+				return data;
+			},
+		};
+		for (const resolution of SUPPORTED_RESOLUTIONS) {
+			const world = await worldFromChoice(
+				{ kind: 'earth', resolution },
+				sources,
+			);
+			expect(world.resolution).toBe(resolution);
+			expect(world.origin).toEqual({ kind: 'earth' });
+			expect(world.seaLevel).toBe(DEFAULT_SEA_LEVEL_M);
+			expect(world).toEqual(earthWorld(data, resolution));
+			expect(world.elevation).not.toBe(data.elevation);
+			expect(describeWorld(world)).toBe(`Earth · ${resolution}`);
+		}
+		expect(asked).toBe(SUPPORTED_RESOLUTIONS.length);
+	});
+
+	it('fails as the loading of the Earth data fails', async () => {
+		const error = new Error('offline');
+		await expect(
+			worldFromChoice(
+				{ kind: 'earth', resolution: 64 },
+				{ loadEarth: () => Promise.reject(error) },
+			),
+		).rejects.toBe(error);
+	});
+
+	it('rejects rather than throws when a world cannot be generated', async () => {
+		const made = worldFromChoice(
+			{ kind: 'generated', resolution: 64, seed: 1, landFraction: 2 },
+			noEarth,
+		);
+		await expect(made).rejects.toThrow(RangeError);
 	});
 });
 
@@ -472,6 +598,7 @@ describe('runCreate', () => {
 		landFraction: 0.3,
 	};
 	const blankChoice: NewWorldChoice = { kind: 'blank', resolution: 64 };
+	const earthChoice: NewWorldChoice = { kind: 'earth', resolution: 128 };
 
 	/** Steps that only write down what was asked of them, in order. */
 	const recordingSteps = (
@@ -533,6 +660,80 @@ describe('runCreate', () => {
 		]);
 	});
 
+	it('says it is loading the Earth, makes the world, hands it over and closes', async () => {
+		const { calls, steps } = recordingSteps();
+		await runCreate(earthChoice, steps);
+		expect(calls).toEqual([
+			['setBusy', true, LOADING_EARTH_LABEL],
+			['afterPaint'],
+			['createWorld', earthChoice],
+			['onWorld', true],
+			['afterPaint'],
+			['close'],
+		]);
+	});
+
+	it('stays busy for as long as the world takes to arrive', async () => {
+		const world = createBlankWorld(64);
+		let arrive: (made: typeof world) => void = () => {};
+		const { calls, steps } = recordingSteps({
+			createWorld: (choice) => {
+				calls.push(['createWorld', choice]);
+				return new Promise((resolve) => {
+					arrive = resolve;
+				});
+			},
+			onWorld: (made) => {
+				calls.push(['onWorld', made === world]);
+			},
+		});
+		const done = runCreate(earthChoice, steps);
+		// Long enough for everything that does not wait on the world.
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(calls).toEqual([
+			['setBusy', true, LOADING_EARTH_LABEL],
+			['afterPaint'],
+			['createWorld', earthChoice],
+		]);
+		arrive(world);
+		await done;
+		expect(calls.slice(3)).toEqual([
+			['onWorld', true],
+			['afterPaint'],
+			['close'],
+		]);
+	});
+
+	it('stays open and says so when the Earth data does not arrive', async () => {
+		const error = new Error('offline');
+		const { calls, steps } = recordingSteps({
+			createWorld: () => Promise.reject(error),
+		});
+		await runCreate(earthChoice, steps);
+		expect(calls).toEqual([
+			['setBusy', true, LOADING_EARTH_LABEL],
+			['afterPaint'],
+			['logError', error],
+			['setBusy', false, CONFIRM_LABEL],
+			['fail', EARTH_FAILED_MESSAGE],
+		]);
+	});
+
+	it('says the world could not be created when another kind is rejected', async () => {
+		const error = new Error('no world');
+		for (const choice of [generatedChoice, blankChoice]) {
+			const { calls, steps } = recordingSteps({
+				createWorld: () => Promise.reject(error),
+			});
+			await runCreate(choice, steps);
+			expect(calls.slice(-3)).toEqual([
+				['logError', error],
+				['setBusy', false, CONFIRM_LABEL],
+				['fail', CREATE_FAILED_MESSAGE],
+			]);
+		}
+	});
+
 	it('builds the world only once the busy dialog has been drawn', async () => {
 		let painted = false;
 		const { calls, steps } = recordingSteps({
@@ -571,6 +772,87 @@ describe('runCreate', () => {
 		]);
 	});
 
+	it('drops a world that arrives after the dialog has closed', async () => {
+		const world = createBlankWorld(64);
+		let arrive: (made: typeof world) => void = () => {};
+		let closed = false;
+		const { calls, steps } = recordingSteps({
+			createWorld: () =>
+				new Promise((resolve) => {
+					arrive = resolve;
+				}),
+		});
+		const done = runCreate(
+			earthChoice,
+			stepsUntilClosed(steps, () => closed),
+		);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		closed = true;
+		arrive(world);
+		await done;
+		expect(calls).toEqual([
+			['setBusy', true, LOADING_EARTH_LABEL],
+			['afterPaint'],
+			['afterPaint'],
+			['close'],
+		]);
+	});
+
+	it('says nothing of a failure after the dialog has closed', async () => {
+		const error = new Error('offline');
+		let fail: (reason: Error) => void = () => {};
+		let closed = false;
+		const { calls, steps } = recordingSteps({
+			createWorld: () =>
+				new Promise((_resolve, reject) => {
+					fail = reject;
+				}),
+		});
+		const done = runCreate(
+			earthChoice,
+			stepsUntilClosed(steps, () => closed),
+		);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		closed = true;
+		fail(error);
+		await done;
+		expect(calls).toEqual([
+			['setBusy', true, LOADING_EARTH_LABEL],
+			['afterPaint'],
+			['logError', error],
+			['setBusy', false, CONFIRM_LABEL],
+		]);
+	});
+
+	it('hands the world over and says a failure while the dialog is open', async () => {
+		const { calls, steps } = recordingSteps();
+		await runCreate(
+			earthChoice,
+			stepsUntilClosed(steps, () => false),
+		);
+		expect(calls).toEqual([
+			['setBusy', true, LOADING_EARTH_LABEL],
+			['afterPaint'],
+			['createWorld', earthChoice],
+			['onWorld', true],
+			['afterPaint'],
+			['close'],
+		]);
+		const error = new Error('offline');
+		const failing = recordingSteps({
+			createWorld: () => Promise.reject(error),
+		});
+		await runCreate(
+			earthChoice,
+			stepsUntilClosed(failing.steps, () => false),
+		);
+		expect(failing.calls.slice(-3)).toEqual([
+			['logError', error],
+			['setBusy', false, CONFIRM_LABEL],
+			['fail', EARTH_FAILED_MESSAGE],
+		]);
+	});
+
 	it('still closes when handing the world over throws', async () => {
 		const error = new Error('no listener');
 		const { calls, steps } = recordingSteps({
@@ -598,16 +880,28 @@ describe('the wording of the dialog', () => {
 		expect(RESOLUTION_HINTS[64]).toBe('about 150 km cells');
 	});
 
-	it('names both ways of starting a world', () => {
+	it('names every way of starting a world', () => {
 		expect(START_LABELS).toEqual({
 			blank: 'Blank ocean',
 			generated: 'Generated continents',
+			earth: 'Earth',
 		});
+		expect(EARTH_HINT).toBe('real elevation');
 	});
 
-	it('changes the confirm button while generating', () => {
+	it('changes the confirm button while generating or loading', () => {
 		expect(CONFIRM_LABEL).toBe('Create world');
 		expect(GENERATING_LABEL).toBe('Generating…');
+		expect(LOADING_EARTH_LABEL).toBe('Loading Earth…');
+	});
+
+	it('says in fixed words that the Earth data could not be loaded', () => {
+		expect(EARTH_FAILED_MESSAGE).toBe(
+			"Earth's elevation data could not be loaded. Check your connection and try again. The current world has not been changed.",
+		);
+		expect(CREATE_FAILED_MESSAGE).toBe(
+			'The new world could not be created. The current world has not been changed.',
+		);
 	});
 
 	it('writes land percentages as whole numbers', () => {

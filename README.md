@@ -7,11 +7,13 @@ Browser-based planet simulator for worldbuilding: draw continents and plates, th
 The first time, the page opens on a blank ocean, with the New world dialog showing. Pressing **Create world** as it stands gives generated continents on the coarsest grid, from a seed chosen at random, with 30% land; **Cancel** keeps the blank ocean. The **New world** button at the top of the panel brings the dialog back at any time, filled in with the options of the current world. It offers:
 
 - **Resolution**: 64, 128 or 256 cells along each edge of a cube face, which makes cells of about 150, 75 or 40 km.
-- **Start with**: a blank ocean, or generated continents.
+- **Start with**: a blank ocean, generated continents, or the Earth.
 - **Seed**, for generated continents: a whole number from 0 to 4294967295. The same seed and land always give the same continents, and the same seed at another resolution gives the same continents on a finer or coarser grid. Leave the field blank for a seed chosen at random, or press **Random** to fill one in.
 - **Land**, for generated continents: the share of the surface to make land, from 0 to 100%.
 
-The line under the World heading says how the current world started, such as `Generated · 64 · seed 1977 · 30% land` or `Blank ocean · 128`: the resolution, then the seed and the land. To get a world back, type its seed into the dialog and set the same land.
+**Earth** starts from the real planet: the mean elevation of the ground and the sea floor in every cell, at the resolution chosen, with about 29% land at a sea level of 0 m. Greenland and Antarctica stand at the top of their ice, not at the rock beneath it. The seed and the land do not apply and are greyed out. The elevation data, under a megabyte, is fetched the first time an Earth world is made, while the button says "Loading Earth…", and is kept until the page is closed. If it cannot be fetched, the dialog says so and stays open, and the current world is left untouched; **Create world** tries again. See [Data](#data) for where the elevation comes from.
+
+The line under the World heading says how the current world started, such as `Generated · 64 · seed 1977 · 30% land`, `Blank ocean · 128` or `Earth · 128`: the resolution, then the seed and the land. To get a world back, type its seed into the dialog and set the same land.
 
 A new world replaces the current one, and the old one cannot be brought back: its strokes are no longer there to undo. The sea level returns to 0 m. The camera, the relief exaggeration, the grid setting and the tool settings stay as they were. Generating the finest grid takes about half a second, during which the button says "Generating…" and the page does not respond; it cannot be cancelled once started.
 
@@ -19,7 +21,7 @@ The world is saved in the browser as you work: about a second after the last str
 
 **Export** downloads the world as a file named `world.earthsim`. **Import** replaces the current world with the one in such a file, at once and without asking, and like a new world it leaves nothing to undo. A file that is not a world file, or one that is damaged, cut short or made by a newer version, is refused with a message under the buttons, and the current world is left untouched.
 
-What is saved, in the browser and in a file alike, is the world only: its terrain, its resolution, its sea level and how it started. The undo history, the camera, the relief exaggeration, the grid setting and the tool settings are not saved. A sea level beyond the ends of the Sea level slider is brought to the nearer end when a world is imported or brought back.
+What is saved, in the browser and in a file alike, is the world only: its terrain, its resolution, its sea level and how it started. An Earth world is saved with its terrain like any other, so it comes back, and imports, without the elevation data being fetched again. The undo history, the camera, the relief exaggeration, the grid setting and the tool settings are not saved. A sea level beyond the ends of the Sea level slider is brought to the nearer end when a world is imported or brought back.
 
 The Tools panel chooses what the left mouse button does on the globe:
 
@@ -46,11 +48,13 @@ Requires Node.js and npm. Run `npm install` once, then:
 - `npm test`: run the unit tests once.
 - `npm run check`: lint and check formatting with Biome.
 - `npm run typecheck`: type-check every part of the source.
+- `npm run build:earth`: rebuild the Earth's elevation data from its source; see [Data](#data).
 
 ### Layout
 
 - `src/core/`: the simulation as a pure library, with no DOM, Three.js or worker globals.
   - `src/core/serialize.ts`: the world file format, and the checks a file must pass to be read as a world.
+  - `src/core/earth.ts`: reading the Earth data file, and the Earth as a world at each resolution.
 - `src/app/`: the page, which imports the core.
   - `src/app/main.ts`: joins the parts of the page together.
   - `src/app/appState.ts`: the world being edited, and the one way of replacing it.
@@ -59,11 +63,32 @@ Requires Node.js and npm. Run `npm install` once, then:
   - `src/app/refresh.ts`: when to ask the worker again after the world changes.
   - `src/app/storage.ts`: the saved world in the browser's IndexedDB, and exporting and importing world files.
   - `src/app/autosave.ts`: when to save after the world changes.
+  - `src/app/earthData.ts`: fetching the Earth data file the first time it is needed.
   - `src/app/globe/`: the globe's renderer, shaders, camera and picking.
   - `src/app/ui/`: the panels of controls and the New world dialog.
 - `src/worker/`: the Web Worker that computes from a copy of the world and keeps nothing between requests.
   - `src/worker/sim.worker.ts`: the worker itself, which only passes messages to the handler.
   - `src/worker/handle.ts`: the message handler, a plain function that answers one request.
   - `src/worker/client.ts`: the page's side of the channel, which runs on the main thread.
+- `public/data/earth-256.bin`: the Earth's elevation, served beside the page as it is.
+- `scripts/`: what builds the data, run with Node rather than in the browser.
+  - `scripts/build-earth-data.ts`: downloads the source and writes `public/data/earth-256.bin`.
+  - `scripts/earth/`: the parts of that script that touch no file: reading the source's TIFF format, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data file for the tests.
+  - `scripts/run-with-vite.mjs`: runs a TypeScript script through Vite, so that it can import the core.
 
-The core is compiled without the DOM type library, and the worker and its handler with the worker's in place of it, so a `document` or `window` reference in either fails `npm run typecheck`.
+The core is compiled without the DOM type library, and the worker and its handler with the worker's in place of it, so a `document` or `window` reference in either fails `npm run typecheck`. The project does not depend on Node's type package either, so nothing under `src/` can use a Node API; the scripts are type-checked against the few Node functions they call, declared by hand in `scripts/node.d.ts`.
+
+## Data
+
+The Earth start uses `public/data/earth-256.bin`: the mean elevation of each of the 393,216 cells of the finest grid, as whole metres in signed 16-bit integers, little-endian, in cell order, with no header (786,432 bytes). The two coarser grids are averaged from it, by area, when an Earth world is made.
+
+It is derived from NOAA's ETOPO 2022 global relief model:
+
+- **Product**: ETOPO 2022 at 60 arc-seconds, ice surface version, as the GeoTIFF `ETOPO_2022_v1_60s_N90W180_surface.tif` (21,600 × 10,800 pixels of one arc-minute; elevations in metres against the EGM2008 geoid, in effect mean sea level), from <https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO2022/data/60s/60s_surface_elev_gtif/>. The file is 465,969,062 bytes and its SHA-256 is `9d27d4b8ea8e76977e2988bca667d7c8fa68b927355feffcddd6b4875a7fd08e`; the build script checks both, at every run, and deletes a file whose SHA-256 differs.
+- **Ice surface**: the elevations follow the top of the ice sheets, so Greenland and Antarctica stand at the height of their ice. The bedrock version of the model is not used, and the page has no data on the rock under the ice.
+- **Citation**: NOAA National Centers for Environmental Information. 2022: ETOPO 2022 15 Arc-Second Global Relief Model. NOAA National Centers for Environmental Information. https://doi.org/10.25921/fd45-gt74 . Accessed 2026-11-11.
+- **Licence**, as stated on NOAA's metadata page for that DOI, read on 2026-11-11: "These data were produced by NOAA and are not subject to copyright protection in the United States. NOAA waives any potential copyright and related rights in these data worldwide through the Creative Commons Zero 1.0 Universal Public Domain Dedication (CC0-1.0)." The same page says: "Not to be used for navigation."
+
+To rebuild the file, run `npm run build:earth`. It downloads the GeoTIFF, about 466 MB, into `.cache/etopo/`, which is not committed, and reuses it from there afterwards; a download that was cut off carries on where it stopped. Each pixel goes to the cell that holds its centre and counts in that cell's mean by its area. The build takes about 40 seconds once the file is there, and gives the same bytes every time.
+
+The script reads the GeoTIFF with its own small reader rather than a library. `npm run build:earth -- --verify-with-gdal` first compares what that reader gives with what [GDAL](https://gdal.org/)'s `gdallocationinfo` gives at about 2,400 pixels (the corners, the edges, the corners where tiles meet, and pixels at random) and stops if any differs; without GDAL installed it says so and carries on. When the file in this repository was built, on 2026-11-11 with GDAL 3.12.2, those pixels matched bit for bit, as did all 233,280,000 pixels in a separate comparison with the whole image as `gdal_translate` decodes it. The cell means were also worked out a second time from GDAL's copy of the image, with separate code: 392,815 cells came out the same to the metre, 3 differed by the rounding of a mean that ends in a half, and 398 lie beside lines between cells that the centres of whole columns of pixels fall exactly on, where rounding decides which cell a pixel goes to; none of those differed by more than 15 m.

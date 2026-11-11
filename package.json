@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build",
+    "build:earth": "node scripts/run-with-vite.mjs scripts/build-earth-data.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "check": "biome check .",
