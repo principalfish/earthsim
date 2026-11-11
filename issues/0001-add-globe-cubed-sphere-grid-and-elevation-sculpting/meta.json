@@ -9,7 +9,7 @@
   "gh_issue": 1,
   "build_model": "claude-fable-5-2",
   "created": "2026-11-10 11:12",
-  "updated": "2026-11-11 16:30",
+  "updated": "2026-11-11 16:31",
   "done": "2026-11-11 16:29",
   "local": [
     {
@@ -22,12 +22,14 @@
     {
       "kind": "worktree",
       "name": "/home/philiph/workspace/earth_sim/.claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9",
-      "added": "2026-11-10 11:34"
+      "added": "2026-11-10 11:34",
+      "removed": "2026-11-11 16:31"
     },
     {
       "kind": "branch",
       "name": "claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9",
-      "added": "2026-11-10 11:34"
+      "added": "2026-11-10 11:34",
+      "removed": "2026-11-11 16:31"
     }
   ],
   "pr": 2
