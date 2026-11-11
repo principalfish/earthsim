@@ -14,7 +14,7 @@ Not included: any climate or time simulation, a flat map view, and changing a wo
 
 ## Plan
 
-_2026-11-11 · 11 of 11 pieces done · now: all done, in review; review fixes (round 1) in progress_
+_2026-11-11 · 11 of 11 pieces done · now: all done, in review; self review complete_
 
 - [x] **1/11 Scaffold tooling and app shell** · `b22e81a`
   An npm project with Vite, Vitest, Biome, TypeScript and Three.js, and an empty page.
@@ -38,3 +38,5 @@ _2026-11-11 · 11 of 11 pieces done · now: all done, in review; review fixes (r
   Export and import world files, and restore the current world after a refresh.
 - [x] **11/11 Earth preset** · `4170dd0`
   Real Earth elevation from NOAA's ETOPO 2022 as a starting world.
+- [x] **Review fixes (round 1)** · `96588b1`
+  All 11 findings from the self review: three behaviour fixes, a download size cap, tests for the sculpt controller, view input, page wiring and history focus, and README additions.
