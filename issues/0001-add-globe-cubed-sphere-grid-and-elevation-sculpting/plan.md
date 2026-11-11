@@ -150,7 +150,7 @@ earth_sim is a browser-based planet simulator for worldbuilding. The repo holds 
     - Manual review: saving for real. Run `npm run dev`, sculpt something, refresh and confirm it comes back; export, make a new world, import the file and confirm it matches; try importing some unrelated file and confirm the message.
 
 11. Earth preset
-    - Files: `scripts/build-earth-data.ts`, `public/data/earth-256.bin`, `src/core/earth.ts`, `src/core/earth.test.ts`, `src/app/ui/newWorldDialog.ts`, `src/app/earthData.ts`, `README.md`, `package.json`
+    - Files: `scripts/build-earth-data.ts`, `public/data/earth-256.bin`, `src/core/earth.ts`, `src/core/earth.test.ts`, `src/core/world.ts`, `src/core/serialize.ts`, `src/core/index.ts`, `src/app/ui/newWorldDialog.ts`, `src/app/ui/worldPanel.ts`, `src/app/earthData.ts`, `src/app/main.ts`, `src/app/styles.css`, `README.md`, `package.json`, `.gitignore` (and the tests beside any of these)
     - What: a third start type, "Earth". A script downloads NOAA's ETOPO 2022 ice-surface elevation (a coarse product such as the 60 arc-second grid is plenty), averages it into each cell of the 256 grid and writes 16-bit metres to `public/data/earth-256.bin`; the download itself is not committed. Before committing the data, confirm ETOPO 2022's terms allow redistribution and record the source and citation in the README; if the terms are unclear, stop and ask. In `core`: decode the file and average it down, area-weighted, for 128 and 64. In the app: fetch the file when Earth is chosen, with a clear message if it fails to load.
     - Functions: `decodeEarth(bytes)`, `earthWorld(data, resolution)`, `loadEarthData()`
     - Depends on: 2, 3, 9

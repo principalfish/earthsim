@@ -1,10 +1,10 @@
 # Resume point — read this first
 
 ## Where we are
-Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`), state `building`. Pieces 1 to 9 of 11 are committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, latest `f9aba12`. The user settled piece 10's choices (`decisions.md`, `plan.md` Notes) and said "Start it" on 2026-11-11: the builder is building piece 10 (save, load and autosave) and will stop uncommitted at its review, which has a manual review. Piece 11 (Earth preset) is not started. GitHub: issue principalfish/earthsim#1 carries the plan checklist; draft PR 2 is open; `main` is still `ffed15a` and nothing is merged.
+Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`), state `building`. Pieces 1 to 10 of 11 are committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, latest `0f565b8`. The user settled piece 10's choices (`decisions.md`, `plan.md` Notes) and said "Start it" on 2026-11-11: the builder is building piece 10 (save, load and autosave) and will stop uncommitted at its review, which has a manual review. Piece 11 (Earth preset) is not started. GitHub: issue principalfish/earthsim#1 carries the plan checklist; draft PR 2 is open; `main` is still `ffed15a` and nothing is merged.
 
 State checks (run from `/home/philiph/workspace/earth_sim`):
-- `git log --oneline -1 claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` shows `f9aba12 … piece 9/11: add new-world dialog` until piece 10 is approved, and `git ls-remote --heads origin` shows the same SHA.
+- `git log --oneline -1 claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` shows `0f565b8 … piece 10/11: add save, load and autosave` until piece 11 is approved, and `git ls-remote --heads origin` shows the same SHA.
 - `python3 ~/.claude/lib/planner.py meta 1` shows state `building`, `gh_issue` 1, `pr` 2, `build_model` `claude-fable-5-2`.
 - `git -C .claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9 status --short` prints nothing until piece 10 is being built; then piece 10's uncommitted files.
 - `git -C .planner status --short` is empty.
