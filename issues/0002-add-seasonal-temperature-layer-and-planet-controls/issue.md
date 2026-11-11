@@ -4,7 +4,7 @@ earth_sim can shape a planet but not yet simulate one. This adds the first simul
 
 Temperature comes from a seasonal energy balance on the world's own grid: monthly steps through the year, repeated until they settle, with sunlight by latitude and season, land warming and cooling faster than ocean, heat spreading between neighbouring cells, cooling with height, and snow or ice brightening cold surfaces. It runs in its own Web Worker and recalculates automatically after edits.
 
-A new Planet section sets axial tilt, the star's brightness, the orbit's distance and the strength of the greenhouse effect, and shows the sunlight received and the length of the year. The settings are saved with the world; existing worlds load with Earth's values.
+A new Planet section sets axial tilt, the star's brightness and mass, the orbit's distance and the strength of the greenhouse effect, and shows the sunlight received and the length of the year. Year length matters: a longer year gives the land and sea more time to warm and cool, so its seasons are stronger. The settings are saved with the world; existing worlds load with Earth's values.
 
 On the globe, temperature replaces the height colours while relief and coastlines stay. You can step or play through the twelve months, switch to annual summaries (average, warmest month, coldest month, seasonal range), read a legend fitted to the world on screen, and see the value under the cursor. The page also shows the world's date, counted in years since it began.
 
@@ -17,7 +17,7 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 _2026-11-11 · 0 of 10 pieces done · now: not started; building waits for issue 1 to be merged_
 
 - [ ] **1/10 Planet settings and date on the world** · not started
-  Worlds carry axial tilt, star brightness, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
+  Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
 - [ ] **2/10 Sunlight by latitude and season** · not started
   Exact daily and monthly sunlight for any tilt from 0 to 90 degrees.
 - [ ] **3/10 Observed Earth temperature data** · not started
@@ -31,7 +31,7 @@ _2026-11-11 · 0 of 10 pieces done · now: not started; building waits for issue
 - [ ] **7/10 Month slider, annual summaries and date** · not started
   Step or play through the twelve months, view annual summaries, and see the world's date.
 - [ ] **8/10 Planet panel** · not started
-  Sliders for tilt, star, orbit and greenhouse strength, with sunlight received and year length shown.
+  Sliders for tilt, star brightness, star mass, orbit and greenhouse strength, with sunlight received and year length shown.
 - [ ] **9/10 Value under the cursor** · not started
   A readout of position, elevation and temperature at the point under the pointer.
 - [ ] **10/10 Earth comparison view and error baseline** · not started
