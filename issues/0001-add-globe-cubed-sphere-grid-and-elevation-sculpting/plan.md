@@ -132,7 +132,7 @@ earth_sim is a browser-based planet simulator for worldbuilding. The repo holds 
    - Tests: the handler returns the same statistics as calling core directly; an unknown request kind returns an error response, not a throw; the client matches responses to requests by id when they arrive out of order; the latest-wins helper resolves only the newest of several overlapping requests; a worker error rejects the pending request and leaves the client usable; the worker does not alter the caller's elevation array.
 
 9. New-world dialog
-   - Files: `src/app/ui/newWorldDialog.ts`, `src/app/ui/worldPanel.ts`, `src/app/appState.ts`, `src/app/appState.test.ts`, `src/app/main.ts`, `src/app/styles.css`, `index.html`
+   - Files: `src/app/ui/newWorldDialog.ts`, `src/app/ui/worldPanel.ts`, `src/app/ui/viewPanel.ts`, `src/app/appState.ts`, `src/app/appState.test.ts`, `src/app/startOptions.ts`, `src/app/main.ts`, `src/app/styles.css`, `index.html`, `README.md` (and the tests beside any of these)
    - What: a "New world" button and dialog: resolution (64, 128, 256), start type (blank ocean or generated continents), and for generated worlds a seed field, a random-seed button and a land-fraction slider. Confirming replaces the current world everywhere through one function: the globe, the sculpt controller, the history (cleared), the sea level (reset to zero) and the statistics. The dialog warns that the current world is replaced. With no world to restore, the page opens on a blank ocean with this dialog showing, replacing the fixed-seed world from piece 5.
    - Functions: `openNewWorldDialog()`, `replaceWorld(world)`, `createAppState()`
    - Depends on: 4, 5, 7, 8
