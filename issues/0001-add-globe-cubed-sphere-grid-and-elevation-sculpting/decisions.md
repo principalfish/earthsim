@@ -44,6 +44,7 @@
 - Piece 11 reads the GeoTIFF with a hand-written reader in the build script, no new package, cross-checked against GDAL at sample points ("Hand-written reader"). (2026-11-11)
 - Piece 11's scripted browser checks keep the throwaway browser profile in the session's scratch folder; nothing is written to the Windows temp folder ("No, keep it in the scratch folder"). (2026-11-11)
 - NOAA is credited in the README only, with its own citation text ("README only"). (2026-11-11)
+- Piece 11 approved after the user looked at Earth on the globe ("Tried it, approve"), with no changes asked for. All 11 pieces are approved. (2026-11-11)
 
 ## Open
 
