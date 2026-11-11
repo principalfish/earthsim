@@ -14,9 +14,9 @@ If anything differs, stop and tell the user.
 All design and run decisions are in `decisions.md` (Settled); each piece's as-built details, checks and review-loop outcome are in `plan.md` Notes. The user tried and approved every manual-review piece (5, 6, 9, 10, 11) with "Tried it, approve"; pieces 1 to 4, 7 and 8 ran without review pauses at their request. The implementation model was `claude-fable-5-2` for this issue only.
 
 ## The pending decision (exact)
-No design decision is pending. The user has been given the all-pieces-done recap and offered:
-1. `/review self add-globe-cubed-sphere-grid-and-elevation-sculpting` in the planner chat, to check the whole branch; the user picks findings and the builder applies them as a review-fixes commit. Then `/publish` for the final PR text. Merging is the user's.
-2. Widening `.planner/tools/coverage-changed.sh` to include `scripts/` (it measures `src/` only today). Not done; awaiting their word.
+The user said "Run the review" on 2026-11-11 and `/review self` is in progress in the planner chat: base `main` (`ffed15a`) against `4170dd0`. Four checks (correctness and security on Opus; style and common-mistakes on Sonnet) are running as fresh subagents; the coverage check waits for the builder's whole-branch coverage report. Then a fresh verifier judges the findings, and the user picks which to fix. No review file is written yet (`planner.py next-review` gives its path). If this chat is lost mid-review, re-run `/review self add-globe-cubed-sphere-grid-and-elevation-sculpting` from the start.
+
+Also open: whether to widen `.planner/tools/coverage-changed.sh` to include `scripts/`.
 
 ## What the next session does
 1. Run the state checks; `planner.py ingest 1`.
