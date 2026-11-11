@@ -14,9 +14,9 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 
 ## Plan
 
-_2026-11-11 · 0 of 10 pieces done · now: not started; building waits for issue 1 to be merged_
+_2026-11-11 · 0 of 10 pieces done · now: piece 1 in progress_
 
-- [ ] **1/10 Planet settings and date on the world** · not started
+- [ ] **1/10 Planet settings and date on the world** · in progress
   Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
 - [ ] **2/10 Sunlight by latitude and season** · not started
   Exact daily and monthly sunlight for any tilt from 0 to 90 degrees.

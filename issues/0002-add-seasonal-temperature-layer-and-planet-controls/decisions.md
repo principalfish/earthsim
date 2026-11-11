@@ -28,8 +28,7 @@
 - Star mass is a fifth planet control ("Add star mass as a setting"), chosen over deriving mass from brightness (the planner's recommendation) and over treating every year as Earth-length. Year length follows exactly from Kepler's third law: Earth years equal the square root of orbit distance cubed over star mass, in solar units. The user first asked whether year length matters; it does, because a season's length sets how far land and ocean warm and cool, so a short year blurs the seasons and a long one deepens them. Any brightness can be paired with any mass. (2026-11-11)
 
 ## Open
-
-_None._
+- Drawing the sun in the scene (the user, 2026-11-11, after the builder was started: "as part of this can we render the sun in the background when appropriate"). To settle: whether it also lights the globe, leaving a night side; where it sits, given the model has no time of day; how its size and colour follow the star settings; and which piece it becomes.
 
 ## Assumed
 - Temperature means near-surface air temperature in degrees Celsius, one value per cell per month.
