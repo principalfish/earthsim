@@ -1,10 +1,10 @@
 # Resume point — read this first
 
 ## Where we are
-Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`) is in state `review`: all 11 pieces are built, approved by the user, committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, head `4170dd0` (piece 11, Earth preset). Eleven commits on `main`, 97 files, about 28,700 lines. GitHub: issue principalfish/earthsim#1 has every piece ticked; draft PR 2 is open; `main` is still `ffed15a` and nothing is merged. The builder session (`local_acf49a6d-c0ef-4a98-8721-d05319ed32de`) is idle with a clean worktree, waiting to apply any fixes a review chooses.
+Issue 0001 (`add-globe-cubed-sphere-grid-and-elevation-sculpting`) is in state `review`: all 11 pieces are built, approved by the user, committed and pushed on `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9`, head `96588b1` (review fixes, on top of piece 11's `4170dd0`). Twelve commits on `main`, 97 files, about 28,700 lines. GitHub: issue principalfish/earthsim#1 has every piece ticked; draft PR 2 is open; `main` is still `ffed15a` and nothing is merged. The builder session (`local_acf49a6d-c0ef-4a98-8721-d05319ed32de`) is idle with a clean worktree, waiting to apply any fixes a review chooses.
 
 State checks (run from `/home/philiph/workspace/earth_sim`):
-- `git log --oneline -1 claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` shows `4170dd0 … piece 11/11: add Earth preset`, and `git ls-remote --heads origin` shows the same SHA for that branch.
+- `git log --oneline -1 claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` shows `96588b1 … review fixes: apply self-review findings`, and `git ls-remote --heads origin` shows the same SHA for that branch.
 - `python3 ~/.claude/lib/planner.py meta 1` shows state `review`, `gh_issue` 1, `pr` 2.
 - `git -C .claude/worktrees/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9 status --short` prints nothing.
 - `git -C .planner status --short` is empty.
@@ -14,24 +14,13 @@ If anything differs, stop and tell the user.
 All design and run decisions are in `decisions.md` (Settled); each piece's as-built details, checks and review-loop outcome are in `plan.md` Notes. The user tried and approved every manual-review piece (5, 6, 9, 10, 11) with "Tried it, approve"; pieces 1 to 4, 7 and 8 ran without review pauses at their request. The implementation model was `claude-fable-5-2` for this issue only.
 
 ## The pending decision (exact)
-`/review self` round 1 has run on `main` (`ffed15a`) against `4170dd0` (2026-11-11). Checks: correctness and security on Opus, coverage, style and common-mistakes on Sonnet; verifier on Opus. No high findings. The verifier upheld 11 and dropped 4. The user chose **all 11** to fix. The review is written to `reviews/01-2026-11-11.md` and indexed in `review.md`, and the findings were sent to the builder on 2026-11-11 to apply as its Review fixes step (it pauses for the user's review through the planner chat before committing). Next: when the builder reports the review-fixes commit, ingest, confirm it with `git log main..<meta.branch>`, re-run the checks that raised findings (correctness, security, coverage, style) on the new diff with a fresh verifier, then record the outcome in the review file, `review.md` and the issue's `## Plan` checklist.
+`/review self` round 1 (review file `reviews/01-2026-11-11.md`): the user chose all 11 verified findings; the builder applied them as one commit, `96588b1` ("review fixes: apply self-review findings"), pushed on 2026-11-11. The branch head is `96588b1`; state `review`.
 
-Progress note: the builder's turn ended on a usage-limit error at about 15:30 on 2026-11-11 with S1, C3 and C2 part-done and uncommitted (eight modified files) and the other eight findings untouched; the user said "Try again" and it was messaged to carry on. If it shows `failed` or idle again with no review request, message it again.
+How it was approved: the builder reports the user typed "approve" directly in the builder chat after its review request to the planner chat was queued; the planner chat did not relay an approval and could not confirm the user's message from the builder's transcript. The user has been told and asked to say if that was not them.
 
-Verified (id · where · severity · issue · fix):
-- V1 · `src/app/sculpt.ts:667-863` · medium · `createSculptController` has no test (stroke lifecycle, capture and cancel paths, `track` bounds, `setWorld` order) · a fake-canvas harness: one `onStrokeEnd` per stroke, none for move, `setWorld` ends the stroke before `onWorldChange`.
-- C1 · `src/app/main.ts:112,276` · low · after a worker load error, the next world replacement shows "Calculating…" for good · keep a failed flag and show unavailable, or have the client reject requests after a load error.
-- C3 · `src/app/appState.ts:142-146` · low · a kept sea level is only clamped, breaking `ViewPanel.setSeaLevel`'s whole-multiple-of-10 m contract · round to `SEA_LEVEL_SLIDER_STEP_M` in `replaceWorld` when keeping.
-- S1 · `scripts/build-earth-data.ts:194-205` · low · the download has no size cap; size and hash are checked only after the stream ends · stop and delete once `written > ETOPO_FILE_BYTES`; check `Content-Range` on a 206.
-- C2 · `src/app/refresh.ts:91-104` with `main.ts:276-277` · low · an in-flight result from the old world can replace "Calculating…" for up to 150 ms · a generation counter in the scheduler, or request at once on replacement.
-- V3 · `src/app/globe/input.ts:108-193` · low · drag state machine untested · same harness as V1.
-- V2 · `src/app/main.ts:150-339` · low (verifier lowered it from medium) · listener order and the `starting` guard are untested · move the wiring into an injectable function and test call order.
-- V4 · `src/app/ui/toolPanel.ts:262-270` · low · the focus hand-off when a history button becomes disabled is untested · test `setHistoryState` focus moves.
-- Y1 · `README.md:63-70` · low · `src/app/startup.ts` missing from Layout · add a line.
-- Y2 · `README.md:5-40` · low · no paragraph introduces the View panel · add one.
-- Y3 · `src/core/protocol.ts:85`, `serialize.ts:144` · low · two `isRecord` helpers that differ on arrays · rename the serialize one `isPlainObject`, or share one.
+In progress: the planner chat is re-running the four checks that raised findings (correctness and security on Opus, coverage and style on Sonnet) on `git diff 4170dd0..96588b1`, as fresh subagents, with a fresh verifier for anything they raise. If this chat is lost, re-run those four on that diff. Then: update `reviews/01-2026-11-11.md` (Outcome: fixed with `96588b1`, re-check results, the limits below) and its line in `review.md`; add `- [x] **Review fixes (round 1)** · \`96588b1\`` to the issue's `## Plan`, update its status line, `gh issue edit 1`; save; suggest `/publish add-globe-cubed-sphere-grid-and-elevation-sculpting`.
 
-Dropped: V5 (`grid.ts:665-666` reset: the wrap needs 2^32 searches and the reset is plainly correct); Y4 (the two clamps do not behave the same); Y5 (acceptable, different needs); Y6 (exports for tests; the guide allows it). Common-mistakes was clean and appended nothing to the guides.
+Limits the builder stated for this round, to record in the review file: the saved-world browser cases used an in-memory stand-in for IndexedDB, so a real reload was not re-checked (the storage code did not change); the stale-statistics fix is unit-tested only; the download guard's glue in `scripts/build-earth-data.ts` is untested and nothing was downloaded; four small adapters in `src/app/main.ts` are checked by reading and the browser run only. A dev server on port 5176 that was serving the builder's worktree stopped during the round; it was not the builder's and has not been restarted.
 
 Also open: whether to widen `.planner/tools/coverage-changed.sh` to include `scripts/`.
 
