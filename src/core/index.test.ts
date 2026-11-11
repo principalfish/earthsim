@@ -18,4 +18,18 @@ describe('core', () => {
 			expect(core, name).toHaveProperty(name);
 		}
 	});
+
+	it('exports sunlight by latitude and season', () => {
+		for (const name of [
+			'SOLAR_CONSTANT_W_M2',
+			'NORTHERN_SOLSTICE_FRACTION',
+			'MONTHS_PER_YEAR',
+			'dailyInsolation',
+			'monthlyInsolation',
+			'subsolarLatitude',
+			'cellLatitudes',
+		]) {
+			expect(core, name).toHaveProperty(name);
+		}
+	});
 });

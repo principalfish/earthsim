@@ -6,6 +6,7 @@ export * from './earth';
 export * from './generate';
 export * from './grid';
 export * from './history';
+export * from './insolation';
 export * from './noise';
 export * from './planet';
 export * from './protocol';
