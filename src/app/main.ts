@@ -10,6 +10,7 @@ import { createSculptController } from './sculpt';
 import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
 import { createLayerControls, createLayerPanel } from './ui/layerPanel';
 import { openNewWorldDialog } from './ui/newWorldDialog';
+import { createPlanetPanel } from './ui/planetPanel';
 import { createStatsPanel } from './ui/statsPanel';
 import { createToolPanel } from './ui/toolPanel';
 import { createViewPanel, SEA_LEVEL_SLIDER_STEP_M } from './ui/viewPanel';
@@ -104,6 +105,7 @@ if (globe !== null) {
 			}),
 		createToolPanel: (options) => createToolPanel(panel, options),
 		createViewPanel: (options) => createViewPanel(panel, options),
+		createPlanetPanel: (options) => createPlanetPanel(panel, options),
 		createStatistics: (options) =>
 			createStatisticsService({
 				...options,

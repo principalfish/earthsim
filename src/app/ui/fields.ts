@@ -13,6 +13,18 @@ export type RangeScale = {
 	readonly format: (value: number) => string;
 };
 
+/** A value marked on a slider's track, such as a reference to compare with. */
+export type RangeMark = {
+	/** The value marked, within the slider's range. */
+	readonly value: number;
+	/**
+	 * What the mark stands for, shown when the cursor rests on it. A screen
+	 * reader does not hear the mark, so the slider's value as written says
+	 * when it is on the value marked.
+	 */
+	readonly title: string;
+};
+
 /** What a slider is built from. */
 export type RangeFieldOptions = RangeScale & {
 	/** The slider's `id`, unique on the page. */
@@ -27,6 +39,11 @@ export type RangeFieldOptions = RangeScale & {
 	 * itself; false when left out. The slider still says its value.
 	 */
 	readonly quietValue?: boolean;
+	/**
+	 * A value marked on the track, under the slider, which stays marked
+	 * through a change of scale; none when left out.
+	 */
+	readonly mark?: RangeMark;
 };
 
 /** A slider on the page. */
@@ -40,9 +57,15 @@ export type RangeField = {
 	setScale(scale: RangeScale): void;
 	/**
 	 * Moves the slider to a value within its range, written as its scale
-	 * writes it. `onInput` is not called.
+	 * writes it unless other words are given. `onInput` is not called.
+	 *
+	 * @param value - The value to move to.
+	 * @param text - What to write for it in place of the scale's own
+	 * writing, beside the label and as what a screen reader says, for a
+	 * slider that stands for something it can only come near. When the
+	 * slider is next moved, its scale writes the value again.
 	 */
-	setValue(value: number): void;
+	setValue(value: number, text?: string): void;
 	/** Greys the slider out so that it cannot be moved, or brings it back. */
 	setDisabled(disabled: boolean): void;
 };
@@ -107,6 +130,20 @@ export type SelectFieldOptions<T extends string> = {
 	readonly onChange: (value: T) => void;
 };
 
+/**
+ * Where a value lies along a slider's range, from 0 at its lowest to 1 at
+ * its highest.
+ *
+ * @param value - The value, within the range.
+ * @param min - The lowest value.
+ * @param max - The highest value, above the lowest.
+ */
+export const rangeFraction = (
+	value: number,
+	min: number,
+	max: number,
+): number => (value - min) / (max - min);
+
 /** Class a field carries while its control cannot be used. */
 const DISABLED_CLASS = 'is-disabled';
 
@@ -136,7 +173,11 @@ export const createElement = <K extends keyof HTMLElementTagNameMap>(
  * whenever it changes unless `quietValue` is set, when it is marked
  * `aria-live="off"`.
  *
- * @param options - The slider's range, starting value, wording and
+ * A mark, if there is one, is a short line under the track, centred where
+ * the middle of the slider's thumb stands at the value marked. It is
+ * hidden from screen readers.
+ *
+ * @param options - The slider's range, starting value, wording, mark and
  * callback.
  */
 export const createRangeField = (options: RangeFieldOptions): RangeField => {
@@ -161,8 +202,7 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 	input.max = String(options.max);
 	input.step = String(options.step);
 	/** Writes a value beside the label and as what a screen reader says. */
-	const write = (value: number): void => {
-		const text = format(value);
+	const write = (value: number, text = format(value)): void => {
 		output.textContent = text;
 		input.setAttribute('aria-valuetext', text);
 	};
@@ -175,7 +215,25 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 	});
 
 	header.append(label, output);
-	field.append(header, input);
+	/** Puts the mark, if any, where the value marked lies along a range. */
+	let placeMark = (_min: number, _max: number): void => {};
+	if (options.mark === undefined) {
+		field.append(header, input);
+	} else {
+		const { value: marked, title } = options.mark;
+		const track = createElement('div', 'field__track');
+		const mark = createElement('span', 'field__mark');
+		mark.title = title;
+		mark.setAttribute('aria-hidden', 'true');
+		placeMark = (min, max) => {
+			// The thumb's middle travels the track less the thumb's width.
+			const fraction = rangeFraction(marked, min, max);
+			mark.style.left = `calc(var(--range-thumb-size) / 2 + (100% - var(--range-thumb-size)) * ${fraction})`;
+		};
+		placeMark(options.min, options.max);
+		track.append(input, mark);
+		field.append(header, track);
+	}
 	return {
 		element: field,
 		setScale: (scale) => {
@@ -187,10 +245,11 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 			input.value = String(scale.value);
 			format = scale.format;
 			write(scale.value);
+			placeMark(scale.min, scale.max);
 		},
-		setValue: (value) => {
+		setValue: (value, text) => {
 			input.value = String(value);
-			write(value);
+			write(value, text);
 		},
 		setDisabled: (disabled) => {
 			input.disabled = disabled;

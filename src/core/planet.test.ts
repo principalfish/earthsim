@@ -3,14 +3,20 @@ import {
 	DEFAULT_AGE_YEARS,
 	DEFAULT_PLANET,
 	EARTH_YEAR_DAYS,
+	GREENHOUSE_FACTOR,
 	normaliseAgeYears,
 	normalisePlanet,
 	PLANET_LIMITS,
 	PLANET_SETTINGS,
 	type PlanetSettings,
 	sunlightRelativeToEarth,
+	TRUSTED_WARMTH_MAX,
+	TRUSTED_WARMTH_MIN,
+	trustNote,
+	warmthRelativeToEarth,
 	yearLengthDays,
 } from './planet';
+import { TEMPERATURE_MODEL } from './temperature';
 
 /**
  * The host's structured clone, which is how a world reaches a worker. It is
@@ -218,6 +224,106 @@ describe('yearLengthDays', () => {
 		]) {
 			expect(yearLengthDays(planetWith(changes))).toBe(earth);
 		}
+	});
+});
+
+describe('the greenhouse factor', () => {
+	it('is the temperature model’s', () => {
+		expect(GREENHOUSE_FACTOR).toBe(0.633);
+		expect(TEMPERATURE_MODEL.greenhouseFactor).toBe(GREENHOUSE_FACTOR);
+	});
+});
+
+/**
+ * Where the Earth was measured to freeze over and to pass a mean of 33 °C:
+ * the greenhouse strength, then each as the range of sunlight it falls
+ * within, as a multiple of Earth's, and the range of warmth that gives.
+ */
+const EARTH_EDGES = [
+	[0, [1.404, 1.411], [0.86, 0.864], [2.069, 2.081], [1.267, 1.274]],
+	[0.5, [1.068, 1.073], [0.861, 0.865], [1.562, 1.571], [1.259, 1.267]],
+	[1, [0.864, 0.868], [0.864, 0.868], [1.251, 1.258], [1.251, 1.258]],
+	[1.5, [0.723, 0.727], [0.864, 0.868], [1.043, 1.049], [1.245, 1.253]],
+	[2, [0.622, 0.625], [0.863, 0.867], [0.896, 0.901], [1.243, 1.251]],
+	[3, [0.483, 0.485], [0.857, 0.861], [0.701, 0.705], [1.244, 1.251]],
+] as const;
+
+/** A planet at Earth's distance with a sunlight and greenhouse strength. */
+const lit = (sunlight: number, greenhouseStrength = 1): PlanetSettings =>
+	planetWith({ starBrightness: sunlight, greenhouseStrength });
+
+describe('warmthRelativeToEarth', () => {
+	it('is exactly 1 for Earth', () => {
+		expect(warmthRelativeToEarth(DEFAULT_PLANET)).toBe(1);
+	});
+
+	it('is the sunlight at Earth’s greenhouse strength', () => {
+		for (const sunlight of [0.1, 0.9, 1.25, 7]) {
+			expect(warmthRelativeToEarth(lit(sunlight))).toBe(sunlight);
+		}
+		expect(
+			warmthRelativeToEarth(planetWith({ orbitDistanceAu: 2 })),
+		).toBeCloseTo(0.25, 12);
+	});
+
+	it('follows the sunlight over the emissivity, against Earth’s', () => {
+		const k = TEMPERATURE_MODEL.greenhouseFactor;
+		expect(warmthRelativeToEarth(lit(1, 0))).toBeCloseTo(1 / (1 + k), 12);
+		expect(warmthRelativeToEarth(lit(2, 3))).toBeCloseTo(
+			(2 * (1 + 3 * k)) / (1 + k),
+			12,
+		);
+	});
+
+	it.each(EARTH_EDGES)(
+		'gives the warmth measured at the Earth’s edges, within 0.001, at greenhouse strength %d',
+		(greenhouse, frozen, frozenWarmth, hot, hotWarmth) => {
+			for (const [sunlight, warmth] of [
+				[frozen[0], frozenWarmth[0]],
+				[frozen[1], frozenWarmth[1]],
+				[hot[0], hotWarmth[0]],
+				[hot[1], hotWarmth[1]],
+			] as const) {
+				expect(
+					Math.abs(warmthRelativeToEarth(lit(sunlight, greenhouse)) - warmth),
+				).toBeLessThanOrEqual(0.001);
+			}
+		},
+	);
+});
+
+describe('trustNote', () => {
+	it('says nothing for Earth', () => {
+		expect(trustNote(DEFAULT_PLANET)).toBeNull();
+	});
+
+	it('trusts the band from a warmth of 0.9 to 1.25, both ends included', () => {
+		expect(TRUSTED_WARMTH_MIN).toBe(0.9);
+		expect(TRUSTED_WARMTH_MAX).toBe(1.25);
+		expect(trustNote(lit(0.9))).toBeNull();
+		expect(trustNote(lit(1.25))).toBeNull();
+	});
+
+	it('is rough on the cold side just below the band, and the hot just above', () => {
+		expect(trustNote(lit(0.9 - 1e-9))).toBe('cold');
+		expect(trustNote(lit(0.1))).toBe('cold');
+		expect(trustNote(lit(1.25 + 1e-9))).toBe('hot');
+		expect(trustNote(lit(10))).toBe('hot');
+	});
+
+	it.each(EARTH_EDGES)(
+		'is rough where the Earth was measured frozen over, and above a mean of 33 °C, at greenhouse strength %d',
+		(greenhouse, frozen, _frozenWarmth, hot) => {
+			expect(trustNote(lit(frozen[0], greenhouse))).toBe('cold');
+			expect(trustNote(lit(frozen[1], greenhouse))).toBe('cold');
+			expect(trustNote(lit(hot[1], greenhouse))).toBe('hot');
+		},
+	);
+
+	it('follows the greenhouse strength as well as the sunlight', () => {
+		expect(trustNote(lit(1, 0))).toBe('cold');
+		expect(trustNote(lit(1, 3))).toBe('hot');
+		expect(trustNote(lit(0.6, 3))).toBeNull();
 	});
 });
 

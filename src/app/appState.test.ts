@@ -756,3 +756,79 @@ describe('notifyPlanetChange', () => {
 		);
 	});
 });
+
+describe('setPlanet', () => {
+	const DIM: PlanetSettings = {
+		axialTiltDeg: 0,
+		starBrightness: 0.5,
+		starMass: 2,
+		orbitDistanceAu: 1.5,
+		greenhouseStrength: 0.25,
+	};
+
+	it('gives the world being edited a copy of the settings, then tells the planet listeners once', () => {
+		const world = createBlankWorld(64);
+		const replaced: World[] = [];
+		const state = createAppState({
+			world,
+			listeners: [(next) => replaced.push(next)],
+		});
+		const told: PlanetSettings[] = [];
+		state.addPlanetListener((next) => told.push({ ...next.planet }));
+
+		const settings = { ...DIM };
+		state.setPlanet(settings);
+		expect(world.planet).toEqual(DIM);
+		expect(world.planet).not.toBe(settings);
+		expect(told).toEqual([DIM]);
+		expect(replaced).toEqual([]);
+	});
+
+	it('sets the world of the moment', () => {
+		const state = createAppState({ world: createBlankWorld(64) });
+		const next = createBlankWorld(64);
+		state.replaceWorld(next);
+		state.setPlanet(DIM);
+		expect(next.planet).toEqual(DIM);
+	});
+
+	it('brings each setting within its limits', () => {
+		const state = createAppState({ world: createBlankWorld(64) });
+		state.setPlanet({ ...DIM, starMass: 50, axialTiltDeg: -5 });
+		expect(state.world.planet).toEqual({
+			...DIM,
+			starMass: PLANET_LIMITS.starMass.max,
+			axialTiltDeg: PLANET_LIMITS.axialTiltDeg.min,
+		});
+	});
+
+	it('tells nobody of settings that change nothing, before or after normalising', () => {
+		const state = createAppState({ world: createBlankWorld(64) });
+		let told = 0;
+		state.addPlanetListener(() => {
+			told += 1;
+		});
+		state.setPlanet({ ...DEFAULT_PLANET });
+		state.setPlanet(DIM);
+		state.setPlanet({ ...DIM });
+		state.setPlanet({ ...DIM, starMass: 2, orbitDistanceAu: 1.5 });
+		expect(told).toBe(1);
+
+		state.setPlanet({ ...DIM, greenhouseStrength: 3 });
+		state.setPlanet({ ...DIM, greenhouseStrength: 7 });
+		expect(told).toBe(2);
+	});
+
+	it('refuses a setting that is not a number, changing nothing', () => {
+		const state = createAppState({ world: createBlankWorld(64) });
+		let told = 0;
+		state.addPlanetListener(() => {
+			told += 1;
+		});
+		expect(() =>
+			state.setPlanet({ ...DIM, starBrightness: Number.NaN }),
+		).toThrow(RangeError);
+		expect(state.world.planet).toEqual(DEFAULT_PLANET);
+		expect(told).toBe(0);
+	});
+});

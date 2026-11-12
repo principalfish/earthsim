@@ -37,6 +37,7 @@ import {
 	type WorldSources,
 	worldFromChoice,
 } from './ui/newWorldDialog';
+import type { PlanetPanel, PlanetPanelOptions } from './ui/planetPanel';
 import type { ToolPanel, ToolPanelOptions } from './ui/toolPanel';
 import type { ViewPanel, ViewPanelOptions } from './ui/viewPanel';
 import {
@@ -133,6 +134,10 @@ export type PageParts = {
 	readonly createViewPanel: (
 		options: ViewPanelOptions,
 	) => Pick<ViewPanel, 'setSeaLevel'>;
+	/** Adds the planet controls to the panel. */
+	readonly createPlanetPanel: (
+		options: PlanetPanelOptions,
+	) => Pick<PlanetPanel, 'setPlanet'>;
 	/**
 	 * Adds the statistics readout to the panel and starts whatever computes
 	 * the statistics.
@@ -185,11 +190,11 @@ export type PageParts = {
  *
  * @remarks
  * The parts are made in the order the panel shows them: the world
- * controls, the tools, the view controls, the layers and then the
- * statistics. The temperature, which has nothing of its own in the panel,
- * is made just before the layers, which switch it on and off. The page
- * opens on the height colours with the temperature not showing, so nothing
- * asks for the temperature until it is chosen.
+ * controls, the tools, the view controls, the planet controls, the layers
+ * and then the statistics. The temperature, which has nothing of its own
+ * in the panel, is made just before the layers, which switch it on and
+ * off. The page opens on the height colours with the temperature not
+ * showing, so nothing asks for the temperature until it is chosen.
  *
  * The date line under the world's description is written as soon as the
  * world controls are made, and follows the world's age and every change of
@@ -198,7 +203,8 @@ export type PageParts = {
  * A world that replaces the one being edited reaches, in this order: the
  * sculpt controller, which ends a stroke still under way on the old world
  * and then has the history forget that world; the globe; the sea-level
- * control; the world's description; the statistics and then the
+ * control; the planet controls, which show the world's settings without
+ * passing them on; the world's description; the statistics and then the
  * temperature, each first reset and then asked for again; the layer panel,
  * which stops the year playing and puts July back on screen; the date line;
  * the panel's message, which is taken back; and the autosave. An edit of
@@ -208,7 +214,12 @@ export type PageParts = {
  * for the statistics and the temperature again, and mark the world
  * changed for the autosave. A change of the planet settings, told through
  * {@link AppState.notifyPlanetChange}, asks for the temperature again and
- * marks the world changed; the statistics do not depend on it.
+ * marks the world changed; the statistics do not depend on it. The planet
+ * controls make such a change through {@link AppState.setPlanet} at each
+ * movement of a slider. A drag needs no wait of its own: the temperature
+ * waits for the changes to stop, and stops a calculation a later change
+ * overtakes. The planet settings are not part of the history: an undo puts
+ * back the last stroke, whatever the planet controls did since.
  *
  * Until the storage has answered, the panel, the globe and the history
  * shortcuts are out of reach and nothing is saved. A change made to the
@@ -340,6 +351,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		},
 		onGridVisible: globe.setGridVisible,
 	});
+	const planet = parts.createPlanetPanel({
+		planet: state.world.planet,
+		onChange: state.setPlanet,
+	});
 	// A part that shows the temperature and fails on a change is recorded
 	// here, and the edit that made the change carries on regardless.
 	const layers = createLayerStore(logError);
@@ -368,6 +383,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	state.addListener(sculpt.setWorld);
 	state.addListener(globe.setWorld);
 	state.addListener((world) => view.setSeaLevel(world.seaLevel));
+	state.addListener((world) => planet.setPlanet(world.planet));
 	state.addListener((world) => worldPanel.setDescription(describeWorld(world)));
 	// The figures on show are the old world's, and so are any still on
 	// their way: neither is to be shown as the new world's.

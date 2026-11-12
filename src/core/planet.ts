@@ -133,6 +133,90 @@ export const sunlightRelativeToEarth = (planet: PlanetSettings): number =>
 export const yearLengthDays = (planet: PlanetSettings): number =>
 	EARTH_YEAR_DAYS * Math.sqrt(planet.orbitDistanceAu ** 3 / planet.starMass);
 
+/**
+ * How fast the temperature model's emissivity falls as the greenhouse
+ * effect strengthens: the emissivity is `1 / (1 + k g)` for greenhouse
+ * strength `g`, so Earth (`g = 1`) radiates with emissivity about 0.61.
+ * The model takes its own greenhouse factor from here.
+ */
+export const GREENHOUSE_FACTOR = 0.633;
+
+/**
+ * The lowest warmth, from {@link warmthRelativeToEarth}, that the
+ * temperature model is trusted for. This warmth itself is trusted.
+ *
+ * @remarks
+ * The model is calibrated on the Earth, and at its cold edge a world
+ * freezes over. Measured at 64 cells per face edge, solving from nothing,
+ * the Earth freezes over at a warmth of 0.857 to 0.868 at every greenhouse
+ * strength from 0 to 3: at sunlight 1.404 to 1.411 times Earth's with no
+ * greenhouse effect, 1.068 to 1.073 at half Earth's, 0.864 to 0.868 at
+ * Earth's, 0.723 to 0.727 at 1.5, 0.622 to 0.625 at 2 and 0.483 to 0.485
+ * at 3. At Earth's greenhouse strength it is wholly frozen at 0.865 times
+ * Earth's sunlight, with a mean of −37 °C, and ordinary at 0.87, at −1 °C
+ * with 5% of it frozen. A generated world with 30% land freezes over at a
+ * warmth of 0.860 to 0.872, and one all ocean at 0.835 to 0.848. The band
+ * starts a little above all of these.
+ */
+export const TRUSTED_WARMTH_MIN = 0.9;
+
+/**
+ * The highest warmth, from {@link warmthRelativeToEarth}, that the
+ * temperature model is trusted for. This warmth itself is trusted.
+ *
+ * @remarks
+ * Measured as for {@link TRUSTED_WARMTH_MIN}, the Earth's mean temperature
+ * passes 33 °C at a warmth of 1.243 to 1.274 at every greenhouse strength
+ * from 0 to 3: at sunlight 2.069 to 2.081 times Earth's with no greenhouse
+ * effect, 1.562 to 1.571 at half Earth's, 1.251 to 1.258 at Earth's, 1.043
+ * to 1.049 at 1.5, 0.896 to 0.901 at 2 and 0.701 to 0.705 at 3. A
+ * generated world with 30% land passes it at 1.237 to 1.259, and one all
+ * ocean at 1.215 to 1.237. The band ends near the lowest of the Earth's.
+ */
+export const TRUSTED_WARMTH_MAX = 1.25;
+
+/**
+ * The sunlight a planet receives and the strength of its greenhouse effect
+ * as one measure of how warm they make it, with Earth's 1.
+ *
+ * @remarks
+ * The sunlight from {@link sunlightRelativeToEarth}, times `1 + k g` over
+ * Earth's `1 + k`, for greenhouse strength `g` and the model's
+ * {@link GREENHOUSE_FACTOR} `k`: the sunlight over the emissivity, against
+ * Earth's. The model's edges, where a world freezes over and where it grows
+ * very hot, fall at nearly the same warmth whatever the greenhouse
+ * strength.
+ *
+ * @param planet - The planet's settings.
+ */
+export const warmthRelativeToEarth = (planet: PlanetSettings): number =>
+	sunlightRelativeToEarth(planet) *
+	((1 + GREENHOUSE_FACTOR * planet.greenhouseStrength) /
+		(1 + GREENHOUSE_FACTOR));
+
+/** Which way a planet lies outside the band the model is trusted for. */
+export type RoughSide = 'cold' | 'hot';
+
+/**
+ * Whether the temperature model's results for a planet are rough, and on
+ * which side.
+ *
+ * @param planet - The planet's settings.
+ * @returns `'cold'` for a warmth below {@link TRUSTED_WARMTH_MIN}, `'hot'`
+ * for one above {@link TRUSTED_WARMTH_MAX}, and null within the band, both
+ * ends included.
+ */
+export const trustNote = (planet: PlanetSettings): RoughSide | null => {
+	const warmth = warmthRelativeToEarth(planet);
+	if (warmth < TRUSTED_WARMTH_MIN) {
+		return 'cold';
+	}
+	if (warmth > TRUSTED_WARMTH_MAX) {
+		return 'hot';
+	}
+	return null;
+};
+
 /** Whether a value is a date a world can hold: finite years from zero up. */
 export const isAgeYears = (value: unknown): value is number =>
 	typeof value === 'number' && Number.isFinite(value) && value >= 0;

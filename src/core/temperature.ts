@@ -62,6 +62,7 @@ import {
 import type { MonthlyTemperature } from './observed';
 import {
 	DEFAULT_PLANET,
+	GREENHOUSE_FACTOR,
 	normalisePlanet,
 	PLANET_LIMITS,
 	PLANET_SETTINGS,
@@ -229,7 +230,7 @@ export const TEMPERATURE_MODEL: TemperatureModel = Object.freeze({
 	landHeatCapacity: 1e7,
 	seaIceHeatCapacity: 1e7,
 	lapseRate: 6.5e-3,
-	greenhouseFactor: 0.633,
+	greenhouseFactor: GREENHOUSE_FACTOR,
 	albedo: 0.27,
 	albedoPoleward: 0.078,
 	landAlbedoExtra: 0,

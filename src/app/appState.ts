@@ -17,6 +17,8 @@ import {
 	normaliseAgeYears,
 	normalisePlanet,
 	normaliseSeaLevel,
+	PLANET_SETTINGS,
+	type PlanetSettings,
 	type World,
 } from '../core/index';
 
@@ -127,7 +129,8 @@ export type AppState = {
 	/**
 	 * Tells the planet listeners that the planet settings of the world
 	 * being edited have been changed in place. Whatever changes them calls
-	 * this once afterwards; the listeners of a replacement are not told.
+	 * this once afterwards, as {@link AppState.setPlanet} does; the
+	 * listeners of a replacement are not told.
 	 *
 	 * @remarks
 	 * As for a replacement, a listener that throws does not stop the
@@ -135,6 +138,21 @@ export type AppState = {
 	 * of several, is thrown from here.
 	 */
 	notifyPlanetChange(): void;
+	/**
+	 * Gives the world being edited other planet settings, and tells the
+	 * planet listeners once, through {@link AppState.notifyPlanetChange}.
+	 *
+	 * @remarks
+	 * The settings are put through {@link normalisePlanet} first. If that
+	 * leaves every setting as the world has it, nothing is changed and no
+	 * listener is told.
+	 *
+	 * @param settings - The new settings. They are not kept: the world gets
+	 * a copy.
+	 * @throws RangeError if a setting is not a number, NaN included. Nothing
+	 * is changed and no listener is told.
+	 */
+	setPlanet(settings: PlanetSettings): void;
 };
 
 /**
@@ -202,6 +220,13 @@ export const createAppState = (options: AppStateOptions): AppState => {
 		}
 	};
 
+	const notifyPlanetChange = (): void =>
+		announce(
+			planetListeners,
+			current,
+			'Several parts of the page failed to take the new planet settings',
+		);
+
 	return {
 		get world(): World {
 			return current;
@@ -246,11 +271,15 @@ export const createAppState = (options: AppStateOptions): AppState => {
 		addPlanetListener: (listener) => {
 			planetListeners.push(listener);
 		},
-		notifyPlanetChange: () =>
-			announce(
-				planetListeners,
-				current,
-				'Several parts of the page failed to take the new planet settings',
-			),
+		notifyPlanetChange,
+		setPlanet: (settings) => {
+			const planet = normalisePlanet(settings);
+			const before = current.planet;
+			if (PLANET_SETTINGS.every((name) => planet[name] === before[name])) {
+				return;
+			}
+			current.planet = planet;
+			notifyPlanetChange();
+		},
 	};
 };

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
 	createBlankWorld,
+	DEFAULT_PLANET,
 	DEFAULT_SEA_LEVEL_M,
 	generateWorld,
 	normaliseSeaLevel,
+	PLANET_SETTINGS,
+	type PlanetSettings,
 	type SimRequest,
 	type World,
 	type WorldFileResult,
@@ -28,6 +31,7 @@ import {
 	type NewWorldDialogOptions,
 	newWorldValuesFor,
 } from './ui/newWorldDialog';
+import type { PlanetPanelOptions } from './ui/planetPanel';
 import type { ToolPanelOptions } from './ui/toolPanel';
 import type { ViewPanelOptions } from './ui/viewPanel';
 import {
@@ -77,6 +81,7 @@ type Stage = {
 	readonly autosaveOptions: PageAutosaveOptions;
 	readonly toolPanelOptions: ToolPanelOptions;
 	readonly viewPanelOptions: ViewPanelOptions;
+	readonly planetPanelOptions: PlanetPanelOptions;
 	readonly statisticsOptions: PageStatisticsOptions;
 	readonly temperatureOptions: PageTemperatureOptions;
 	readonly layerOptions: PageLayerOptions;
@@ -89,6 +94,13 @@ type Stage = {
 	/** Has that read fail. */
 	failLoad(error: unknown): void;
 };
+
+/** A planet's settings as the stand-ins write them in the log. */
+const describePlanet = (planet: PlanetSettings): string =>
+	PLANET_SETTINGS.map((name) => planet[name]).join(' ');
+
+/** Earth's settings as the stand-ins write them in the log. */
+const EARTH = describePlanet(DEFAULT_PLANET);
 
 /** The levels of the page's sea-level slider. */
 const SEA_LEVEL_RANGE = { minM: -6000, maxM: 6000, stepM: 10 };
@@ -121,6 +133,7 @@ const createStage = (
 	let autosaveOptions: PageAutosaveOptions | undefined;
 	let toolPanelOptions: ToolPanelOptions | undefined;
 	let viewPanelOptions: ViewPanelOptions | undefined;
+	let planetPanelOptions: PlanetPanelOptions | undefined;
 	let statisticsOptions: PageStatisticsOptions | undefined;
 	let temperatureOptions: PageTemperatureOptions | undefined;
 	let layerOptions: PageLayerOptions | undefined;
@@ -154,6 +167,9 @@ const createStage = (
 		},
 		get viewPanelOptions() {
 			return required(viewPanelOptions, 'view panel');
+		},
+		get planetPanelOptions() {
+			return required(planetPanelOptions, 'planet panel');
 		},
 		get statisticsOptions() {
 			return required(statisticsOptions, 'statistics');
@@ -278,6 +294,14 @@ const createStage = (
 				setSeaLevel: (metres) => log.push(`viewPanel.setSeaLevel ${metres}`),
 			};
 		},
+		createPlanetPanel: (options) => {
+			log.push(`createPlanetPanel ${describePlanet(options.planet)}`);
+			planetPanelOptions = options;
+			return {
+				setPlanet: (planet) =>
+					log.push(`planetPanel.setPlanet ${describePlanet(planet)}`),
+			};
+		},
 		createStatistics: (options) => {
 			log.push('createStatistics');
 			statisticsOptions = options;
@@ -380,6 +404,7 @@ describe('startPage', () => {
 			'createAutosave',
 			'createToolPanel',
 			`createViewPanel ${DEFAULT_SEA_LEVEL_M}`,
+			`createPlanetPanel ${EARTH}`,
 			'createTemperature',
 			'createLayerPanel',
 			'createStatistics',
@@ -448,6 +473,7 @@ describe('a world replacement', () => {
 			'toolPanel.setHistoryState false false',
 			`globe.setWorld ${describeWorld(next)}`,
 			`viewPanel.setSeaLevel ${DEFAULT_SEA_LEVEL_M}`,
+			`planetPanel.setPlanet ${EARTH}`,
 			`worldPanel.setDescription ${describeWorld(next)}`,
 			'statistics.reset',
 			'statistics.refresh',
@@ -496,6 +522,7 @@ describe('the start of the page', () => {
 		const stage = createStage();
 		const world = generateWorld({ resolution: 64, seed: 9, landFraction: 0.4 });
 		world.seaLevel = normaliseSeaLevel(250);
+		world.planet = { ...DEFAULT_PLANET, axialTiltDeg: 45, starMass: 2 };
 		world.ageYears = 2_400_000;
 		stage.log.length = 0;
 		stage.answerLoad({ kind: 'world', world });
@@ -509,6 +536,7 @@ describe('the start of the page', () => {
 			'toolPanel.setHistoryState false false',
 			`globe.setWorld ${describeWorld(world)}`,
 			'viewPanel.setSeaLevel 250',
+			'planetPanel.setPlanet 45 1 2 1 1',
 			`worldPanel.setDescription ${describeWorld(world)}`,
 			'statistics.reset',
 			'statistics.refresh',
@@ -767,6 +795,85 @@ describe('a change of the planet settings', () => {
 		stage.state.world.planet = { ...stage.state.world.planet, axialTiltDeg: 0 };
 		stage.state.notifyPlanetChange();
 		expect(stage.log).toEqual(['temperature.refresh', 'autosave.markChanged']);
+	});
+});
+
+describe('the planet controls', () => {
+	const TILTED: PlanetSettings = { ...DEFAULT_PLANET, axialTiltDeg: 0 };
+
+	it('start on the settings of the world the page opens on', async () => {
+		const stage = await createStartedStage();
+		expect(stage.planetPanelOptions.planet).toEqual(DEFAULT_PLANET);
+	});
+
+	it('set the world of the moment, then reach the temperature and the autosave once each, and not the statistics', async () => {
+		const stage = await createStartedStage();
+		const next = createBlankWorld(64);
+		stage.state.replaceWorld(next);
+		stage.log.length = 0;
+
+		stage.planetPanelOptions.onChange(TILTED);
+		expect(next.planet).toEqual(TILTED);
+		expect(stage.log).toEqual(['temperature.refresh', 'autosave.markChanged']);
+	});
+
+	it('reach nothing with the settings the world already has', async () => {
+		const stage = await createStartedStage();
+		stage.planetPanelOptions.onChange({ ...DEFAULT_PLANET });
+		expect(stage.log).toEqual([]);
+	});
+
+	it('are not undone: an undo puts back the last stroke and leaves the planet', async () => {
+		const stage = await createStartedStage();
+		const before = stage.state.world.elevation[5];
+		makeStroke(stage);
+		stage.planetPanelOptions.onChange(TILTED);
+		stage.log.length = 0;
+
+		stage.pressKey(UNDO_KEYS);
+		expect(stage.state.world.elevation[5]).toBe(before);
+		expect(stage.state.world.planet).toEqual(TILTED);
+		expect(stage.log).toEqual([
+			'globe.updateElevation',
+			'toolPanel.setHistoryState false true',
+			'statistics.refresh',
+			'temperature.refresh',
+			'autosave.markChanged',
+		]);
+
+		stage.pressKey(UNDO_KEYS);
+		expect(stage.state.world.planet).toEqual(TILTED);
+	});
+
+	it('show the settings of a world imported, without passing them on again', async () => {
+		const stage = await createStartedStage();
+		const world = generateWorld({ resolution: 64, seed: 2, landFraction: 0.2 });
+		world.planet = { ...DEFAULT_PLANET, orbitDistanceAu: 2, starMass: 0.5 };
+		stage.importResult = { ok: true, world };
+		stage.worldPanelOptions.onImport(new Blob());
+		await settle();
+
+		expect(stage.log).toContain('planetPanel.setPlanet 23.44 1 0.5 2 1');
+		expect(
+			stage.log.filter((entry) => entry === 'autosave.markChanged'),
+		).toHaveLength(1);
+		expect(
+			stage.log.filter((entry) => entry === 'temperature.refresh'),
+		).toHaveLength(1);
+	});
+
+	it('show Earth’s settings for a new world', async () => {
+		const stage = await createStartedStage();
+		stage.planetPanelOptions.onChange(TILTED);
+		stage.worldPanelOptions.onNewWorld();
+		const dialog = required(stage.dialogs[1], 'dialog');
+		const made = await dialog.createWorld({ kind: 'blank', resolution: 64 });
+		made.planet = { ...TILTED };
+		stage.log.length = 0;
+		dialog.onWorld(made);
+
+		expect(made.planet).toEqual(DEFAULT_PLANET);
+		expect(stage.log).toContain(`planetPanel.setPlanet ${EARTH}`);
 	});
 });
 
@@ -1069,6 +1176,29 @@ describe('the temperature, on its worker', () => {
 			'a change of the planet',
 			nothing,
 			(stage: Stage) => stage.state.notifyPlanetChange(),
+		],
+		[
+			'a drag of a planet slider',
+			nothing,
+			(stage: Stage) => {
+				for (const axialTiltDeg of [20, 15, 10, 5, 0]) {
+					stage.planetPanelOptions.onChange({
+						...stage.state.world.planet,
+						axialTiltDeg,
+					});
+				}
+			},
+		],
+		[
+			'putting Earth’s planet settings back',
+			(stage: Stage) =>
+				stage.planetPanelOptions.onChange({
+					...DEFAULT_PLANET,
+					starBrightness: 0.5,
+					greenhouseStrength: 2,
+				}),
+			(stage: Stage) =>
+				stage.planetPanelOptions.onChange({ ...DEFAULT_PLANET }),
 		],
 		[
 			'a world replacement',

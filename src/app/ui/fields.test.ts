@@ -10,6 +10,8 @@ import {
 	createRangeField,
 	createSegmentedPicker,
 	createSelectField,
+	type RangeMark,
+	rangeFraction,
 } from './fields';
 
 describe('createSegmentedPicker', () => {
@@ -85,7 +87,7 @@ describe('createRangeField', () => {
 		vi.unstubAllGlobals();
 	});
 
-	const make = (quietValue?: boolean) => {
+	const make = (quietValue?: boolean, mark?: RangeMark) => {
 		const moved: number[] = [];
 		const field = createRangeField({
 			id: 'speed',
@@ -97,6 +99,7 @@ describe('createRangeField', () => {
 			format: (value) => `${value} km/h`,
 			onInput: (value) => moved.push(value),
 			quietValue,
+			mark,
 		});
 		const root = field.element as unknown as FakeElement;
 		return {
@@ -142,6 +145,71 @@ describe('createRangeField', () => {
 		field.setValue(5);
 		expect(output.textContent).toBe('5 km/h');
 		expect(input.getAttribute('aria-valuetext')).toBe('5 km/h');
+	});
+
+	it('writes other words for a value when given them, until it is moved', () => {
+		const { field, input, output, moved } = make();
+		field.setValue(4, 'about 4.2 km/h');
+		expect(input.value).toBe('4');
+		expect(output.textContent).toBe('about 4.2 km/h');
+		expect(input.getAttribute('aria-valuetext')).toBe('about 4.2 km/h');
+		expect(moved).toEqual([]);
+
+		input.value = '5';
+		input.fire('input');
+		expect(output.textContent).toBe('5 km/h');
+		expect(input.getAttribute('aria-valuetext')).toBe('5 km/h');
+	});
+
+	it('has no mark unless given one', () => {
+		const root = make().field.element as unknown as FakeElement;
+		expect(byClass(root, 'field__mark')).toEqual([]);
+		expect(byClass(root, 'field__track')).toEqual([]);
+	});
+
+	it('marks a value under the track, where the middle of the thumb stands at it', () => {
+		const { field, input } = make(false, { value: 2.5, title: 'Walking' });
+		const root = field.element as unknown as FakeElement;
+		const track = oneByClass(root, 'field__track');
+		const mark = oneByClass(root, 'field__mark');
+		expect(track.children).toEqual([input, mark]);
+		expect(mark.title).toBe('Walking');
+		expect(mark.style.left).toBe(
+			'calc(var(--range-thumb-size) / 2 + (100% - var(--range-thumb-size)) * 0.25)',
+		);
+	});
+
+	it('keeps its mark from screen readers, which hear the value', () => {
+		const { field } = make(false, { value: 2.5, title: 'Walking' });
+		const mark = oneByClass(
+			field.element as unknown as FakeElement,
+			'field__mark',
+		);
+		expect(mark.getAttribute('aria-hidden')).toBe('true');
+	});
+
+	it('keeps the value marked through a change of scale', () => {
+		const { field } = make(false, { value: 2.5, title: 'Walking' });
+		field.setScale({
+			min: 0,
+			max: 5,
+			step: 1,
+			value: 1,
+			format: String,
+		});
+		const mark = oneByClass(
+			field.element as unknown as FakeElement,
+			'field__mark',
+		);
+		expect(mark.style.left).toContain('* 0.5)');
+	});
+});
+
+describe('rangeFraction', () => {
+	it('runs from 0 at the lowest value to 1 at the highest', () => {
+		expect(rangeFraction(-5, -5, 15)).toBe(0);
+		expect(rangeFraction(0, -5, 15)).toBe(0.25);
+		expect(rangeFraction(15, -5, 15)).toBe(1);
 	});
 });
 

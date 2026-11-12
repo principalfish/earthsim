@@ -17,6 +17,9 @@
   --radius-sm: 0.375rem;
   --opacity-disabled: 0.55;
   --panel-width: 20rem;
+  /* About the width of the browsers' own slider thumb, 16px, which a mark
+     on a slider's track is placed by. */
+  --range-thumb-size: 1rem;
   --dialog-width: 28rem;
 
   color-scheme: dark;
@@ -130,6 +133,25 @@ body {
   width: 100%;
   margin: 0;
   accent-color: var(--color-accent);
+}
+
+/* A slider with a value marked: the mark hangs under the track, where the
+   middle of the thumb stands at that value. */
+.field__track {
+  --field-mark-height: 0.375rem;
+
+  position: relative;
+  display: grid;
+  padding-block-end: var(--field-mark-height);
+}
+
+.field__mark {
+  position: absolute;
+  inset-block-end: 0;
+  width: 2px;
+  height: var(--field-mark-height);
+  background: var(--color-text-muted);
+  translate: -50% 0;
 }
 
 .field__checkbox {
@@ -478,6 +500,41 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-sm);
+}
+
+.planet-readout {
+  font-size: var(--font-size-sm);
+}
+
+.planet-readout__lines {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.planet-readout__row {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: space-between;
+}
+
+.planet-readout__value {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  text-align: end;
+}
+
+/* The note carries its own margin, so its region takes no room while empty. */
+.planet-readout__note {
+  margin: 0;
+  margin-block-start: var(--space-sm);
+  line-height: 1.4;
+}
+
+/* Sized by its label rather than stretched across the section. */
+.planet-reset {
+  justify-self: start;
 }
 
 .stats {
