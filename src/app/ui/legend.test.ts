@@ -22,6 +22,7 @@ import {
 	FIT_TAIL_SHARE,
 	fitRange,
 	fitRangeFromZero,
+	formatFigures,
 	formatTick,
 	LEGEND_EMPTY_TEXT,
 	LEGEND_FIRST_YEAR_TEXT,
@@ -391,6 +392,32 @@ describe('formatTick', () => {
 	});
 });
 
+describe('formatFigures', () => {
+	it('writes the mean signed and the RMS unsigned, each to one decimal', () => {
+		expect(
+			formatFigures({ meanDifference: -0.145, rmsDifference: 3.934 }),
+		).toBe('Mean −0.1 °C · RMS 3.9 °C');
+		expect(formatFigures({ meanDifference: 0.26, rmsDifference: 12.05 })).toBe(
+			'Mean +0.3 °C · RMS 12.1 °C',
+		);
+	});
+
+	it('writes a mean that rounds to zero as 0.0, with no sign', () => {
+		for (const meanDifference of [0, -0, 0.04, -0.04, -0.049]) {
+			expect(
+				formatFigures({ meanDifference, rmsDifference: 0 }),
+				`${meanDifference}`,
+			).toBe('Mean 0.0 °C · RMS 0.0 °C');
+		}
+	});
+
+	it('rounds a half away from zero', () => {
+		expect(formatFigures({ meanDifference: -1.25, rmsDifference: 1.25 })).toBe(
+			'Mean −1.3 °C · RMS 1.3 °C',
+		);
+	});
+});
+
 describe('tickPosition', () => {
 	it('gives the share of the range below a value, in percent', () => {
 		expect(tickPosition(-10, { min: -10, max: 30 })).toBe(0);
@@ -497,10 +524,23 @@ describe('legendContent', () => {
 				],
 				below: null,
 				above: null,
+				figures: null,
 			},
 			status: null,
 			bar: null,
 		});
+	});
+
+	it('writes the error figures of a source that has them', () => {
+		const figures = { meanDifference: 0.31, rmsDifference: 4.44 };
+		expect(
+			legendContent(layerOf('current'), { ...source, figures }, true).scale
+				?.figures,
+		).toBe('Mean +0.3 °C · RMS 4.4 °C');
+		expect(
+			legendContent(layerOf('current'), { ...source, figures: null }, true)
+				.scale?.figures,
+		).toBeNull();
 	});
 
 	it('says what the end colours stand for at each end with values beyond it', () => {
@@ -632,6 +672,7 @@ describe('createLegend', () => {
 			low: oneByClass(root, 'legend__end--low'),
 			high: oneByClass(root, 'legend__end--high'),
 			ticks: oneByClass(root, 'legend__ticks'),
+			figures: oneByClass(root, 'legend__figures'),
 			scale: oneByClass(root, 'legend__scale'),
 			status: oneByClass(root, 'legend__status'),
 			bar: oneByClass(root, 'legend__bar'),
@@ -654,6 +695,7 @@ describe('createLegend', () => {
 					ticks: [],
 					below: null,
 					above: null,
+					figures: null,
 				},
 				status: null,
 				bar: null,
@@ -679,6 +721,7 @@ describe('createLegend', () => {
 				],
 				below: null,
 				above: null,
+				figures: null,
 			},
 			status: null,
 			bar: null,
@@ -772,6 +815,7 @@ describe('createLegend', () => {
 					ticks: labels.map((label, index) => ({ label, position: index })),
 					below: null,
 					above: null,
+					figures: null,
 				},
 				status: null,
 				bar: null,
@@ -788,10 +832,43 @@ describe('createLegend', () => {
 		above: string | null,
 	): void =>
 		legend.show({
-			scale: { caption: 'c', gradient: 'g', ticks: [], below, above },
+			scale: {
+				caption: 'c',
+				gradient: 'g',
+				ticks: [],
+				below,
+				above,
+				figures: null,
+			},
 			status: null,
 			bar: null,
 		});
+
+	it('writes the error figures on a line of their own under the ends, only while there are some', () => {
+		const parts = make();
+		const show = (figures: string | null): void =>
+			parts.legend.show({
+				scale: {
+					caption: 'c',
+					gradient: 'g',
+					ticks: [],
+					below: '−20 and below',
+					above: '20 and above',
+					figures,
+				},
+				status: null,
+				bar: null,
+			});
+		show(null);
+		expect(parts.figures.hidden).toBe(true);
+		show('Mean −0.1 °C · RMS 3.9 °C');
+		expect(parts.figures.hidden).toBe(false);
+		expect(parts.figures.textContent).toBe('Mean −0.1 °C · RMS 3.9 °C');
+		expect(parts.scale.children.at(-1)).toBe(parts.figures);
+		show(null);
+		expect(parts.figures.hidden).toBe(true);
+		expect(parts.figures.textContent).toBe('');
+	});
 
 	it('writes what the end colours stand for on a line of its own under the ticks', () => {
 		const parts = make();
@@ -801,6 +878,7 @@ describe('createLegend', () => {
 			'legend__ramp',
 			'legend__ticks',
 			'legend__ends',
+			'legend__figures',
 		]);
 		expect(parts.ends.hidden).toBe(false);
 		expect(parts.ends.children).toEqual([parts.low, parts.high]);

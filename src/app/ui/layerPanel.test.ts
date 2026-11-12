@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+	compareField,
+	compareFields,
+	differenceField,
+	type FieldDifference,
 	getGrid,
+	type MonthlyTemperature,
 	summariseTemperature,
 	type TemperatureResult,
 } from '../../core/index';
@@ -10,12 +15,14 @@ import {
 } from '../../core/testing/temperatureFixtures';
 import {
 	type ColourRamp,
+	DIFFERENCE_RAMP,
 	rampGradient,
 	SEASONAL_RANGE_RAMP,
 	TEMPERATURE_RAMP,
 	type ValueRange,
 } from '../globe/ramp';
 import { createLayerStore, type LayerStore } from '../layers';
+import type { ObservedLoader } from '../observedData';
 import { PLAYBACK_STEP_MS } from '../playback';
 import {
 	byClass,
@@ -25,12 +32,21 @@ import {
 	oneByClass,
 } from '../testing/fakeDocument';
 import { createFakeTimers } from '../testing/fakeTimers';
-import { DEFAULT_MONTH, DEFAULT_PAGE_VIEW, type PageView } from '../view';
+import { settle } from '../testing/settle';
+import {
+	DEFAULT_MONTH,
+	DEFAULT_PAGE_VIEW,
+	type PageView,
+	type TemperatureSource,
+} from '../view';
+import type { ComparisonContent } from './comparison';
 import {
 	createLayerControls,
 	createLayerPanel,
 	type LayerControlsOptions,
 	type LayerPanel,
+	OBSERVED_FAILED_TEXT,
+	OBSERVED_LOADING_TEXT,
 	SEASONAL_RANGE_TICK_STEP,
 	temperatureCaption,
 } from './layerPanel';
@@ -38,7 +54,11 @@ import {
 	cellWeights,
 	FIT_TAIL_SHARE,
 	fitRange,
+	fitRangeFromZero,
+	formatFigures,
+	formatTick,
 	LEGEND_EMPTY_TEXT,
+	LEGEND_FIRST_YEAR_TEXT,
 	LEGEND_NOT_SHOWN_TEXT,
 	LEGEND_OUT_OF_DATE_TEXT,
 	LEGEND_UNAVAILABLE_TEXT,
@@ -117,6 +137,11 @@ const createStage = () => {
 	const shown: Shown[] = [];
 	const showing: boolean[] = [];
 	const legends: (LegendContent | null)[] = [];
+	/** What the comparison controls were told to show. */
+	const comparisons: ComparisonContent[] = [];
+	/** The observed temperature's loader, as each test sets it. */
+	let loadObserved: ObservedLoader = () =>
+		Promise.reject(new Error('The observed temperature is not asked for'));
 	/** What the controls were told to show: the view settings and playing. */
 	const views: { readonly view: PageView; readonly playing: boolean }[] = [];
 	/** What the panel told of the view settings. */
@@ -132,6 +157,7 @@ const createStage = () => {
 		setTimer: timers.setTimer,
 		clearTimer: timers.clearTimer,
 		onView: (view) => told.push(view),
+		loadObserved: (resolution) => loadObserved(resolution),
 		reportError: (error) => {
 			reported.push(error);
 			if (reportFailure !== null) {
@@ -154,6 +180,7 @@ const createStage = () => {
 			return {
 				showLegend: (content) => legends.push(content),
 				showView: (view, playing) => views.push({ view, playing }),
+				showComparison: (content) => comparisons.push(content),
 			};
 		},
 	});
@@ -175,6 +202,7 @@ const createStage = () => {
 		shown,
 		showing,
 		legends,
+		comparisons,
 		views,
 		told,
 		timers,
@@ -190,6 +218,12 @@ const createStage = () => {
 		failNext: (error: Error): void => {
 			failure = error;
 		},
+		/** Has the observed temperature come from this loader from now on. */
+		setLoader: (loader: ObservedLoader): void => {
+			loadObserved = loader;
+		},
+		/** What the comparison controls were last told to show. */
+		lastComparison: () => comparisons.at(-1),
 		/** Has every report of an error throw this, once the error is taken. */
 		failReports: (error: Error): void => {
 			reportFailure = error;
@@ -621,6 +655,7 @@ describe('createLayerPanel, the month', () => {
 		expect(stage.told.at(-1)).toEqual({
 			layer: 'temperature',
 			temperatureView: 'month',
+			source: 'simulated',
 			month: 11,
 		});
 	});
@@ -664,9 +699,14 @@ describe('createLayerPanel, the month', () => {
 		stage.arrive(result);
 		stage.controls.onMonth(2);
 		stage.controls.onPlay();
-		stage.panel.resetMonth();
+		stage.panel.newWorld(null);
 		expect(stage.lastView()).toEqual({
-			view: { layer: 'temperature', temperatureView: 'month', month: 6 },
+			view: {
+				layer: 'temperature',
+				temperatureView: 'month',
+				source: 'simulated',
+				month: 6,
+			},
 			playing: false,
 		});
 		expect(stage.told.at(-1)?.month).toBe(DEFAULT_MONTH);
@@ -680,10 +720,15 @@ describe('createLayerPanel, the month', () => {
 		stage.arrive(resultWith());
 		stage.controls.onPlay();
 		const shown = stage.shown.length;
-		stage.panel.resetMonth();
+		stage.panel.newWorld(null);
 		expect(stage.timers.pending()).toBe(0);
 		expect(stage.lastView()).toEqual({
-			view: { layer: 'temperature', temperatureView: 'month', month: 6 },
+			view: {
+				layer: 'temperature',
+				temperatureView: 'month',
+				source: 'simulated',
+				month: 6,
+			},
 			playing: false,
 		});
 		expect(stage.shown).toHaveLength(shown);
@@ -694,10 +739,11 @@ describe('createLayerPanel, the month', () => {
 		stage.controls.onLayer('temperature');
 		stage.controls.onTemperatureView('range');
 		stage.controls.onMonth(2);
-		stage.panel.resetMonth();
+		stage.panel.newWorld(null);
 		expect(stage.lastView()?.view).toEqual({
 			layer: 'temperature',
 			temperatureView: 'range',
+			source: 'simulated',
 			month: DEFAULT_MONTH,
 		});
 	});
@@ -721,7 +767,12 @@ describe('createLayerPanel, playing the year', () => {
 		stage.timers.advance(PLAYBACK_STEP_MS);
 		expect(stage.shown.at(-1)?.field).toBe(result.months[7]);
 		expect(stage.lastView()).toEqual({
-			view: { layer: 'temperature', temperatureView: 'month', month: 7 },
+			view: {
+				layer: 'temperature',
+				temperatureView: 'month',
+				source: 'simulated',
+				month: 7,
+			},
 			playing: true,
 		});
 		expect(stage.told.at(-1)?.month).toBe(7);
@@ -785,7 +836,12 @@ describe('createLayerPanel, playing the year', () => {
 		stage.controls.onMonth(3);
 		expect(stage.shown.at(-1)?.field).toBe(result.months[3]);
 		expect(stage.lastView()).toEqual({
-			view: { layer: 'temperature', temperatureView: 'month', month: 3 },
+			view: {
+				layer: 'temperature',
+				temperatureView: 'month',
+				source: 'simulated',
+				month: 3,
+			},
 			playing: true,
 		});
 		stage.timers.advance(PLAYBACK_STEP_MS - 1);
@@ -804,7 +860,12 @@ describe('createLayerPanel, playing the year', () => {
 		expect(stage.errors).toEqual([]);
 		expect(stage.timers.pending()).toBe(0);
 		expect(stage.lastView()).toEqual({
-			view: { layer: 'temperature', temperatureView: 'month', month: 7 },
+			view: {
+				layer: 'temperature',
+				temperatureView: 'month',
+				source: 'simulated',
+				month: 7,
+			},
 			playing: false,
 		});
 		// The globe still shows July, and the legend says so, marking it out
@@ -829,7 +890,12 @@ describe('createLayerPanel, playing the year', () => {
 		expect(stage.reported).toEqual([failure]);
 		expect(stage.timers.pending()).toBe(0);
 		expect(stage.lastView()).toEqual({
-			view: { layer: 'temperature', temperatureView: 'month', month: 7 },
+			view: {
+				layer: 'temperature',
+				temperatureView: 'month',
+				source: 'simulated',
+				month: 7,
+			},
 			playing: false,
 		});
 		stage.timers.advance(5 * PLAYBACK_STEP_MS);
@@ -1085,6 +1151,7 @@ describe('createLayerPanel, what the globe shows', () => {
 			field: result.months[DEFAULT_MONTH],
 			view: 'month',
 			month: DEFAULT_MONTH,
+			source: 'simulated',
 			current: true,
 		});
 		expect(shown?.field).toBe(stage.shown.at(-1)?.field);
@@ -1144,6 +1211,7 @@ describe('createLayerPanel, what the globe shows', () => {
 			field: first.months[DEFAULT_MONTH],
 			view: 'month',
 			month: DEFAULT_MONTH,
+			source: 'simulated',
 			current: false,
 		});
 
@@ -1160,6 +1228,7 @@ describe('createLayerPanel, what the globe shows', () => {
 			field: second.months[1],
 			view: 'month',
 			month: 1,
+			source: 'simulated',
 			current: true,
 		});
 	});
@@ -1174,6 +1243,665 @@ describe('createLayerPanel, what the globe shows', () => {
 		expect(stage.panel.shown()).not.toBeNull();
 		stage.store.clear();
 		expect(stage.panel.shown()).toBeNull();
+	});
+});
+
+/** A loader of the observed temperature that answers when a test says. */
+const createDeferredLoader = () => {
+	const calls: {
+		readonly resolution: number;
+		resolve(months: MonthlyTemperature): void;
+		reject(error: unknown): void;
+	}[] = [];
+	const loader: ObservedLoader = (resolution) =>
+		new Promise((resolve, reject) => {
+			calls.push({ resolution, resolve, reject });
+		});
+	/** The call made last, which must have been made. */
+	const last = () => {
+		const call = calls.at(-1);
+		if (call === undefined) {
+			throw new Error('The observed temperature was not asked for');
+		}
+		return call;
+	};
+	return { calls, loader, last };
+};
+
+/**
+ * An observed year on the 64 grid that differs from a simulated one: each
+ * cell is colder by an amount of its own, the more so the later the month,
+ * and a few cells far colder, so that it reaches below the simulated year.
+ */
+const observedFor = (result: TemperatureResult): Float32Array[] =>
+	result.months.map((month, m) =>
+		month.map(
+			(value, cell) =>
+				value - 1 - (cell % 5) * 0.4 - m * 0.3 - (cell % 997 === 0 ? 50 : 0),
+		),
+	);
+
+/** A stage in Temperature view on the measured Earth at 64, with a result. */
+const createEarthStage = () => {
+	const stage = createStage();
+	const deferred = createDeferredLoader();
+	stage.setLoader(deferred.loader);
+	stage.controls.onLayer('temperature');
+	stage.panel.newWorld(64);
+	const result = resultOnGrid();
+	stage.arrive(result);
+	const observed = observedFor(result);
+	const grid = getGrid(64);
+	/** Chooses a source and has the observed temperature arrive. */
+	const choose = async (source: TemperatureSource): Promise<void> => {
+		const before = deferred.calls.length;
+		stage.controls.onSource(source);
+		if (deferred.calls.length > before) {
+			deferred.last().resolve(observed);
+			await settle();
+		}
+	};
+	return { stage, deferred, result, observed, grid, choose };
+};
+
+/** The figures the legend writes for a pair of fields. */
+const figuresText = (
+	a: Float32Array,
+	b: Float32Array,
+	grid = getGrid(64),
+): string => formatFigures(compareField(a, b, grid));
+
+describe('createLayerPanel, the comparison', () => {
+	it('is offered only in Temperature view on the measured Earth', () => {
+		const stage = createStage();
+		// The controls start hidden, and are told nothing until it changes.
+		expect(stage.lastComparison()).toBeUndefined();
+		stage.panel.setEarth(64);
+		// Terrain view: not offered.
+		expect(stage.lastComparison()?.offered).toBe(false);
+		stage.controls.onLayer('temperature');
+		expect(stage.lastComparison()).toEqual({
+			offered: true,
+			source: 'simulated',
+			message: null,
+		});
+		stage.controls.onLayer('terrain');
+		expect(stage.lastComparison()?.offered).toBe(false);
+		stage.controls.onLayer('temperature');
+		stage.panel.setEarth(null);
+		expect(stage.lastComparison()?.offered).toBe(false);
+		stage.panel.newWorld(64);
+		expect(stage.lastComparison()?.offered).toBe(true);
+		stage.panel.newWorld(null);
+		expect(stage.lastComparison()?.offered).toBe(false);
+	});
+
+	it('names no source in the caption until it is offered, and the source from then on', () => {
+		const stage = createStage();
+		stage.controls.onLayer('temperature');
+		stage.arrive(resultOnGrid());
+		expect(stage.lastLegend()?.scale?.caption).toBe(
+			'Air temperature in July, °C',
+		);
+		stage.panel.setEarth(64);
+		expect(stage.lastLegend()?.scale?.caption).toBe(
+			'Simulated air temperature in July, °C',
+		);
+	});
+
+	it('ignores a source chosen while it is not offered', () => {
+		const { stage, deferred } = createEarthStage();
+		stage.panel.setEarth(null);
+		const told = stage.told.length;
+		stage.controls.onSource('observed');
+		expect(deferred.calls).toHaveLength(0);
+		expect(stage.lastComparison()?.source).toBe('simulated');
+		expect(stage.told.at(-1)?.source).toBe('simulated');
+		expect(stage.told.length).toBe(told + 1);
+	});
+
+	it('asks for the observed temperature once, and keeps the simulated on the globe until it arrives', async () => {
+		const { stage, deferred, result, observed } = createEarthStage();
+		const sent = stage.shown.length;
+		stage.controls.onSource('observed');
+		expect(deferred.calls.map((call) => call.resolution)).toEqual([64]);
+		expect(stage.lastComparison()).toEqual({
+			offered: true,
+			source: 'observed',
+			message: OBSERVED_LOADING_TEXT,
+		});
+		expect(stage.told.at(-1)?.source).toBe('observed');
+		expect(stage.shown).toHaveLength(sent);
+		expect(stage.panel.shown()?.source).toBe('simulated');
+		stage.controls.onSource('difference');
+		expect(deferred.calls).toHaveLength(1);
+
+		deferred.last().resolve(observed);
+		await settle();
+		expect(stage.lastComparison()?.message).toBeNull();
+		const difference = stage.shown.at(-1)?.field as Float32Array;
+		expect([...difference]).toEqual([
+			...differenceField(
+				result.months[DEFAULT_MONTH] as Float32Array,
+				observed[DEFAULT_MONTH] as Float32Array,
+			),
+		]);
+		expect(stage.panel.shown()?.source).toBe('difference');
+		stage.controls.onSource('observed');
+		expect(stage.shown.at(-1)?.field).toBe(observed[DEFAULT_MONTH]);
+		expect(deferred.calls).toHaveLength(1);
+	});
+
+	it('keeps saying the observed temperature is loading whatever is chosen until it arrives', async () => {
+		const { stage, deferred, result, observed } = createEarthStage();
+		stage.controls.onSource('observed');
+		stage.controls.onSource('difference');
+		expect(stage.lastComparison()).toEqual({
+			offered: true,
+			source: 'difference',
+			message: OBSERVED_LOADING_TEXT,
+		});
+		stage.controls.onSource('simulated');
+		expect(stage.lastComparison()?.message).toBe(OBSERVED_LOADING_TEXT);
+		stage.controls.onSource('difference');
+		expect(stage.lastComparison()?.message).toBe(OBSERVED_LOADING_TEXT);
+		expect(deferred.calls).toHaveLength(1);
+		expect(stage.panel.shown()?.source).toBe('simulated');
+
+		deferred.last().resolve(observed);
+		await settle();
+		expect(stage.lastComparison()).toEqual({
+			offered: true,
+			source: 'difference',
+			message: null,
+		});
+		expect(stage.panel.shown()?.source).toBe('difference');
+		expect([...(stage.shown.at(-1)?.field ?? [])]).toEqual([
+			...differenceField(
+				result.months[DEFAULT_MONTH] as Float32Array,
+				observed[DEFAULT_MONTH] as Float32Array,
+			),
+		]);
+	});
+
+	it('shows the observed month and each summary of the observed year, on one scale shared with the simulated', async () => {
+		const { stage, result, observed, choose } = createEarthStage();
+		const own = stage.shown.at(-1)?.range;
+		expect(own).toEqual(yearRange(result));
+		await choose('observed');
+		const shared = fitRange(
+			[...result.months, ...observed],
+			cellWeights(observed[0]?.length ?? 0),
+		);
+		expect(shared.range).not.toEqual(own);
+		const last = stage.shown.at(-1);
+		expect(last?.field).toBe(observed[DEFAULT_MONTH]);
+		expect(last?.range).toEqual(shared.range);
+		expect(last?.ramp).toBe(TEMPERATURE_RAMP);
+		expect(stage.lastLegend()?.scale?.caption).toBe(
+			'Observed air temperature in July, °C',
+		);
+		expect(stage.lastLegend()?.scale?.below).toBe(
+			shared.beyond.below ? `${formatTick(shared.range.min)} and below` : null,
+		);
+
+		const theirs = summariseTemperature(observed);
+		for (const view of ['annualMean', 'warmest', 'coldest'] as const) {
+			stage.controls.onTemperatureView(view);
+			expect(stage.shown.at(-1)?.field, view).toEqual(theirs[view]);
+			expect(stage.shown.at(-1)?.range, view).toEqual(shared.range);
+		}
+		stage.controls.onTemperatureView('range');
+		expect(stage.shown.at(-1)?.field).toEqual(theirs.range);
+		expect(stage.shown.at(-1)?.range).toEqual({
+			min: 0,
+			max: Math.max(
+				fitRangeFromZero(summariseTemperature(result.months).range).max,
+				fitRangeFromZero(theirs.range).max,
+			),
+		});
+		expect(stage.shown.at(-1)?.ramp).toBe(SEASONAL_RANGE_RAMP);
+		expect(stage.lastLegend()?.scale?.caption).toBe(
+			'Observed seasonal range: difference between the warmest and coldest months, °C',
+		);
+		// The simulated year now shares the scale, in every month and summary.
+		stage.controls.onSource('simulated');
+		expect(stage.shown.at(-1)?.range).toEqual(stage.shown.at(-2)?.range);
+		stage.controls.onTemperatureView('month');
+		expect(stage.shown.at(-1)?.field).toBe(result.months[DEFAULT_MONTH]);
+		expect(stage.shown.at(-1)?.range).toEqual(shared.range);
+		stage.controls.onMonth(0);
+		expect(stage.shown.at(-1)?.range).toEqual(shared.range);
+	});
+
+	it('gives the simulated year its own scale again once the world stops being the measured Earth, and the shared one when it is again', async () => {
+		const { stage, result, observed, choose } = createEarthStage();
+		await choose('observed');
+		const shared = fitRange(
+			[...result.months, ...observed],
+			cellWeights(observed[0]?.length ?? 0),
+		).range;
+		stage.panel.setEarth(null);
+		expect(stage.shown.at(-1)?.field).toBe(result.months[DEFAULT_MONTH]);
+		expect(stage.shown.at(-1)?.range).toEqual(yearRange(result));
+		expect(stage.lastLegend()?.scale?.figures).toBeNull();
+		expect(stage.lastLegend()?.scale?.caption).toBe(
+			'Air temperature in July, °C',
+		);
+		// The same field on another scale is sent again, with that scale.
+		stage.panel.setEarth(64);
+		expect(stage.lastComparison()).toEqual({
+			offered: true,
+			source: 'simulated',
+			message: null,
+		});
+		expect(stage.shown.at(-1)?.field).toBe(result.months[DEFAULT_MONTH]);
+		expect(stage.shown.at(-1)?.range).toEqual(shared);
+		expect(stage.lastLegend()?.scale?.figures).not.toBeNull();
+		// A new result takes the shared scale.
+		const next = resultOnGrid();
+		stage.arrive(next);
+		expect(stage.shown.at(-1)?.field).toBe(next.months[DEFAULT_MONTH]);
+		expect(stage.shown.at(-1)?.range).toEqual(shared);
+	});
+
+	it('forgets the observed temperature and the shared scale for a new world', async () => {
+		const { stage, deferred, choose } = createEarthStage();
+		await choose('observed');
+		stage.store.clear();
+		stage.panel.newWorld(64);
+		expect(stage.lastComparison()?.source).toBe('simulated');
+		const next = resultOnGrid();
+		stage.arrive(next);
+		expect(stage.shown.at(-1)?.range).toEqual(yearRange(next));
+		expect(stage.lastLegend()?.scale?.figures).toBeNull();
+		stage.controls.onSource('observed');
+		expect(deferred.calls).toHaveLength(2);
+	});
+
+	it('draws the difference of every month and summary on the fixed scale, with both end words', async () => {
+		const { stage, result, observed, choose } = createEarthStage();
+		await choose('difference');
+		const ours = summariseTemperature(result.months);
+		const theirs = summariseTemperature(observed);
+		const expectFixed = (caption: string): void => {
+			const last = stage.shown.at(-1);
+			expect(last?.range).toEqual({ min: -20, max: 20 });
+			expect(last?.ramp).toBe(DIFFERENCE_RAMP);
+			const scale = stage.lastLegend()?.scale;
+			expect(scale?.caption).toBe(caption);
+			expect(tickLabels(stage.lastLegend())).toEqual([
+				'−20',
+				'−10',
+				'0',
+				'10',
+				'20',
+			]);
+			expect(scale?.below).toBe('−20 and below');
+			expect(scale?.above).toBe('20 and above');
+		};
+		expectFixed('Simulated less observed in July, °C');
+		stage.controls.onMonth(0);
+		expect([...(stage.shown.at(-1)?.field ?? [])]).toEqual([
+			...differenceField(
+				result.months[0] as Float32Array,
+				observed[0] as Float32Array,
+			),
+		]);
+		expectFixed('Simulated less observed in January, °C');
+		const captions = {
+			annualMean: 'Simulated less observed, annual average air temperature, °C',
+			warmest:
+				'Simulated less observed, air temperature in the warmest month, °C',
+			coldest:
+				'Simulated less observed, air temperature in the coldest month, °C',
+			range: 'Simulated less observed, seasonal range, °C',
+		};
+		for (const view of ['annualMean', 'warmest', 'coldest', 'range'] as const) {
+			stage.controls.onTemperatureView(view);
+			expect([...(stage.shown.at(-1)?.field ?? [])], view).toEqual([
+				...differenceField(ours[view], theirs[view]),
+			]);
+			expectFixed(captions[view]);
+		}
+	});
+
+	it('writes the figures of the simulated field on screen against the observed, for each month and summary and every source', async () => {
+		const { stage, result, observed, grid, choose } = createEarthStage();
+		// Before the observed temperature is there, none.
+		expect(stage.lastLegend()?.scale?.figures).toBeNull();
+		await choose('observed');
+		const { months } = compareFields(result.months, observed, grid);
+		for (const source of ['simulated', 'observed', 'difference'] as const) {
+			stage.controls.onSource(source);
+			stage.controls.onTemperatureView('month');
+			for (const month of [0, 6, 11]) {
+				stage.controls.onMonth(month);
+				expect(stage.lastLegend()?.scale?.figures, `${source} ${month}`).toBe(
+					formatFigures(months[month] as FieldDifference),
+				);
+			}
+			const ours = summariseTemperature(result.months);
+			const theirs = summariseTemperature(observed);
+			for (const view of [
+				'annualMean',
+				'warmest',
+				'coldest',
+				'range',
+			] as const) {
+				stage.controls.onTemperatureView(view);
+				expect(stage.lastLegend()?.scale?.figures, `${source} ${view}`).toBe(
+					figuresText(ours[view], theirs[view]),
+				);
+			}
+		}
+		// The figures differ by month, so a wrong month would be seen.
+		expect(formatFigures(months[0] as FieldDifference)).not.toBe(
+			formatFigures(months[11] as FieldDifference),
+		);
+	});
+
+	it('makes each derived field once for each result, and drops the differences with it', async () => {
+		const { stage, choose } = createEarthStage();
+		await choose('difference');
+		const july = stage.shown.at(-1)?.field;
+		stage.controls.onMonth(0);
+		const january = stage.shown.at(-1)?.field;
+		stage.controls.onMonth(DEFAULT_MONTH);
+		expect(stage.shown.at(-1)?.field).toBe(july);
+		stage.controls.onTemperatureView('warmest');
+		const warmest = stage.shown.at(-1)?.field;
+		stage.controls.onTemperatureView('month');
+		stage.controls.onTemperatureView('warmest');
+		expect(stage.shown.at(-1)?.field).toBe(warmest);
+		// Not sent again as the status changes.
+		const sent = stage.shown.length;
+		stage.store.markOutOfDate();
+		stage.store.markCalculating();
+		expect(stage.shown).toHaveLength(sent);
+		// A new result: new differences.
+		stage.arrive(resultOnGrid());
+		const next = stage.shown.at(-1)?.field;
+		expect(next).not.toBe(warmest);
+		stage.controls.onTemperatureView('month');
+		expect(stage.shown.at(-1)?.field).not.toBe(july);
+		stage.controls.onMonth(0);
+		expect(stage.shown.at(-1)?.field).not.toBe(january);
+	});
+
+	it('never marks the observed temperature out of date, and marks the difference as the simulated', async () => {
+		const { stage, choose } = createEarthStage();
+		await choose('observed');
+		stage.store.markOutOfDate();
+		expect(stage.lastLegend()?.status).toBeNull();
+		expect(stage.lastLegend()?.bar).toBeNull();
+		expect(stage.panel.shown()).toMatchObject({
+			source: 'observed',
+			current: true,
+		});
+		stage.store.markCalculating();
+		expect(stage.lastLegend()?.status).toBeNull();
+		expect(stage.panel.shown()?.current).toBe(true);
+
+		stage.controls.onSource('difference');
+		expect(stage.lastLegend()?.status).toBe(LEGEND_FIRST_YEAR_TEXT);
+		expect(stage.lastLegend()?.bar).not.toBeNull();
+		expect(stage.panel.shown()).toMatchObject({
+			source: 'difference',
+			current: false,
+		});
+		stage.controls.onSource('simulated');
+		expect(stage.lastLegend()?.status).toBe(LEGEND_FIRST_YEAR_TEXT);
+		expect(stage.panel.shown()).toMatchObject({
+			source: 'simulated',
+			current: false,
+		});
+	});
+
+	it('writes no figures under the observed temperature while the result is not current, and those of the next current one', async () => {
+		const { stage, observed, grid, choose } = createEarthStage();
+		await choose('observed');
+		expect(stage.lastLegend()?.scale?.figures).not.toBeNull();
+		stage.store.markOutOfDate();
+		expect(stage.lastLegend()?.scale?.figures).toBeNull();
+		expect(stage.lastLegend()?.status).toBeNull();
+		expect(stage.panel.shown()?.current).toBe(true);
+		stage.store.markCalculating();
+		expect(stage.lastLegend()?.scale?.figures).toBeNull();
+		// The simulated and the difference keep theirs, marked as before.
+		stage.controls.onSource('difference');
+		expect(stage.lastLegend()?.scale?.figures).not.toBeNull();
+		expect(stage.lastLegend()?.status).toBe(LEGEND_FIRST_YEAR_TEXT);
+		stage.controls.onSource('simulated');
+		expect(stage.lastLegend()?.scale?.figures).not.toBeNull();
+		stage.controls.onSource('observed');
+		expect(stage.lastLegend()?.scale?.figures).toBeNull();
+
+		const next = resultOnGrid();
+		stage.store.setResult(next, true);
+		const { months } = compareFields(next.months, observed, grid);
+		expect(stage.lastLegend()?.scale?.figures).toBe(
+			formatFigures(months[DEFAULT_MONTH] as FieldDifference),
+		);
+		stage.controls.onTemperatureView('annualMean');
+		expect(stage.lastLegend()?.scale?.figures).toBe(
+			figuresText(
+				summariseTemperature(next.months).annualMean,
+				summariseTemperature(observed).annualMean,
+			),
+		);
+
+		stage.store.markUnavailable();
+		expect(stage.lastLegend()?.scale?.figures).toBeNull();
+		expect(stage.panel.shown()?.current).toBe(true);
+	});
+
+	it('marks the difference out of date exactly when it marks the simulated', async () => {
+		const { stage, choose } = createEarthStage();
+		await choose('difference');
+		expect(stage.lastLegend()?.status).toBeNull();
+		expect(stage.panel.shown()?.current).toBe(true);
+		stage.store.markOutOfDate();
+		expect(stage.lastLegend()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
+		expect(stage.panel.shown()?.current).toBe(false);
+		stage.controls.onSource('simulated');
+		expect(stage.lastLegend()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
+		expect(stage.panel.shown()?.current).toBe(false);
+	});
+
+	it('marks the observed temperature out of date only while the globe keeps an earlier field', async () => {
+		const { stage, choose } = createEarthStage();
+		await choose('observed');
+		stage.failNext(new Error('Refused'));
+		expect(() => stage.controls.onMonth(0)).toThrow('Refused');
+		expect(stage.lastLegend()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
+		expect(stage.panel.shown()).toMatchObject({
+			source: 'observed',
+			month: DEFAULT_MONTH,
+			current: false,
+		});
+	});
+
+	it.each([
+		[
+			'the world stops being the measured Earth',
+			(panel: LayerPanel) => panel.setEarth(null),
+		],
+		['a new world arrives', (panel: LayerPanel) => panel.newWorld(64)],
+	])(
+		'goes back to Simulated, and hides the choice if it must, when %s',
+		async (_, change) => {
+			const { stage, result, choose } = createEarthStage();
+			await choose('difference');
+			change(stage.panel);
+			expect(stage.lastComparison()?.source).toBe('simulated');
+			expect(stage.told.at(-1)?.source).toBe('simulated');
+			if (stage.store.temperature.result === result) {
+				expect(stage.panel.shown()?.source).toBe('simulated');
+				expect(stage.shown.at(-1)?.field).toBe(result.months[DEFAULT_MONTH]);
+			}
+		},
+	);
+
+	it('says the observed temperature could not be loaded, goes back to Simulated and asks again at the next choice', async () => {
+		const { stage, deferred, result, observed } = createEarthStage();
+		const error = new TypeError('Failed to fetch');
+		stage.controls.onSource('observed');
+		deferred.last().reject(error);
+		await settle();
+		expect(stage.reported).toEqual([error]);
+		expect(stage.lastComparison()).toEqual({
+			offered: true,
+			source: 'simulated',
+			message: OBSERVED_FAILED_TEXT,
+		});
+		expect(OBSERVED_FAILED_TEXT).toBe(
+			'Observed temperature could not be loaded',
+		);
+		expect(stage.told.at(-1)?.source).toBe('simulated');
+		// The simulated temperature goes on working.
+		expect(stage.panel.shown()?.source).toBe('simulated');
+		stage.controls.onMonth(0);
+		expect(stage.shown.at(-1)?.field).toBe(result.months[0]);
+		expect(stage.shown.at(-1)?.range).toEqual(yearRange(result));
+		expect(stage.lastLegend()?.scale?.figures).toBeNull();
+
+		stage.controls.onSource('difference');
+		expect(deferred.calls).toHaveLength(2);
+		expect(stage.lastComparison()?.message).toBe(OBSERVED_LOADING_TEXT);
+		deferred.last().resolve(observed);
+		await settle();
+		expect(stage.lastComparison()?.message).toBeNull();
+		expect(stage.panel.shown()?.source).toBe('difference');
+	});
+
+	it.each([
+		['the world was replaced', (panel: LayerPanel) => panel.newWorld(64)],
+		[
+			'the world stopped being the measured Earth',
+			(panel: LayerPanel) => panel.setEarth(null),
+		],
+		[
+			'the world stopped and started being the measured Earth',
+			(panel: LayerPanel) => {
+				panel.setEarth(null);
+				panel.setEarth(64);
+			},
+		],
+		[
+			'the world changed resolution',
+			(panel: LayerPanel) => panel.newWorld(128),
+		],
+	])('sets aside what arrives after %s', async (_, change) => {
+		for (const outcome of ['arrives', 'fails'] as const) {
+			const { stage, deferred, observed } = createEarthStage();
+			stage.controls.onSource('observed');
+			change(stage.panel);
+			const sent = stage.shown.length;
+			const comparisons = stage.comparisons.length;
+			const told = stage.told.length;
+			if (outcome === 'arrives') {
+				deferred.last().resolve(observed);
+			} else {
+				deferred.last().reject(new Error('late'));
+			}
+			await settle();
+			expect(stage.shown, outcome).toHaveLength(sent);
+			expect(stage.comparisons, outcome).toHaveLength(comparisons);
+			expect(stage.told, outcome).toHaveLength(told);
+			expect(stage.reported, outcome).toEqual([]);
+			expect(stage.panel.shown()?.source ?? 'simulated', outcome).toBe(
+				'simulated',
+			);
+		}
+	});
+
+	it('reports what the globe throws as the observed temperature arrives', async () => {
+		const { stage, deferred, observed } = createEarthStage();
+		stage.controls.onSource('observed');
+		const error = new Error('Refused');
+		stage.failNext(error);
+		deferred.last().resolve(observed);
+		await settle();
+		expect(stage.reported).toEqual([error]);
+	});
+
+	it('shows the height colours for every source until there is a result', async () => {
+		const stage = createStage();
+		const deferred = createDeferredLoader();
+		stage.setLoader(deferred.loader);
+		stage.controls.onLayer('temperature');
+		stage.panel.newWorld(64);
+		stage.controls.onSource('observed');
+		deferred.last().resolve(observedFor(resultOnGrid()));
+		await settle();
+		expect(stage.shown).toEqual([]);
+		expect(stage.panel.shown()).toBeNull();
+	});
+
+	it('does not compare a result of another grid with the observed year', async () => {
+		const { stage, choose } = createEarthStage();
+		await choose('observed');
+		const other = resultWith();
+		stage.arrive(other);
+		expect(stage.shown.at(-1)?.field).toBe(other.months[DEFAULT_MONTH]);
+		expect(stage.panel.shown()?.source).toBe('simulated');
+		expect(stage.lastLegend()?.scale?.figures).toBeNull();
+	});
+
+	it('does nothing when told again what it was told of the world', () => {
+		const { stage } = createEarthStage();
+		const told = stage.told.length;
+		const comparisons = stage.comparisons.length;
+		stage.panel.setEarth(64);
+		expect(stage.told).toHaveLength(told);
+		expect(stage.comparisons).toHaveLength(comparisons);
+	});
+
+	it('does nothing when the source on screen is chosen again', () => {
+		const { stage, deferred } = createEarthStage();
+		const told = stage.told.length;
+		const sent = stage.shown.length;
+		stage.controls.onSource('simulated');
+		expect(stage.told).toHaveLength(told);
+		expect(stage.shown).toHaveLength(sent);
+		expect(deferred.calls).toHaveLength(0);
+	});
+
+	it('is told nothing new by a new world that changes nothing', () => {
+		const stage = createStage();
+		const views = stage.views.length;
+		stage.panel.newWorld(null);
+		expect(stage.views).toHaveLength(views);
+	});
+});
+
+describe('temperatureCaption', () => {
+	it('names no source unless given one', () => {
+		expect(temperatureCaption('month', 0)).toBe(
+			'Air temperature in January, °C',
+		);
+		expect(temperatureCaption('range', 0)).toBe(
+			'Seasonal range: difference between the warmest and coldest months, °C',
+		);
+	});
+
+	it('names the simulated and the observed source', () => {
+		expect(temperatureCaption('annualMean', 0, 'simulated')).toBe(
+			'Simulated annual average air temperature, °C',
+		);
+		expect(temperatureCaption('coldest', 0, 'observed')).toBe(
+			'Observed air temperature in the coldest month, °C',
+		);
+	});
+
+	it('names the difference after what it is a difference of', () => {
+		expect(temperatureCaption('month', 6, 'difference')).toBe(
+			'Simulated less observed in July, °C',
+		);
+		expect(temperatureCaption('range', 6, 'difference')).toBe(
+			'Simulated less observed, seasonal range, °C',
+		);
 	});
 });
 
@@ -1196,6 +1924,7 @@ describe('createLayerControls', () => {
 			onTemperatureView: (next) => chosen.push(next),
 			onMonth: (next) => chosen.push(`month ${next}`),
 			onPlay: () => chosen.push('play'),
+			onSource: (next) => chosen.push(next),
 		});
 		const [section] = panel.children as [FakeElement];
 		const radios = (name: string): FakeElement[] =>
@@ -1216,9 +1945,45 @@ describe('createLayerControls', () => {
 		]);
 		expect(
 			byClass(section, 'segmented__label').map((label) => label.textContent),
-		).toEqual(['Terrain', 'Temperature']);
+		).toEqual([
+			'Terrain',
+			'Temperature',
+			'Simulated',
+			'Observed',
+			'Difference',
+		]);
 		expect(oneByClass(section, 'legend').hidden).toBe(true);
 		expect(oneByClass(section, 'temperature-view').hidden).toBe(true);
+		expect(oneByClass(section, 'comparison').hidden).toBe(true);
+	});
+
+	it('puts the comparison controls under the Show control, above the month, and shows them as told', () => {
+		const { controls, chosen, section, radios } = make({
+			layer: 'temperature',
+		});
+		const temperature = oneByClass(section, 'temperature-view');
+		expect(temperature.children.map((child) => child.className)).toEqual([
+			'field',
+			'comparison',
+			'month-controls',
+		]);
+		const comparison = oneByClass(section, 'comparison');
+		expect(comparison.hidden).toBe(true);
+		controls.showComparison({
+			offered: true,
+			source: 'observed',
+			message: 'm',
+		});
+		expect(comparison.hidden).toBe(false);
+		expect(
+			radios('temperature-source').map((radio) => [radio.value, radio.checked]),
+		).toEqual([
+			['simulated', false],
+			['observed', true],
+			['difference', false],
+		]);
+		fake.pick(radios('temperature-source')[2] as FakeElement);
+		expect(chosen).toEqual(['difference']);
 	});
 
 	it('starts on the layer it is given', () => {

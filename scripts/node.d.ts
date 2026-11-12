@@ -118,6 +118,11 @@ declare const TextDecoder: new () => {
 	decode(input: Uint8Array): string;
 };
 
+/** Encodes text as UTF-8. */
+declare const TextEncoder: new () => {
+	encode(input: string): Uint8Array;
+};
+
 /** A response to {@link fetch}, as far as the scripts read one. */
 type ScriptResponse = {
 	readonly ok: boolean;

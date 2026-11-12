@@ -595,9 +595,30 @@ body {
   align-items: end;
 }
 
+/* The choice of where the temperature comes from, with a line under it for
+   what the page has to say of it. */
+.comparison {
+  display: grid;
+}
+
+/* Left empty rather than hidden when there is nothing to say, so that a
+   screen reader announces what is written into it; empty, it takes no
+   room. */
+.comparison__message {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.comparison__message:not(:empty) {
+  margin-top: var(--space-xs);
+}
+
 /* Hidden by the page, which the display set on them would otherwise undo. */
 .temperature-view[hidden],
-.month-controls[hidden] {
+.month-controls[hidden],
+.comparison[hidden] {
   display: none;
 }
 
@@ -685,6 +706,15 @@ body {
   text-align: right;
 }
 
+/* The error figures against the observed temperature, directly under the
+   words for the ends. */
+.legend__figures {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
 .legend__bar {
   width: 100%;
   height: 0.25rem;
@@ -694,19 +724,20 @@ body {
 /* What lies under the pointer, laid over the bottom-left corner of the
    globe's area. The pointer passes through it to the globe, so it never
    stops a stroke or a drag. Its width is fixed, with room in a wide font for
-   the longest usual line, `Annual average −30 °C · out of date`, so it keeps
-   its size as the values change and leaves the bottom-right corner free; in
-   a window narrower than that it is as wide as the area allows. Each part
-   has a line of its own and a part with nothing to say takes none, so the
-   strip is two lines high in Terrain view and three in Temperature view:
-   its height changes only with what is shown, not with the values. */
+   the longest usual line, `Annual average −12 °C difference · out of date`,
+   so it keeps its size as the values change and leaves the bottom-right
+   corner free; in a window narrower than that it is as wide as the area
+   allows. Each part has a line of its own and a part with nothing to say
+   takes none, so the strip is two lines high in Terrain view and three in
+   Temperature view: its height changes only with what is shown, not with
+   the values. */
 .cursor-readout {
   grid-area: 1 / 1;
   display: flex;
   flex-direction: column;
   align-self: end;
   justify-self: start;
-  inline-size: min(20.5em, 100% - 2 * var(--space-sm));
+  inline-size: min(26em, 100% - 2 * var(--space-sm));
   margin: var(--space-sm);
   padding: var(--space-xs) var(--space-sm);
   overflow: hidden;

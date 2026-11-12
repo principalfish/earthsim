@@ -18,7 +18,7 @@ import {
 	type Resolution,
 	SUPPORTED_RESOLUTIONS,
 } from './grid';
-import { DEFAULT_AGE_YEARS, DEFAULT_PLANET } from './planet';
+import { DEFAULT_AGE_YEARS, DEFAULT_PLANET, PLANET_SETTINGS } from './planet';
 import { clampElevations, DEFAULT_SEA_LEVEL_M, type World } from './world';
 
 /** Cells along a face edge of the grid the Earth data is stored on. */
@@ -158,3 +158,77 @@ export const earthWorld = (data: EarthData, resolution: number): World => {
 		elevation,
 	};
 };
+
+/** The starting value of the 32-bit FNV-1a hash. */
+const FNV_OFFSET_BASIS = 0x811c9dc5;
+
+/** The multiplier of the 32-bit FNV-1a hash. */
+const FNV_PRIME = 0x01000193;
+
+/**
+ * A 32-bit checksum of an elevation array: the FNV-1a hash of the bit
+ * patterns of its values, one 32-bit word to a value, in cell order.
+ *
+ * @remarks
+ * Each value is read as the 32 bits of its single-precision float, so the
+ * checksum tells apart any two arrays that differ in a single bit,
+ * including `0` and `-0`, and is the same on every machine whatever its
+ * byte order. It reads every cell once: under half a millisecond for the
+ * 393,216 cells of the finest grid, timed in Node.
+ *
+ * @param elevation - The elevations. Not changed.
+ * @returns A whole number from 0 to 4,294,967,295.
+ */
+export const elevationChecksum = (elevation: Float32Array): number => {
+	const words = new Uint32Array(
+		elevation.buffer,
+		elevation.byteOffset,
+		elevation.length,
+	);
+	let hash = FNV_OFFSET_BASIS;
+	for (let cell = 0; cell < words.length; cell++) {
+		hash = Math.imul(hash ^ (words[cell] as number), FNV_PRIME);
+	}
+	return hash >>> 0;
+};
+
+/**
+ * The {@link elevationChecksum} of the elevation {@link earthWorld} makes
+ * from the committed Earth data file at each resolution.
+ */
+export const EARTH_ELEVATION_CHECKSUMS: Readonly<Record<Resolution, number>> =
+	Object.freeze({
+		64: 0x8ee4cef9,
+		128: 0xdece7e24,
+		256: 0x2a24d1c5,
+	});
+
+/**
+ * Whether a world is the measured Earth: the Earth preset as it was made,
+ * whose temperature can be compared with the observed one.
+ *
+ * @remarks
+ * All of these hold: the world started as the Earth; its five planet
+ * settings are exactly {@link DEFAULT_PLANET}'s; its sea level is the
+ * preset's, {@link DEFAULT_SEA_LEVEL_M}; and its elevation's
+ * {@link elevationChecksum} is the one in
+ * {@link EARTH_ELEVATION_CHECKSUMS} for its resolution. Any stroke that
+ * changes a cell makes it something else, and undoing the stroke makes it
+ * the measured Earth again. A world written to a file and read back keeps
+ * every elevation bit for bit, so it is still the measured Earth.
+ *
+ * The checksum is worked out only once the cheaper tests have passed, so
+ * a world that is not the Earth, or whose settings differ, costs nothing.
+ *
+ * @param world - The world. Not changed.
+ */
+export const isMeasuredEarth = (world: World): boolean =>
+	world.origin.kind === 'earth' &&
+	world.seaLevel === DEFAULT_SEA_LEVEL_M &&
+	PLANET_SETTINGS.every(
+		(name) => world.planet[name] === DEFAULT_PLANET[name],
+	) &&
+	isSupportedResolution(world.resolution) &&
+	world.elevation.length === FACE_COUNT * world.resolution * world.resolution &&
+	elevationChecksum(world.elevation) ===
+		EARTH_ELEVATION_CHECKSUMS[world.resolution];

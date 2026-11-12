@@ -320,8 +320,20 @@ export const createSelectField = <T extends string>(
 	return field;
 };
 
+/** A segmented picker, with a way to show another choice made elsewhere. */
+export type SegmentedChoice<T extends string> = {
+	/** The picker, to put in a panel. */
+	readonly element: HTMLElement;
+	/**
+	 * Shows a value as the one chosen, without calling `onChange`; a value
+	 * the picker does not offer leaves no segment chosen.
+	 */
+	setValue(value: T): void;
+};
+
 /**
- * Creates a choice of one of a few things, drawn as one row of segments.
+ * Creates a choice of one of a few things, drawn as one row of segments,
+ * whose choice can also be set from outside.
  *
  * @remarks
  * The segments are radio buttons, so the picker is one tab stop and the
@@ -329,15 +341,16 @@ export const createSelectField = <T extends string>(
  * alone: it is not shown.
  *
  * @param options - What it offers, the starting choice and the callback.
- * @returns The picker, to put in a panel.
+ * @returns The picker and the way to set its choice.
  */
-export const createSegmentedPicker = <T extends string>(
+export const createSegmentedChoice = <T extends string>(
 	options: SegmentedPickerOptions<T>,
-): HTMLElement => {
+): SegmentedChoice<T> => {
 	const picker = createElement('fieldset', 'segmented');
 	const legend = createElement('legend', 'u-visually-hidden');
 	legend.textContent = options.legend;
 	const row = createElement('div', 'segmented__options');
+	const inputs: { readonly value: T; readonly input: HTMLInputElement }[] = [];
 
 	for (const choice of options.choices) {
 		const option = createElement('label', 'segmented__option');
@@ -352,6 +365,7 @@ export const createSegmentedPicker = <T extends string>(
 				options.onChange(choice.value);
 			}
 		});
+		inputs.push({ value: choice.value, input });
 
 		const label = createElement('span', 'segmented__label');
 		label.textContent = choice.label;
@@ -361,8 +375,29 @@ export const createSegmentedPicker = <T extends string>(
 	}
 
 	picker.append(legend, row);
-	return picker;
+	return {
+		element: picker,
+		setValue: (value) => {
+			for (const entry of inputs) {
+				entry.input.checked = entry.value === value;
+			}
+		},
+	};
 };
+
+/**
+ * Creates a choice of one of a few things, drawn as one row of segments.
+ *
+ * @remarks
+ * As {@link createSegmentedChoice}, for a picker whose choice is made only
+ * on it.
+ *
+ * @param options - What it offers, the starting choice and the callback.
+ * @returns The picker, to put in a panel.
+ */
+export const createSegmentedPicker = <T extends string>(
+	options: SegmentedPickerOptions<T>,
+): HTMLElement => createSegmentedChoice(options).element;
 
 /**
  * Creates a button that does something on the page.

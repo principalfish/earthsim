@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { SEVEN_STOP_RAMP, TWO_STOP_RAMP } from '../testing/rampFixtures';
 import {
 	type ColourRamp,
+	centredRange,
 	checkRamp,
 	cssColour,
+	type DataRampStop,
+	DIFFERENCE_RAMP,
 	MAX_RAMP_STOPS,
 	rampColourAt,
 	rampGradient,
@@ -226,6 +229,72 @@ describe('the seasonal range ramp', () => {
 			const next = lightness(rampColourAt(SEASONAL_RANGE_RAMP, i / samples));
 			expect(next).toBeLessThan(previous);
 			previous = next;
+		}
+	});
+});
+
+describe('the difference ramp', () => {
+	it('is one the globe can draw', () => {
+		expect(checkRamp(DIFFERENCE_RAMP)).toBe(DIFFERENCE_RAMP);
+		expect(DIFFERENCE_RAMP.stops.length).toBeLessThanOrEqual(MAX_RAMP_STOPS);
+	});
+
+	it('has its stops symmetric about the middle', () => {
+		const { stops } = DIFFERENCE_RAMP;
+		stops.forEach((stop, index) => {
+			const mirror = stops[stops.length - 1 - index] as DataRampStop;
+			expect(stop.at + mirror.at).toBeCloseTo(1, 12);
+		});
+	});
+
+	it('is near white in the middle, blue at the low end and red at the high', () => {
+		expect(lightness(rampColourAt(DIFFERENCE_RAMP, 0.5))).toBeGreaterThan(95);
+		const low = hue(rampColourAt(DIFFERENCE_RAMP, 0));
+		expect(low).toBeGreaterThan(190);
+		expect(low).toBeLessThan(240);
+		const high = hue(rampColourAt(DIFFERENCE_RAMP, 1));
+		expect(high < 15 || high > 345).toBe(true);
+	});
+
+	it('grows darker at every step away from the middle, on either side', () => {
+		const samples = 500;
+		for (const side of [-1, 1]) {
+			let previous = lightness(rampColourAt(DIFFERENCE_RAMP, 0.5));
+			for (let i = 1; i <= samples; i++) {
+				const t = 0.5 + (side * i) / (2 * samples);
+				const next = lightness(rampColourAt(DIFFERENCE_RAMP, t));
+				expect(next).toBeLessThan(previous);
+				previous = next;
+			}
+		}
+	});
+
+	it('keeps to blue below the middle and to red above it', () => {
+		for (const t of [0, 0.1, 0.3, 0.45]) {
+			const h = hue(rampColourAt(DIFFERENCE_RAMP, t));
+			expect(h, `${t}`).toBeGreaterThan(180);
+			expect(h, `${t}`).toBeLessThan(250);
+		}
+		for (const t of [0.55, 0.7, 0.9, 1]) {
+			const h = hue(rampColourAt(DIFFERENCE_RAMP, t));
+			expect(h < 40 || h > 340, `${t}`).toBe(true);
+		}
+	});
+});
+
+describe('centredRange', () => {
+	it('is symmetric about zero', () => {
+		for (const halfSpan of [0.5, 1, 20, 1e6]) {
+			const range = centredRange(halfSpan);
+			expect(range.min).toBe(-range.max);
+			expect(range.max).toBe(halfSpan);
+			expect((range.min + range.max) / 2).toBe(0);
+		}
+	});
+
+	it('refuses a half-span that is not a finite number above zero', () => {
+		for (const halfSpan of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+			expect(() => centredRange(halfSpan), `${halfSpan}`).toThrow(RangeError);
 		}
 	});
 });

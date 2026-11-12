@@ -96,6 +96,51 @@ export const SEASONAL_RANGE_RAMP: ColourRamp = {
 };
 
 /**
+ * The ramp a difference of temperatures is drawn with, such as the
+ * simulated less the observed: blue where the first is colder, near white
+ * where the two agree, and red where the first is warmer.
+ *
+ * @remarks
+ * The stops are symmetric about the middle, which is the near-white of no
+ * difference on a scale centred on zero, as {@link centredRange} makes one:
+ * a difference and its opposite are drawn equally far from white, in the
+ * two hues. Each side grows darker away from the middle, so the size of a
+ * difference reads from lightness alone, as for the other ramps; the two
+ * hues, blue and red, are told apart in the common colour-vision
+ * deficiencies.
+ */
+export const DIFFERENCE_RAMP: ColourRamp = {
+	name: 'difference',
+	stops: [
+		{ at: 0, colour: 0x2166ac },
+		{ at: 0.2, colour: 0x67a9cf },
+		{ at: 0.4, colour: 0xd1e5f0 },
+		{ at: 0.5, colour: 0xf7f7f7 },
+		{ at: 0.6, colour: 0xfddbc7 },
+		{ at: 0.8, colour: 0xef8a62 },
+		{ at: 1, colour: 0xb2182b },
+	],
+};
+
+/**
+ * A range centred on zero, such as a scale of differences that reach as
+ * far either way.
+ *
+ * @param halfSpan - How far the range reaches either side of zero; a
+ * finite number above zero.
+ * @returns From `-halfSpan` to `halfSpan`.
+ * @throws RangeError unless `halfSpan` is a finite number above zero.
+ */
+export const centredRange = (halfSpan: number): ValueRange => {
+	if (!(halfSpan > 0 && Number.isFinite(halfSpan))) {
+		throw new RangeError(
+			`A centred range needs a finite half-span above zero; got ${halfSpan}`,
+		);
+	}
+	return { min: -halfSpan, max: halfSpan };
+};
+
+/**
  * Checks that a ramp is one the globe can draw.
  *
  * @param ramp - The ramp.

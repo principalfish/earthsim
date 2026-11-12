@@ -20,6 +20,7 @@ import type { Globe, WindowPoint } from '../globe/renderer';
 import {
 	MONTH_NAMES,
 	TEMPERATURE_VIEW_LABELS,
+	type TemperatureSource,
 	type TemperatureView,
 } from '../view';
 import { createElement } from './fields';
@@ -98,30 +99,40 @@ const fieldName = (view: TemperatureView, month: number): string =>
 /**
  * A value of the temperature field on screen as the readout writes it,
  * named by what the field is: `July 18 °C`, `Annual average 14 °C`,
- * `Warmest month 27 °C`, `Coldest month −31 °C` or `Seasonal range 12 °C`.
+ * `Warmest month 27 °C`, `Coldest month −31 °C` or `Seasonal range 12 °C`;
+ * and by where it comes from, when that is not the simulation: `July
+ * 21 °C observed`, or `July +2 °C difference` for the simulated less the
+ * observed.
  *
  * @remarks
  * The value is rounded to a whole degree, a half upwards, and written with
  * its digits grouped in threes and a true minus sign; a value that rounds
- * to zero is `0`, never `−0`. The seasonal range is named as a range, so
- * that it does not read as a temperature: it is the difference between the
- * warmest and the coldest month.
+ * to zero is `0`, never `−0`. A difference is signed both ways, `+2` above
+ * zero and `−3` below, and one that rounds to zero is `0`, never `+0`. The
+ * seasonal range is named as a range, so that it does not read as a
+ * temperature: it is the difference between the warmest and the coldest
+ * month.
  *
  * @param value - The value in degrees Celsius.
  * @param view - What of the year the field is.
  * @param month - The month the field is for the Month view, from January
  * at 0; read only for that view.
+ * @param source - Where the field comes from; the simulation when left
+ * out.
  */
 export const formatTemperature = (
 	value: number,
 	view: TemperatureView,
 	month: number,
+	source: TemperatureSource = 'simulated',
 ): string => {
 	// Rounded once, so that the sign and the digits agree: −0.5 rounds to
 	// zero, and is written `0`.
 	const rounded = Math.round(value);
-	const sign = rounded < 0 ? '−' : '';
-	return `${fieldName(view, month)} ${sign}${groupedWhole(rounded)} °C`;
+	const positive = source === 'difference' && rounded > 0 ? '+' : '';
+	const sign = rounded < 0 ? '−' : positive;
+	const text = `${fieldName(view, month)} ${sign}${groupedWhole(rounded)} °C`;
+	return source === 'simulated' ? text : `${text} ${source}`;
 };
 
 /** The temperature at the place under the pointer, from what is on screen. */
@@ -132,7 +143,9 @@ export type ReadoutTemperature = {
 	readonly view: TemperatureView;
 	/** The month the field is for the Month view, from January at 0. */
 	readonly month: number;
-	/** Whether the field is the current result as chosen. */
+	/** Where the field comes from. */
+	readonly source: TemperatureSource;
+	/** Whether the field is the one chosen and up to date. */
 	readonly current: boolean;
 };
 
@@ -180,6 +193,7 @@ export const describeReadout = (parts: ReadoutParts): ReadoutText => {
 						temperature.value,
 						temperature.view,
 						temperature.month,
+						temperature.source,
 					),
 		status:
 			temperature === null || temperature.current
@@ -226,6 +240,7 @@ export const readoutPartsAt = (
 						value,
 						view: shown.view,
 						month: shown.month,
+						source: shown.source,
 						current: shown.current,
 					}
 				: null,

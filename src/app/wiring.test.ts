@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { readEarthDataFile } from '../../scripts/earth/dataFile.mjs';
 import {
 	createBlankWorld,
 	DEFAULT_PLANET,
 	DEFAULT_SEA_LEVEL_M,
+	decodeEarth,
+	deserializeWorld,
+	earthWorld,
 	generateWorld,
 	normaliseSeaLevel,
 	PLANET_SETTINGS,
 	type PlanetSettings,
 	type SimRequest,
+	serializeWorld,
 	type World,
 	type WorldFileResult,
 } from '../core/index';
@@ -25,6 +30,7 @@ import { RESTORE_FAILED_MESSAGE } from './startup';
 import type { LoadOutcome } from './storage';
 import { createFakeTimers } from './testing/fakeTimers';
 import { settle } from './testing/settle';
+import type { ComparisonContent } from './ui/comparison';
 import {
 	createLayerPanel,
 	type LayerControlsOptions,
@@ -354,7 +360,8 @@ const createStage = (
 				return own.createLayerPanel(options);
 			}
 			return {
-				resetMonth: () => log.push('layerPanel.resetMonth'),
+				newWorld: (earth) => log.push(`layerPanel.newWorld ${earth}`),
+				setEarth: (earth) => log.push(`layerPanel.setEarth ${earth}`),
 				shown: () => stage.shownTemperature,
 			};
 		},
@@ -371,6 +378,8 @@ const createStage = (
 			dialogs.push(options);
 		},
 		loadEarth: () => Promise.reject(new Error('The Earth is not asked for')),
+		loadObserved: () =>
+			Promise.reject(new Error('The observed temperature is not asked for')),
 		exportWorld: (current) => {
 			log.push('exportWorld');
 			stage.exportWorld(current);
@@ -444,6 +453,7 @@ describe('startPage', () => {
 			'createStatistics',
 			'statistics.refresh',
 			'createCursorReadout',
+			'layerPanel.setEarth null',
 			'setInert true',
 			'store.load',
 		]);
@@ -514,7 +524,7 @@ describe('a world replacement', () => {
 			'statistics.refresh',
 			'temperature.reset',
 			'temperature.refresh',
-			'layerPanel.resetMonth',
+			'layerPanel.newWorld null',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
 		]);
@@ -577,7 +587,7 @@ describe('the start of the page', () => {
 			'statistics.refresh',
 			'temperature.reset',
 			'temperature.refresh',
-			'layerPanel.resetMonth',
+			'layerPanel.newWorld null',
 			'worldPanel.setDate 2.4 million years',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
@@ -694,6 +704,7 @@ describe('the history shortcuts', () => {
 			'toolPanel.setHistoryState false true',
 			'statistics.refresh',
 			'temperature.refresh',
+			'layerPanel.setEarth null',
 			'autosave.markChanged',
 		]);
 		expect(stage.state.world.elevation[5]).not.toBe(1234);
@@ -705,6 +716,7 @@ describe('the history shortcuts', () => {
 			'toolPanel.setHistoryState true false',
 			'statistics.refresh',
 			'temperature.refresh',
+			'layerPanel.setEarth null',
 			'autosave.markChanged',
 		]);
 		expect(stage.state.world.elevation[5]).toBe(1234);
@@ -756,6 +768,7 @@ describe('what changes the terrain or the sea level', () => {
 			'toolPanel.setHistoryState true false',
 			'statistics.refresh',
 			'temperature.refresh',
+			'layerPanel.setEarth null',
 			'autosave.markChanged',
 		]);
 	});
@@ -778,11 +791,13 @@ describe('what changes the terrain or the sea level', () => {
 			'toolPanel.setHistoryState false true',
 			'statistics.refresh',
 			'temperature.refresh',
+			'layerPanel.setEarth null',
 			'autosave.markChanged',
 			'globe.updateElevation',
 			'toolPanel.setHistoryState true false',
 			'statistics.refresh',
 			'temperature.refresh',
+			'layerPanel.setEarth null',
 			'autosave.markChanged',
 		]);
 	});
@@ -801,6 +816,7 @@ describe('what changes the terrain or the sea level', () => {
 			'globe.setSeaLevel -340',
 			'statistics.refresh',
 			'temperature.refresh',
+			'layerPanel.setEarth null',
 			'autosave.markChanged',
 		]);
 	});
@@ -829,7 +845,11 @@ describe('a change of the planet settings', () => {
 		const stage = await createStartedStage();
 		stage.state.world.planet = { ...stage.state.world.planet, axialTiltDeg: 0 };
 		stage.state.notifyPlanetChange();
-		expect(stage.log).toEqual(['temperature.refresh', 'autosave.markChanged']);
+		expect(stage.log).toEqual([
+			'temperature.refresh',
+			'layerPanel.setEarth null',
+			'autosave.markChanged',
+		]);
 	});
 });
 
@@ -849,7 +869,11 @@ describe('the planet controls', () => {
 
 		stage.planetPanelOptions.onChange(TILTED);
 		expect(next.planet).toEqual(TILTED);
-		expect(stage.log).toEqual(['temperature.refresh', 'autosave.markChanged']);
+		expect(stage.log).toEqual([
+			'temperature.refresh',
+			'layerPanel.setEarth null',
+			'autosave.markChanged',
+		]);
 	});
 
 	it('reach nothing with the settings the world already has', async () => {
@@ -873,6 +897,7 @@ describe('the planet controls', () => {
 			'toolPanel.setHistoryState false true',
 			'statistics.refresh',
 			'temperature.refresh',
+			'layerPanel.setEarth null',
 			'autosave.markChanged',
 		]);
 
@@ -1155,7 +1180,11 @@ describe('the temperature, on its worker', () => {
 					reportError: () => {},
 					createControls: (controls) => {
 						choose = controls.onLayer;
-						return { showLegend: () => {}, showView: () => {} };
+						return {
+							showLegend: () => {},
+							showView: () => {},
+							showComparison: () => {},
+						};
 					},
 				}),
 		});
@@ -1315,6 +1344,7 @@ describe('the cursor readout', () => {
 			field: new Float32Array(next.elevation.length),
 			view: 'warmest',
 			month: 6,
+			source: 'simulated',
 			current: true,
 		};
 		stage.shownTemperature = shown;
@@ -1361,6 +1391,7 @@ describe('the cursor readout', () => {
 		stage.layerOptions.onView({
 			layer: 'temperature',
 			temperatureView: 'month',
+			source: 'simulated',
 			month: 3,
 		});
 		expect(stage.readoutCalls).toEqual(['invalidate']);
@@ -1401,7 +1432,11 @@ describe('the cursor readout', () => {
 					reportError: () => {},
 					createControls: (controls) => {
 						choose = controls.onLayer;
-						return { showLegend: () => {}, showView: () => {} };
+						return {
+							showLegend: () => {},
+							showView: () => {},
+							showComparison: () => {},
+						};
 					},
 				}),
 		});
@@ -1414,6 +1449,7 @@ describe('the cursor readout', () => {
 			field: result.months[DEFAULT_MONTH],
 			view: 'month',
 			month: DEFAULT_MONTH,
+			source: 'simulated',
 			current: true,
 		});
 		stage.layerOptions.store.markOutOfDate();
@@ -1427,21 +1463,25 @@ describe('the date line', () => {
 		stage.layerOptions.onView({
 			layer: 'temperature',
 			temperatureView: 'month',
+			source: 'simulated',
 			month: 6,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
 			temperatureView: 'month',
+			source: 'simulated',
 			month: 7,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
 			temperatureView: 'annualMean',
+			source: 'simulated',
 			month: 7,
 		});
 		stage.layerOptions.onView({
 			layer: 'terrain',
 			temperatureView: 'annualMean',
+			source: 'simulated',
 			month: 7,
 		});
 		expect(stage.log).toEqual([
@@ -1487,6 +1527,7 @@ describe('the month on screen', () => {
 						return {
 							showLegend: () => {},
 							showView: (view) => views.push(view),
+							showComparison: () => {},
 						};
 					},
 				}),
@@ -1519,6 +1560,7 @@ describe('the month on screen', () => {
 		expect(views.at(-1)).toEqual({
 			layer: 'temperature',
 			temperatureView: 'month',
+			source: 'simulated',
 			month: DEFAULT_MONTH,
 		});
 		expect(page.stage.log).toContain('worldPanel.setDate Year 0 · July');
@@ -1633,5 +1675,165 @@ describe('a worker that fails to load', () => {
 		expect(store.temperature.status).toBe('unavailable');
 		expect(stage.errors).toEqual([]);
 		expect(temperatureLog).toEqual([]);
+	});
+});
+
+describe('the comparison on the measured Earth', () => {
+	const EARTH_DATA = decodeEarth(readEarthDataFile());
+	/** A new Earth world at 64 cells per face edge. */
+	const freshEarth = (): World => earthWorld(EARTH_DATA, 64);
+
+	/** A page on a world, with the real layer panel, in Temperature view. */
+	const createComparisonStage = async (world: World = freshEarth()) => {
+		let controls: LayerControlsOptions | undefined;
+		const comparisons: ComparisonContent[] = [];
+		const stage = await createStartedStage(world, {
+			createLayerPanel: (options) =>
+				createLayerPanel({
+					...options,
+					loadObserved: async (resolution) =>
+						Array.from(
+							{ length: 12 },
+							() => new Float32Array(6 * resolution * resolution),
+						),
+					globe: { setLayer: () => {} },
+					setTimer: () => 0,
+					clearTimer: () => {},
+					reportError: () => {},
+					createControls: (made) => {
+						controls = made;
+						return {
+							showLegend: () => {},
+							showView: () => {},
+							showComparison: (content) => comparisons.push(content),
+						};
+					},
+				}),
+		});
+		const chosen = required(controls, 'layer controls');
+		chosen.onLayer('temperature');
+		/** Has a current result for the world on show arrive. */
+		const arrive = (): void => {
+			const { store } = stage.layerOptions;
+			store.markCalculating();
+			store.setResult(
+				temperatureOf(1, stage.state.world.elevation.length),
+				true,
+			);
+		};
+		arrive();
+		return {
+			stage,
+			controls: chosen,
+			arrive,
+			offered: (): boolean => comparisons.at(-1)?.offered ?? false,
+			source: () => comparisons.at(-1)?.source,
+			shownSource: () => stage.readoutOptions.shownTemperature()?.source,
+		};
+	};
+
+	/** A page on the measured Earth showing the observed temperature. */
+	const createObservingStage = async () => {
+		const page = await createComparisonStage();
+		page.controls.onSource('observed');
+		await settle();
+		expect(page.shownSource()).toBe('observed');
+		return page;
+	};
+
+	it('is offered for the Earth the page opens on, in Temperature view only', async () => {
+		const page = await createComparisonStage();
+		expect(page.offered()).toBe(true);
+		expect(page.source()).toBe('simulated');
+		page.controls.onLayer('terrain');
+		expect(page.offered()).toBe(false);
+		page.controls.onLayer('temperature');
+		expect(page.offered()).toBe(true);
+	});
+
+	it.each([
+		[
+			'a generated world',
+			() => generateWorld({ resolution: 64, seed: 3, landFraction: 0.3 }),
+		],
+		['a blank world', () => createBlankWorld(64)],
+	])('is not offered for %s', async (_, make) => {
+		const page = await createComparisonStage(make());
+		expect(page.offered()).toBe(false);
+		page.stage.state.replaceWorld(make());
+		expect(page.offered()).toBe(false);
+	});
+
+	it('goes, with the view back on Simulated, after a stroke, and comes back on Simulated after its undo', async () => {
+		const page = await createObservingStage();
+		makeStroke(page.stage);
+		expect(page.offered()).toBe(false);
+		expect(page.source()).toBe('simulated');
+		expect(page.shownSource()).toBe('simulated');
+		page.stage.pressKey(UNDO_KEYS);
+		expect(page.offered()).toBe(true);
+		expect(page.source()).toBe('simulated');
+		page.stage.pressKey(REDO_KEYS);
+		expect(page.offered()).toBe(false);
+	});
+
+	it('goes after a change of sea level, and comes back with the sea level set back', async () => {
+		const page = await createObservingStage();
+		page.stage.viewPanelOptions.onSeaLevel(-500);
+		expect(page.offered()).toBe(false);
+		expect(page.shownSource()).toBe('simulated');
+		page.stage.viewPanelOptions.onSeaLevel(0);
+		expect(page.offered()).toBe(true);
+		expect(page.source()).toBe('simulated');
+	});
+
+	it('goes after a change of a planet setting, and comes back with Reset to Earth', async () => {
+		const page = await createObservingStage();
+		page.stage.planetPanelOptions.onChange({
+			...DEFAULT_PLANET,
+			axialTiltDeg: 30,
+		});
+		expect(page.offered()).toBe(false);
+		expect(page.shownSource()).toBe('simulated');
+		page.stage.planetPanelOptions.onChange(DEFAULT_PLANET);
+		expect(page.offered()).toBe(true);
+		expect(page.source()).toBe('simulated');
+	});
+
+	it('goes for a new world that is not the measured Earth, and comes for one that is', async () => {
+		const page = await createObservingStage();
+		page.stage.state.replaceWorld(createBlankWorld(64));
+		expect(page.offered()).toBe(false);
+		page.stage.state.replaceWorld(freshEarth());
+		expect(page.offered()).toBe(true);
+		expect(page.source()).toBe('simulated');
+	});
+
+	it('is offered for an Earth world brought back or imported that still matches, and not for one that does not', async () => {
+		const page = await createComparisonStage(createBlankWorld(64));
+		const readBack = (world: World): World => {
+			const read = deserializeWorld(serializeWorld(world));
+			if (!read.ok) {
+				throw new Error('The world could not be read back');
+			}
+			return read.world;
+		};
+		page.stage.state.replaceWorld(readBack(freshEarth()), {
+			keepSettings: true,
+		});
+		expect(page.offered()).toBe(true);
+
+		const edited = freshEarth();
+		edited.seaLevel = 10;
+		page.stage.importResult = { ok: true, world: readBack(edited) };
+		page.stage.worldPanelOptions.onImport(new Blob());
+		await settle();
+		expect(page.stage.state.world.seaLevel).toBe(10);
+		expect(page.offered()).toBe(false);
+
+		page.stage.importResult = { ok: true, world: readBack(freshEarth()) };
+		page.stage.worldPanelOptions.onImport(new Blob());
+		await settle();
+		expect(page.offered()).toBe(true);
 	});
 });

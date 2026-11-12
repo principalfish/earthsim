@@ -30,9 +30,104 @@ export type FieldComparison = {
 	readonly annual: FieldDifference;
 };
 
+/** The sum of a grid's cell areas, in the order of its cells. */
+const totalAreaOf = (areas: ArrayLike<number>, cellCount: number): number => {
+	let total = 0;
+	for (let cell = 0; cell < cellCount; cell++) {
+		total += areas[cell] as number;
+	}
+	return total;
+};
+
+/**
+ * The area-weighted mean and root-mean-square of a difference, given cell
+ * by cell.
+ */
+const figuresOf = (
+	areas: ArrayLike<number>,
+	cellCount: number,
+	totalArea: number,
+	differenceAt: (cell: number) => number,
+): FieldDifference => {
+	let sum = 0;
+	let squares = 0;
+	for (let cell = 0; cell < cellCount; cell++) {
+		const difference = differenceAt(cell);
+		const area = areas[cell] as number;
+		sum += area * difference;
+		squares += area * difference * difference;
+	}
+	return {
+		meanDifference: sum / totalArea,
+		rmsDifference: Math.sqrt(squares / totalArea),
+	};
+};
+
+/**
+ * One field less another, cell by cell, such as a simulated temperature
+ * less the observed one.
+ *
+ * @param a - The field to subtract from. Not changed.
+ * @param b - The field to subtract, in the same units and cell order. Not
+ * changed.
+ * @returns A new array: `a[cell] - b[cell]` in each cell, in single
+ * precision.
+ * @throws RangeError if the two are not the same length.
+ */
+export const differenceField = (
+	a: ArrayLike<number>,
+	b: ArrayLike<number>,
+): Float32Array => {
+	if (a.length !== b.length) {
+		throw new RangeError(
+			`Only fields of the same length can be subtracted; got ${a.length} and ${b.length}`,
+		);
+	}
+	const difference = new Float32Array(a.length);
+	for (let cell = 0; cell < a.length; cell++) {
+		difference[cell] = (a[cell] as number) - (b[cell] as number);
+	}
+	return difference;
+};
+
+/**
+ * Area-weighted error figures of one field against another, such as a
+ * month or a summary of the year.
+ *
+ * @param a - One value per cell of `grid`. Not changed.
+ * @param b - The field to compare `a` with, in the same units and cell
+ * order. Not changed.
+ * @param grid - The grid both are on.
+ * @returns New figures, in the fields' units: the mean and the
+ * root-mean-square of `a` less `b`, each cell weighted by its area, worked
+ * out in double precision.
+ * @throws RangeError if either does not hold one value per cell.
+ */
+export const compareField = (
+	a: ArrayLike<number>,
+	b: ArrayLike<number>,
+	grid: Grid,
+): FieldDifference => {
+	const { cellCount, areas } = grid;
+	if (a.length !== cellCount || b.length !== cellCount) {
+		throw new RangeError(`Comparing needs two fields of ${cellCount} values`);
+	}
+	return figuresOf(
+		areas,
+		cellCount,
+		totalAreaOf(areas, cellCount),
+		(cell) => (a[cell] as number) - (b[cell] as number),
+	);
+};
+
 /**
  * Area-weighted error figures of twelve monthly fields against twelve
  * others, month by month and for the annual mean.
+ *
+ * @remarks
+ * Each month's figures are those {@link compareField} gives for it. The
+ * annual mean's are of the mean of the twelve monthly differences, cell by
+ * cell, in double precision.
  *
  * @param a - Twelve fields, one value per cell of `grid`. Not changed.
  * @param b - Twelve fields to compare `a` with, in the same units and cell
@@ -58,43 +153,26 @@ export const compareFields = (
 			);
 		}
 	}
-	let totalArea = 0;
-	for (let cell = 0; cell < cellCount; cell++) {
-		totalArea += areas[cell] as number;
-	}
+	const totalArea = totalAreaOf(areas, cellCount);
 	const annualDifference = new Float64Array(cellCount);
 	const months: FieldDifference[] = [];
 	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
 		const first = a[month] as ArrayLike<number>;
 		const second = b[month] as ArrayLike<number>;
-		let sum = 0;
-		let squares = 0;
+		months.push(compareField(first, second, grid));
 		for (let cell = 0; cell < cellCount; cell++) {
 			const difference = (first[cell] as number) - (second[cell] as number);
-			const area = areas[cell] as number;
-			sum += area * difference;
-			squares += area * difference * difference;
 			annualDifference[cell] =
 				(annualDifference[cell] as number) + difference / MONTHS_PER_YEAR;
 		}
-		months.push({
-			meanDifference: sum / totalArea,
-			rmsDifference: Math.sqrt(squares / totalArea),
-		});
-	}
-	let sum = 0;
-	let squares = 0;
-	for (let cell = 0; cell < cellCount; cell++) {
-		const difference = annualDifference[cell] as number;
-		const area = areas[cell] as number;
-		sum += area * difference;
-		squares += area * difference * difference;
 	}
 	return {
 		months,
-		annual: {
-			meanDifference: sum / totalArea,
-			rmsDifference: Math.sqrt(squares / totalArea),
-		},
+		annual: figuresOf(
+			areas,
+			cellCount,
+			totalArea,
+			(cell) => annualDifference[cell] as number,
+		),
 	};
 };

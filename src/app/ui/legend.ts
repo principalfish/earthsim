@@ -5,6 +5,7 @@
  */
 
 import {
+	type FieldDifference,
 	getGrid,
 	isSupportedResolution,
 	type TemperatureProgress,
@@ -355,6 +356,35 @@ export const formatTick = (value: number): string => {
 };
 
 /**
+ * A difference to one decimal as the legend's error figures write it: a
+ * true minus sign below zero, a plus sign above it, and `0.0`, with no
+ * sign, for one that rounds to zero.
+ */
+const signedTenths = (value: number): string => {
+	const tenths = Math.round(Math.abs(value) * 10);
+	const digits = (tenths / 10).toFixed(1);
+	if (tenths === 0) {
+		return digits;
+	}
+	return `${value < 0 ? '−' : '+'}${digits}`;
+};
+
+/**
+ * The error figures of the field on show against another, as the legend
+ * writes them under its scale, such as `Mean −0.1 °C · RMS 3.9 °C`.
+ *
+ * @remarks
+ * Both are to one decimal, a half rounded away from zero. The mean
+ * difference is signed, `+0.3` above zero and `−0.1` below, and one that
+ * rounds to zero is `0.0` with no sign; the root-mean-square difference is
+ * never below zero and has no sign.
+ *
+ * @param figures - The mean and root-mean-square difference, in degrees.
+ */
+export const formatFigures = (figures: FieldDifference): string =>
+	`Mean ${signedTenths(figures.meanDifference)} °C · RMS ${(Math.round(figures.rmsDifference * 10) / 10).toFixed(1)} °C`;
+
+/**
  * Where a value sits along the scale, as a percentage of its length from
  * the low end.
  *
@@ -437,6 +467,12 @@ export type LegendScale = {
 	 * there are none.
 	 */
 	readonly above: string | null;
+	/**
+	 * The error figures of the field on show against the observed one, as
+	 * {@link formatFigures} writes them, on a line under the ends; null when
+	 * there are none to show.
+	 */
+	readonly figures: string | null;
 };
 
 /** What the globe shows a layer with, for the legend to draw. */
@@ -454,6 +490,11 @@ export type LegendSource = {
 	 * it; left out, the legend chooses one.
 	 */
 	readonly tickStep?: number;
+	/**
+	 * The error figures of the field shown against the observed one, or
+	 * null or left out when there are none to show.
+	 */
+	readonly figures?: FieldDifference | null;
 };
 
 /** What the legend shows at one moment. */
@@ -488,7 +529,8 @@ export type LegendContent = {
  * over the earlier result's scale, which is what the globe then shows, and
  * {@link LEGEND_NOT_SHOWN_TEXT} when there is no scale at all. The scale's
  * ticks are at its own step when it has one, and it says what its end
- * colours stand for at each end that has values beyond it.
+ * colours stand for at each end that has values beyond it, and gives the
+ * source's error figures when it has them.
  */
 export const legendContent = (
 	layer: TemperatureLayer,
@@ -515,6 +557,10 @@ export const legendContent = (
 					above: source.beyond.above
 						? `${formatTick(source.range.max)} and above`
 						: null,
+					figures:
+						source.figures === undefined || source.figures === null
+							? null
+							: formatFigures(source.figures),
 				};
 	switch (layer.status) {
 		case 'current': {
@@ -572,6 +618,10 @@ export type Legend = {
  * own end, so that it never runs into a value marked near that end. The
  * line, and room for it, is there only while at least one part shows.
  *
+ * The error figures, when there are any, are on a line of their own
+ * directly under that, and the line, and room for it, is there only while
+ * there are.
+ *
  * @returns The legend.
  */
 export const createLegend = (): Legend => {
@@ -586,7 +636,9 @@ export const createLegend = (): Legend => {
 	const below = createElement('span', 'legend__end legend__end--low');
 	const above = createElement('span', 'legend__end legend__end--high');
 	ends.append(below, above);
-	scale.append(title, ramp, ticks, ends);
+	const figures = createElement('p', 'legend__figures');
+	figures.hidden = true;
+	scale.append(title, ramp, ticks, ends, figures);
 
 	const status = createElement('p', 'legend__status');
 	status.setAttribute('aria-live', 'polite');
@@ -623,6 +675,8 @@ export const createLegend = (): Legend => {
 				above.hidden = content.scale.above === null;
 				ends.hidden =
 					content.scale.below === null && content.scale.above === null;
+				figures.textContent = content.scale.figures ?? '';
+				figures.hidden = content.scale.figures === null;
 			}
 			const text = content.status ?? '';
 			if (status.textContent !== text) {

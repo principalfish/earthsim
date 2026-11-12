@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareFields } from './compare';
+import { compareField, compareFields, differenceField } from './compare';
 import { getGrid } from './grid';
 import { cellLatitudes, MONTHS_PER_YEAR } from './insolation';
 
@@ -100,5 +100,77 @@ describe('compareFields', () => {
 		expect(() =>
 			compareFields(base, [...base.slice(1), new Float32Array(3)], grid),
 		).toThrow(RangeError);
+	});
+});
+
+describe('differenceField', () => {
+	it('is zero everywhere for identical fields', () => {
+		const field = base[0] as Float32Array;
+		const difference = differenceField(field, field);
+		expect(difference).toBeInstanceOf(Float32Array);
+		expect(difference).toHaveLength(cellCount);
+		expect(difference.every((value) => value === 0)).toBe(true);
+	});
+
+	it('gives the first less the second, in a new array', () => {
+		const a = Float32Array.of(1, 5, -2.5);
+		const b = Float32Array.of(3, 1, -2.5);
+		const difference = differenceField(a, b);
+		expect([...difference]).toEqual([-2, 4, 0]);
+		expect(difference).not.toBe(a);
+		expect([...a]).toEqual([1, 5, -2.5]);
+	});
+
+	it('refuses fields of unequal lengths', () => {
+		expect(() =>
+			differenceField(new Float32Array(3), new Float32Array(4)),
+		).toThrow(RangeError);
+	});
+});
+
+describe('compareField', () => {
+	it('is zero for identical fields', () => {
+		const field = base[3] as Float32Array;
+		expect(compareField(field, field, grid)).toEqual({
+			meanDifference: 0,
+			rmsDifference: 0,
+		});
+	});
+
+	it('gives the same figures as compareFields for each month', () => {
+		const shifted = fields(
+			(month, cell) =>
+				((base[month] as Float32Array)[cell] as number) +
+				(cell % 7) -
+				month / 4,
+		);
+		const { months } = compareFields(shifted, base, grid);
+		months.forEach((figures, month) => {
+			expect(
+				compareField(
+					shifted[month] as Float32Array,
+					base[month] as Float32Array,
+					grid,
+				),
+			).toEqual(figures);
+		});
+	});
+
+	it('gives a shift as its mean and its size as its root-mean-square', () => {
+		const field = base[0] as Float32Array;
+		const warmer = field.map((value) => value - 2);
+		const { meanDifference, rmsDifference } = compareField(warmer, field, grid);
+		expect(meanDifference).toBeCloseTo(-2, 5);
+		expect(rmsDifference).toBeCloseTo(2, 5);
+	});
+
+	it('refuses anything but one value per cell in each', () => {
+		const field = base[0] as Float32Array;
+		expect(() => compareField(field.subarray(1), field, grid)).toThrow(
+			RangeError,
+		);
+		expect(() => compareField(field, field.subarray(1), grid)).toThrow(
+			RangeError,
+		);
 	});
 });

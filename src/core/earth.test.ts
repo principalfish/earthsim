@@ -5,9 +5,13 @@ import {
 	EARTH_DATA_BYTES,
 	EARTH_DATA_CELLS,
 	EARTH_DATA_RESOLUTION,
+	EARTH_ELEVATION_CHECKSUMS,
 	type EarthData,
 	earthWorld,
+	elevationChecksum,
+	isMeasuredEarth,
 } from './earth';
+import { generateWorld } from './generate';
 import {
 	cellAt,
 	cellCentre,
@@ -20,9 +24,11 @@ import {
 	latLonToDirection,
 	SUPPORTED_RESOLUTIONS,
 } from './grid';
-import { DEFAULT_PLANET } from './planet';
+import { DEFAULT_PLANET, PLANET_SETTINGS } from './planet';
+import { deserializeWorld, serializeWorld } from './serialize';
 import { computeTerrainStats } from './stats';
 import {
+	createBlankWorld,
 	DEFAULT_SEA_LEVEL_M,
 	MAX_ELEVATION_M,
 	MIN_ELEVATION_M,
@@ -560,6 +566,114 @@ describe('the Earth', () => {
 				0.6,
 			);
 			expect(north / (north + south), `${world.resolution}`).toBeLessThan(0.75);
+		}
+	});
+});
+
+describe('elevationChecksum', () => {
+	it('is the FNV-1a hash of the values’ bit patterns, a word to a value', () => {
+		// FNV-1a of no words is its offset basis.
+		expect(elevationChecksum(new Float32Array(0))).toBe(0x811c9dc5);
+		// One word: the basis XOR the word, times the prime, in 32 bits.
+		const one = Float32Array.of(1);
+		const bits = new Uint32Array(one.buffer)[0] as number;
+		expect(elevationChecksum(one)).toBe(
+			Math.imul(0x811c9dc5 ^ bits, 0x01000193) >>> 0,
+		);
+	});
+
+	it('tells apart arrays that differ in one bit or in their order', () => {
+		const base = elevationChecksum(Float32Array.of(1, 2, 3));
+		expect(elevationChecksum(Float32Array.of(1, 2, 3))).toBe(base);
+		expect(elevationChecksum(Float32Array.of(1, 3, 2))).not.toBe(base);
+		expect(elevationChecksum(Float32Array.of(0))).not.toBe(
+			elevationChecksum(Float32Array.of(-0)),
+		);
+		const nudged = Float32Array.of(1, 2, 3);
+		const words = new Uint32Array(nudged.buffer);
+		words[1] = (words[1] as number) ^ 1;
+		expect(elevationChecksum(nudged)).not.toBe(base);
+	});
+
+	it('reads only the cells of a view into a larger buffer', () => {
+		const buffer = new Float32Array([9, 1, 2, 3, 9]);
+		expect(elevationChecksum(buffer.subarray(1, 4))).toBe(
+			elevationChecksum(Float32Array.of(1, 2, 3)),
+		);
+	});
+
+	it('gives the committed checksum for the Earth at every resolution', () => {
+		for (const world of WORLDS) {
+			expect(elevationChecksum(world.elevation), `${world.resolution}`).toBe(
+				EARTH_ELEVATION_CHECKSUMS[world.resolution],
+			);
+		}
+	});
+});
+
+describe('isMeasuredEarth', () => {
+	/** A fresh Earth world at the resolution, with its own elevation. */
+	const freshEarth = (resolution: number): World =>
+		earthWorld(EARTH, resolution);
+
+	it('holds for the Earth preset at every resolution', () => {
+		for (const resolution of SUPPORTED_RESOLUTIONS) {
+			expect(isMeasuredEarth(freshEarth(resolution)), `${resolution}`).toBe(
+				true,
+			);
+		}
+	});
+
+	it('stops holding when one cell changes, and holds again once it is put back', () => {
+		const world = freshEarth(64);
+		const before = world.elevation[1000] as number;
+		world.elevation[1000] = before + 1;
+		expect(isMeasuredEarth(world)).toBe(false);
+		world.elevation[1000] = before;
+		expect(isMeasuredEarth(world)).toBe(true);
+	});
+
+	it('does not hold at another sea level, and holds again at the preset’s', () => {
+		const world = freshEarth(64);
+		world.seaLevel = 10;
+		expect(isMeasuredEarth(world)).toBe(false);
+		world.seaLevel = DEFAULT_SEA_LEVEL_M;
+		expect(isMeasuredEarth(world)).toBe(true);
+	});
+
+	it.each(PLANET_SETTINGS)('does not hold with another %s', (name) => {
+		const world = freshEarth(64);
+		world.planet = { ...DEFAULT_PLANET, [name]: DEFAULT_PLANET[name] * 1.01 };
+		expect(isMeasuredEarth(world)).toBe(false);
+		world.planet = { ...DEFAULT_PLANET };
+		expect(isMeasuredEarth(world)).toBe(true);
+	});
+
+	it('does not hold for a generated or a blank world, even with the Earth’s terrain', () => {
+		expect(
+			isMeasuredEarth(
+				generateWorld({ resolution: 64, seed: 1, landFraction: 0.3 }),
+			),
+		).toBe(false);
+		expect(isMeasuredEarth(createBlankWorld(64))).toBe(false);
+		const earth = freshEarth(64);
+		expect(isMeasuredEarth({ ...earth, origin: { kind: 'blank' } })).toBe(
+			false,
+		);
+	});
+
+	it('does not hold for the Earth’s terrain of one resolution under another', () => {
+		const earth = freshEarth(64);
+		expect(isMeasuredEarth({ ...earth, resolution: 128 })).toBe(false);
+	});
+
+	it('still holds for an Earth world written to a file and read back', () => {
+		for (const resolution of SUPPORTED_RESOLUTIONS) {
+			const read = deserializeWorld(serializeWorld(freshEarth(resolution)));
+			if (!read.ok) {
+				throw new Error(`The Earth at ${resolution} could not be read back`);
+			}
+			expect(isMeasuredEarth(read.world), `${resolution}`).toBe(true);
 		}
 	});
 });

@@ -115,6 +115,34 @@ describe('formatTemperature', () => {
 		expect(formatTemperature(-0, 'month', 6)).toBe('July 0 °C');
 	});
 
+	it('names the observed temperature as observed', () => {
+		expect(formatTemperature(21.2, 'month', 6, 'observed')).toBe(
+			'July 21 °C observed',
+		);
+		expect(formatTemperature(-12, 'coldest', 6, 'observed')).toBe(
+			'Coldest month −12 °C observed',
+		);
+		expect(formatTemperature(18, 'month', 6, 'simulated')).toBe('July 18 °C');
+	});
+
+	it('signs a difference both ways, and never zero', () => {
+		expect(formatTemperature(2.2, 'month', 6, 'difference')).toBe(
+			'July +2 °C difference',
+		);
+		expect(formatTemperature(-3, 'month', 6, 'difference')).toBe(
+			'July −3 °C difference',
+		);
+		for (const value of [0, -0, 0.4, -0.4, -0.5]) {
+			expect(
+				formatTemperature(value, 'month', 6, 'difference'),
+				`${value}`,
+			).toBe('July 0 °C difference');
+		}
+		expect(formatTemperature(-12, 'annualMean', 6, 'difference')).toBe(
+			'Annual average −12 °C difference',
+		);
+	});
+
 	it('groups the digits of a hot planet in threes', () => {
 		expect(formatTemperature(1234.4, 'annualMean', 6)).toBe(
 			'Annual average 1,234 °C',
@@ -146,7 +174,13 @@ describe('describeReadout', () => {
 		expect(
 			describeReadout({
 				...place,
-				temperature: { value: -18.2, view: 'month', month: 6, current: true },
+				temperature: {
+					value: -18.2,
+					view: 'month',
+					month: 6,
+					source: 'simulated',
+					current: true,
+				},
 			}),
 		).toEqual({
 			position: '27.9° N, 86.9° E',
@@ -156,11 +190,49 @@ describe('describeReadout', () => {
 		});
 	});
 
+	it('names the source of the temperature, marked out of date as any other', () => {
+		expect(
+			describeReadout({
+				...place,
+				temperature: {
+					value: -12,
+					view: 'annualMean',
+					month: 6,
+					source: 'difference',
+					current: false,
+				},
+			}),
+		).toEqual({
+			position: '27.9° N, 86.9° E',
+			elevation: '8,123 m',
+			temperature: 'Annual average −12 °C difference',
+			status: READOUT_OUT_OF_DATE_TEXT,
+		});
+		expect(
+			describeReadout({
+				...place,
+				temperature: {
+					value: 21,
+					view: 'month',
+					month: 6,
+					source: 'observed',
+					current: true,
+				},
+			}).temperature,
+		).toBe('July 21 °C observed');
+	});
+
 	it('marks a temperature that is not current out of date', () => {
 		const text = describeReadout({
 			...place,
 			heightM: -3400,
-			temperature: { value: 12, view: 'range', month: 6, current: false },
+			temperature: {
+				value: 12,
+				view: 'range',
+				month: 6,
+				source: 'simulated',
+				current: false,
+			},
 		});
 		expect(text).toEqual({
 			position: '27.9° N, 86.9° E',
@@ -196,6 +268,7 @@ const shownOf = (
 	field,
 	view: 'month',
 	month: DEFAULT_MONTH,
+	source: 'simulated',
 	current: true,
 	...values,
 });
@@ -238,8 +311,13 @@ describe('readoutPartsAt', () => {
 			value: -12.5,
 			view: 'coldest',
 			month: DEFAULT_MONTH,
+			source: 'simulated',
 			current: false,
 		});
+		expect(
+			readoutPartsAt(world, direction, shownOf(field, { source: 'observed' }))
+				.temperature?.source,
+		).toBe('observed');
 	});
 
 	it('gives no temperature for a field of another grid, or no value', () => {

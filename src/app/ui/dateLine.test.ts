@@ -6,7 +6,12 @@ import { createDateLine, dateLineText, formatWorldAge } from './dateLine';
 const temperatureView = (
 	temperature: PageView['temperatureView'] = 'month',
 	month = 6,
-): PageView => ({ layer: 'temperature', temperatureView: temperature, month });
+): PageView => ({
+	layer: 'temperature',
+	temperatureView: temperature,
+	source: 'simulated',
+	month,
+});
 
 describe('formatWorldAge', () => {
 	it.each([

@@ -2,7 +2,8 @@
  * The view settings that choose what the globe shows. Like the camera and
  * the relief exaggeration, they belong to the page, not to the world: they
  * are not saved, and a new world keeps them, all but the month, which a new
- * world sets back to {@link DEFAULT_MONTH}.
+ * world sets back to {@link DEFAULT_MONTH}, and the temperature's source,
+ * which it sets back to {@link DEFAULT_TEMPERATURE_SOURCE}.
  */
 
 /** What the globe can be coloured by. */
@@ -53,6 +54,35 @@ export const TEMPERATURE_VIEW_LABELS: Readonly<
 	range: 'Seasonal range',
 };
 
+/**
+ * Where the temperature on the globe comes from: the simulation, the
+ * observed Earth, or the one less the other. Only the measured Earth is
+ * offered more than the simulation.
+ */
+export const TEMPERATURE_SOURCES = [
+	'simulated',
+	'observed',
+	'difference',
+] as const;
+
+/**
+ * Where the temperature on the globe comes from: the simulated year, the
+ * observed one, or the simulated less the observed.
+ */
+export type TemperatureSource = (typeof TEMPERATURE_SOURCES)[number];
+
+/** Where the temperature comes from when the page opens and for a new world. */
+export const DEFAULT_TEMPERATURE_SOURCE: TemperatureSource = 'simulated';
+
+/** The name each source of the temperature goes by on the page. */
+export const TEMPERATURE_SOURCE_LABELS: Readonly<
+	Record<TemperatureSource, string>
+> = {
+	simulated: 'Simulated',
+	observed: 'Observed',
+	difference: 'Difference',
+};
+
 /** The months of the year, January first, as the page names them. */
 export const MONTH_NAMES = [
 	'January',
@@ -82,6 +112,11 @@ export type PageView = {
 	/** What of the temperature's year is shown in Temperature view. */
 	readonly temperatureView: TemperatureView;
 	/**
+	 * Where the temperature shown comes from: always the simulation unless
+	 * the world is the measured Earth.
+	 */
+	readonly source: TemperatureSource;
+	/**
 	 * The month on screen for the Month view, from January at 0 to
 	 * December at 11.
 	 */
@@ -92,5 +127,6 @@ export type PageView = {
 export const DEFAULT_PAGE_VIEW: PageView = {
 	layer: DEFAULT_LAYER,
 	temperatureView: DEFAULT_TEMPERATURE_VIEW,
+	source: DEFAULT_TEMPERATURE_SOURCE,
 	month: DEFAULT_MONTH,
 };

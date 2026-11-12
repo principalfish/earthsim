@@ -8,6 +8,7 @@ import {
 } from '../testing/fakeDocument';
 import {
 	createRangeField,
+	createSegmentedChoice,
 	createSegmentedPicker,
 	createSelectField,
 	type RangeMark,
@@ -74,6 +75,48 @@ describe('createSegmentedPicker', () => {
 		(inputs[1] as FakeElement).checked = false;
 		(inputs[1] as FakeElement).fire('change');
 		expect(chosen).toEqual([]);
+	});
+});
+
+describe('createSegmentedChoice', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const make = () => {
+		const chosen: string[] = [];
+		const choice = createSegmentedChoice({
+			name: 'fruit',
+			legend: 'Fruit',
+			choices: [
+				{ value: 'apple', label: 'Apple' },
+				{ value: 'pear', label: 'Pear' },
+			],
+			value: 'apple',
+			onChange: (value) => chosen.push(value),
+		});
+		const picker = choice.element as unknown as FakeElement;
+		return { choice, chosen, inputs: byClass(picker, 'segmented__input') };
+	};
+
+	it('shows a value set from outside as chosen, without passing it on', () => {
+		const { choice, chosen, inputs } = make();
+		choice.setValue('pear');
+		expect(inputs.map((input) => input.checked)).toEqual([false, true]);
+		choice.setValue('apple');
+		expect(inputs.map((input) => input.checked)).toEqual([true, false]);
+		expect(chosen).toEqual([]);
+	});
+
+	it('passes on each choice made on it', () => {
+		const { chosen, inputs } = make();
+		fake.pick(inputs[1] as FakeElement);
+		expect(chosen).toEqual(['pear']);
 	});
 });
 

@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-	readEarthDataFile,
-	readObservedTemperatureFile,
-} from '../../scripts/earth/dataFile.mjs';
+import { readEarthDataFile } from '../../scripts/earth/dataFile.mjs';
 import { applyDab } from './brush';
 import { coarsenWorld } from './coarsen';
-import { compareFields } from './compare';
 import { decodeEarth, earthWorld } from './earth';
 import { generateWorld } from './generate';
 import {
@@ -16,7 +12,6 @@ import {
 	latLonToDirection,
 } from './grid';
 import { cellLatitudes, MONTHS_PER_YEAR } from './insolation';
-import { decodeObservedTemperature, observedTemperature } from './observed';
 import { PLANET_LIMITS, PLANET_SETTINGS, type PlanetSettings } from './planet';
 import {
 	coolingDrift,
@@ -275,23 +270,6 @@ describe('solveTemperature on the Earth', {
 		expect(EARTH.elevation[siberia]).toBeGreaterThan(EARTH.seaLevel);
 		expect(EARTH.elevation[pacific]).toBeLessThan(EARTH.seaLevel);
 		expect(range[siberia]).toBeGreaterThan(2 * (range[pacific] as number));
-	});
-
-	it('is within a loose ceiling of the observed temperature', () => {
-		// The first tuned run gave a root-mean-square error of 3.9 K for the
-		// annual mean and from 3.6 to 6.5 K for single months, with the
-		// global mean 0.15 K below the observed. The ceilings leave room for
-		// later changes to the model without letting it drift far.
-		const observed = observedTemperature(
-			decodeObservedTemperature(readObservedTemperatureFile()),
-			N,
-		);
-		const { months, annual } = compareFields(earth().months, observed, grid);
-		expect(annual.rmsDifference).toBeLessThan(5);
-		expect(Math.abs(annual.meanDifference)).toBeLessThan(2);
-		for (const month of months) {
-			expect(month.rmsDifference).toBeLessThan(8);
-		}
 	});
 
 	it('gives the Earth’s recorded values to within 0.01 K, from nothing and carried on after a raised patch', () => {

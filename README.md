@@ -91,7 +91,10 @@ Requires Node.js and npm. Run `npm install` once, then:
 - `npm run typecheck`: type-check every part of the source.
 - `npm run build:earth`: rebuild the Earth's elevation data from its source; see [Data](#data).
 - `npm run build:observed-temperature`: rebuild the Earth's observed temperature data from its source; see [Data](#data).
+- `npm run baseline:temperature`: write the Earth temperature baseline afresh; see below.
 - `npm run time:temperature`: time the temperature solver at every resolution, from nothing and after small edits, on the Earth and a generated world, as the page works it out and, above the coarsest grid, on the world's own grid as well; print how far apart those two are and the simulated Earth's error against the observed temperature, as Markdown tables. It takes a few minutes.
+
+`src/core/baseline/earthTemperature.json` holds the Earth temperature baseline: for the Earth preset at 64 cells per face edge, with Earth's planet settings and its sea level, the mean and root-mean-square difference of the simulated temperature less the observed, in kelvin to three decimals, for the annual average, each month, the warmest month, the coldest month and the seasonal range, the same figures the legend shows. A test solves that Earth and fails, naming each figure, if any is worse than the file's by more than 0.05 K: a root-mean-square difference that has grown by more than that, or a mean difference whose size has. A figure that has improved passes. When a change to the model is meant to move the figures, run `npm run baseline:temperature`, which solves the Earth, writes the file and prints each figure that moved, and commit the file with the change.
 
 ### Layout
 
@@ -102,7 +105,8 @@ Requires Node.js and npm. Run `npm install` once, then:
   - `src/core/temperature.ts`: the temperature model, a seasonal energy balance on the world's grid, or the grid a step coarser above the coarsest, stepped through the year until the year repeats.
   - `src/core/coarsen.ts`: a world averaged onto the grid a step coarser, and a field carried back from it.
   - `src/core/exchange.ts`: heat passed between neighbouring cells, and the multigrid-preconditioned solver for the implicit steps it needs.
-  - `src/core/compare.ts`: area-weighted error figures between two sets of monthly fields.
+  - `src/core/compare.ts`: one field less another, and area-weighted error figures between two fields or two sets of monthly fields.
+  - `src/core/baseline/`: the Earth temperature baseline, and the figures and the check it is kept with.
   - `src/core/testing/`: temperature results and progress of the right form, which only the tests use.
 - `src/app/`: the page, which imports the core.
   - `src/app/main.ts`: makes the parts of the page from the document, the globe, the workers and the browser's storage, and hands them over to be joined.
@@ -114,13 +118,14 @@ Requires Node.js and npm. Run `npm install` once, then:
   - `src/app/refresh.ts`: when to ask a worker again after the world changes.
   - `src/app/workerService.ts`: the statistics and temperature services, each on a worker of its own: starting the worker, keeping only the newest answer, and what happens when there is no worker.
   - `src/app/layers.ts`: the computed layers the page holds, for now the temperature, with whether it is current, out of date or being calculated.
-  - `src/app/view.ts`: the view settings that choose what the globe shows: the layer, what of the temperature's year is shown, and the month on screen.
+  - `src/app/view.ts`: the view settings that choose what the globe shows: the layer, what of the temperature's year is shown, where the temperature comes from, and the month on screen.
   - `src/app/playback.ts`: playing through the year, a month at a time.
   - `src/app/storage.ts`: the saved world in the browser's IndexedDB, and exporting and importing world files.
   - `src/app/autosave.ts`: when to save after the world changes.
   - `src/app/earthData.ts`: fetching the Earth data file the first time it is needed.
+  - `src/app/observedData.ts`: fetching the observed temperature file the first time it is needed, and keeping it on each grid it is asked for.
   - `src/app/globe/`: the globe's renderer, shaders, camera and picking, and the colour ramps of the data layers (`ramp.ts`).
-  - `src/app/ui/`: the panels of controls, the New world dialog, the Layers panel, the legend, the date line and the cursor readout over the globe.
+  - `src/app/ui/`: the panels of controls, the New world dialog, the Layers panel with its comparison controls, the legend, the date line and the cursor readout over the globe.
   - `src/app/testing/`: stand-ins for the canvas, the document the panels are built in, the browser's animation frames and timers, and a way to let settled promises run, which only the tests use.
 - `src/worker/`: the Web Worker that computes from a copy of the world and keeps nothing between requests. The page runs two of it, one for the statistics and one for the temperature.
   - `src/worker/sim.worker.ts`: the worker itself, which only passes messages to the handler, and posts its progress and its answer, whose arrays it transfers.
@@ -135,7 +140,10 @@ Requires Node.js and npm. Run `npm install` once, then:
   - `scripts/download.ts`: downloads a source file into `.cache/` once, checked against the length and SHA-256 pinned for it.
   - `scripts/earth/`: the parts of those scripts that touch no file: what each source file must be and the checks on its download, reading the TIFF and netCDF formats, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data files for the tests, and `testing/` writes small netCDF files for them.
   - `scripts/time-temperature.ts`: the solver's timings and the simulated Earth's error figures.
+  - `scripts/update-earth-temperature-baseline.ts`: writes the Earth temperature baseline afresh.
   - `scripts/run-with-vite.mjs`: runs a TypeScript script through Vite, so that it can import the core.
+
+While the world is the measured Earth, Temperature view adds a choice under **Show** of where the temperature comes from: **Simulated**, what the page works out, **Observed**, the Earth's measured temperature (see [Observed temperature](#observed-temperature)), and **Difference**, the simulated less the observed. The world is the measured Earth while it is an Earth world just as it was made: Earth's five planet settings exactly, the sea level at 0 m, and every cell's elevation as the Earth preset made it at the world's resolution, which the page checks against a checksum kept for each resolution. A stroke, a move of the Sea level slider or of a Planet slider, or a new or imported world that is not such an Earth takes the choice away and puts the view back on Simulated; undoing back to the Earth as it was, **Reset to Earth** or the sea level set back to 0 m brings the choice back, on Simulated. An Earth world saved and brought back, or exported and imported, keeps its elevations exactly, so it keeps the choice. Like the layer and the view, the choice is not saved, and a new world starts on Simulated. The observed temperature is fetched the first time Observed or Difference is chosen, which takes a moment, and the line under the choice says "Loading observed temperature" meanwhile; if it cannot be fetched, the line says "Observed temperature could not be loaded", the view goes back to Simulated and keeps working, and the next choice of Observed or Difference tries again. From the first time Observed or Difference is chosen for a world, the simulated and the observed temperatures share one scale, fitted as above to their 24 months together, so that a colour means the same temperature in both, and their seasonal ranges likewise share one from zero; before that the simulated scale is the one described above, and it is again once the world stops being the measured Earth. The difference, of every month and summary and of the seasonal range alike, has a fixed scale from −20 to +20 °C, marked every 10 degrees, in colours that run from blue where the simulation is colder than observed through near white where the two agree to red where it is warmer, and its legend always says "−20 and below" and "20 and above". While the choice is offered and the observed temperature has loaded, the legend gives under the scale, whichever the source, two error figures for the month or summary on screen (though not under Observed while the simulated temperature is out of date, being calculated again or unavailable), the simulated less the observed, each place counting for its share of the surface: the mean difference and the root-mean-square difference, such as `Mean −0.1 °C · RMS 3.9 °C`. The observed temperature is never marked "Out of date"; the difference is whenever the simulated temperature would be. The strip in the corner names the source of the value too: `July 21 °C observed`, and for the difference a signed value, `July +2 °C difference` or `July −3 °C difference`, with `0 °C` for none.
 
 The core is compiled without the DOM type library, and the worker and its handler with the worker's in place of it, so a `document` or `window` reference in either fails `npm run typecheck`. The project does not depend on Node's type package either, so nothing under `src/` can use a Node API; the scripts are type-checked against the few Node functions they call, declared by hand in `scripts/node.d.ts`.
 

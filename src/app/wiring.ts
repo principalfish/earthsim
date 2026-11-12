@@ -9,7 +9,9 @@
  */
 
 import {
+	isMeasuredEarth,
 	normaliseSeaLevel,
+	type Resolution,
 	type World,
 	type WorldFileResult,
 } from '../core/index';
@@ -18,6 +20,7 @@ import type { Autosave, AutosaveOptions } from './autosave';
 import type { RotateButton, ViewInput } from './globe/input';
 import type { Globe } from './globe/renderer';
 import { createLayerStore, type LayerStore } from './layers';
+import type { ObservedLoader } from './observedData';
 import type { RefreshScheduler, TemperatureScheduler } from './refresh';
 import {
 	DEFAULT_TOOL,
@@ -93,6 +96,8 @@ export type PageLayerOptions = {
 	readonly temperature: Pick<TemperatureScheduler, 'setShowing'>;
 	/** Called with the view settings whenever any of them changes. */
 	readonly onView: (view: PageView) => void;
+	/** Gives the observed temperature on a world's grid. */
+	readonly loadObserved: ObservedLoader;
 };
 
 /** What the cursor readout reads of the page. */
@@ -166,7 +171,7 @@ export type PageParts = {
 	 */
 	readonly createLayerPanel: (
 		options: PageLayerOptions,
-	) => Pick<LayerPanel, 'resetMonth' | 'shown'>;
+	) => Pick<LayerPanel, 'newWorld' | 'setEarth' | 'shown'>;
 	/**
 	 * Lays the cursor readout over the globe, hidden until the pointer is
 	 * over it, and has it follow the pointer.
@@ -178,6 +183,11 @@ export type PageParts = {
 	readonly openNewWorldDialog: (options: NewWorldDialogOptions) => void;
 	/** Gives the Earth's elevation data, for a world that starts as Earth. */
 	readonly loadEarth: WorldSources['loadEarth'];
+	/**
+	 * Gives the Earth's observed temperature on a world's grid, for the
+	 * comparison on the measured Earth.
+	 */
+	readonly loadObserved: ObservedLoader;
 	/** Offers a world to the user as a file; may throw. */
 	readonly exportWorld: (world: World) => void;
 	/** Reads a file as a world, trusting nothing about it. */
@@ -223,7 +233,8 @@ export type PageParts = {
  * or the sea level, each new world, each change of the view settings and
  * each change of the temperature store. Opening the New world dialog hides
  * it until the next pointer event on the canvas: a move, a press or a
- * release.
+ * release. Once the readout is made, the layer panel is told whether the
+ * world the page opens on is the measured Earth.
  *
  * A world that replaces the one being edited reaches, in this order: the
  * sculpt controller, which ends a stroke still under way on the old world
@@ -231,15 +242,20 @@ export type PageParts = {
  * control; the planet controls, which show the world's settings without
  * passing them on; the world's description; the statistics and then the
  * temperature, each first reset and then asked for again; the layer panel,
- * which stops the year playing and puts July back on screen; the date line;
+ * which stops the year playing, puts July back on screen and is told
+ * whether the world is the measured Earth; the date line;
  * the panel's message, which is taken back; and the autosave. An edit of
  * the world, which is no new world, keeps the month on screen.
  *
  * A committed stroke, an undo, a redo and the sea-level control each ask
- * for the statistics and the temperature again, and mark the world
- * changed for the autosave. A change of the planet settings, told through
- * {@link AppState.notifyPlanetChange}, asks for the temperature again and
- * marks the world changed; the statistics do not depend on it. The planet
+ * for the statistics and the temperature again, tell the layer panel
+ * whether the world is still, or is again, the measured Earth, and mark
+ * the world changed for the autosave. A change of the planet settings,
+ * told through {@link AppState.notifyPlanetChange}, asks for the
+ * temperature again, tells the layer panel the same and marks the world
+ * changed; the statistics do not depend on it. Whether the world is the
+ * measured Earth is worked out once for each of these, and once for each
+ * new world, never during a stroke. The planet
  * controls make such a change through {@link AppState.setPlanet} at each
  * movement of a slider. A drag needs no wait of its own: the temperature
  * waits for the changes to stop, and stops a calculation a later change
@@ -258,6 +274,14 @@ export type PageParts = {
  */
 export const startPage = (parts: PageParts): Promise<void> => {
 	const { state, globe, logError } = parts;
+	/**
+	 * The world's resolution if it is the measured Earth, for the layer
+	 * panel; null if it is not.
+	 */
+	const earthOf = (world: World): Resolution | null =>
+		isMeasuredEarth(world) ? world.resolution : null;
+	/** Tells the layer panel whether the world, changed, is the measured Earth. */
+	const checkEarth = (): void => layerPanel.setEarth(earthOf(state.world));
 	globe.setWorld(state.world);
 	const viewInput = parts.createViewInput(rotateButtonFor(DEFAULT_TOOL), () =>
 		readout.invalidate(),
@@ -348,6 +372,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		onTerrainChange: () => {
 			statistics.refresh();
 			temperature.refresh();
+			checkEarth();
 			autosave.markChanged();
 			readout.invalidate();
 		},
@@ -377,6 +402,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			globe.setSeaLevel(world.seaLevel);
 			statistics.refresh();
 			temperature.refresh();
+			checkEarth();
 			autosave.markChanged();
 			readout.invalidate();
 		},
@@ -401,6 +427,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			date.setView(next);
 			readout.invalidate();
 		},
+		loadObserved: parts.loadObserved,
 	});
 	const statistics = parts.createStatistics({
 		currentWorld: () => state.world,
@@ -415,6 +442,9 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// Told after the layer panel, which brings what the globe shows up to
 	// date first.
 	layers.addListener(() => readout.invalidate());
+	// The world the page opens on reaches no listener of a new world, so
+	// the layer panel is told of it here, once every part it tells is made.
+	checkEarth();
 
 	// What a new world reaches, in this order. The sculpt controller goes
 	// first: it ends a stroke still under way while the globe and the
@@ -436,10 +466,11 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	state.addListener(temperature.reset);
 	state.addListener(temperature.refresh);
 	// The month on screen is the view's, but a new world starts again from
-	// July, after the store has dropped the old world's result so that the
-	// old result is not shown for July on the way. The date line then has
-	// the new world's age with that month.
-	state.addListener(layerPanel.resetMonth);
+	// July and from the simulated temperature, after the store has dropped
+	// the old world's result so that the old result is not shown for July
+	// on the way. The date line then has the new world's age with that
+	// month.
+	state.addListener((world) => layerPanel.newWorld(earthOf(world)));
 	state.addListener((world) => date.setYears(world.ageYears));
 	state.addListener(() => readout.invalidate());
 	// What the panel said of an earlier import or export is over with.
@@ -451,6 +482,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// depends on them.
 	state.addPlanetListener(() => {
 		temperature.refresh();
+		checkEarth();
 		autosave.markChanged();
 	});
 
