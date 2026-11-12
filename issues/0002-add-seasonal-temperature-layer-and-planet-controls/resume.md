@@ -15,7 +15,9 @@ _Updated 2026-11-12, with all 14 pieces committed and the issue in review._
 - Piece 7 was committed on 2026-11-12 after the user's second manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 8 and starts it only on the user's go-ahead.
 - Pieces 8 to 13 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user (put to them 2026-11-12)
+## Pending with the user
+
+Nothing yet. The user asked for the whole-branch review on 2026-11-12 ("run the review on opus / sonnet"). It is running in the planner chat over `main...claude/add-seasonal-temperature-layer-and-planet-controls-f645fa` at `d0f873a`: 13 fresh check subagents, because the diff (130 files, about +35,000 lines) is too large for one per check. Correctness on Opus in three parts (core and worker; app state, wiring and scripts; panels and globe), security on Opus over the whole branch's trust boundaries, and coverage, style and common-mistakes on Sonnet in the same three parts. The common-mistakes agents were told not to edit the guides and to report candidates. Their shared brief, the plan context and the branch coverage report are in the planner chat's scratchpad under `review-0002/`. Next: collect all 13 reports, spawn a fresh Opus verifier with every raw finding, write the review to `reviews/NN-<date>.md` (`planner.py next-review`), present the verified and dropped findings, and have the user pick which to fix; the builder applies them. If the chat was interrupted before the reports came back, re-run the checks.
 
 All 14 pieces are committed and pushed; the head is `d0f873a`, the state is `review`, draft PR #4 is open at that head. The all-pieces recap has been given. Waiting on the user to run `/review self add-seasonal-temperature-layer-and-planet-controls` in this chat (the builder keeps its worktree for the review's fixes, and has the whole-branch coverage figures: 97%, 66 of 3,182 changed lines not run, all with accepted reasons). Then `/publish`; merging is the user's.
 
