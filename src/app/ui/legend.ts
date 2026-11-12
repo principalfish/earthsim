@@ -590,7 +590,7 @@ export const legendContent = (
 
 /** The legend on the page. */
 export type Legend = {
-	/** The legend, to put in a panel. */
+	/** The legend, to put in its place over the globe. */
 	readonly element: HTMLElement;
 	/** Shows the content given, or hides the legend for null. */
 	show(content: LegendContent | null): void;

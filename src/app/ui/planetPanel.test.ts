@@ -320,13 +320,12 @@ describe('createPlanetPanel', () => {
 	const make = (planet: PlanetSettings = DEFAULT_PLANET) => {
 		const fake = createFakeDocument();
 		vi.stubGlobal('document', fake.document);
-		const panel = fake.createElement('aside');
+		const section = fake.createElement('div');
 		const changes: PlanetSettings[] = [];
-		const controls = createPlanetPanel(panel as unknown as HTMLElement, {
+		const controls = createPlanetPanel(section as unknown as HTMLElement, {
 			planet,
 			onChange: (next) => changes.push(next),
 		});
-		const section = controls.element as unknown as FakeElement;
 		const inputs = byClass(section, 'field__range');
 		/** The slider of a setting, its value as written and its mark. */
 		const field = (setting: keyof PlanetSettings) => {
@@ -346,7 +345,6 @@ describe('createPlanetPanel', () => {
 		};
 		const values = byClass(section, 'planet-readout__value');
 		return {
-			panel,
 			section,
 			controls,
 			changes,
@@ -360,12 +358,9 @@ describe('createPlanetPanel', () => {
 		};
 	};
 
-	it('adds a Planet section to the panel: the sliders, the two lines, the note and the button', () => {
-		const { panel, section } = make();
-		expect(panel.children).toEqual([section]);
-		expect(section.tagName).toBe('SECTION');
+	it('adds the planet controls to the section’s body: the sliders, the two lines, the note and the button', () => {
+		const { section } = make();
 		expect(section.children.map((child) => child.className)).toEqual([
-			'panel__heading',
 			'field',
 			'field',
 			'field',
@@ -374,7 +369,6 @@ describe('createPlanetPanel', () => {
 			'planet-readout',
 			'button button--compact planet-reset',
 		]);
-		expect(oneByClass(section, 'panel__heading').textContent).toBe('Planet');
 	});
 
 	it('labels each slider and writes its value for screen readers, Earth’s said to be Earth’s', () => {

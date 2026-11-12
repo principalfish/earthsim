@@ -7,11 +7,14 @@ import { attachViewInput } from './globe/input';
 import { MAX_DRAWN_SEA_LEVEL_M, MIN_DRAWN_SEA_LEVEL_M } from './globe/material';
 import { createGlobe, type Globe } from './globe/renderer';
 import { loadObservedTemperature } from './observedData';
+import { createPanelMemory, reachStorage } from './panelMemory';
 import { createSculptController } from './sculpt';
 import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
 import { createCursorReadout, createReadoutStrip } from './ui/cursorReadout';
+import { createGlobeOverlays } from './ui/globeOverlays';
 import { createLayerControls, createLayerPanel } from './ui/layerPanel';
 import { openNewWorldDialog } from './ui/newWorldDialog';
+import { createPanelSections } from './ui/panelSections';
 import { createPlanetPanel } from './ui/planetPanel';
 import { createStatsPanel } from './ui/statsPanel';
 import { createToolPanel } from './ui/toolPanel';
@@ -80,6 +83,11 @@ const logError = (error: unknown): void => console.error(error);
 
 const globe = createGlobeOrExplain();
 if (globe !== null) {
+	const sections = createPanelSections(
+		panel,
+		createPanelMemory(reachStorage(() => window.localStorage)),
+	);
+	const overlays = createGlobeOverlays(viewport);
 	void startPage({
 		// The page starts on a blank ocean, which stays until the saved
 		// world, if there is one, has been read. A world keeps its own sea
@@ -97,7 +105,8 @@ if (globe !== null) {
 			attachViewInput(canvas, globe, rotateButton, onCameraMove),
 		createSculpt: (world, options) =>
 			createSculptController(globe, world, { canvas, ...options }),
-		createWorldPanel: (options) => createWorldPanel(panel, options),
+		createWorldPanel: (options) =>
+			createWorldPanel(sections.world.body, options),
 		openStore: openWorldStore,
 		createAutosave: (options) =>
 			createAutosave({
@@ -106,14 +115,15 @@ if (globe !== null) {
 				setTimer,
 				clearTimer,
 			}),
-		createToolPanel: (options) => createToolPanel(panel, options),
-		createViewPanel: (options) => createViewPanel(panel, options),
-		createPlanetPanel: (options) => createPlanetPanel(panel, options),
+		createToolPanel: (options) => createToolPanel(sections.tools, options),
+		createViewPanel: (options) => createViewPanel(sections.view.body, options),
+		createPlanetPanel: (options) =>
+			createPlanetPanel(sections.planet.body, options),
 		createStatistics: (options) =>
 			createStatisticsService({
 				...options,
 				createWorker,
-				readout: createStatsPanel(panel),
+				readout: createStatsPanel(sections.statistics.body),
 				setTimer,
 				clearTimer,
 				logError,
@@ -133,15 +143,17 @@ if (globe !== null) {
 				setTimer,
 				clearTimer,
 				reportError: logError,
-				createControls: (controls) => createLayerControls(panel, controls),
+				createControls: (controls) =>
+					createLayerControls(sections.layers.body, overlays.legend, controls),
 			}),
 		createCursorReadout: (options) =>
 			createCursorReadout({
 				...options,
 				canvas,
 				globe,
-				show: createReadoutStrip(viewport).show,
+				show: createReadoutStrip(overlays.readout).show,
 			}),
+		layersSection: sections.layers,
 		openNewWorldDialog,
 		loadEarth: loadEarthData,
 		loadObserved: loadObservedTemperature,

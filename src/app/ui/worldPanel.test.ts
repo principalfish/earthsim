@@ -13,7 +13,6 @@ import { importWorldFile } from '../storage';
 import {
 	createFakeDocument,
 	type FakeDocument,
-	type FakeElement,
 	oneByClass,
 } from '../testing/fakeDocument';
 import {
@@ -269,15 +268,14 @@ describe('createWorldPanel', () => {
 	});
 
 	const make = () => {
-		const panel = fake.createElement('aside');
-		const controls = createWorldPanel(panel as unknown as HTMLElement, {
+		const section = fake.createElement('div');
+		const controls = createWorldPanel(section as unknown as HTMLElement, {
 			description: 'Blank ocean · 64',
 			onNewWorld: () => {},
 			onExport: () => {},
 			onImportOpen: () => {},
 			onImport: () => {},
 		});
-		const [section] = panel.children as [FakeElement];
 		return { controls, section };
 	};
 

@@ -17,8 +17,6 @@ export type StatsFigure = {
 
 /** The readout of terrain statistics on the page. */
 export type StatsPanel = {
-	/** The section that was added to the panel. */
-	readonly element: HTMLElement;
 	/**
 	 * Shows statistics in place of whatever the readout showed before.
 	 * They stay on the page until the next call of any method.
@@ -108,7 +106,7 @@ export const statsFigures = (stats: TerrainStats): StatsFigure[] =>
 	FIGURES.map(({ label, format }) => ({ label, value: format(stats) }));
 
 /**
- * Adds the statistics readout to the side panel.
+ * Adds the statistics readout to the Statistics section of the side panel.
  *
  * @remarks
  * The readout starts by saying that statistics are being calculated. Once
@@ -120,16 +118,14 @@ export const statsFigures = (stats: TerrainStats): StatsFigure[] =>
  * figures and the loss of them when it is next idle, without the focus
  * moving. Only the values that differ are rewritten, so only those are
  * announced. The note under the figures never changes and is outside the
- * region.
+ * region. The readout is kept up to date while its section is closed, so
+ * that it shows the figures of the moment as it opens.
  *
- * @param panel - The panel to add the readout to, after what it holds.
+ * @param body - The section's body, to add the readout to, after what it
+ * holds.
  * @returns The readout.
  */
-export const createStatsPanel = (panel: HTMLElement): StatsPanel => {
-	const section = createElement('section', 'panel__section');
-	const heading = createElement('h2', 'panel__heading');
-	heading.textContent = 'Statistics';
-
+export const createStatsPanel = (body: HTMLElement): StatsPanel => {
 	const region = createElement('div', 'stats');
 	region.setAttribute('aria-live', 'polite');
 
@@ -152,8 +148,7 @@ export const createStatsPanel = (panel: HTMLElement): StatsPanel => {
 	note.hidden = true;
 
 	region.append(status);
-	section.append(heading, region, note);
-	panel.append(section);
+	body.append(region, note);
 
 	/** Says something in place of the figures, with the note hidden. */
 	const showStatus = (text: string): void => {
@@ -169,7 +164,6 @@ export const createStatsPanel = (panel: HTMLElement): StatsPanel => {
 	};
 
 	return {
-		element: section,
 		show: (stats) => {
 			statsFigures(stats).forEach((figure, index) => {
 				const value = values[index];

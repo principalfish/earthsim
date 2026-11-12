@@ -4,13 +4,14 @@
  * shown, with a slider and a play button for the month, and, on the
  * measured Earth, whether it is the simulated temperature, the observed one
  * or the difference; the slider and the play button in Terrain view too
- * while the globe is lit by the sun; and the legend.
+ * while the globe is lit by the sun; and the legend, which is laid over the
+ * globe rather than in the section.
  *
  * {@link createLayerPanel} decides what the globe and the legend show, from
  * the view settings and the layer store, and switches the temperature's
  * calculation on and off with the layer. {@link createLayerControls} is the
- * section on the page, which only shows what it is told and passes on what
- * is chosen.
+ * section's controls and the legend on the page, which only show what they
+ * are told and pass on what is chosen.
  */
 
 import {
@@ -910,8 +911,9 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 };
 
 /**
- * Adds the Layers section to the side panel: the choice of layer, the
- * temperature's view controls, and the legend.
+ * Adds the layer controls to the Layers section of the side panel, the
+ * choice of layer and the temperature's view controls, and the legend to
+ * its place over the globe.
  *
  * @remarks
  * The temperature's controls show only in Temperature view: a drop-down of
@@ -923,17 +925,21 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
  * their own. The button is a toggle whose pressed state says whether the
  * year is playing.
  *
- * @param panel - The panel to add the section to, after what it holds.
+ * The legend is shown and hidden only as it is told, whether the Layers
+ * section is open or closed.
+ *
+ * @param body - The section's body, to add the controls to, after what it
+ * holds.
+ * @param legendPlace - Where the legend goes, over the globe, after what it
+ * holds.
  * @param options - The starting view settings and whom to tell of a choice.
  * @returns The controls, with the legend hidden.
  */
 export const createLayerControls = (
-	panel: HTMLElement,
+	body: HTMLElement,
+	legendPlace: HTMLElement,
 	options: LayerControlsOptions,
 ): LayerControls => {
-	const section = createElement('section', 'panel__section');
-	const heading = createElement('h2', 'panel__heading');
-	heading.textContent = 'Layers';
 	const legend = createLegend();
 
 	const temperatureControls = createElement('div', 'temperature-view');
@@ -988,8 +994,7 @@ export const createLayerControls = (
 	};
 	showView(options.view, false);
 
-	section.append(
-		heading,
+	body.append(
 		createSegmentedPicker({
 			name: 'layer',
 			legend: 'Layer',
@@ -998,9 +1003,8 @@ export const createLayerControls = (
 			onChange: options.onLayer,
 		}),
 		temperatureControls,
-		legend.element,
 	);
-	panel.append(section);
+	legendPlace.append(legend.element);
 	return {
 		showLegend: legend.show,
 		showView,

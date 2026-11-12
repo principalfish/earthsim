@@ -357,8 +357,6 @@ export type PlanetPanelOptions = {
 
 /** The planet controls on the page. */
 export type PlanetPanel = {
-	/** The section that holds the controls. */
-	readonly element: HTMLElement;
 	/**
 	 * Shows other settings, for settings that changed without the panel,
 	 * as a new world's do. `onChange` is not called.
@@ -371,7 +369,7 @@ export type PlanetPanel = {
 };
 
 /**
- * Adds the planet controls to the side panel.
+ * Adds the planet controls to the Planet section of the side panel.
  *
  * @remarks
  * Each slider writes its value beside its label, and a screen reader hears
@@ -390,18 +388,15 @@ export type PlanetPanel = {
  * The button that puts Earth's settings back is always usable. Pressed on
  * Earth's settings, it passes them on again.
  *
- * @param panel - The panel to add the controls to, after what it holds.
+ * @param body - The section's body, to add the controls to, after what it
+ * holds.
  * @param options - The starting settings and the callback for changes.
  * @returns The controls that were added.
  */
 export const createPlanetPanel = (
-	panel: HTMLElement,
+	body: HTMLElement,
 	options: PlanetPanelOptions,
 ): PlanetPanel => {
-	const section = createElement('section', 'panel__section');
-	const heading = createElement('h2', 'panel__heading');
-	heading.textContent = 'Planet';
-
 	let current: PlanetSettings = { ...options.planet };
 
 	const readout = createElement('div', 'planet-readout');
@@ -496,12 +491,6 @@ export const createPlanetPanel = (
 	reset.classList.add('button--compact');
 	reset.classList.add('planet-reset');
 
-	section.append(
-		heading,
-		...fields.map(({ field }) => field.element),
-		readout,
-		reset,
-	);
-	panel.append(section);
-	return { element: section, setPlanet: show };
+	body.append(...fields.map(({ field }) => field.element), readout, reset);
+	return { setPlanet: show };
 };

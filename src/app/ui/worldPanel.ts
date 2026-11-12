@@ -64,8 +64,6 @@ export type WorldPanelOptions = {
 
 /** The world controls on the page. */
 export type WorldPanel = {
-	/** The section that holds the controls. */
-	readonly element: HTMLElement;
 	/**
 	 * Shows another line describing the world being edited.
 	 *
@@ -240,7 +238,7 @@ export const describeWorld = (world: World): string => {
 };
 
 /**
- * Adds the world controls to the side panel.
+ * Adds the world controls to the World section of the side panel.
  *
  * @remarks
  * The line describing the world is ordinary text, so the seed in it can be
@@ -256,18 +254,15 @@ export const describeWorld = (world: World): string => {
  * say: what went wrong with an import or an export, and how the last save
  * went. Both are set as plain text.
  *
- * @param panel - The panel to add the controls to, after what it holds.
+ * @param body - The section's body, to add the controls to, after what it
+ * holds.
  * @param options - The starting line and the callbacks for the buttons.
  * @returns The controls that were added.
  */
 export const createWorldPanel = (
-	panel: HTMLElement,
+	body: HTMLElement,
 	options: WorldPanelOptions,
 ): WorldPanel => {
-	const section = createElement('section', 'panel__section');
-	const heading = createElement('h2', 'panel__heading');
-	heading.textContent = 'World';
-
 	const description = createElement('p', 'world-summary');
 	description.textContent = options.description;
 
@@ -316,10 +311,8 @@ export const createWorldPanel = (
 	autosave.setAttribute('aria-live', 'polite');
 	status.append(message, autosave);
 
-	section.append(heading, description, date, buttons, chooser, status);
-	panel.append(section);
+	body.append(description, date, buttons, chooser, status);
 	return {
-		element: section,
 		setDescription: (text) => {
 			description.textContent = text;
 		},

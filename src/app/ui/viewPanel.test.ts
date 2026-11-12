@@ -67,8 +67,8 @@ describe('createViewPanel', () => {
 
 	const make = (sunlight?: boolean) => {
 		const told: string[] = [];
-		const panel = fake.createElement('aside');
-		createViewPanel(panel as unknown as HTMLElement, {
+		const section = fake.createElement('div');
+		createViewPanel(section as unknown as HTMLElement, {
 			seaLevel: 0,
 			sunlight,
 			onExaggeration: (factor) => told.push(`exaggeration ${factor}`),
@@ -76,7 +76,6 @@ describe('createViewPanel', () => {
 			onGridVisible: (visible) => told.push(`grid ${visible}`),
 			onSunlight: (on) => told.push(`sunlight ${on}`),
 		});
-		const [section] = panel.children as [FakeElement];
 		const box = (id: string): FakeElement => {
 			const found = byClass(section, 'field__checkbox').find(
 				(input) => input.id === id,

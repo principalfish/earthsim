@@ -11,12 +11,7 @@ import {
 	MIN_DRAWN_SEA_LEVEL_M,
 	MIN_EXAGGERATION,
 } from '../globe/material';
-import {
-	createCheckField,
-	createElement,
-	createRangeField,
-	type RangeScale,
-} from './fields';
+import { createCheckField, createRangeField, type RangeScale } from './fields';
 
 /** The step between sea levels the slider can be set to, in metres. */
 export const SEA_LEVEL_SLIDER_STEP_M = 10;
@@ -43,8 +38,6 @@ export type ViewPanelOptions = {
 
 /** The view controls on the page. */
 export type ViewPanel = {
-	/** The section that holds the controls. */
-	readonly element: HTMLElement;
 	/**
 	 * Moves the sea-level slider and rewrites the level beside its label,
 	 * for a sea level that changed without the slider. `onSeaLevel` is not
@@ -77,20 +70,17 @@ export const formatMetres = (metres: number): string => {
 };
 
 /**
- * Adds the view controls to the side panel.
+ * Adds the view controls to the View section of the side panel.
  *
- * @param panel - The panel to add the controls to, after what it holds.
+ * @param body - The section's body, to add the controls to, after what it
+ * holds.
  * @param options - The starting values and the callbacks for changes.
  * @returns The controls that were added.
  */
 export const createViewPanel = (
-	panel: HTMLElement,
+	body: HTMLElement,
 	options: ViewPanelOptions,
 ): ViewPanel => {
-	const section = createElement('section', 'panel__section');
-	const heading = createElement('h2', 'panel__heading');
-	heading.textContent = 'View';
-
 	const seaLevelScale = (metres: number): RangeScale => ({
 		min: MIN_DRAWN_SEA_LEVEL_M,
 		max: MAX_DRAWN_SEA_LEVEL_M,
@@ -105,8 +95,7 @@ export const createViewPanel = (
 		onInput: options.onSeaLevel,
 	});
 
-	section.append(
-		heading,
+	body.append(
 		createRangeField({
 			id: 'view-exaggeration',
 			label: 'Relief exaggeration',
@@ -131,9 +120,7 @@ export const createViewPanel = (
 			onChange: options.onSunlight,
 		}),
 	);
-	panel.append(section);
 	return {
-		element: section,
 		setSeaLevel: (metres) => seaLevel.setScale(seaLevelScale(metres)),
 	};
 };

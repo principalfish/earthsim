@@ -46,6 +46,7 @@ import {
 	worldFromChoice,
 } from './ui/newWorldDialog';
 import type { PlanetPanel, PlanetPanelOptions } from './ui/planetPanel';
+import type { Section } from './ui/section';
 import type { ToolPanel, ToolPanelOptions } from './ui/toolPanel';
 import type { ViewPanel, ViewPanelOptions } from './ui/viewPanel';
 import {
@@ -139,9 +140,7 @@ export type PageParts = {
 		options: Pick<SculptOptions, 'onStrokeEnd' | 'onWorldChange'>,
 	) => Omit<SculptController, 'dispose'>;
 	/** Adds the world controls to the panel. */
-	readonly createWorldPanel: (
-		options: WorldPanelOptions,
-	) => Omit<WorldPanel, 'element'>;
+	readonly createWorldPanel: (options: WorldPanelOptions) => WorldPanel;
 	/** Gives the slot the saved world is kept in, without reading it yet. */
 	readonly openStore: () => Pick<WorldStore, 'load' | 'save'>;
 	/** Makes the autosave, not yet started. */
@@ -170,7 +169,7 @@ export type PageParts = {
 		options: PageTemperatureOptions,
 	) => Pick<TemperatureScheduler, 'refresh' | 'reset' | 'setShowing'>;
 	/**
-	 * Adds the Layers section to the panel, which holds the view settings:
+	 * Adds the layer controls to the panel, which hold the view settings:
 	 * what the globe is coloured by, and so whether the temperature is
 	 * showing, and what of the temperature's year it shows. It starts on
 	 * {@link DEFAULT_PAGE_VIEW}.
@@ -185,6 +184,11 @@ export type PageParts = {
 	readonly createCursorReadout: (
 		options: PageReadoutOptions,
 	) => Pick<CursorReadout, 'invalidate' | 'clear'>;
+	/**
+	 * The panel's Layers section, already in the panel, which ticking the
+	 * Sunlight control opens.
+	 */
+	readonly layersSection: Pick<Section, 'setOpen'>;
 	/** Opens the dialog that starts a new world. */
 	readonly openNewWorldDialog: (options: NewWorldDialogOptions) => void;
 	/** Gives the Earth's elevation data, for a world that starts as Earth. */
@@ -237,12 +241,14 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * is one, and otherwise on the dialog that starts a new world.
  *
  * @remarks
- * The parts are made in the order the panel shows them: the world
- * controls, the tools, the view controls, the planet controls, the layers
- * and then the statistics. The temperature, which has nothing of its own
- * in the panel, is made just before the layers, which switch it on and
- * off. The page opens on the height colours with the temperature not
- * showing, so nothing asks for the temperature until it is chosen.
+ * The panel's sections are in place before the page starts, in the order
+ * the panel shows them, so the parts that fill them can be made in an
+ * order of their own: the world controls, the tools, the view controls,
+ * the planet controls, the layers and then the statistics. The
+ * temperature, which has nothing of its own in the panel, is made just
+ * before the layers, which switch it on and off. The page opens on the
+ * height colours with the temperature not showing, so nothing asks for the
+ * temperature until it is chosen.
  *
  * The date line under the world's description is written as soon as the
  * world controls are made, and follows the world's age and every change of
@@ -261,7 +267,11 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * and when Temperature view is chosen the line between day and night is
  * drawn instead, whether or not there is a temperature on the globe yet.
  * The globe is told how it is lit once for each change of that, by the
- * Sunlight control or by a change of layer.
+ * Sunlight control or by a change of layer. Ticking the Sunlight control
+ * also opens the Layers section, where the month controls are, if it is
+ * closed; clearing it leaves the section as it is. Nothing else the page
+ * does opens or closes a section: a new, imported or restored world leaves
+ * every section as it is.
  *
  * The cursor readout over the globe is made after the statistics, and reads
  * what the globe shows of the temperature from the layer panel. Besides
@@ -474,6 +484,9 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		onSunlight: (on) => {
 			lightGlobe(on);
 			layerPanel.setSunlight(on);
+			if (on) {
+				parts.layersSection.setOpen(true);
+			}
 		},
 	});
 	const planet = parts.createPlanetPanel({

@@ -415,14 +415,14 @@ export const createCursorReadout = (
 
 /** The readout strip on the page. */
 export type ReadoutStrip = {
-	/** The strip, added to the globe's area. */
+	/** The strip, added to the place given for it. */
 	readonly element: HTMLElement;
 	/** Shows a readout's text, or hides the strip for null. */
 	show(text: ReadoutText | null): void;
 };
 
 /**
- * Adds the readout strip to the globe's area, after what it holds, hidden.
+ * Adds the readout strip, hidden, to the place given for it.
  *
  * @remarks
  * The strip holds one line for each piece of the text: the position, the
@@ -430,13 +430,15 @@ export type ReadoutStrip = {
  * nothing to say. The mark that the temperature is out of date is the end
  * of the temperature's line, hidden while it has nothing to say, and the
  * stylesheet puts a middle dot before it. The stylesheet lays the strip
- * over the globe's bottom-left corner, out of the pointer's way.
+ * over the globe's bottom-left corner, beside or above the legend, out of
+ * the pointer's way.
  *
  * The strip is for sighted users of a pointer. It is not a live region and
  * is hidden from assistive technology, since it changes with every
  * movement of the pointer and would otherwise be announced each time.
  *
- * @param container - The globe's area, which the strip is laid over.
+ * @param container - Where the strip goes, in the row of overlays along the
+ * bottom of the globe's area.
  * @returns The strip.
  */
 export const createReadoutStrip = (container: HTMLElement): ReadoutStrip => {

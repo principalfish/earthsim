@@ -46,8 +46,8 @@ body {
 }
 
 /* Layout */
-/* One cell, the globe's area, which the globe fills and the cursor readout
-   is laid over; neither can stretch it. */
+/* One cell, the globe's area, which the globe fills and the overlays are
+   laid over; neither can stretch it. */
 .viewport {
   display: grid;
   grid-template-rows: minmax(0, 1fr);
@@ -111,6 +111,61 @@ body {
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+/* The button that opens and closes a section, drawn as the heading it
+   fills, across the panel, with a marker before the name that points to
+   the name while the section is closed and down while it is open. */
+.panel__toggle {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  inline-size: 100%;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: start;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.panel__toggle::before {
+  flex: none;
+  inline-size: 0.5em;
+  block-size: 0.5em;
+  content: "";
+  background: currentcolor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.panel__toggle[aria-expanded="true"]::before {
+  rotate: 90deg;
+}
+
+.panel__toggle:hover {
+  color: var(--color-text);
+}
+
+.panel__toggle:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+/* What a section holds, spaced as the section's own rows are. */
+.panel__body {
+  display: grid;
+  gap: var(--space-md);
+}
+
+/* Hidden while the section is closed, which the display set on it would
+   otherwise undo. */
+.panel__body[hidden] {
+  display: none;
 }
 
 /* Components */
@@ -623,10 +678,25 @@ body {
   display: none;
 }
 
+/* Laid over the globe's bottom-right corner, on the backing the cursor
+   readout has. It is as wide as the panel and has the panel's inline
+   padding, room for the values marked at the ends of the scale, which
+   stand out past the ramp by half their width. In a window narrower than
+   that it is as wide as the globe's area allows. The pointer passes
+   through it to the globe, so turning and sculpting work under it. */
 .legend {
   display: grid;
+  flex: none;
   gap: var(--space-sm);
+  inline-size: var(--panel-width);
+  max-inline-size: 100%;
+  padding: var(--space-sm) var(--space-md);
   font-size: var(--font-size-sm);
+  color: var(--color-text);
+  background: var(--color-overlay-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
 }
 
 /* A part of the legend with nothing to show is hidden, which the display
@@ -722,24 +792,48 @@ body {
   accent-color: var(--color-accent);
 }
 
-/* What lies under the pointer, laid over the bottom-left corner of the
-   globe's area. The pointer passes through it to the globe, so it never
-   stops a stroke or a drag. Its width is fixed, with room in a wide font for
-   the longest usual line, `Annual average −12 °C difference · out of date`,
-   so it keeps its size as the values change and leaves the bottom-right
-   corner free; in a window narrower than that it is as wide as the area
-   allows. Each part has a line of its own and a part with nothing to say
-   takes none, so the strip is two lines high in Terrain view and three in
-   Temperature view: its height changes only with what is shown, not with
-   the values. */
-.cursor-readout {
+/* The row along the bottom of the globe's area that the legend and the
+   cursor readout sit in, a small margin in from its edges. The legend comes
+   first and the row runs from right to left, so the legend takes the
+   bottom-right corner and the strip, pushed along by its margin, the left
+   edge. The lines stack upwards, so when the two do not fit side by side the
+   legend keeps the bottom and the strip's line sits directly above it; on
+   one line both stand on the bottom edge. The pointer passes through the
+   row and all it holds to the globe. */
+.globe-overlays {
   grid-area: 1 / 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row-reverse;
+  flex-wrap: wrap-reverse;
+  /* With the lines stacked upwards, the start is the bottom. */
+  align-items: flex-start;
   align-self: end;
-  justify-self: start;
-  inline-size: min(26em, 100% - 2 * var(--space-sm));
+  gap: var(--space-sm);
+  min-width: 0;
   margin: var(--space-sm);
+  pointer-events: none;
+}
+
+/* A place that draws no box, so what it holds is laid out by the row. */
+.globe-overlays__place {
+  display: contents;
+}
+
+/* What lies under the pointer, against the left edge of the globe's area.
+   The pointer passes through it to the globe, so it never stops a stroke or
+   a drag. Its width is fixed, with room in a wide font for the longest
+   usual line, `Annual average −12 °C difference · out of date`, so it keeps
+   its size as the values change; in a window narrower than that it is as
+   wide as the area allows. Each part has a line of its own and a part with
+   nothing to say takes none, so the strip is two lines high in Terrain view
+   and three in Temperature view: its height changes only with what is
+   shown, not with the values. */
+.cursor-readout {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  inline-size: min(26em, 100%);
+  margin-inline-end: auto;
   padding: var(--space-xs) var(--space-sm);
   overflow: hidden;
   font-size: var(--font-size-sm);

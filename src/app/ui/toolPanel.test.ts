@@ -17,7 +17,9 @@ import {
 	type FakeDocument,
 	type FakeElement,
 	findAll,
+	oneByClass,
 } from '../testing/fakeDocument';
+import { createSection } from './section';
 import {
 	BRUSH_RADIUS_SLIDER_STEP_KM,
 	BRUSH_STRENGTH_SLIDER_STEP,
@@ -209,19 +211,23 @@ describe('createToolPanel', () => {
 
 	const make = () => {
 		const told: string[] = [];
-		const panel = fake.createElement('aside');
-		const { setHistoryState } = createToolPanel(
-			panel as unknown as HTMLElement,
-			{
-				onHistory: (action) => told.push(action),
-				onTool: (tool) => told.push(`tool ${tool}`),
-				onRadius: (km) => told.push(`radius ${km}`),
-				onStrength: (strength) => told.push(`strength ${strength}`),
-				onSmoothSetting: (setting) => told.push(`smooth ${setting}`),
-			},
+		const tools = createSection('Tools', {
+			id: 'section-tools',
+			open: false,
+			onToggle: (open) => told.push(`open ${open}`),
+		});
+		const { setHistoryState } = createToolPanel(tools, {
+			onHistory: (action) => told.push(action),
+			onTool: (tool) => told.push(`tool ${tool}`),
+			onRadius: (km) => told.push(`radius ${km}`),
+			onStrength: (strength) => told.push(`strength ${strength}`),
+			onSmoothSetting: (setting) => told.push(`smooth ${setting}`),
+		});
+		const section = tools.body as unknown as FakeElement;
+		const toggle = oneByClass(
+			tools.element as unknown as FakeElement,
+			'panel__toggle',
 		);
-		const [section] = panel.children as [FakeElement];
-		const tools = byClass(section, 'segmented__input');
 		const field = (id: string): FakeElement => {
 			const [input] = findAll(section, (element) => element.id === id);
 			const found = input?.parentNode;
@@ -232,7 +238,16 @@ describe('createToolPanel', () => {
 		};
 		const shownValue = (id: string): string | null =>
 			byClass(field(id), 'field__value')[0]?.textContent ?? null;
-		return { told, section, tools, field, shownValue, setHistoryState };
+		return {
+			told,
+			section,
+			tools: byClass(section, 'segmented__input'),
+			field,
+			shownValue,
+			setHistoryState,
+			heading: () => toggle.textContent,
+			toggle,
+		};
 	};
 
 	it('offers every tool in one row of segments, starting on Move', () => {
@@ -243,6 +258,25 @@ describe('createToolPanel', () => {
 		expect(
 			byClass(section, 'segmented__label').map((label) => label.textContent),
 		).toEqual(TOOLS.map((tool) => TOOL_LABELS[tool]));
+	});
+
+	it('names the chosen tool on the heading while the section is closed, and only the section when open', () => {
+		const { tools, told, heading, toggle } = make();
+		expect(heading()).toBe('Tools · Move');
+		fake.pick(tools[1] as FakeElement);
+		expect(heading()).toBe('Tools · Raise');
+		toggle.fire('click');
+		expect(heading()).toBe('Tools');
+		fake.pick(tools[3] as FakeElement);
+		expect(heading()).toBe('Tools');
+		toggle.fire('click');
+		expect(heading()).toBe(`Tools · ${TOOL_LABELS.smooth}`);
+		expect(told).toEqual([
+			'tool raise',
+			'open true',
+			'tool smooth',
+			'open false',
+		]);
 	});
 
 	it('greys out the brush sliders for Move and brings them back for a brush', () => {

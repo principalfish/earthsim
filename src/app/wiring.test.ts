@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readEarthDataFile } from '../../scripts/earth/dataFile.mjs';
 import {
 	createBlankWorld,
@@ -28,11 +28,14 @@ import {
 } from '../worker/testing/fakeWorker';
 import { type AppState, createAppState } from './appState';
 import { MAIN_BUTTON, SECONDARY_BUTTON } from './globe/input';
+import { createPanelMemory, panelMemoryKey } from './panelMemory';
 import { PLAYBACK_STEP_MS } from './playback';
 import { TEMPERATURE_DEBOUNCE_MS } from './refresh';
 import type { SculptOptions, StrokeChanges } from './sculpt';
 import { RESTORE_FAILED_MESSAGE } from './startup';
 import type { LoadOutcome } from './storage';
+import { createFakeDocument, type FakeDocument } from './testing/fakeDocument';
+import { createFakeStorage } from './testing/fakeStorage';
 import { createFakeTimers } from './testing/fakeTimers';
 import { settle } from './testing/settle';
 import type { ComparisonContent } from './ui/comparison';
@@ -46,6 +49,7 @@ import {
 	type NewWorldDialogOptions,
 	newWorldValuesFor,
 } from './ui/newWorldDialog';
+import { createPanelSections, PANEL_SECTIONS } from './ui/panelSections';
 import type { PlanetPanelOptions } from './ui/planetPanel';
 import type { ToolPanelOptions } from './ui/toolPanel';
 import type { ViewPanelOptions } from './ui/viewPanel';
@@ -104,6 +108,8 @@ type Stage = {
 	readonly readoutOptions: PageReadoutOptions;
 	/** What the stand-in for the cursor readout was asked to do, in order. */
 	readonly readoutCalls: string[];
+	/** What the stand-in for the Layers section was asked to do, in order. */
+	readonly sectionCalls: string[];
 	/** What the stand-in for the layer panel says the globe shows. */
 	shownTemperature: ShownTemperature | null;
 	/** Every sun the globe was given, in order. */
@@ -153,7 +159,13 @@ const required = <T>(value: T | undefined, name: string): T => {
 
 /** The parts a test may make itself, in place of the stage's stand-ins. */
 type StageParts = Partial<
-	Pick<PageParts, 'createStatistics' | 'createTemperature' | 'createLayerPanel'>
+	Pick<
+		PageParts,
+		| 'createStatistics'
+		| 'createTemperature'
+		| 'createLayerPanel'
+		| 'layersSection'
+	>
 >;
 
 const createStage = (
@@ -180,6 +192,7 @@ const createStage = (
 	let readoutOptions: PageReadoutOptions | undefined;
 	let onCameraMove: (() => void) | undefined;
 	const readoutCalls: string[] = [];
+	const sectionCalls: string[] = [];
 	let keyListener: ((event: ShortcutEvent) => void) | undefined;
 	let hidingListener: (() => void) | undefined;
 	let answerLoad: ((outcome: LoadOutcome) => void) | undefined;
@@ -227,6 +240,7 @@ const createStage = (
 			return required(readoutOptions, 'cursor readout');
 		},
 		readoutCalls,
+		sectionCalls,
 		shownTemperature: null,
 		suns,
 		moveCamera: () => required(onCameraMove, 'view input')(),
@@ -402,6 +416,9 @@ const createStage = (
 				clear: () => readoutCalls.push('clear'),
 			};
 		},
+		layersSection: own.layersSection ?? {
+			setOpen: (open) => sectionCalls.push(`layersSection.setOpen ${open}`),
+		},
 		openNewWorldDialog: (options) => {
 			log.push(`openNewWorldDialog ${options.notice ?? 'no notice'}`);
 			dialogs.push(options);
@@ -437,6 +454,7 @@ const createStartedStage = async (
 	await stage.started;
 	stage.log.length = 0;
 	stage.readoutCalls.length = 0;
+	stage.sectionCalls.length = 0;
 	stage.suns.length = 0;
 	return stage;
 };
@@ -464,7 +482,7 @@ const UNDO_KEYS = { key: 'z', code: 'KeyZ', ctrlKey: true };
 const REDO_KEYS = { key: 'y', code: 'KeyY', ctrlKey: true };
 
 describe('startPage', () => {
-	it('shows the starting world and makes the parts in the order of the panel', () => {
+	it('shows the starting world and makes the parts in order', () => {
 		const world = createBlankWorld(64);
 		const { log } = createStage(world);
 		expect(log).toEqual([
@@ -1747,6 +1765,111 @@ describe('the sun', () => {
 		await settle();
 		expect(stage.suns).toEqual([sunOf(DEFAULT_MONTH, next.planet)]);
 		expect(sunCalls(stage.log)).toHaveLength(1);
+	});
+});
+
+describe('the panel’s sections', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	/**
+	 * The real sections in a panel of their own, on a storage that holds
+	 * these entries at first.
+	 */
+	const createSections = (entries: Readonly<Record<string, string>> = {}) => {
+		const storage = createFakeStorage(entries);
+		const panel = fake.createElement('aside');
+		const sections = createPanelSections(
+			panel as unknown as HTMLElement,
+			createPanelMemory(storage),
+		);
+		/** Whether each section is open, in the panel's order. */
+		const states = () =>
+			PANEL_SECTIONS.map(({ key }) => [key, sections[key].isOpen()]);
+		return { storage, sections, states };
+	};
+
+	it('are not asked to open or close anything as the page starts', async () => {
+		const stage = createStage();
+		expect(stage.sectionCalls).toEqual([]);
+		stage.answerLoad({ kind: 'empty' });
+		await stage.started;
+		expect(stage.sectionCalls).toEqual([]);
+	});
+
+	it('have the Layers section opened when Sunlight is ticked, and nothing when it is cleared', async () => {
+		const stage = await createStartedStage();
+		stage.viewPanelOptions.onSunlight(false);
+		expect(stage.sectionCalls).toEqual([]);
+		stage.viewPanelOptions.onSunlight(true);
+		stage.viewPanelOptions.onSunlight(false);
+		expect(stage.sectionCalls).toEqual(['layersSection.setOpen true']);
+	});
+
+	it('open a closed Layers section when Sunlight is ticked, and remember it as a click would', async () => {
+		const { storage, sections, states } = createSections();
+		const stage = await createStartedStage(undefined, {
+			layersSection: sections.layers,
+		});
+		stage.viewPanelOptions.onSunlight(true);
+		expect(sections.layers.isOpen()).toBe(true);
+		expect(sections.layers.body.hidden).toBe(false);
+		expect(storage.writes).toEqual([[panelMemoryKey('layers'), 'open']]);
+
+		stage.viewPanelOptions.onSunlight(false);
+		expect(states()).toEqual([
+			['world', true],
+			['layers', true],
+			['view', false],
+			['planet', false],
+			['tools', false],
+			['statistics', false],
+		]);
+		expect(storage.writes).toHaveLength(1);
+	});
+
+	it('leave an open Layers section alone when Sunlight is ticked', async () => {
+		const { storage, sections } = createSections({
+			[panelMemoryKey('layers')]: 'open',
+		});
+		const stage = await createStartedStage(undefined, {
+			layersSection: sections.layers,
+		});
+		stage.viewPanelOptions.onSunlight(true);
+		expect(sections.layers.isOpen()).toBe(true);
+		expect(storage.writes).toEqual([]);
+	});
+
+	it('are not opened, closed or written to storage by a restored world, a new world and an import', async () => {
+		const { storage, sections, states } = createSections({
+			[panelMemoryKey('world')]: 'closed',
+			[panelMemoryKey('planet')]: 'open',
+			[panelMemoryKey('statistics')]: 'open',
+		});
+		const before = states();
+		const stage = createStage(undefined, { layersSection: sections.layers });
+		stage.answerLoad({
+			kind: 'world',
+			world: generateWorld({ resolution: 64, seed: 9, landFraction: 0.4 }),
+		});
+		await stage.started;
+		expect(states()).toEqual(before);
+
+		stage.state.replaceWorld(createBlankWorld(64));
+		expect(states()).toEqual(before);
+
+		stage.importResult = { ok: true, world: createBlankWorld(64) };
+		stage.worldPanelOptions.onImport(new Blob());
+		await settle();
+		expect(states()).toEqual(before);
+		expect(stage.sectionCalls).toEqual([]);
+		expect(storage.writes).toEqual([]);
 	});
 });
 

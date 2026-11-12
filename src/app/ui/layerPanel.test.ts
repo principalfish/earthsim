@@ -63,7 +63,9 @@ import {
 	LEGEND_OUT_OF_DATE_TEXT,
 	LEGEND_UNAVAILABLE_TEXT,
 	type LegendContent,
+	legendContent,
 } from './legend';
+import { createSection } from './section';
 
 /** What the globe was asked to show: a field, its range and ramp, or none. */
 type Shown = {
@@ -2052,26 +2054,34 @@ describe('createLayerControls', () => {
 
 	const make = (view: Partial<PageView> = {}) => {
 		const chosen: string[] = [];
-		const panel = fake.createElement('aside');
-		const controls = createLayerControls(panel as unknown as HTMLElement, {
-			view: { ...DEFAULT_PAGE_VIEW, ...view },
-			onLayer: (next) => chosen.push(next),
-			onTemperatureView: (next) => chosen.push(next),
-			onMonth: (next) => chosen.push(`month ${next}`),
-			onPlay: () => chosen.push('play'),
-			onSource: (next) => chosen.push(next),
-		});
-		const [section] = panel.children as [FakeElement];
+		const section = fake.createElement('div');
+		const place = fake.createElement('div');
+		const controls = createLayerControls(
+			section as unknown as HTMLElement,
+			place as unknown as HTMLElement,
+			{
+				view: { ...DEFAULT_PAGE_VIEW, ...view },
+				onLayer: (next) => chosen.push(next),
+				onTemperatureView: (next) => chosen.push(next),
+				onMonth: (next) => chosen.push(`month ${next}`),
+				onPlay: () => chosen.push('play'),
+				onSource: (next) => chosen.push(next),
+			},
+		);
 		const radios = (name: string): FakeElement[] =>
 			byClass(section, 'segmented__input').filter(
 				(input) => input.name === name,
 			);
-		return { controls, chosen, section, radios };
+		return { controls, chosen, section, place, radios };
 	};
 
-	it('adds a Layers section with Terrain chosen and the legend hidden', () => {
-		const { section, radios } = make();
-		expect(oneByClass(section, 'panel__heading').textContent).toBe('Layers');
+	it('adds the layer controls with Terrain chosen, and the legend to its own place, hidden', () => {
+		const { section, place, radios } = make();
+		expect(section.children.map((child) => child.className)).toEqual([
+			'segmented',
+			'temperature-view',
+		]);
+		expect(place.children.map((child) => child.className)).toEqual(['legend']);
 		expect(
 			radios('layer').map((radio) => [radio.value, radio.checked]),
 		).toEqual([
@@ -2087,7 +2097,8 @@ describe('createLayerControls', () => {
 			'Observed',
 			'Difference',
 		]);
-		expect(oneByClass(section, 'legend').hidden).toBe(true);
+		expect(byClass(section, 'legend')).toEqual([]);
+		expect(oneByClass(place, 'legend').hidden).toBe(true);
 		expect(oneByClass(section, 'temperature-view').hidden).toBe(true);
 		expect(oneByClass(section, 'comparison').hidden).toBe(true);
 	});
@@ -2139,12 +2150,13 @@ describe('createLayerControls', () => {
 	});
 
 	it('shows the legend it is given', () => {
-		const { controls, section } = make();
+		const { controls, place } = make();
 		controls.showLegend({ scale: null, status: 'x', bar: null });
-		expect(oneByClass(section, 'legend').hidden).toBe(false);
+		expect(oneByClass(place, 'legend').hidden).toBe(false);
 		controls.showLegend(null);
-		expect(oneByClass(section, 'legend').hidden).toBe(true);
+		expect(oneByClass(place, 'legend').hidden).toBe(true);
 	});
+
 	it('shows the temperature controls in Temperature view only', () => {
 		const { controls, section } = make();
 		const temperature = oneByClass(section, 'temperature-view');
@@ -2288,5 +2300,111 @@ describe('createLayerControls', () => {
 		expect(play.getAttribute('aria-pressed')).toBe('true');
 		controls.showView({ ...DEFAULT_PAGE_VIEW, layer: 'temperature' }, false);
 		expect(play.getAttribute('aria-pressed')).toBe('false');
+	});
+});
+
+describe('the legend over the globe', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	/** The real layer panel and controls, in a Layers section open or not. */
+	const make = (open: boolean) => {
+		const section = createSection('Layers', {
+			id: 'section-layers',
+			open,
+			onToggle: () => {},
+		});
+		const place = fake.createElement('div');
+		const store = createLayerStore(() => {});
+		const timers = createFakeTimers();
+		createLayerPanel({
+			store,
+			setTimer: timers.setTimer,
+			clearTimer: timers.clearTimer,
+			loadObserved: () =>
+				Promise.reject(new Error('The observed temperature is not asked for')),
+			reportError: () => {},
+			globe: { setLayer: () => {} },
+			temperature: { setShowing: () => {} },
+			createControls: (options) =>
+				createLayerControls(
+					section.body,
+					place as unknown as HTMLElement,
+					options,
+				),
+		});
+		const body = section.body as unknown as FakeElement;
+		/** Picks a layer on the controls, as a click does. */
+		const pickLayer = (index: number): void => {
+			const radios = byClass(body, 'segmented__input').filter(
+				(input) => input.name === 'layer',
+			);
+			fake.pick(radios[index] as FakeElement);
+		};
+		const legend = oneByClass(place, 'legend');
+		return {
+			section,
+			body,
+			store,
+			pickLayer,
+			legend,
+			status: () => oneByClass(legend, 'legend__status').textContent,
+			bar: oneByClass(legend, 'legend__bar'),
+			scale: oneByClass(legend, 'legend__scale'),
+		};
+	};
+
+	it('is in its place over the globe and not in the Layers section', () => {
+		const { section, legend } = make(true);
+		expect(
+			byClass(section.element as unknown as FakeElement, 'legend'),
+		).toEqual([]);
+		expect(legend.parentNode?.classList.contains('panel__body')).toBe(false);
+	});
+
+	it.each([
+		['open', true],
+		['closed', false],
+	])(
+		'shows on Temperature and hides on Terrain with the Layers section %s',
+		(_name, open) => {
+			const { section, body, pickLayer, legend, status } = make(true);
+			section.setOpen(open);
+			expect(body.hidden).toBe(!open);
+			expect(legend.hidden).toBe(true);
+			pickLayer(1);
+			expect(legend.hidden).toBe(false);
+			expect(status()).toBe(LEGEND_EMPTY_TEXT);
+			pickLayer(0);
+			expect(legend.hidden).toBe(true);
+		},
+	);
+
+	it('follows the calculation while the Layers section is closed, as when it is open', () => {
+		const { section, store, pickLayer, legend, status, bar, scale } =
+			make(true);
+		pickLayer(1);
+		section.setOpen(false);
+		store.markCalculating();
+		store.setProgress(progressOf(1));
+		expect(legend.hidden).toBe(false);
+		expect(status()).toBe(legendContent(store.temperature, null, false).status);
+		expect(bar.hidden).toBe(false);
+		expect(scale.hidden).toBe(true);
+
+		const result = resultWith();
+		store.setResult(result, true);
+		expect(legend.hidden).toBe(false);
+		expect(bar.hidden).toBe(true);
+		expect(scale.hidden).toBe(false);
+		expect(oneByClass(legend, 'legend__caption').textContent).toBe(
+			temperatureCaption('month', DEFAULT_MONTH),
+		);
 	});
 });
