@@ -4,20 +4,38 @@
  * the world as it is, with the progress of a calculation under way.
  */
 
-import type { TemperatureProgress } from '../../core/index';
+import {
+	getGrid,
+	isSupportedResolution,
+	type TemperatureProgress,
+	weightedQuantiles,
+} from '../../core/index';
 import { type ColourRamp, rampGradient, type ValueRange } from '../globe/ramp';
 import type { TemperatureLayer } from '../layers';
 import { createElement } from './fields';
 
 /**
  * The narrowest range a scale is fitted to, in degrees Celsius. A field
- * that varies less than this, or not at all, is shown over this much,
- * centred on its middle, so that the ramp is not stretched over a sliver.
+ * that varies less than this, or not at all, is shown over at least this
+ * much, about its middle, so that the ramp is not stretched over a sliver.
  */
 export const MIN_FITTED_SPAN_C = 2;
 
-/** The most values {@link legendTicks} marks along a scale. */
+/**
+ * The share of a year's weight, by area, a temperature scale leaves out at
+ * each end: half a percent, so that the scale spans the middle 99% of the
+ * world.
+ */
+export const FIT_TAIL_SHARE = 0.005;
+
+/** The most values {@link legendTicks} marks along a scale at its own step. */
 export const MAX_LEGEND_TICKS = 6;
+
+/**
+ * The most values {@link legendTicks} marks along a scale at a step it is
+ * given: room for a label every 5 degrees along a scale up to 55.
+ */
+export const MAX_STEPPED_TICKS = 12;
 
 /**
  * How far, as a share of its size, a range's end divided by a step may fall
@@ -33,6 +51,25 @@ const TICK_SLACK = 4 * Number.EPSILON;
  * {@link TICK_SLACK} of it is less than half a step.
  */
 const MAX_TICK_INDEX = 2 ** 48;
+
+/**
+ * The first and last whole multiples of a step within a range, as counts
+ * of the step. Each end divided by the step is given {@link TICK_SLACK} of
+ * room outward, so that an end that is a multiple of the step is counted
+ * although its division falls just short.
+ */
+const tickIndices = (
+	min: number,
+	max: number,
+	step: number,
+): { readonly first: number; readonly last: number } => {
+	const low = min / step;
+	const high = max / step;
+	return {
+		first: Math.ceil(low - Math.abs(low) * TICK_SLACK),
+		last: Math.floor(high + Math.abs(high) * TICK_SLACK),
+	};
+};
 
 /** What the legend says before there is a result to show. */
 export const LEGEND_EMPTY_TEXT = 'Not calculated yet';
@@ -56,38 +93,146 @@ export const LEGEND_NOT_SHOWN_TEXT = 'Temperature could not be shown';
 /** What the legend says of the calculation before its first year is done. */
 export const LEGEND_FIRST_YEAR_TEXT = 'Calculating · first year';
 
+/** Whether a field shown on a scale holds values beyond either of its ends. */
+export type ValuesBeyond = {
+	/** Whether some value lies below the scale's low end. */
+	readonly below: boolean;
+	/** Whether some value lies above the scale's high end. */
+	readonly above: boolean;
+};
+
+/** No value beyond either end of a scale. */
+export const NOTHING_BEYOND: ValuesBeyond = { below: false, above: false };
+
+/** A scale fitted to some fields, and whether it leaves values out. */
+export type FittedScale = {
+	/** The range the scale spans. */
+	readonly range: ValueRange;
+	/** Whether the fields hold values beyond either end of the range. */
+	readonly beyond: ValuesBeyond;
+};
+
 /**
- * The range a scale is fitted to: from the coldest value to the hottest in
- * any of the fields, so that a colour means the same in every month.
+ * What each cell of a field counts for when a scale is fitted to it.
  *
- * @param months - The fields, such as the twelve months of a year.
- * @returns The lowest and highest finite value in any field, widened about
- * its middle to {@link MIN_FITTED_SPAN_C} if narrower. Values that are not
- * numbers or are infinite are passed over.
- * @throws RangeError if no field holds a finite value.
+ * @remarks
+ * A field with as many cells as one of the grids is weighted by that grid's
+ * cell areas, since cells differ in area and a scale is to describe the
+ * world by area, not by the count of its cells. A field of any other
+ * length, which no world has but a test can make, has every cell counted
+ * the same.
+ *
+ * @param cellCount - The cells in the field.
+ * @returns One weight per cell: the grid's own areas, which must not be
+ * changed, or ones.
  */
-export const fitRange = (months: readonly Float32Array[]): ValueRange => {
-	let min = Number.POSITIVE_INFINITY;
+export const cellWeights = (cellCount: number): ArrayLike<number> => {
+	const n = Math.round(Math.sqrt(cellCount / 6));
+	if (isSupportedResolution(n) && 6 * n * n === cellCount) {
+		return getGrid(n).areas;
+	}
+	return new Float64Array(cellCount).fill(1);
+};
+
+/**
+ * The scale a year of temperatures is fitted to, the same in every month
+ * so that a colour means the same in each, and spanning the middle 99% of
+ * the world by area.
+ *
+ * @remarks
+ * Its ends are the weighted quantiles {@link FIT_TAIL_SHARE} in from either
+ * end of every value in the fields together, each weighted by its cell's
+ * weight, as a cell-month by its cell's area: so a peak or a pole that
+ * covers little of the world does not stretch the scale and squeeze the
+ * rest into a few colours. Values beyond the ends take the end colours.
+ * Before they are rounded, the ends are widened about their middle to
+ * {@link MIN_FITTED_SPAN_C} if they are closer than that. They are then
+ * rounded outward to whole degrees, the low end down and the high end up,
+ * so that the legend's words for what lies beyond them are whole numbers.
+ *
+ * @param months - The fields, such as the twelve months of a year, each one
+ * value per cell. Values that are not numbers or are infinite are passed
+ * over.
+ * @param weights - What each cell counts for, one per cell, as from
+ * {@link cellWeights}.
+ * @returns The range, at least {@link MIN_FITTED_SPAN_C} wide with whole
+ * ends, and whether any finite value lies below its low end or above its
+ * high end.
+ * @throws RangeError if no field holds a finite value, or a field or the
+ * weights are not as {@link weightedQuantiles} takes them.
+ */
+export const fitRange = (
+	months: readonly Float32Array[],
+	weights: ArrayLike<number>,
+): FittedScale => {
+	const cuts = weightedQuantiles(months, weights, FIT_TAIL_SHARE);
+	let { low, high } = cuts;
+	if (high - low < MIN_FITTED_SPAN_C) {
+		const middle = (low + high) / 2;
+		low = middle - MIN_FITTED_SPAN_C / 2;
+		high = middle + MIN_FITTED_SPAN_C / 2;
+	}
+	const range = { min: Math.floor(low), max: Math.ceil(high) };
+	return {
+		range,
+		beyond: {
+			below: cuts.lowest < range.min,
+			above: cuts.highest > range.max,
+		},
+	};
+};
+
+/**
+ * The range a scale of sizes is fitted to, such as the seasonal range: from
+ * zero up to the largest value in the field, rounded up to a whole number.
+ *
+ * @param field - The values, none below zero.
+ * @returns From 0 to the largest finite value rounded up to a whole number,
+ * or to {@link MIN_FITTED_SPAN_C} if that is smaller. Values that are not
+ * numbers or are infinite are passed over.
+ * @throws RangeError if the field holds no finite value.
+ */
+export const fitRangeFromZero = (field: Float32Array): ValueRange => {
 	let max = Number.NEGATIVE_INFINITY;
-	for (const field of months) {
-		for (const value of field) {
-			if (Number.isFinite(value)) {
-				min = Math.min(min, value);
-				max = Math.max(max, value);
-			}
+	for (const value of field) {
+		if (Number.isFinite(value)) {
+			max = Math.max(max, value);
 		}
 	}
-	if (!Number.isFinite(min) || !Number.isFinite(max)) {
+	if (!Number.isFinite(max)) {
 		throw new RangeError('A scale needs at least one finite value to fit');
 	}
-	if (max - min < MIN_FITTED_SPAN_C) {
-		const middle = (min + max) / 2;
-		return {
-			min: middle - MIN_FITTED_SPAN_C / 2,
-			max: middle + MIN_FITTED_SPAN_C / 2,
-		};
+	return { min: 0, max: Math.max(MIN_FITTED_SPAN_C, Math.ceil(max)) };
+};
+
+/**
+ * The whole multiples of a whole step inside a range, or null for fewer
+ * than two of them, more than {@link MAX_STEPPED_TICKS}, or multiples of
+ * the step past {@link MAX_TICK_INDEX}, the most counted to for a step
+ * chosen as well.
+ */
+const steppedTicks = (
+	min: number,
+	max: number,
+	step: number,
+): number[] | null => {
+	const { first, last } = tickIndices(min, max, step);
+	if (
+		!(Math.abs(first) <= MAX_TICK_INDEX) ||
+		!(Math.abs(last) <= MAX_TICK_INDEX) ||
+		last - first + 1 > MAX_STEPPED_TICKS
+	) {
+		return null;
 	}
-	return { min, max };
+	const ticks: number[] = [];
+	for (let k = first; k <= last; k++) {
+		const tick = k * step;
+		if (tick >= min && tick <= max) {
+			// Not -0, which would print as such in some places.
+			ticks.push(tick === 0 ? 0 : tick);
+		}
+	}
+	return ticks.length >= 2 ? ticks : null;
 };
 
 /**
@@ -100,6 +245,13 @@ export const fitRange = (months: readonly Float32Array[]): ValueRange => {
  * is the nearest number to its decimal value, so it prints as written, and
  * a value that falls on an end of the range is marked.
  *
+ * A scale can be given a step of its own instead, such as every 5 degrees
+ * for the seasonal range: then the values are the whole multiples of that
+ * step inside the range, ends included, so long as there are from two to
+ * {@link MAX_STEPPED_TICKS} of them. For a range so wide that the step
+ * gives more, or so narrow that it gives fewer than two, the step is set
+ * aside and the values are chosen as above.
+ *
  * Doubles cannot keep that promise for every range, so some are refused
  * rather than marked with fewer than two values: one too narrow or too
  * wide for its step to be a finite number above zero (narrower than about
@@ -110,15 +262,34 @@ export const fitRange = (months: readonly Float32Array[]): ValueRange => {
  *
  * @param min - The low end of the scale.
  * @param max - The high end; above `min`.
- * @returns The values, lowest first: from two to {@link MAX_LEGEND_TICKS}.
+ * @param step - A step of the scale's own to mark it at, a whole number
+ * above zero; left out, the step is chosen as above.
+ * @returns The values, lowest first: from two to {@link MAX_LEGEND_TICKS},
+ * or to {@link MAX_STEPPED_TICKS} at a step given.
  * @throws RangeError unless both ends are finite and `min` is below `max`,
- * and for a range that cannot be marked at two round values, as above.
+ * for a step given that is not a whole number above zero, and for a range
+ * that cannot be marked at two round values, as above.
  */
-export const legendTicks = (min: number, max: number): number[] => {
+export const legendTicks = (
+	min: number,
+	max: number,
+	step?: number,
+): number[] => {
 	if (!Number.isFinite(min) || !Number.isFinite(max) || !(min < max)) {
 		throw new RangeError(
 			`A scale must run up from one finite value to another; got ${min} to ${max}`,
 		);
+	}
+	if (step !== undefined) {
+		if (!(Number.isSafeInteger(step) && step > 0)) {
+			throw new RangeError(
+				`A step to mark a scale at must be a whole number above zero; got ${step}`,
+			);
+		}
+		const ticks = steppedTicks(min, max, step);
+		if (ticks !== null) {
+			return ticks;
+		}
 	}
 	const unmarkable = (): RangeError =>
 		new RangeError(
@@ -140,12 +311,7 @@ export const legendTicks = (min: number, max: number): number[] => {
 			if (!Number.isFinite(power) || !Number.isFinite(step) || !(step > 0)) {
 				throw unmarkable();
 			}
-			// A little room either way, so that an end that is a multiple of
-			// the step is counted although its division falls just short.
-			const low = min / step;
-			const high = max / step;
-			const first = Math.ceil(low - Math.abs(low) * TICK_SLACK);
-			const last = Math.floor(high + Math.abs(high) * TICK_SLACK);
+			const { first, last } = tickIndices(min, max, step);
 			if (
 				!(Math.abs(first) <= MAX_TICK_INDEX) ||
 				!(Math.abs(last) <= MAX_TICK_INDEX)
@@ -253,10 +419,41 @@ export type LegendTick = {
 
 /** A scale the legend draws. */
 export type LegendScale = {
+	/** What the scale measures, with its unit. */
+	readonly caption: string;
 	/** The ramp as a CSS gradient from left to right. */
 	readonly gradient: string;
 	/** The values marked along it. */
 	readonly ticks: readonly LegendTick[];
+	/**
+	 * What the legend says at the scale's low end, such as `−34 and below`,
+	 * when there are values below it that take its first colour; null when
+	 * there are none.
+	 */
+	readonly below: string | null;
+	/**
+	 * What the legend says at the scale's high end, such as `29 and above`,
+	 * when there are values above it that take its last colour; null when
+	 * there are none.
+	 */
+	readonly above: string | null;
+};
+
+/** What the globe shows a layer with, for the legend to draw. */
+export type LegendSource = {
+	/** The range the layer is shown on. */
+	readonly range: ValueRange;
+	/** The ramp it is shown with. */
+	readonly ramp: ColourRamp;
+	/** What the field shown measures, with its unit. */
+	readonly caption: string;
+	/** Whether there are values beyond either end of the range. */
+	readonly beyond: ValuesBeyond;
+	/**
+	 * A step of the scale's own to mark it at, as {@link legendTicks} takes
+	 * it; left out, the legend chooses one.
+	 */
+	readonly tickStep?: number;
 };
 
 /** What the legend shows at one moment. */
@@ -280,9 +477,8 @@ export type LegendContent = {
  * What the legend shows for the temperature layer as it stands.
  *
  * @param layer - The layer, from the store.
- * @param range - The range the globe is showing the layer on, or null when
- * it shows no scale.
- * @param ramp - The ramp the globe is showing it with.
+ * @param source - The range, ramp and caption the globe is showing the
+ * layer with, or null when it shows no scale.
  * @param showsResult - Whether what the globe shows is the layer's own
  * result, and not an earlier one it kept when it refused this one. False
  * whenever it shows no scale.
@@ -290,23 +486,35 @@ export type LegendContent = {
  * calculating, a bar. A current result has no line while the globe shows
  * it. While the globe does not, the line is {@link LEGEND_OUT_OF_DATE_TEXT}
  * over the earlier result's scale, which is what the globe then shows, and
- * {@link LEGEND_NOT_SHOWN_TEXT} when there is no scale at all.
+ * {@link LEGEND_NOT_SHOWN_TEXT} when there is no scale at all. The scale's
+ * ticks are at its own step when it has one, and it says what its end
+ * colours stand for at each end that has values beyond it.
  */
 export const legendContent = (
 	layer: TemperatureLayer,
-	range: ValueRange | null,
-	ramp: ColourRamp,
+	source: LegendSource | null,
 	showsResult: boolean,
 ): LegendContent => {
 	const scale =
-		range === null
+		source === null
 			? null
 			: {
-					gradient: rampGradient(ramp),
-					ticks: legendTicks(range.min, range.max).map((value) => ({
+					caption: source.caption,
+					gradient: rampGradient(source.ramp),
+					ticks: legendTicks(
+						source.range.min,
+						source.range.max,
+						source.tickStep,
+					).map((value) => ({
 						label: formatTick(value),
-						position: tickPosition(value, range),
+						position: tickPosition(value, source.range),
 					})),
+					below: source.beyond.below
+						? `${formatTick(source.range.min)} and below`
+						: null,
+					above: source.beyond.above
+						? `${formatTick(source.range.max)} and above`
+						: null,
 				};
 	switch (layer.status) {
 		case 'current': {
@@ -356,19 +564,29 @@ export type Legend = {
  * hidden only with the whole legend, when the legend is given nothing to
  * show.
  *
- * @param caption - What the scale measures, with its unit.
+ * The caption over the ramp is the scale's own, so it changes with what the
+ * scale measures, and is hidden with the scale.
+ *
+ * What the end colours stand for, such as `−34 and below` and `29 and
+ * above`, is on a line of its own under the values marked, each part at its
+ * own end, so that it never runs into a value marked near that end. The
+ * line, and room for it, is there only while at least one part shows.
+ *
  * @returns The legend.
  */
-export const createLegend = (caption: string): Legend => {
+export const createLegend = (): Legend => {
 	const legend = createElement('div', 'legend');
 	legend.hidden = true;
 
 	const title = createElement('p', 'legend__caption');
-	title.textContent = caption;
 	const scale = createElement('div', 'legend__scale');
 	const ramp = createElement('div', 'legend__ramp');
 	const ticks = createElement('div', 'legend__ticks');
-	scale.append(title, ramp, ticks);
+	const ends = createElement('p', 'legend__ends');
+	const below = createElement('span', 'legend__end legend__end--low');
+	const above = createElement('span', 'legend__end legend__end--high');
+	ends.append(below, above);
+	scale.append(title, ramp, ticks, ends);
 
 	const status = createElement('p', 'legend__status');
 	status.setAttribute('aria-live', 'polite');
@@ -387,6 +605,9 @@ export const createLegend = (caption: string): Legend => {
 			}
 			scale.hidden = content.scale === null;
 			if (content.scale !== null) {
+				if (title.textContent !== content.scale.caption) {
+					title.textContent = content.scale.caption;
+				}
 				ramp.style.background = content.scale.gradient;
 				ticks.replaceChildren(
 					...content.scale.ticks.map((tick) => {
@@ -396,6 +617,12 @@ export const createLegend = (caption: string): Legend => {
 						return mark;
 					}),
 				);
+				below.textContent = content.scale.below ?? '';
+				below.hidden = content.scale.below === null;
+				above.textContent = content.scale.above ?? '';
+				above.hidden = content.scale.above === null;
+				ends.hidden =
+					content.scale.below === null && content.scale.above === null;
 			}
 			const text = content.status ?? '';
 			if (status.textContent !== text) {

@@ -125,6 +125,9 @@ if (globe !== null) {
 			createLayerPanel({
 				...options,
 				globe,
+				setTimer,
+				clearTimer,
+				reportError: logError,
 				createControls: (controls) => createLayerControls(panel, controls),
 			}),
 		openNewWorldDialog,

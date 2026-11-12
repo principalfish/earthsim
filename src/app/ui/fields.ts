@@ -21,6 +21,12 @@ export type RangeFieldOptions = RangeScale & {
 	readonly label: string;
 	/** Called with the new value whenever the slider moves. */
 	readonly onInput: (value: number) => void;
+	/**
+	 * Whether a screen reader is kept from reading out the value beside the
+	 * label each time it changes, for a slider moved often by the page
+	 * itself; false when left out. The slider still says its value.
+	 */
+	readonly quietValue?: boolean;
 };
 
 /** A slider on the page. */
@@ -32,6 +38,11 @@ export type RangeField = {
 	 * control that sets one of several things. `onInput` is not called.
 	 */
 	setScale(scale: RangeScale): void;
+	/**
+	 * Moves the slider to a value within its range, written as its scale
+	 * writes it. `onInput` is not called.
+	 */
+	setValue(value: number): void;
 	/** Greys the slider out so that it cannot be moved, or brings it back. */
 	setDisabled(disabled: boolean): void;
 };
@@ -60,11 +71,11 @@ export type ButtonOptions = {
 	readonly onClick: () => void;
 };
 
-/** One of the things a segmented picker offers. */
-export type SegmentedChoice<T extends string> = {
+/** One of the things a picker offers. */
+export type Choice<T extends string> = {
 	/** What choosing it gives. */
 	readonly value: T;
-	/** The text on its segment. */
+	/** The text it is shown with. */
 	readonly label: string;
 };
 
@@ -75,8 +86,22 @@ export type SegmentedPickerOptions<T extends string> = {
 	/** What is being chosen, as a screen reader names the group. */
 	readonly legend: string;
 	/** What it offers, in the order the segments show them. */
-	readonly choices: readonly SegmentedChoice<T>[];
+	readonly choices: readonly Choice<T>[];
 	/** The value chosen at first. */
+	readonly value: T;
+	/** Called with the value when another is chosen. */
+	readonly onChange: (value: T) => void;
+};
+
+/** What a drop-down choice is built from. */
+export type SelectFieldOptions<T extends string> = {
+	/** The drop-down's `id`, unique on the page. */
+	readonly id: string;
+	/** The text of its label. */
+	readonly label: string;
+	/** What it offers, in the order the list shows them. */
+	readonly choices: readonly Choice<T>[];
+	/** The value chosen at first; one of the choices. */
 	readonly value: T;
 	/** Called with the value when another is chosen. */
 	readonly onChange: (value: T) => void;
@@ -104,6 +129,13 @@ export const createElement = <K extends keyof HTMLElementTagNameMap>(
  * Creates a labelled slider with its current value written beside the
  * label.
  *
+ * @remarks
+ * The value as written is also what a screen reader says of the slider, so
+ * that it hears "July" or "30%" rather than the bare number. The value
+ * beside the label is an `<output>`, which a screen reader reads out
+ * whenever it changes unless `quietValue` is set, when it is marked
+ * `aria-live="off"`.
+ *
  * @param options - The slider's range, starting value, wording and
  * callback.
  */
@@ -118,7 +150,9 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 
 	const output = createElement('output', 'field__value');
 	output.htmlFor.add(options.id);
-	output.textContent = format(options.value);
+	if (options.quietValue === true) {
+		output.setAttribute('aria-live', 'off');
+	}
 
 	const input = createElement('input', 'field__range');
 	input.id = options.id;
@@ -126,10 +160,17 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 	input.min = String(options.min);
 	input.max = String(options.max);
 	input.step = String(options.step);
+	/** Writes a value beside the label and as what a screen reader says. */
+	const write = (value: number): void => {
+		const text = format(value);
+		output.textContent = text;
+		input.setAttribute('aria-valuetext', text);
+	};
 	input.value = String(options.value);
+	write(options.value);
 	input.addEventListener('input', () => {
 		const value = input.valueAsNumber;
-		output.textContent = format(value);
+		write(value);
 		options.onInput(value);
 	});
 
@@ -145,7 +186,11 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 			input.step = String(scale.step);
 			input.value = String(scale.value);
 			format = scale.format;
-			output.textContent = format(scale.value);
+			write(scale.value);
+		},
+		setValue: (value) => {
+			input.value = String(value);
+			write(value);
 		},
 		setDisabled: (disabled) => {
 			input.disabled = disabled;
@@ -174,6 +219,45 @@ export const createCheckField = (options: CheckFieldOptions): HTMLElement => {
 	label.textContent = options.label;
 
 	field.append(input, label);
+	return field;
+};
+
+/**
+ * Creates a labelled drop-down choice of one of several things, for
+ * choices whose labels are too long or too many for a row of segments.
+ *
+ * @param options - What it offers, the starting choice and the callback.
+ * @returns The drop-down with its label, to put in a panel.
+ */
+export const createSelectField = <T extends string>(
+	options: SelectFieldOptions<T>,
+): HTMLElement => {
+	const field = createElement('div', 'field');
+
+	const label = createElement('label', 'field__label');
+	label.htmlFor = options.id;
+	label.textContent = options.label;
+
+	const select = createElement('select', 'field__select');
+	select.id = options.id;
+	for (const choice of options.choices) {
+		const option = createElement('option', 'field__option');
+		option.value = choice.value;
+		option.textContent = choice.label;
+		select.append(option);
+	}
+	// Once the options are in: a value is chosen from among them.
+	select.value = options.value;
+	select.addEventListener('change', () => {
+		const chosen = options.choices.find(
+			(choice) => choice.value === select.value,
+		);
+		if (chosen !== undefined) {
+			options.onChange(chosen.value);
+		}
+	});
+
+	field.append(label, select);
 	return field;
 };
 

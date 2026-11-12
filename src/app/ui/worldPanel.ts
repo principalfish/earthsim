@@ -1,7 +1,8 @@
 /**
- * The world controls: a line saying which world is being edited, the
- * buttons that start a new one, export it and import another, and a line
- * saying whether it has been saved.
+ * The world controls: a line saying which world is being edited, a line
+ * with its date and what of the year the globe shows, the buttons that
+ * start a new one, export it and import another, and a line saying whether
+ * it has been saved.
  */
 
 import type { World, WorldFileError, WorldFileResult } from '../../core/index';
@@ -72,6 +73,13 @@ export type WorldPanel = {
 	 * {@link describeWorld}.
 	 */
 	setDescription(description: string): void;
+	/**
+	 * Shows another date line under the world's description.
+	 *
+	 * @param date - The line, shown as plain text, such as
+	 * `Year 0 · July`.
+	 */
+	setDate(date: string): void;
 	/**
 	 * Shows how the last save went: {@link SAVED_LABEL} or
 	 * {@link AUTOSAVE_UNAVAILABLE_LABEL}. Until the first call the line is
@@ -236,7 +244,9 @@ export const describeWorld = (world: World): string => {
  *
  * @remarks
  * The line describing the world is ordinary text, so the seed in it can be
- * selected and copied.
+ * selected and copied. Under it is the date line, empty until it is first
+ * set; it is not announced as it changes, since it changes every second
+ * while the year plays.
  *
  * Import asks the browser for a file, offering those named as world files
  * are; whichever file is chosen is passed on, and the same file can be
@@ -260,6 +270,8 @@ export const createWorldPanel = (
 
 	const description = createElement('p', 'world-summary');
 	description.textContent = options.description;
+
+	const date = createElement('p', 'world-date');
 
 	// Out of sight: the Import button stands in for it.
 	const chooser = createElement('input', 'world-file');
@@ -304,12 +316,15 @@ export const createWorldPanel = (
 	autosave.setAttribute('aria-live', 'polite');
 	status.append(message, autosave);
 
-	section.append(heading, description, buttons, chooser, status);
+	section.append(heading, description, date, buttons, chooser, status);
 	panel.append(section);
 	return {
 		element: section,
 		setDescription: (text) => {
 			description.textContent = text;
+		},
+		setDate: (text) => {
+			date.textContent = text;
 		},
 		setAutosaveState: (state) => {
 			// Left alone when it already says so, so that a screen reader

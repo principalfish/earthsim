@@ -61,6 +61,41 @@ export const TEMPERATURE_RAMP: ColourRamp = {
 };
 
 /**
+ * The ramp the seasonal range is drawn with: one hue, purple, from near
+ * white for a year that hardly changes to deep violet for the widest swing.
+ *
+ * @remarks
+ * Every step towards the high end is darker than the one before, so the
+ * order reads from lightness alone, as for {@link TEMPERATURE_RAMP}; it
+ * runs the other way, light to dark, and in a hue of its own, so that the
+ * range is not read as a temperature.
+ *
+ * Most of a world has a small range: the oceans and the tropics change
+ * little through the year, and only the hearts of large continents swing
+ * widely. So the low end is given most of the colour: the six colours are
+ * evenly spaced along the square root of the range, their stops at the
+ * squares of 0, 0.2, 0.4, 0.6, 0.8 and 1, with the colour blended in
+ * straight pieces between them. The colour changes fastest at the low end:
+ * a range 16% of the way up the scale has the colour that would sit at 40%
+ * with the stops evenly spaced, and every range between the ends is drawn
+ * darker than it would be with them. The scale itself stays linear: a value
+ * sits as far along the legend as its share of the range, and the legend's
+ * gradient, drawn from these stops, shows the same crowding of colour at
+ * its low end.
+ */
+export const SEASONAL_RANGE_RAMP: ColourRamp = {
+	name: 'seasonal range',
+	stops: [
+		{ at: 0, colour: 0xfcfbfd },
+		{ at: 0.04, colour: 0xdadaeb },
+		{ at: 0.16, colour: 0xbcbddc },
+		{ at: 0.36, colour: 0x9e9ac8 },
+		{ at: 0.64, colour: 0x6a51a3 },
+		{ at: 1, colour: 0x3f007d },
+	],
+};
+
+/**
  * Checks that a ramp is one the globe can draw.
  *
  * @param ramp - The ramp.

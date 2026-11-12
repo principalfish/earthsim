@@ -15,13 +15,14 @@ import {
 } from '../worker/testing/fakeWorker';
 import { type AppState, createAppState } from './appState';
 import { MAIN_BUTTON, SECONDARY_BUTTON } from './globe/input';
+import { PLAYBACK_STEP_MS } from './playback';
 import { TEMPERATURE_DEBOUNCE_MS } from './refresh';
 import type { SculptOptions, StrokeChanges } from './sculpt';
 import { RESTORE_FAILED_MESSAGE } from './startup';
 import type { LoadOutcome } from './storage';
 import { createFakeTimers } from './testing/fakeTimers';
 import { settle } from './testing/settle';
-import { createLayerPanel } from './ui/layerPanel';
+import { createLayerPanel, type LayerControlsOptions } from './ui/layerPanel';
 import {
 	FIRST_NEW_WORLD_VALUES,
 	type NewWorldDialogOptions,
@@ -36,6 +37,7 @@ import {
 	type WorldPanelOptions,
 } from './ui/worldPanel';
 import type { ShortcutEvent } from './undo';
+import { DEFAULT_MONTH, type PageView } from './view';
 import {
 	type PageAutosaveOptions,
 	type PageLayerOptions,
@@ -228,6 +230,7 @@ const createStage = (
 			return {
 				setDescription: (description) =>
 					log.push(`worldPanel.setDescription ${description}`),
+				setDate: (date) => log.push(`worldPanel.setDate ${date}`),
 				setAutosaveState: (autosaveState) =>
 					log.push(`worldPanel.setAutosaveState ${autosaveState}`),
 				setMessage: (message) => log.push(`worldPanel.setMessage ${message}`),
@@ -301,7 +304,10 @@ const createStage = (
 		createLayerPanel: (options) => {
 			log.push('createLayerPanel');
 			layerOptions = options;
-			own.createLayerPanel?.(options);
+			if (own.createLayerPanel !== undefined) {
+				return own.createLayerPanel(options);
+			}
+			return { resetMonth: () => log.push('layerPanel.resetMonth') };
 		},
 		openNewWorldDialog: (options) => {
 			log.push(`openNewWorldDialog ${options.notice ?? 'no notice'}`);
@@ -369,6 +375,7 @@ describe('startPage', () => {
 			`createViewInput ${MAIN_BUTTON}`,
 			'createSculpt',
 			`createWorldPanel ${describeWorld(world)}`,
+			'worldPanel.setDate Year 0',
 			'openStore',
 			'createAutosave',
 			'createToolPanel',
@@ -446,6 +453,7 @@ describe('a world replacement', () => {
 			'statistics.refresh',
 			'temperature.reset',
 			'temperature.refresh',
+			'layerPanel.resetMonth',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
 		]);
@@ -488,6 +496,7 @@ describe('the start of the page', () => {
 		const stage = createStage();
 		const world = generateWorld({ resolution: 64, seed: 9, landFraction: 0.4 });
 		world.seaLevel = normaliseSeaLevel(250);
+		world.ageYears = 2_400_000;
 		stage.log.length = 0;
 		stage.answerLoad({ kind: 'world', world });
 		await stage.started;
@@ -505,6 +514,8 @@ describe('the start of the page', () => {
 			'statistics.refresh',
 			'temperature.reset',
 			'temperature.refresh',
+			'layerPanel.resetMonth',
+			'worldPanel.setDate 2.4 million years',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
 			'worldPanel.setAutosaveState saved',
@@ -997,9 +1008,12 @@ describe('the temperature, on its worker', () => {
 				createLayerPanel({
 					...options,
 					globe: { setLayer: (field) => shown.push(field) },
+					setTimer: () => 0,
+					clearTimer: () => {},
+					reportError: () => {},
 					createControls: (controls) => {
 						choose = controls.onLayer;
-						return { showLegend: () => {} };
+						return { showLegend: () => {}, showView: () => {} };
 					},
 				}),
 		});
@@ -1119,6 +1133,119 @@ describe('the temperature, on its worker', () => {
 		page.stage.strokeActive = false;
 		await page.wait();
 		expect(page.posted()).toHaveLength(2);
+	});
+});
+
+describe('the date line', () => {
+	it('follows the view settings the layer panel tells of', async () => {
+		const stage = await createStartedStage();
+		stage.layerOptions.onView({
+			layer: 'temperature',
+			temperatureView: 'month',
+			month: 6,
+		});
+		stage.layerOptions.onView({
+			layer: 'temperature',
+			temperatureView: 'month',
+			month: 7,
+		});
+		stage.layerOptions.onView({
+			layer: 'temperature',
+			temperatureView: 'annualMean',
+			month: 7,
+		});
+		stage.layerOptions.onView({
+			layer: 'terrain',
+			temperatureView: 'annualMean',
+			month: 7,
+		});
+		expect(stage.log).toEqual([
+			'worldPanel.setDate Year 0 · July',
+			'worldPanel.setDate Year 0 · August',
+			'worldPanel.setDate Year 0 · Annual average',
+			'worldPanel.setDate Year 0',
+		]);
+	});
+
+	it('follows the age of a world imported, and of a new one', async () => {
+		const stage = await createStartedStage();
+		const imported = createBlankWorld(64);
+		imported.ageYears = 12_345;
+		stage.importResult = { ok: true, world: imported };
+		stage.worldPanelOptions.onImport(new Blob());
+		await settle();
+		expect(stage.log).toContain('worldPanel.setDate 12,345 years');
+		stage.log.length = 0;
+
+		stage.state.replaceWorld(createBlankWorld(64));
+		expect(stage.log).toContain('worldPanel.setDate Year 0');
+	});
+});
+
+describe('the month on screen', () => {
+	/** A page with the real layer panel, in Temperature view on a result. */
+	const createMonthStage = async () => {
+		let controls: LayerControlsOptions | undefined;
+		const views: PageView[] = [];
+		const timers = createFakeTimers();
+		const page = await createWorkerStage({
+			showing: false,
+			createLayerPanel: (options) =>
+				createLayerPanel({
+					...options,
+					globe: { setLayer: () => {} },
+					setTimer: timers.setTimer,
+					clearTimer: timers.clearTimer,
+					reportError: () => {},
+					createControls: (made) => {
+						controls = made;
+						return {
+							showLegend: () => {},
+							showView: (view) => views.push(view),
+						};
+					},
+				}),
+		});
+		const chosen = required(controls, 'layer controls');
+		chosen.onLayer('temperature');
+		return { page, controls: chosen, views, timers };
+	};
+
+	it('is kept through an edit of the terrain', async () => {
+		const { page, controls, views } = await createMonthStage();
+		controls.onMonth(2);
+		expect(page.stage.log.at(-1)).toBe('worldPanel.setDate Year 0 · March');
+		page.stage.log.length = 0;
+		makeStroke(page.stage);
+		await page.wait();
+		expect(views.at(-1)?.month).toBe(2);
+		expect(
+			page.stage.log.filter((line) => line.startsWith('worldPanel.setDate')),
+		).toEqual([]);
+	});
+
+	it('goes back to July for a new world, which the date line says', async () => {
+		const { page, controls, views } = await createMonthStage();
+		controls.onTemperatureView('warmest');
+		controls.onTemperatureView('month');
+		controls.onMonth(2);
+		page.stage.log.length = 0;
+		page.stage.state.replaceWorld(createBlankWorld(64));
+		expect(views.at(-1)).toEqual({
+			layer: 'temperature',
+			temperatureView: 'month',
+			month: DEFAULT_MONTH,
+		});
+		expect(page.stage.log).toContain('worldPanel.setDate Year 0 · July');
+	});
+
+	it('stops the year playing for a new world', async () => {
+		const { page, controls, timers } = await createMonthStage();
+		controls.onPlay();
+		timers.advance(PLAYBACK_STEP_MS);
+		expect(page.stage.log).toContain('worldPanel.setDate Year 0 · August');
+		page.stage.state.replaceWorld(createBlankWorld(64));
+		expect(timers.pending()).toBe(0);
 	});
 });
 

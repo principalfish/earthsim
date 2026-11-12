@@ -74,4 +74,8 @@ describe('core', () => {
 			expect(core, name).toHaveProperty(name);
 		}
 	});
+
+	it('exports weighted quantiles', () => {
+		expect(core).toHaveProperty('weightedQuantiles');
+	});
 });

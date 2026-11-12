@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { SEVEN_STOP_RAMP, TWO_STOP_RAMP } from '../testing/rampFixtures';
 import {
+	type ColourRamp,
 	checkRamp,
 	cssColour,
 	MAX_RAMP_STOPS,
 	rampColourAt,
 	rampGradient,
+	SEASONAL_RANGE_RAMP,
 	TEMPERATURE_RAMP,
 } from './ramp';
 
@@ -16,6 +18,22 @@ const lightness = ([r, g, b]: readonly [number, number, number]): number => {
 	const y = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
 	const f = y > 216 / 24389 ? Math.cbrt(y) : ((24389 / 27) * y + 16) / 116;
 	return 116 * f - 16;
+};
+
+/**
+ * The hue, in degrees from 0 to 360 with red at 0 and blue at 240, of
+ * channels from 0 to 1 that are not all equal.
+ */
+const hue = ([r, g, b]: readonly [number, number, number]): number => {
+	const max = Math.max(r, g, b);
+	const span = max - Math.min(r, g, b);
+	const sector =
+		max === r
+			? (g - b) / span
+			: max === g
+				? (b - r) / span + 2
+				: (r - g) / span + 4;
+	return (sector * 60 + 360) % 360;
 };
 
 describe('checkRamp', () => {
@@ -144,6 +162,69 @@ describe('the temperature ramp', () => {
 		for (let i = 1; i <= samples; i++) {
 			const next = lightness(rampColourAt(TEMPERATURE_RAMP, i / samples));
 			expect(next).toBeGreaterThan(previous);
+			previous = next;
+		}
+	});
+});
+
+describe('the seasonal range ramp', () => {
+	it('is one the globe can draw', () => {
+		expect(checkRamp(SEASONAL_RANGE_RAMP)).toBe(SEASONAL_RANGE_RAMP);
+	});
+
+	it('starts nearly white and ends dark', () => {
+		expect(lightness(rampColourAt(SEASONAL_RANGE_RAMP, 0))).toBeGreaterThan(95);
+		expect(lightness(rampColourAt(SEASONAL_RANGE_RAMP, 1))).toBeLessThan(20);
+	});
+
+	it('keeps to one purple hue past its near-white end', () => {
+		// The near-white end, up to the second stop, has too little colour
+		// for its hue to mean much.
+		const from = SEASONAL_RANGE_RAMP.stops[1]?.at as number;
+		const samples = 100;
+		for (let i = 0; i <= samples; i++) {
+			const colour = rampColourAt(
+				SEASONAL_RANGE_RAMP,
+				from + ((1 - from) * i) / samples,
+			);
+			expect(Math.abs(hue(colour) - 255)).toBeLessThanOrEqual(20);
+		}
+	});
+
+	it('gives the low end most of the colour, its stops at the squares of even steps', () => {
+		expect(SEASONAL_RANGE_RAMP.stops.map((stop) => stop.at)).toEqual([
+			0, 0.04, 0.16, 0.36, 0.64, 1,
+		]);
+	});
+
+	it('is darker between its ends than the same colours evenly spaced', () => {
+		const even: ColourRamp = {
+			name: 'even',
+			stops: SEASONAL_RANGE_RAMP.stops.map((stop, index, stops) => ({
+				at: index / (stops.length - 1),
+				colour: stop.colour,
+			})),
+		};
+		// A quarter of the way up is darker than the evenly spaced colours
+		// are at 45%.
+		expect(lightness(rampColourAt(SEASONAL_RANGE_RAMP, 0.25))).toBeLessThan(
+			lightness(rampColourAt(even, 0.45)),
+		);
+		const samples = 100;
+		for (let i = 1; i < samples; i++) {
+			const t = i / samples;
+			expect(lightness(rampColourAt(SEASONAL_RANGE_RAMP, t))).toBeLessThan(
+				lightness(rampColourAt(even, t)),
+			);
+		}
+	});
+
+	it('grows darker at every step from the low end to the high', () => {
+		const samples = 1000;
+		let previous = lightness(rampColourAt(SEASONAL_RANGE_RAMP, 0));
+		for (let i = 1; i <= samples; i++) {
+			const next = lightness(rampColourAt(SEASONAL_RANGE_RAMP, i / samples));
+			expect(next).toBeLessThan(previous);
 			previous = next;
 		}
 	});

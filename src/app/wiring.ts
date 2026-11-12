@@ -27,6 +27,8 @@ import {
 } from './sculpt';
 import { applyStartup, decideStartup, type StartupRead } from './startup';
 import type { WorldStore } from './storage';
+import { createDateLine } from './ui/dateLine';
+import type { LayerPanel } from './ui/layerPanel';
 import {
 	FIRST_NEW_WORLD_VALUES,
 	type NewWorldDialogOptions,
@@ -49,6 +51,7 @@ import {
 	handleHistoryKey,
 	type ShortcutEvent,
 } from './undo';
+import { DEFAULT_PAGE_VIEW, type PageView } from './view';
 
 /** What the page asks of its globe once the globe exists. */
 export type PageGlobe = Pick<
@@ -86,6 +89,8 @@ export type PageLayerOptions = {
 	readonly store: LayerStore;
 	/** What calculates the temperature, told whether it is showing. */
 	readonly temperature: Pick<TemperatureScheduler, 'setShowing'>;
+	/** Called with the view settings whenever any of them changes. */
+	readonly onView: (view: PageView) => void;
 };
 
 /** The parts of a page, for {@link startPage} to join. */
@@ -140,10 +145,14 @@ export type PageParts = {
 		options: PageTemperatureOptions,
 	) => Pick<TemperatureScheduler, 'refresh' | 'reset' | 'setShowing'>;
 	/**
-	 * Adds the Layers section to the panel, which chooses what the globe is
-	 * coloured by and so whether the temperature is showing.
+	 * Adds the Layers section to the panel, which holds the view settings:
+	 * what the globe is coloured by, and so whether the temperature is
+	 * showing, and what of the temperature's year it shows. It starts on
+	 * {@link DEFAULT_PAGE_VIEW}.
 	 */
-	readonly createLayerPanel: (options: PageLayerOptions) => void;
+	readonly createLayerPanel: (
+		options: PageLayerOptions,
+	) => Pick<LayerPanel, 'resetMonth'>;
 	/** Opens the dialog that starts a new world. */
 	readonly openNewWorldDialog: (options: NewWorldDialogOptions) => void;
 	/** Gives the Earth's elevation data, for a world that starts as Earth. */
@@ -182,12 +191,18 @@ export type PageParts = {
  * opens on the height colours with the temperature not showing, so nothing
  * asks for the temperature until it is chosen.
  *
+ * The date line under the world's description is written as soon as the
+ * world controls are made, and follows the world's age and every change of
+ * the view settings.
+ *
  * A world that replaces the one being edited reaches, in this order: the
  * sculpt controller, which ends a stroke still under way on the old world
  * and then has the history forget that world; the globe; the sea-level
  * control; the world's description; the statistics and then the
- * temperature, each first reset and then asked for again; the panel's
- * message, which is taken back; and the autosave.
+ * temperature, each first reset and then asked for again; the layer panel,
+ * which stops the year playing and puts July back on screen; the date line;
+ * the panel's message, which is taken back; and the autosave. An edit of
+ * the world, which is no new world, keeps the month on screen.
  *
  * A committed stroke, an undo, a redo and the sea-level control each ask
  * for the statistics and the temperature again, and mark the world
@@ -251,6 +266,11 @@ export const startPage = (parts: PageParts): Promise<void> => {
 				showMessage: worldPanel.setMessage,
 				logError,
 			}),
+	});
+	const date = createDateLine({
+		years: state.world.ageYears,
+		view: DEFAULT_PAGE_VIEW,
+		show: worldPanel.setDate,
 	});
 	// One connection for as long as the page lasts, which reading the saved
 	// world opens. A save made as the page goes then needs no connection
@@ -328,7 +348,11 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		isStrokeActive: sculpt.isStrokeActive,
 		store: layers,
 	});
-	parts.createLayerPanel({ store: layers, temperature });
+	const layerPanel = parts.createLayerPanel({
+		store: layers,
+		temperature,
+		onView: date.setView,
+	});
 	const statistics = parts.createStatistics({
 		currentWorld: () => state.world,
 		isStrokeActive: sculpt.isStrokeActive,
@@ -353,6 +377,12 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// world's solve starts from.
 	state.addListener(temperature.reset);
 	state.addListener(temperature.refresh);
+	// The month on screen is the view's, but a new world starts again from
+	// July, after the store has dropped the old world's result so that the
+	// old result is not shown for July on the way. The date line then has
+	// the new world's age with that month.
+	state.addListener(layerPanel.resetMonth);
+	state.addListener((world) => date.setYears(world.ageYears));
 	// What the panel said of an earlier import or export is over with.
 	state.addListener(() => worldPanel.setMessage(null));
 	// The autosave takes no note of this until it is started, which is

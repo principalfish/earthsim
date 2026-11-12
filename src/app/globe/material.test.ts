@@ -20,7 +20,12 @@ import {
 	replaceLayer,
 	showLayer,
 } from './material';
-import { MAX_RAMP_STOPS, TEMPERATURE_RAMP } from './ramp';
+import {
+	MAX_RAMP_STOPS,
+	rampColourAt,
+	SEASONAL_RANGE_RAMP,
+	TEMPERATURE_RAMP,
+} from './ramp';
 
 /**
  * The source of a GLSL function, from its signature to its closing brace,
@@ -234,6 +239,36 @@ describe('the sampling of per-cell values', () => {
 			`const int MAX_RAMP_STOPS = ${MAX_RAMP_STOPS};`,
 		);
 	});
+});
+
+describe('a data value beyond the range', () => {
+	const { material } = createGlobeMaterial();
+
+	it('takes the colour of the end it is beyond, in the shader', () => {
+		// The value's place along the ramp is not kept within it, but each
+		// stop's blend is, so past either end the end colour is all there is.
+		expect(glslFunction(material.fragmentShader, 'layerColour')).toContain(
+			'return rampColour((value - uLayerRange.x) / (uLayerRange.y - uLayerRange.x));',
+		);
+		expect(glslFunction(material.fragmentShader, 'rampColour')).toContain(
+			'colour = mix(colour, uRampColour[i], clamp((t - uRampAt[i - 1]) / span, 0.0, 1.0));',
+		);
+	});
+
+	it.each([
+		['temperature', TEMPERATURE_RAMP],
+		['seasonal range', SEASONAL_RANGE_RAMP],
+	])(
+		'takes the colour of the end it is beyond, as the %s ramp is drawn',
+		(_, ramp) => {
+			for (const t of [-0.001, -0.5, -40]) {
+				expect(rampColourAt(ramp, t)).toEqual(rampColourAt(ramp, 0));
+			}
+			for (const t of [1.001, 1.5, 40]) {
+				expect(rampColourAt(ramp, t)).toEqual(rampColourAt(ramp, 1));
+			}
+		},
+	);
 });
 
 describe('the coastline over a data layer', () => {

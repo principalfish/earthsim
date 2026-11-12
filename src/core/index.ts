@@ -13,6 +13,7 @@ export * from './noise';
 export * from './observed';
 export * from './planet';
 export * from './protocol';
+export * from './quantile';
 export * from './serialize';
 export * from './stats';
 export * from './temperature';
