@@ -14,6 +14,7 @@ Nothing. On 2026-11-12 the user answered the questions from piece 7's manual rev
 - Piece 7 (uncommitted, HEAD `533ef95`) is being changed: seasonal range "Reshape ramp, finer ticks"; temperature scale "Yes, fit the middle 99%". The builder then sends a new review request; the user tries it again before approving (relay approval only when their words say they tried it). The freeze is still present at that review; it is fixed in piece 8.
 - New piece 8, re-solves that depend only on the world: "Fresh on sea or planet change". Manual review: the user's own freeze sequence.
 - New piece 9, solver speed-ups: "let us also implement the speed up ideas", "All four", "Yes, 128 too". Manual review of the coarser solve's look. Brief the user on 8 and 9 before each starts; the manual reviews on 8 and 9 were proposed by the planner and are still to be confirmed with the user in those briefings.
+- To put to the user in piece 8's briefing: the builder's refinement "B+" (a drift limit for terrain edits on top of the chosen rule; see `plan.md` Notes, 2026-11-12), which the user has not yet seen.
 - Lower sea level cooling the planet: "Keep it".
 - Then the planet panel (now 10), cursor readout (11), Earth comparison (12), the sun (13).
 
