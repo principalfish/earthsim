@@ -32,3 +32,4 @@
 - 2026-11-12 08:54 · add-seasonal-temperature-layer-and-planet-controls (0002) · piece 6 committed 533ef95 (ramp A); builder stopped before piece 7
 - 2026-11-12 09:01 · add-seasonal-temperature-layer-and-planet-controls (0002) · piece 7 started on the user's go-ahead
 - 2026-11-12 10:17 · add-seasonal-temperature-layer-and-planet-controls (0002) · piece 7 manual review: user found a seasonal-range display problem and a freeze after a sea-level round trip; builder diagnosing
+- 2026-11-12 10:31 · add-seasonal-temperature-layer-and-planet-controls (0002) · plan changed to 13 pieces: new 8 (freeze fix) and 9 (speed-ups); piece 7 changes decided

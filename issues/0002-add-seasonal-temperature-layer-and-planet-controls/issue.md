@@ -14,27 +14,31 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 
 ## Plan
 
-_2026-11-12 · 6 of 11 pieces done · now: piece 7 in progress (two problems found in the manual review)_
+_2026-11-12 · 6 of 13 pieces done · now: piece 7 in progress (changes after the manual review)_
 
-- [x] **1/11 Planet settings and date on the world** · `8390675`
+- [x] **1/13 Planet settings and date on the world** · `8390675`
   Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
-- [x] **2/11 Sunlight by latitude and season** · `0c19852`
+- [x] **2/13 Sunlight by latitude and season** · `0c19852`
   Exact daily and monthly sunlight for any tilt from 0 to 90 degrees.
-- [x] **3/11 Observed Earth temperature data** · `4a1e290`
+- [x] **3/13 Observed Earth temperature data** · `4a1e290`
   NOAA's 20th Century Reanalysis v3 monthly climatology, processed into a small committed file and regridded to the world's cells.
-- [x] **4/11 Temperature solver, timing run and first error figures** · `1445e44`
+- [x] **4/13 Temperature solver, timing run and first error figures** · `1445e44`
   The seasonal energy-balance solver, a table of how long it takes at each resolution, and how far the simulated Earth is from the observed one.
-- [x] **5/11 Temperature worker and recalculation** · `ff500c7`
+- [x] **5/13 Temperature worker and recalculation** · `ff500c7`
   Temperature calculated in its own Web Worker and recalculated automatically after edits.
-- [x] **6/11 Temperature layer on the globe** · `533ef95`
+- [x] **6/13 Temperature layer on the globe** · `533ef95`
   The globe coloured by temperature with relief and coastlines kept, a Terrain or Temperature picker, and a legend.
-- [ ] **7/11 Month slider, annual summaries and date** · in progress
-  Step or play through the twelve months, view annual summaries, and see the world's date.
-- [ ] **8/11 Planet panel** · not started
+- [ ] **7/13 Month slider, annual summaries and date** · in progress
+  Step or play through the twelve months, view annual summaries, and see the world's date. After its manual review: a seasonal-range ramp that shows small ranges, and a temperature scale fitted to the middle 99% of the surface.
+- [ ] **8/13 Re-solves that depend only on the world** · not started · added 2026-11-12: the manual review found a frozen climate carried over after a sea-level change
+  A re-solve after a sea-level or planet change starts fresh, so the result no longer depends on the order of edits.
+- [ ] **9/13 Solver speed-ups** · not started · added 2026-11-12: the user asked for the measured speed-ups to be built
+  Worlds above 64 solve one grid coarser with height cooling at full resolution, plus smaller solver fixes; about five times faster at 256.
+- [ ] **10/13 Planet panel** (was 8) · not started
   Sliders for tilt, star brightness, star mass, orbit and greenhouse strength, with sunlight received and year length shown.
-- [ ] **9/11 Value under the cursor** · not started
+- [ ] **11/13 Value under the cursor** (was 9) · not started
   A readout of position, elevation and temperature at the point under the pointer.
-- [ ] **10/11 Earth comparison view and error baseline** · not started
+- [ ] **12/13 Earth comparison view and error baseline** (was 10) · not started
   On the Earth preset: simulated, observed or difference, with error figures and a committed baseline.
-- [ ] **11/11 The sun in the scene** · not started · added 2026-11-11: the user asked for the sun to be drawn
+- [ ] **13/13 The sun in the scene** (was 11) · not started · added 2026-11-11: the user asked for the sun to be drawn
   The star drawn in the scene, following the star settings and the months, with a Sunlight toggle that lights the globe from it.
