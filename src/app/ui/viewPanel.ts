@@ -1,6 +1,7 @@
 /**
  * The view controls: how much relief is exaggerated, where the sea level
- * is, and whether the cell grid is drawn.
+ * is, whether the cell grid is drawn and whether the globe is lit by the
+ * sun.
  */
 
 import {
@@ -28,12 +29,16 @@ export type ViewPanelOptions = {
 	readonly seaLevel: number;
 	/** Whether the grid starts shown; hidden by default. */
 	readonly gridVisible?: boolean;
+	/** Whether sunlight starts on; off by default. */
+	readonly sunlight?: boolean;
 	/** Called with the new factor when the exaggeration slider moves. */
 	readonly onExaggeration: (factor: number) => void;
 	/** Called with the new level in metres when the sea-level slider moves. */
 	readonly onSeaLevel: (metres: number) => void;
 	/** Called when the grid checkbox is ticked or cleared. */
 	readonly onGridVisible: (visible: boolean) => void;
+	/** Called when the Sunlight checkbox is ticked or cleared. */
+	readonly onSunlight: (on: boolean) => void;
 };
 
 /** The view controls on the page. */
@@ -118,6 +123,12 @@ export const createViewPanel = (
 			label: 'Show cell grid',
 			checked: options.gridVisible ?? false,
 			onChange: options.onGridVisible,
+		}),
+		createCheckField({
+			id: 'view-sunlight',
+			label: 'Sunlight',
+			checked: options.sunlight ?? false,
+			onChange: options.onSunlight,
 		}),
 	);
 	panel.append(section);

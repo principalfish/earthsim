@@ -19,6 +19,9 @@
  *
  * Colours are authored and blended as display (sRGB) values and written to
  * the canvas unchanged.
+ *
+ * With sunlight on, the globe is also lit by the sun, from a direction in
+ * core coordinates.
  */
 
 import {
@@ -35,8 +38,11 @@ import {
 } from 'three';
 import {
 	FACE_COUNT,
+	latLonToDirection,
 	normaliseSeaLevel,
 	PLANET_RADIUS_KM,
+	SUN_LONGITUDE_DEG,
+	type Vec3,
 } from '../../core/index';
 import {
 	type ColourRamp,
@@ -98,6 +104,19 @@ export const drawnSeaLevel = (metres: number): number =>
 		MAX_DRAWN_SEA_LEVEL_M,
 		Math.max(MIN_DRAWN_SEA_LEVEL_M, normaliseSeaLevel(metres)),
 	);
+
+/**
+ * The brightness of the night side while the globe is lit by the sun, as a
+ * share of the day side's.
+ */
+export const NIGHT_BRIGHTNESS = 0.3;
+
+/**
+ * Half the width of the band over which day turns to night while the globe
+ * is lit by the sun, in degrees of the sun's height either side of the
+ * horizon.
+ */
+export const TWILIGHT_HALF_WIDTH_DEG = 6;
 
 /** One colour of a ramp and the value it sits at. */
 export type RampStop = {
@@ -411,6 +430,21 @@ void main() {
  * term darkens the globe away from that side so it still reads as a ball.
  * Both are fixed to the camera.
  *
+ * Sunlight is drawn in one of two ways, as `uSunlightAsLine` says. Drawn
+ * as shade, the second term gives way to day and night from the sun's
+ * direction, `uSunDirection`: the side facing the sun is evenly lit, the
+ * side facing away is drawn at {@link NIGHT_BRIGHTNESS} of that, and the
+ * change between them is softened over a band about 12° wide centred on
+ * the line where the sun is on the horizon. The map-style relief shading
+ * stays as it is. Drawn as a line, the colours are shaded exactly as with
+ * sunlight off, since over a data layer a darkened colour would read as
+ * another value, and the line between day and night is drawn instead, a
+ * light line with a dark edge on each side like the brush outline, as wide
+ * in pixels wherever it lies, under the brush outline. Which of the two is
+ * drawn is set apart from whether a data layer is shown: the line can be
+ * drawn over the height colours too. With sunlight off, every step is as
+ * it is without sunlight at all.
+ *
  * Grid lines are drawn where the cell position is a whole number. Their
  * width in pixels comes from the screen derivative of the direction, which
  * is continuous everywhere, carried through the face mapping by hand: the
@@ -446,6 +480,10 @@ uniform vec3 uBrushCentre;
 uniform float uBrushRadius;
 
 const int MAX_RAMP_STOPS = ${MAX_RAMP_STOPS};
+
+uniform bool uSunlight;
+uniform bool uSunlightAsLine;
+uniform vec3 uSunDirection;
 
 uniform bool uLayerShown;
 uniform samplerCube uLayer;
@@ -488,6 +526,17 @@ const float COAST_DARK_ABOVE = 0.45;
 // Change in the height above sea level, in metres a pixel, below which the
 // surface is level and the coastline is not drawn.
 const float COAST_MIN_CHANGE = ${glslFloat(COAST_MIN_CHANGE_M)};
+// Brightness of the night side under sunlight, against the day side's 1.
+const float NIGHT_BRIGHTNESS = ${glslFloat(NIGHT_BRIGHTNESS)};
+// Sine of half the width of the band over which day turns to night: 6°.
+const float TWILIGHT_HALF_WIDTH = ${glslFloat(Math.sin((TWILIGHT_HALF_WIDTH_DEG * Math.PI) / 180))};
+// Half the width of the light line between day and night drawn over a data
+// layer, the width of the dark edge on each side of it, both in pixels, and
+// how strongly each shows.
+const float TERMINATOR_LINE_HALF_WIDTH = 0.6;
+const float TERMINATOR_EDGE_WIDTH = 1.0;
+const float TERMINATOR_LINE_OPACITY = 0.85;
+const float TERMINATOR_EDGE_OPACITY = 0.5;
 
 ${glslRamp('landColour', LAND_RAMP)}
 
@@ -575,6 +624,24 @@ float gridCoverage(vec3 d) {
 	return max(line.x, line.y);
 }
 
+// How much of the day the point at d has, 0 on the night side to 1 on the
+// day side.
+float daylight(vec3 d) {
+	return smoothstep(-TWILIGHT_HALF_WIDTH, TWILIGHT_HALF_WIDTH, dot(d, uSunDirection));
+}
+
+// How much of the fragment the line between day and night covers, 0 to 1:
+// x for its light line alone and y for the line together with its dark
+// edges. Near the line the sine of the sun's height is its angle, so the
+// line is as wide in pixels wherever it lies.
+vec2 terminatorCoverage(vec3 d) {
+	float height = dot(d, uSunDirection);
+	float perPixel = max(length(vec2(dFdx(height), dFdy(height))), 1e-7);
+	float pixels = abs(height) / perPixel;
+	vec2 halfWidth = TERMINATOR_LINE_HALF_WIDTH + vec2(0.0, TERMINATOR_EDGE_WIDTH);
+	return 1.0 - smoothstep(halfWidth - 0.5, halfWidth + 0.5, vec2(pixels));
+}
+
 // How much of the fragment the brush outline covers, 0 to 1: x for its
 // light line alone and y for the line together with its dark edges.
 vec2 brushCoverage(vec3 d) {
@@ -607,8 +674,12 @@ void main() {
 	if (land > 0.0) {
 		shade = mix(1.0, reliefShade(d), land * RELIEF_STRENGTH);
 	}
-	float facing = 0.5 + 0.5 * dot(normalize(normalMatrix * d), GLOBE_LIGHT);
-	shade *= mix(GLOBE_SHADE, 1.0, facing);
+	if (uSunlight && !uSunlightAsLine) {
+		shade *= mix(NIGHT_BRIGHTNESS, 1.0, daylight(d));
+	} else {
+		float facing = 0.5 + 0.5 * dot(normalize(normalMatrix * d), GLOBE_LIGHT);
+		shade *= mix(GLOBE_SHADE, 1.0, facing);
+	}
 	colour *= shade;
 
 	if (uLayerShown) {
@@ -620,6 +691,12 @@ void main() {
 	if (uGridOpacity > 0.0) {
 		// Light lines over the sea and dark ones over the land.
 		colour = mix(colour, vec3(1.0 - land), uGridOpacity * gridCoverage(d));
+	}
+
+	if (uSunlight && uSunlightAsLine) {
+		vec2 terminator = terminatorCoverage(d);
+		colour = mix(colour, vec3(0.0), TERMINATOR_EDGE_OPACITY * terminator.y);
+		colour = mix(colour, vec3(1.0), TERMINATOR_LINE_OPACITY * terminator.x);
 	}
 
 	if (uBrushRadius > 0.0) {
@@ -656,6 +733,15 @@ export type GlobeUniforms = {
 	 * drawn.
 	 */
 	readonly uBrushRadius: IUniform<number>;
+	/** Whether the globe is lit by the sun. */
+	readonly uSunlight: IUniform<boolean>;
+	/**
+	 * Whether sunlight is drawn as the line between day and night over
+	 * colours shaded as without it, rather than by darkening the night side.
+	 */
+	readonly uSunlightAsLine: IUniform<boolean>;
+	/** The sun's direction: a unit vector in core coordinates. */
+	readonly uSunDirection: IUniform<Vector3>;
 	/** Whether a data layer colours the globe in place of the height. */
 	readonly uLayerShown: IUniform<boolean>;
 	/**
@@ -689,8 +775,9 @@ export type GlobeMaterial = {
  * Creates the material that draws the globe.
  *
  * @returns The material together with its uniforms, typed. The elevation
- * texture starts empty, the grid hidden, no brush outline drawn and no data
- * layer shown.
+ * texture starts empty, the grid hidden, no brush outline drawn, no data
+ * layer shown and sunlight off, with the sun over the equator at
+ * {@link SUN_LONGITUDE_DEG}.
  */
 export const createGlobeMaterial = (): GlobeMaterial => {
 	const uniforms: GlobeUniforms = {
@@ -701,6 +788,11 @@ export const createGlobeMaterial = (): GlobeMaterial => {
 		uGridOpacity: { value: 0 },
 		uBrushCentre: { value: new Vector3(1, 0, 0) },
 		uBrushRadius: { value: 0 },
+		uSunlight: { value: false },
+		uSunlightAsLine: { value: false },
+		uSunDirection: {
+			value: new Vector3(...latLonToDirection(0, SUN_LONGITUDE_DEG)),
+		},
 		uLayerShown: { value: false },
 		uLayer: { value: null },
 		uLayerRange: { value: new Vector2(0, 1) },
@@ -888,4 +980,56 @@ export const replaceLayer = (
 	shown?.texture.dispose();
 	showLayer(uniforms, next);
 	return next;
+};
+
+/**
+ * How the globe is lit: `'off'`, as without the sun; `'darkened'`, by the
+ * sun, with the side facing away from it darkened; or `'line'`, with the
+ * colours shaded as without the sun and the line between day and night
+ * drawn over them.
+ */
+export type SunlightStyle = 'off' | 'darkened' | 'line';
+
+/**
+ * Sets how the globe is lit by the sun, or that it is lit as without it.
+ *
+ * @param uniforms - The globe's uniforms.
+ * @param style - How the globe is lit.
+ */
+export const showSunlight = (
+	uniforms: GlobeUniforms,
+	style: SunlightStyle,
+): void => {
+	uniforms.uSunlight.value = style !== 'off';
+	uniforms.uSunlightAsLine.value = style === 'line';
+};
+
+/**
+ * The sun's direction as a unit vector.
+ *
+ * @param direction - Any finite, non-zero vector.
+ * @returns The vector scaled to length 1.
+ * @throws RangeError for a zero or non-finite vector.
+ */
+export const unitSunDirection = (direction: Vec3): Vec3 => {
+	const length = Math.hypot(...direction);
+	if (!(length > 0 && Number.isFinite(length))) {
+		throw new RangeError(
+			`The sun's direction must be a finite, non-zero vector; got ${direction.join(', ')}`,
+		);
+	}
+	return [direction[0] / length, direction[1] / length, direction[2] / length];
+};
+
+/**
+ * Sets the direction the sunlight comes from.
+ *
+ * @param uniforms - The globe's uniforms.
+ * @param direction - The sun's direction in core coordinates: any finite,
+ * non-zero vector; it is normalised.
+ * @throws RangeError as {@link unitSunDirection} does; the direction is
+ * then left as it was.
+ */
+export const aimSunlight = (uniforms: GlobeUniforms, direction: Vec3): void => {
+	uniforms.uSunDirection.value.set(...unitSunDirection(direction));
 };

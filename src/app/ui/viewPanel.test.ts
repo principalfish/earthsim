@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	MAX_DRAWN_SEA_LEVEL_M,
 	MIN_DRAWN_SEA_LEVEL_M,
 } from '../globe/material';
 import {
+	byClass,
+	createFakeDocument,
+	type FakeDocument,
+	type FakeElement,
+} from '../testing/fakeDocument';
+import {
+	createViewPanel,
 	formatExaggeration,
 	formatMetres,
 	SEA_LEVEL_SLIDER_STEP_M,
@@ -45,5 +52,69 @@ describe('the sea-level slider', () => {
 	it('can be set to zero and to both ends of the drawn range', () => {
 		expect(MIN_DRAWN_SEA_LEVEL_M % SEA_LEVEL_SLIDER_STEP_M).toBe(-0);
 		expect(MAX_DRAWN_SEA_LEVEL_M % SEA_LEVEL_SLIDER_STEP_M).toBe(0);
+	});
+});
+
+describe('createViewPanel', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const make = (sunlight?: boolean) => {
+		const told: string[] = [];
+		const panel = fake.createElement('aside');
+		createViewPanel(panel as unknown as HTMLElement, {
+			seaLevel: 0,
+			sunlight,
+			onExaggeration: (factor) => told.push(`exaggeration ${factor}`),
+			onSeaLevel: (metres) => told.push(`sea level ${metres}`),
+			onGridVisible: (visible) => told.push(`grid ${visible}`),
+			onSunlight: (on) => told.push(`sunlight ${on}`),
+		});
+		const [section] = panel.children as [FakeElement];
+		const box = (id: string): FakeElement => {
+			const found = byClass(section, 'field__checkbox').find(
+				(input) => input.id === id,
+			);
+			if (found === undefined) {
+				throw new Error(`No checkbox ${id}`);
+			}
+			return found;
+		};
+		return { told, section, box };
+	};
+
+	it('puts a Sunlight checkbox under Show cell grid, cleared', () => {
+		const { section, box } = make();
+		expect(
+			byClass(section, 'field__checkbox').map((input) => input.id),
+		).toEqual(['view-grid', 'view-sunlight']);
+		const label = byClass(section, 'field__label').find(
+			(element) => element.htmlFor === 'view-sunlight',
+		);
+		expect(label?.textContent).toBe('Sunlight');
+		expect(box('view-sunlight').checked).toBe(false);
+	});
+
+	it('starts the Sunlight checkbox on the setting given', () => {
+		expect(make(true).box('view-sunlight').checked).toBe(true);
+	});
+
+	it('reports each change of the Sunlight checkbox as the sunlight, and a change of the grid checkbox as the grid alone', () => {
+		const { told, box } = make();
+		const sunlight = box('view-sunlight');
+		sunlight.checked = true;
+		sunlight.fire('change');
+		sunlight.checked = false;
+		sunlight.fire('change');
+		const grid = box('view-grid');
+		grid.checked = true;
+		grid.fire('change');
+		expect(told).toEqual(['sunlight true', 'sunlight false', 'grid true']);
 	});
 });

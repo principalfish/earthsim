@@ -1,8 +1,14 @@
 import { NearestFilter } from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_ELEVATION_M, MIN_ELEVATION_M } from '../../core/index';
+import {
+	directionToLatLon,
+	MAX_ELEVATION_M,
+	MIN_ELEVATION_M,
+	SUN_LONGITUDE_DEG,
+} from '../../core/index';
 import { SEVEN_STOP_RAMP } from '../testing/rampFixtures';
 import {
+	aimSunlight,
 	COAST_MIN_CHANGE_M,
 	createCellTexture,
 	createGlobeMaterial,
@@ -15,10 +21,14 @@ import {
 	MAX_EXAGGERATION,
 	MIN_DRAWN_SEA_LEVEL_M,
 	MIN_EXAGGERATION,
+	NIGHT_BRIGHTNESS,
 	OCEAN_RAMP,
 	prepareLayer,
 	replaceLayer,
 	showLayer,
+	showSunlight,
+	TWILIGHT_HALF_WIDTH_DEG,
+	unitSunDirection,
 } from './material';
 import {
 	MAX_RAMP_STOPS,
@@ -594,4 +604,117 @@ describe('replaceLayer', () => {
 		// With no world, as well: no field needs none.
 		expect(replaceLayer(uniforms, null, null, null)).toBeNull();
 	});
+});
+
+describe('createGlobeMaterial, for sunlight', () => {
+	it('starts with sunlight off, the sun over the equator at its longitude', () => {
+		const { uniforms } = createGlobeMaterial();
+		expect(uniforms.uSunlight.value).toBe(false);
+		expect(uniforms.uSunlightAsLine.value).toBe(false);
+		const direction = uniforms.uSunDirection.value;
+		expect(direction.length()).toBeCloseTo(1, 12);
+		const place = directionToLatLon([direction.x, direction.y, direction.z]);
+		expect(place.latitudeDeg).toBeCloseTo(0, 12);
+		expect(place.longitudeDeg).toBeCloseTo(SUN_LONGITUDE_DEG, 12);
+	});
+
+	it('leaves night at 30% of the day, the change softened over 12°', () => {
+		expect(NIGHT_BRIGHTNESS).toBe(0.3);
+		expect(TWILIGHT_HALF_WIDTH_DEG).toBe(6);
+		const { material } = createGlobeMaterial();
+		expect(material.fragmentShader).toContain(
+			'const float NIGHT_BRIGHTNESS = 0.3;',
+		);
+		const written = /const float TWILIGHT_HALF_WIDTH = ([\d.]+);/.exec(
+			material.fragmentShader,
+		);
+		expect(Number(written?.[1])).toBeCloseTo(Math.sin(6 * (Math.PI / 180)), 15);
+	});
+
+	it('reads the sun in the fragment shader alone', () => {
+		const { material } = createGlobeMaterial();
+		expect(material.fragmentShader).toContain('uniform bool uSunlight;');
+		expect(material.fragmentShader).toContain('uniform bool uSunlightAsLine;');
+		expect(material.fragmentShader).toContain('uniform vec3 uSunDirection;');
+		expect(material.vertexShader).not.toContain('uSun');
+	});
+
+	describe('in the shader', () => {
+		const main = glslFunction(
+			createGlobeMaterial().material.fragmentShader,
+			'main',
+		);
+
+		it('keeps the shading fixed to the camera unless the night side is darkened', () => {
+			expect(main).toContain(
+				[
+					'\tif (uSunlight && !uSunlightAsLine) {',
+					'\t\tshade *= mix(NIGHT_BRIGHTNESS, 1.0, daylight(d));',
+					'\t} else {',
+					'\t\tfloat facing = 0.5 + 0.5 * dot(normalize(normalMatrix * d), GLOBE_LIGHT);',
+					'\t\tshade *= mix(GLOBE_SHADE, 1.0, facing);',
+					'\t}',
+					'\tcolour *= shade;',
+				].join('\n'),
+			);
+		});
+
+		it('keeps the relief shading under sunlight', () => {
+			expect(main.indexOf('reliefShade(d)')).toBeGreaterThan(-1);
+			expect(main.indexOf('reliefShade(d)')).toBeLessThan(
+				main.indexOf('daylight(d)'),
+			);
+		});
+
+		it('draws the line between day and night when asked for it, over the coastline and under the brush outline', () => {
+			const line = main.indexOf('terminatorCoverage(d)');
+			expect(main).toContain('if (uSunlight && uSunlightAsLine) {');
+			expect(line).toBeGreaterThan(
+				main.indexOf('coastCoverage(above, change)'),
+			);
+			expect(line).toBeLessThan(main.indexOf('brushCoverage(d)'));
+		});
+
+		it('chooses how the sunlight is drawn whether or not a layer is shown', () => {
+			expect(main).not.toMatch(/uSunlight\b[^;{]*uLayerShown/);
+		});
+	});
+});
+
+describe('showSunlight', () => {
+	it.each([
+		['darkened', true, false],
+		['line', true, true],
+		['off', false, false],
+	] as const)('draws the sunlight %s', (style, on, asLine) => {
+		const { uniforms } = createGlobeMaterial();
+		// From another style first, so that what changes is seen to change.
+		showSunlight(uniforms, style === 'line' ? 'darkened' : 'line');
+		showSunlight(uniforms, style);
+		expect(uniforms.uSunlight.value).toBe(on);
+		expect(uniforms.uSunlightAsLine.value).toBe(asLine);
+	});
+});
+
+describe('aimSunlight', () => {
+	it('sets the direction, normalised', () => {
+		const { uniforms } = createGlobeMaterial();
+		aimSunlight(uniforms, [0, 3, 4]);
+		expect(uniforms.uSunDirection.value.toArray()).toEqual([0, 0.6, 0.8]);
+	});
+
+	it.each([
+		['zero', [0, 0, 0]],
+		['NaN', [Number.NaN, 0, 1]],
+		['infinite', [Number.POSITIVE_INFINITY, 0, 0]],
+	] as const)(
+		'refuses a direction that is %s, changing nothing',
+		(_name, direction) => {
+			const { uniforms } = createGlobeMaterial();
+			aimSunlight(uniforms, [1, 0, 0]);
+			expect(() => aimSunlight(uniforms, direction)).toThrow(RangeError);
+			expect(() => unitSunDirection(direction)).toThrow(RangeError);
+			expect(uniforms.uSunDirection.value.toArray()).toEqual([1, 0, 0]);
+		},
+	);
 });

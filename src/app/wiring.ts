@@ -12,12 +12,16 @@ import {
 	isMeasuredEarth,
 	normaliseSeaLevel,
 	type Resolution,
+	sunColour,
+	sunDirection,
+	sunDrawnSize,
 	type World,
 	type WorldFileResult,
 } from '../core/index';
 import type { AppState } from './appState';
 import type { Autosave, AutosaveOptions } from './autosave';
 import type { RotateButton, ViewInput } from './globe/input';
+import type { SunlightStyle } from './globe/material';
 import type { Globe } from './globe/renderer';
 import { createLayerStore, type LayerStore } from './layers';
 import type { ObservedLoader } from './observedData';
@@ -56,7 +60,7 @@ import {
 	handleHistoryKey,
 	type ShortcutEvent,
 } from './undo';
-import { DEFAULT_PAGE_VIEW, type PageView } from './view';
+import { DEFAULT_PAGE_VIEW, type Layer, type PageView } from './view';
 
 /** What the page asks of its globe once the globe exists. */
 export type PageGlobe = Pick<
@@ -65,6 +69,8 @@ export type PageGlobe = Pick<
 	| 'setSeaLevel'
 	| 'setExaggeration'
 	| 'setGridVisible'
+	| 'setSun'
+	| 'setSunlight'
 	| 'updateElevation'
 >;
 
@@ -171,7 +177,7 @@ export type PageParts = {
 	 */
 	readonly createLayerPanel: (
 		options: PageLayerOptions,
-	) => Pick<LayerPanel, 'newWorld' | 'setEarth' | 'shown'>;
+	) => Pick<LayerPanel, 'newWorld' | 'setEarth' | 'setSunlight' | 'shown'>;
 	/**
 	 * Lays the cursor readout over the globe, hidden until the pointer is
 	 * over it, and has it follow the pointer.
@@ -211,6 +217,22 @@ export type PageParts = {
 };
 
 /**
+ * How the globe is lit for a layer and the Sunlight setting. In Terrain
+ * view the night side is darkened. In Temperature view the colours are
+ * shaded as without the sun, since a darkened colour would read as another
+ * temperature, and the line between day and night is drawn instead.
+ *
+ * @param layer - What the globe is coloured by.
+ * @param sunlight - Whether the globe is lit by the sun.
+ */
+const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
+	if (!sunlight) {
+		return 'off';
+	}
+	return layer === 'temperature' ? 'line' : 'darkened';
+};
+
+/**
  * Joins the parts of the page and starts it: on the saved world if there
  * is one, and otherwise on the dialog that starts a new world.
  *
@@ -225,6 +247,21 @@ export type PageParts = {
  * The date line under the world's description is written as soon as the
  * world controls are made, and follows the world's age and every change of
  * the view settings.
+ *
+ * The globe is given the sun, its direction, drawn size and colour for the
+ * month on screen and the world's planet, once as it first shows the world
+ * and once each time either changes: when the month on screen moves on, by
+ * the slider or as the year plays, when the planet settings change, and
+ * for each new world, once whether or not the new world moves the month
+ * back to July. On a summary of the year the month stays as it was last on
+ * screen, and so does the sun. The Sunlight control turns the globe's
+ * sunlight on and off, and tells the layer panel, which shows the month
+ * controls in Terrain view while it is on; a new world keeps it. While it
+ * is on, the globe's night side is darkened when Terrain view is chosen,
+ * and when Temperature view is chosen the line between day and night is
+ * drawn instead, whether or not there is a temperature on the globe yet.
+ * The globe is told how it is lit once for each change of that, by the
+ * Sunlight control or by a change of layer.
  *
  * The cursor readout over the globe is made after the statistics, and reads
  * what the globe shows of the temperature from the layer panel. Besides
@@ -283,6 +320,33 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	/** Tells the layer panel whether the world, changed, is the measured Earth. */
 	const checkEarth = (): void => layerPanel.setEarth(earthOf(state.world));
 	globe.setWorld(state.world);
+	/** The month on screen, as the view settings last said. */
+	let month = DEFAULT_PAGE_VIEW.month;
+	/** How many times the sun has been placed, to place it once a world. */
+	let sunPlaced = 0;
+	/** Gives the globe the sun of the month on screen and the world's planet. */
+	const placeSun = (): void => {
+		const settings = state.world.planet;
+		globe.setSun(
+			sunDirection(month, settings),
+			sunDrawnSize(settings),
+			sunColour(settings),
+		);
+		sunPlaced++;
+	};
+	placeSun();
+	/** What the globe is coloured by, as the view settings last said. */
+	let layer = DEFAULT_PAGE_VIEW.layer;
+	/** How the globe is lit, as it was last told; it starts unlit. */
+	let sunlightStyle: SunlightStyle = 'off';
+	/** Tells the globe how it is lit, if that has changed. */
+	const lightGlobe = (sunlight: boolean): void => {
+		const next = sunlightStyleFor(layer, sunlight);
+		if (next !== sunlightStyle) {
+			sunlightStyle = next;
+			globe.setSunlight(next);
+		}
+	};
 	const viewInput = parts.createViewInput(rotateButtonFor(DEFAULT_TOOL), () =>
 		readout.invalidate(),
 	);
@@ -407,6 +471,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			readout.invalidate();
 		},
 		onGridVisible: globe.setGridVisible,
+		onSunlight: (on) => {
+			lightGlobe(on);
+			layerPanel.setSunlight(on);
+		},
 	});
 	const planet = parts.createPlanetPanel({
 		planet: state.world.planet,
@@ -425,6 +493,12 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		temperature,
 		onView: (next) => {
 			date.setView(next);
+			layer = next.layer;
+			lightGlobe(next.sunlight);
+			if (next.month !== month) {
+				month = next.month;
+				placeSun();
+			}
 			readout.invalidate();
 		},
 		loadObserved: parts.loadObserved,
@@ -468,9 +542,16 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// The month on screen is the view's, but a new world starts again from
 	// July and from the simulated temperature, after the store has dropped
 	// the old world's result so that the old result is not shown for July
-	// on the way. The date line then has the new world's age with that
-	// month.
-	state.addListener((world) => layerPanel.newWorld(earthOf(world)));
+	// on the way. The sun is placed for the new world's planet, by the
+	// layer panel's change of month if there was one and here otherwise.
+	// The date line then has the new world's age with that month.
+	state.addListener((world) => {
+		const placed = sunPlaced;
+		layerPanel.newWorld(earthOf(world));
+		if (sunPlaced === placed) {
+			placeSun();
+		}
+	});
 	state.addListener((world) => date.setYears(world.ageYears));
 	state.addListener(() => readout.invalidate());
 	// What the panel said of an earlier import or export is over with.
@@ -481,6 +562,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// The planet settings are saved with the world, and the temperature
 	// depends on them.
 	state.addPlanetListener(() => {
+		placeSun();
 		temperature.refresh();
 		checkEarth();
 		autosave.markChanged();

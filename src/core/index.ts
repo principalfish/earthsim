@@ -16,6 +16,7 @@ export * from './planet';
 export * from './protocol';
 export * from './quantile';
 export * from './serialize';
+export * from './star';
 export * from './stats';
 export * from './temperature';
 export * from './world';

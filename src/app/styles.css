@@ -617,6 +617,7 @@ body {
 
 /* Hidden by the page, which the display set on them would otherwise undo. */
 .temperature-view[hidden],
+.temperature-view__show[hidden],
 .month-controls[hidden],
 .comparison[hidden] {
   display: none;

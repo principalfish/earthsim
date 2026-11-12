@@ -11,8 +11,13 @@ import {
 	normaliseSeaLevel,
 	PLANET_SETTINGS,
 	type PlanetSettings,
+	type Rgb,
 	type SimRequest,
 	serializeWorld,
+	sunColour,
+	sunDirection,
+	sunDrawnSize,
+	type Vec3,
 	type World,
 	type WorldFileResult,
 } from '../core/index';
@@ -51,7 +56,7 @@ import {
 	type WorldPanelOptions,
 } from './ui/worldPanel';
 import type { ShortcutEvent } from './undo';
-import { DEFAULT_MONTH, type PageView } from './view';
+import { DEFAULT_MONTH, DEFAULT_PAGE_VIEW, type PageView } from './view';
 import {
 	type PageAutosaveOptions,
 	type PageLayerOptions,
@@ -101,6 +106,8 @@ type Stage = {
 	readonly readoutCalls: string[];
 	/** What the stand-in for the layer panel says the globe shows. */
 	shownTemperature: ShownTemperature | null;
+	/** Every sun the globe was given, in order. */
+	readonly suns: Sun[];
 	/** Turns or zooms the camera, as the view's input says it does. */
 	moveCamera(): void;
 	/** Presses a key as the page hears it. */
@@ -112,6 +119,20 @@ type Stage = {
 	/** Has that read fail. */
 	failLoad(error: unknown): void;
 };
+
+/** A sun as the globe was given it. */
+type Sun = {
+	readonly direction: Vec3;
+	readonly sizeDeg: number;
+	readonly colour: Rgb;
+};
+
+/** The sun of a month and a planet, as the page is to give it. */
+const sunOf = (month: number, planet: PlanetSettings): Sun => ({
+	direction: sunDirection(month, planet),
+	sizeDeg: sunDrawnSize(planet),
+	colour: sunColour(planet),
+});
 
 /** A planet's settings as the stand-ins write them in the log. */
 const describePlanet = (planet: PlanetSettings): string =>
@@ -143,6 +164,7 @@ const createStage = (
 	const errors: unknown[] = [];
 	const saved: World[] = [];
 	const dialogs: NewWorldDialogOptions[] = [];
+	const suns: Sun[] = [];
 	const state = createAppState({ world, seaLevelRange: SEA_LEVEL_RANGE });
 	let sculptOptions:
 		| Pick<SculptOptions, 'onStrokeEnd' | 'onWorldChange'>
@@ -206,6 +228,7 @@ const createStage = (
 		},
 		readoutCalls,
 		shownTemperature: null,
+		suns,
 		moveCamera: () => required(onCameraMove, 'view input')(),
 		pressKey: (press) => {
 			required(
@@ -235,6 +258,11 @@ const createStage = (
 			setSeaLevel: (metres) => log.push(`globe.setSeaLevel ${metres}`),
 			setExaggeration: (factor) => log.push(`globe.setExaggeration ${factor}`),
 			setGridVisible: (visible) => log.push(`globe.setGridVisible ${visible}`),
+			setSun: (direction, sizeDeg, colour) => {
+				log.push('globe.setSun');
+				suns.push({ direction, sizeDeg, colour });
+			},
+			setSunlight: (style) => log.push(`globe.setSunlight ${style}`),
 			updateElevation: () => log.push('globe.updateElevation'),
 		},
 		createViewInput: (rotateButton, onMove) => {
@@ -362,6 +390,7 @@ const createStage = (
 			return {
 				newWorld: (earth) => log.push(`layerPanel.newWorld ${earth}`),
 				setEarth: (earth) => log.push(`layerPanel.setEarth ${earth}`),
+				setSunlight: (on) => log.push(`layerPanel.setSunlight ${on}`),
 				shown: () => stage.shownTemperature,
 			};
 		},
@@ -408,6 +437,7 @@ const createStartedStage = async (
 	await stage.started;
 	stage.log.length = 0;
 	stage.readoutCalls.length = 0;
+	stage.suns.length = 0;
 	return stage;
 };
 
@@ -439,6 +469,7 @@ describe('startPage', () => {
 		const { log } = createStage(world);
 		expect(log).toEqual([
 			`globe.setWorld ${describeWorld(world)}`,
+			'globe.setSun',
 			`createViewInput ${MAIN_BUTTON}`,
 			'createSculpt',
 			`createWorldPanel ${describeWorld(world)}`,
@@ -525,6 +556,7 @@ describe('a world replacement', () => {
 			'temperature.reset',
 			'temperature.refresh',
 			'layerPanel.newWorld null',
+			'globe.setSun',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
 		]);
@@ -588,6 +620,7 @@ describe('the start of the page', () => {
 			'temperature.reset',
 			'temperature.refresh',
 			'layerPanel.newWorld null',
+			'globe.setSun',
 			'worldPanel.setDate 2.4 million years',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
@@ -846,6 +879,7 @@ describe('a change of the planet settings', () => {
 		stage.state.world.planet = { ...stage.state.world.planet, axialTiltDeg: 0 };
 		stage.state.notifyPlanetChange();
 		expect(stage.log).toEqual([
+			'globe.setSun',
 			'temperature.refresh',
 			'layerPanel.setEarth null',
 			'autosave.markChanged',
@@ -870,6 +904,7 @@ describe('the planet controls', () => {
 		stage.planetPanelOptions.onChange(TILTED);
 		expect(next.planet).toEqual(TILTED);
 		expect(stage.log).toEqual([
+			'globe.setSun',
 			'temperature.refresh',
 			'layerPanel.setEarth null',
 			'autosave.markChanged',
@@ -1393,6 +1428,7 @@ describe('the cursor readout', () => {
 			temperatureView: 'month',
 			source: 'simulated',
 			month: 3,
+			sunlight: false,
 		});
 		expect(stage.readoutCalls).toEqual(['invalidate']);
 		stage.layerOptions.store.markCalculating();
@@ -1465,28 +1501,33 @@ describe('the date line', () => {
 			temperatureView: 'month',
 			source: 'simulated',
 			month: 6,
+			sunlight: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
 			temperatureView: 'month',
 			source: 'simulated',
 			month: 7,
+			sunlight: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
 			temperatureView: 'annualMean',
 			source: 'simulated',
 			month: 7,
+			sunlight: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'terrain',
 			temperatureView: 'annualMean',
 			source: 'simulated',
 			month: 7,
+			sunlight: false,
 		});
 		expect(stage.log).toEqual([
 			'worldPanel.setDate Year 0 · July',
 			'worldPanel.setDate Year 0 · August',
+			'globe.setSun',
 			'worldPanel.setDate Year 0 · Annual average',
 			'worldPanel.setDate Year 0',
 		]);
@@ -1540,7 +1581,7 @@ describe('the month on screen', () => {
 	it('is kept through an edit of the terrain', async () => {
 		const { page, controls, views } = await createMonthStage();
 		controls.onMonth(2);
-		expect(page.stage.log.at(-1)).toBe('worldPanel.setDate Year 0 · March');
+		expect(page.stage.log).toContain('worldPanel.setDate Year 0 · March');
 		page.stage.log.length = 0;
 		makeStroke(page.stage);
 		await page.wait();
@@ -1562,6 +1603,7 @@ describe('the month on screen', () => {
 			temperatureView: 'month',
 			source: 'simulated',
 			month: DEFAULT_MONTH,
+			sunlight: false,
 		});
 		expect(page.stage.log).toContain('worldPanel.setDate Year 0 · July');
 	});
@@ -1573,6 +1615,223 @@ describe('the month on screen', () => {
 		expect(page.stage.log).toContain('worldPanel.setDate Year 0 · August');
 		page.stage.state.replaceWorld(createBlankWorld(64));
 		expect(timers.pending()).toBe(0);
+	});
+});
+
+/** A started page with the real layer panel, on the terrain. */
+const createSunStage = async (world?: World) => {
+	let controls: LayerControlsOptions | undefined;
+	const views: PageView[] = [];
+	const timers = createFakeTimers();
+	const stage = await createStartedStage(world, {
+		createLayerPanel: (options) =>
+			createLayerPanel({
+				...options,
+				globe: { setLayer: () => {} },
+				setTimer: timers.setTimer,
+				clearTimer: timers.clearTimer,
+				reportError: () => {},
+				createControls: (made) => {
+					controls = made;
+					return {
+						showLegend: () => {},
+						showView: (view) => views.push(view),
+						showComparison: () => {},
+					};
+				},
+			}),
+	});
+	return {
+		stage,
+		controls: required(controls, 'layer controls'),
+		views,
+		timers,
+	};
+};
+
+describe('the sun', () => {
+	/** The sun calls in a log. */
+	const sunCalls = (log: readonly string[]) =>
+		log.filter((line) => line === 'globe.setSun');
+
+	it('is placed once as the page shows its first world, for July', () => {
+		const world = createBlankWorld(64);
+		world.planet = { ...DEFAULT_PLANET, axialTiltDeg: 40 };
+		const stage = createStage(world);
+		expect(stage.suns).toEqual([sunOf(DEFAULT_MONTH, world.planet)]);
+		expect(stage.log.slice(0, 2)).toEqual([
+			`globe.setWorld ${describeWorld(world)}`,
+			'globe.setSun',
+		]);
+	});
+
+	it('follows each change of the month on screen, once each, and nothing else of the view', async () => {
+		const stage = await createStartedStage();
+		const { planet } = stage.state.world;
+		const view: PageView = {
+			layer: 'temperature',
+			temperatureView: 'month',
+			source: 'simulated',
+			month: 3,
+			sunlight: false,
+		};
+		stage.layerOptions.onView(view);
+		stage.layerOptions.onView({ ...view, temperatureView: 'annualMean' });
+		stage.layerOptions.onView({ ...view, layer: 'terrain', sunlight: true });
+		stage.layerOptions.onView({ ...view, month: 4 });
+		expect(stage.suns).toEqual([sunOf(3, planet), sunOf(4, planet)]);
+	});
+
+	it('follows the slider and the year playing through the real layer panel', async () => {
+		const { stage, controls, timers } = await createSunStage();
+		const { planet } = stage.state.world;
+		stage.viewPanelOptions.onSunlight(true);
+		controls.onMonth(2);
+		expect(stage.suns).toEqual([sunOf(2, planet)]);
+		controls.onPlay();
+		timers.advance(PLAYBACK_STEP_MS);
+		expect(stage.suns).toEqual([sunOf(2, planet), sunOf(3, planet)]);
+		expect(stage.log).toContain('worldPanel.setDate Year 0 · April');
+	});
+
+	it('follows a change of the planet settings, once, in the month on screen', async () => {
+		const { stage, controls } = await createSunStage();
+		stage.viewPanelOptions.onSunlight(true);
+		controls.onMonth(9);
+		stage.suns.length = 0;
+		stage.log.length = 0;
+		const planet: PlanetSettings = {
+			...DEFAULT_PLANET,
+			starMass: 0.5,
+			starBrightness: 0.2,
+			orbitDistanceAu: 0.4,
+		};
+		stage.planetPanelOptions.onChange(planet);
+		expect(stage.suns).toEqual([sunOf(9, planet)]);
+		expect(sunCalls(stage.log)).toHaveLength(1);
+	});
+
+	it('stays in the month last on screen while a summary is shown', async () => {
+		const { stage, controls } = await createSunStage();
+		controls.onLayer('temperature');
+		controls.onMonth(1);
+		controls.onTemperatureView('coldest');
+		controls.onLayer('terrain');
+		stage.suns.length = 0;
+		const planet: PlanetSettings = { ...DEFAULT_PLANET, axialTiltDeg: 60 };
+		stage.planetPanelOptions.onChange(planet);
+		expect(stage.suns).toEqual([sunOf(1, planet)]);
+	});
+
+	it('is placed once for a new world, for its planet', async () => {
+		const stage = await createStartedStage();
+		const next = createBlankWorld(64);
+		next.planet = { ...DEFAULT_PLANET, starMass: 3 };
+		stage.importResult = { ok: true, world: next };
+		stage.worldPanelOptions.onImport(new Blob());
+		await settle();
+		expect(stage.suns).toEqual([sunOf(DEFAULT_MONTH, next.planet)]);
+		expect(sunCalls(stage.log)).toHaveLength(1);
+	});
+
+	it('is placed once for a new world that puts July back on screen', async () => {
+		const { stage, controls } = await createSunStage();
+		stage.viewPanelOptions.onSunlight(true);
+		controls.onMonth(0);
+		stage.suns.length = 0;
+		stage.log.length = 0;
+		const next = createBlankWorld(64);
+		next.planet = { ...DEFAULT_PLANET, starBrightness: 4 };
+		stage.importResult = { ok: true, world: next };
+		stage.worldPanelOptions.onImport(new Blob());
+		await settle();
+		expect(stage.suns).toEqual([sunOf(DEFAULT_MONTH, next.planet)]);
+		expect(sunCalls(stage.log)).toHaveLength(1);
+	});
+});
+
+describe('the Sunlight control', () => {
+	/** The calls that tell the globe how it is lit, in a log. */
+	const sunlightCalls = (log: readonly string[]) =>
+		log.filter((line) => line.startsWith('globe.setSunlight'));
+
+	it('turns the globe’s sunlight on and off, once each, and tells the layer panel', async () => {
+		const stage = await createStartedStage();
+		stage.viewPanelOptions.onSunlight(true);
+		stage.viewPanelOptions.onSunlight(false);
+		expect(stage.log).toEqual([
+			'globe.setSunlight darkened',
+			'layerPanel.setSunlight true',
+			'globe.setSunlight off',
+			'layerPanel.setSunlight false',
+		]);
+	});
+
+	it('draws the line in Temperature view before there is any temperature on the globe', async () => {
+		const { stage, controls } = await createSunStage();
+		controls.onLayer('temperature');
+		stage.log.length = 0;
+		stage.viewPanelOptions.onSunlight(true);
+		expect(stage.readoutOptions.shownTemperature()).toBeNull();
+		expect(sunlightCalls(stage.log)).toEqual(['globe.setSunlight line']);
+	});
+
+	it('darkens the night side in Terrain view', async () => {
+		const { stage } = await createSunStage();
+		stage.viewPanelOptions.onSunlight(true);
+		expect(sunlightCalls(stage.log)).toEqual(['globe.setSunlight darkened']);
+	});
+
+	it('tells the globe again, once, at each change of layer while it is on, and not while it is off', async () => {
+		const { stage, controls } = await createSunStage();
+		controls.onLayer('temperature');
+		controls.onLayer('terrain');
+		expect(sunlightCalls(stage.log)).toEqual([]);
+		stage.viewPanelOptions.onSunlight(true);
+		controls.onLayer('temperature');
+		controls.onLayer('terrain');
+		controls.onLayer('temperature');
+		stage.viewPanelOptions.onSunlight(false);
+		expect(sunlightCalls(stage.log)).toEqual([
+			'globe.setSunlight darkened',
+			'globe.setSunlight line',
+			'globe.setSunlight darkened',
+			'globe.setSunlight line',
+			'globe.setSunlight off',
+		]);
+	});
+
+	it('is kept for a new world, by the globe and the layer panel', async () => {
+		let controls: LayerControlsOptions | undefined;
+		const views: PageView[] = [];
+		const stage = await createStartedStage(undefined, {
+			createLayerPanel: (options) =>
+				createLayerPanel({
+					...options,
+					globe: { setLayer: () => {} },
+					setTimer: () => 0,
+					clearTimer: () => {},
+					reportError: () => {},
+					createControls: (made) => {
+						controls = made;
+						return {
+							showLegend: () => {},
+							showView: (view) => views.push(view),
+							showComparison: () => {},
+						};
+					},
+				}),
+		});
+		stage.viewPanelOptions.onSunlight(true);
+		required(controls, 'layer controls').onMonth(2);
+		stage.log.length = 0;
+		views.length = 0;
+		stage.state.replaceWorld(createBlankWorld(64));
+		expect(stage.log.filter((line) => line.includes('Sunlight'))).toEqual([]);
+		expect(views).toEqual([
+			{ ...DEFAULT_PAGE_VIEW, month: DEFAULT_MONTH, sunlight: true },
+		]);
+		expect(stage.log).toContain('worldPanel.setDate Year 0 · July');
 	});
 });
 

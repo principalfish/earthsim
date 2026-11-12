@@ -3,7 +3,8 @@
  * the relief exaggeration, they belong to the page, not to the world: they
  * are not saved, and a new world keeps them, all but the month, which a new
  * world sets back to {@link DEFAULT_MONTH}, and the temperature's source,
- * which it sets back to {@link DEFAULT_TEMPERATURE_SOURCE}.
+ * which it sets back to {@link DEFAULT_TEMPERATURE_SOURCE}. Whether the
+ * globe is lit by the sun is kept with the rest.
  */
 
 /** What the globe can be coloured by. */
@@ -117,10 +118,12 @@ export type PageView = {
 	 */
 	readonly source: TemperatureSource;
 	/**
-	 * The month on screen for the Month view, from January at 0 to
-	 * December at 11.
+	 * The month on screen, from January at 0 to December at 11: the one the
+	 * Month view shows and the sun stands in.
 	 */
 	readonly month: number;
+	/** Whether the globe is lit by the sun. */
+	readonly sunlight: boolean;
 };
 
 /** The view settings the page opens on. */
@@ -129,4 +132,17 @@ export const DEFAULT_PAGE_VIEW: PageView = {
 	temperatureView: DEFAULT_TEMPERATURE_VIEW,
 	source: DEFAULT_TEMPERATURE_SOURCE,
 	month: DEFAULT_MONTH,
+	sunlight: false,
 };
+
+/**
+ * Whether the month on screen is chosen and played in a view: in the Month
+ * view of Temperature, and in Terrain view while the globe is lit by the
+ * sun, whose place in the sky follows the month.
+ *
+ * @param view - The view settings.
+ */
+export const offersMonth = (view: PageView): boolean =>
+	view.layer === 'temperature'
+		? view.temperatureView === 'month'
+		: view.sunlight;

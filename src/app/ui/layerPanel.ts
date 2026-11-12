@@ -3,7 +3,8 @@
  * Temperature; in Temperature view, which month or summary of the year is
  * shown, with a slider and a play button for the month, and, on the
  * measured Earth, whether it is the simulated temperature, the observed one
- * or the difference; and the legend.
+ * or the difference; the slider and the play button in Terrain view too
+ * while the globe is lit by the sun; and the legend.
  *
  * {@link createLayerPanel} decides what the globe and the legend show, from
  * the view settings and the layer store, and switches the temperature's
@@ -43,6 +44,7 @@ import {
 	LAYERS,
 	type Layer,
 	MONTH_NAMES,
+	offersMonth,
 	type PageView,
 	TEMPERATURE_VIEW_LABELS,
 	TEMPERATURE_VIEWS,
@@ -185,8 +187,8 @@ export type LayerControls = {
 	showLegend(content: LegendContent | null): void;
 	/**
 	 * Shows the view settings: the controls for the temperature in
-	 * Temperature view, the month controls for the Month view alone, the
-	 * month on the slider and whether the year is playing.
+	 * Temperature view, the month controls where {@link offersMonth} says,
+	 * the month on the slider and whether the year is playing.
 	 */
 	showView(view: PageView, playing: boolean): void;
 	/** Shows the comparison controls as given, or hides them. */
@@ -254,7 +256,7 @@ export type LayerPanel = {
 	 * Takes a new world: stops the year playing, puts {@link DEFAULT_MONTH}
 	 * on screen and the source back to {@link DEFAULT_TEMPERATURE_SOURCE},
 	 * and forgets the observed temperature and the comparison of the world
-	 * before. The layer and the temperature view are kept.
+	 * before. The layer, the temperature view and the sunlight are kept.
 	 *
 	 * @param earth - The new world's resolution if it is the measured Earth;
 	 * null if it is not.
@@ -268,6 +270,15 @@ export type LayerPanel = {
 	 * it is not.
 	 */
 	setEarth(earth: Resolution | null): void;
+	/**
+	 * Takes whether the globe is lit by the sun, as the view controls set
+	 * it. Turned on in Terrain view, the month controls show there; turned
+	 * off there, they are hidden again and the year stops playing. In
+	 * Temperature view the controls are as they were either way.
+	 *
+	 * @param on - Whether the globe is lit by the sun.
+	 */
+	setSunlight(on: boolean): void;
 	/**
 	 * What the globe shows of the temperature: exactly what it was last
 	 * given, as of the panel's latest update, which follows every change of
@@ -400,11 +411,14 @@ const DIFFERENCE_SCALE: FittedScale = {
  * whenever the simulated temperature would be. All three need a result:
  * until there is one, the globe shows the height colours.
  *
- * In the Month view the play button plays the year, a month a second and
- * from December back to January. A move of the slider while it plays is
- * where it carries on from: each move restarts the wait of a whole second.
- * It stops when pressed again, when another temperature view or the
- * terrain is chosen, and on a new world.
+ * In the Month view, and in Terrain view while the globe is lit by the sun,
+ * the play button plays the year, a month a second and from December back
+ * to January. A move of the slider while it plays is where it carries on
+ * from: each move restarts the wait of a whole second. It stops when
+ * pressed again, on a new world, and whenever a change of the view hides
+ * the month controls, as {@link offersMonth} decides: another temperature
+ * view, Terrain without sunlight, sunlight turned off in Terrain view, or
+ * a summary chosen on the way back to Temperature view.
  *
  * The legend's scale, ramp, caption, ticks and words for what lies beyond
  * the ends are always those of what the globe shows: what it was last
@@ -435,6 +449,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	let layer: Layer = DEFAULT_PAGE_VIEW.layer;
 	let temperatureView: TemperatureView = DEFAULT_PAGE_VIEW.temperatureView;
 	let source: TemperatureSource = DEFAULT_PAGE_VIEW.source;
+	let sunlight = DEFAULT_PAGE_VIEW.sunlight;
 	/**
 	 * The world's resolution while it is the measured Earth, as the page
 	 * last said; null while it is not, and the comparison is not offered.
@@ -703,6 +718,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		temperatureView,
 		source,
 		month: playback.month,
+		sunlight,
 	});
 	/** Shows the view settings and the comparison, and tells of them. */
 	const announce = (): void => {
@@ -790,7 +806,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 				return;
 			}
 			layer = next;
-			if (layer !== 'temperature') {
+			if (!offersMonth(view())) {
 				playback.pause();
 			}
 			temperature.setShowing(layer === 'temperature');
@@ -802,7 +818,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 				return;
 			}
 			temperatureView = next;
-			if (temperatureView !== 'month') {
+			if (!offersMonth(view())) {
 				playback.pause();
 			}
 			announce();
@@ -869,6 +885,16 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			announce();
 			update();
 		},
+		setSunlight: (on) => {
+			if (on === sunlight) {
+				return;
+			}
+			sunlight = on;
+			if (!offersMonth(view())) {
+				playback.pause();
+			}
+			announce();
+		},
 		setEarth: (next) => {
 			if (next === earth) {
 				return;
@@ -891,10 +917,11 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
  * The temperature's controls show only in Temperature view: a drop-down of
  * what of the year to show; under it the comparison controls of
  * {@link createComparisonControls}, hidden unless they are offered; and,
- * for the Month view alone, a slider from
- * January to December, which a screen reader hears by the month's name, and
- * a play button. The button is a toggle whose pressed state says whether
- * the year is playing.
+ * for the Month view, a slider from January to December, which a screen
+ * reader hears by the month's name, and a play button. The slider and the
+ * button show in Terrain view too while the globe is lit by the sun, on
+ * their own. The button is a toggle whose pressed state says whether the
+ * year is playing.
  *
  * @param panel - The panel to add the section to, after what it holds.
  * @param options - The starting view settings and whom to tell of a choice.
@@ -920,6 +947,7 @@ export const createLayerControls = (
 		value: options.view.temperatureView,
 		onChange: options.onTemperatureView,
 	});
+	viewField.classList.add('temperature-view__show');
 
 	const monthControls = createElement('div', 'month-controls');
 	const month = createRangeField({
@@ -950,8 +978,11 @@ export const createLayerControls = (
 	temperatureControls.append(monthControls);
 
 	const showView = (view: PageView, playing: boolean): void => {
-		temperatureControls.hidden = view.layer !== 'temperature';
-		monthControls.hidden = view.temperatureView !== 'month';
+		const temperatureShown = view.layer === 'temperature';
+		const monthShown = offersMonth(view);
+		temperatureControls.hidden = !temperatureShown && !monthShown;
+		viewField.hidden = !temperatureShown;
+		monthControls.hidden = !monthShown;
 		month.setValue(view.month);
 		play.setAttribute('aria-pressed', String(playing));
 	};

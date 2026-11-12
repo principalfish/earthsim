@@ -657,6 +657,7 @@ describe('createLayerPanel, the month', () => {
 			temperatureView: 'month',
 			source: 'simulated',
 			month: 11,
+			sunlight: false,
 		});
 	});
 
@@ -706,6 +707,7 @@ describe('createLayerPanel, the month', () => {
 				temperatureView: 'month',
 				source: 'simulated',
 				month: 6,
+				sunlight: false,
 			},
 			playing: false,
 		});
@@ -728,6 +730,7 @@ describe('createLayerPanel, the month', () => {
 				temperatureView: 'month',
 				source: 'simulated',
 				month: 6,
+				sunlight: false,
 			},
 			playing: false,
 		});
@@ -745,6 +748,7 @@ describe('createLayerPanel, the month', () => {
 			temperatureView: 'range',
 			source: 'simulated',
 			month: DEFAULT_MONTH,
+			sunlight: false,
 		});
 	});
 });
@@ -772,6 +776,7 @@ describe('createLayerPanel, playing the year', () => {
 				temperatureView: 'month',
 				source: 'simulated',
 				month: 7,
+				sunlight: false,
 			},
 			playing: true,
 		});
@@ -841,6 +846,7 @@ describe('createLayerPanel, playing the year', () => {
 				temperatureView: 'month',
 				source: 'simulated',
 				month: 3,
+				sunlight: false,
 			},
 			playing: true,
 		});
@@ -865,6 +871,7 @@ describe('createLayerPanel, playing the year', () => {
 				temperatureView: 'month',
 				source: 'simulated',
 				month: 7,
+				sunlight: false,
 			},
 			playing: false,
 		});
@@ -895,6 +902,7 @@ describe('createLayerPanel, playing the year', () => {
 				temperatureView: 'month',
 				source: 'simulated',
 				month: 7,
+				sunlight: false,
 			},
 			playing: false,
 		});
@@ -922,6 +930,133 @@ describe('createLayerPanel, playing the year', () => {
 		const result = resultWith();
 		stage.arrive(result);
 		expect(stage.shown.at(-1)?.field).toBe(result.months[8]);
+	});
+});
+
+describe('createLayerPanel, under sunlight', () => {
+	/** A stage in Terrain view with sunlight on. */
+	const sunlit = () => {
+		const stage = createStage();
+		stage.panel.setSunlight(true);
+		return stage;
+	};
+
+	it('tells of the sunlight with the rest of the view, which starts with it off', () => {
+		const stage = createStage();
+		expect(stage.controls.view.sunlight).toBe(false);
+		stage.panel.setSunlight(true);
+		expect(stage.lastView()).toEqual({
+			view: { ...DEFAULT_PAGE_VIEW, sunlight: true },
+			playing: false,
+		});
+		expect(stage.told.at(-1)).toEqual({ ...DEFAULT_PAGE_VIEW, sunlight: true });
+	});
+
+	it('tells nothing for the sunlight it already has', () => {
+		const stage = createStage();
+		stage.panel.setSunlight(false);
+		expect(stage.views).toEqual([]);
+		expect(stage.told).toEqual([]);
+	});
+
+	it('plays the year in Terrain view, the month moving on with the globe on the terrain', () => {
+		const stage = sunlit();
+		stage.controls.onPlay();
+		expect(stage.lastView()?.playing).toBe(true);
+		stage.timers.advance(2 * PLAYBACK_STEP_MS);
+		expect(stage.lastView()).toEqual({
+			view: { ...DEFAULT_PAGE_VIEW, month: 8, sunlight: true },
+			playing: true,
+		});
+		expect(stage.told.at(-1)?.month).toBe(8);
+		expect(stage.shown).toEqual([]);
+		expect(stage.showing).toEqual([]);
+	});
+
+	it('takes the month from the slider in Terrain view', () => {
+		const stage = sunlit();
+		stage.controls.onMonth(1);
+		expect(stage.told.at(-1)).toEqual({
+			...DEFAULT_PAGE_VIEW,
+			month: 1,
+			sunlight: true,
+		});
+		expect(stage.shown).toEqual([]);
+	});
+
+	it('stops the year when sunlight is turned off in Terrain view', () => {
+		const stage = sunlit();
+		stage.controls.onPlay();
+		stage.timers.advance(PLAYBACK_STEP_MS);
+		stage.panel.setSunlight(false);
+		expect(stage.timers.pending()).toBe(0);
+		expect(stage.lastView()).toEqual({
+			view: { ...DEFAULT_PAGE_VIEW, month: 7 },
+			playing: false,
+		});
+		stage.timers.advance(5 * PLAYBACK_STEP_MS);
+		expect(stage.lastView()?.view.month).toBe(7);
+	});
+
+	it('keeps the year playing in Temperature view when sunlight is turned on or off', () => {
+		const stage = createStage();
+		stage.controls.onLayer('temperature');
+		stage.controls.onPlay();
+		stage.panel.setSunlight(true);
+		expect(stage.lastView()?.playing).toBe(true);
+		stage.panel.setSunlight(false);
+		expect(stage.lastView()?.playing).toBe(true);
+		expect(stage.timers.pending()).toBe(1);
+	});
+
+	it('keeps the year playing from the Month view to Terrain, and stops it on the way to a summary', () => {
+		const stage = createStage();
+		stage.panel.setSunlight(true);
+		stage.controls.onLayer('temperature');
+		stage.controls.onPlay();
+		stage.controls.onLayer('terrain');
+		expect(stage.lastView()?.playing).toBe(true);
+		expect(stage.timers.pending()).toBe(1);
+		stage.controls.onTemperatureView('annualMean');
+		expect(stage.lastView()?.playing).toBe(true);
+		stage.controls.onLayer('temperature');
+		expect(stage.lastView()?.playing).toBe(false);
+		expect(stage.timers.pending()).toBe(0);
+	});
+
+	it('stops the year on a summary chosen in Temperature view, as without sunlight', () => {
+		const stage = sunlit();
+		stage.controls.onLayer('temperature');
+		stage.controls.onPlay();
+		stage.controls.onTemperatureView('warmest');
+		expect(stage.lastView()?.playing).toBe(false);
+		expect(stage.timers.pending()).toBe(0);
+	});
+
+	it('keeps the month last on screen while a summary is shown', () => {
+		const stage = sunlit();
+		stage.controls.onLayer('temperature');
+		stage.controls.onMonth(2);
+		stage.controls.onTemperatureView('range');
+		stage.controls.onLayer('terrain');
+		expect(stage.told.at(-1)).toEqual({
+			layer: 'terrain',
+			temperatureView: 'range',
+			source: 'simulated',
+			month: 2,
+			sunlight: true,
+		});
+	});
+
+	it('keeps the sunlight for a new world', () => {
+		const stage = sunlit();
+		stage.controls.onMonth(2);
+		stage.controls.onPlay();
+		stage.panel.newWorld(null);
+		expect(stage.lastView()).toEqual({
+			view: { ...DEFAULT_PAGE_VIEW, sunlight: true },
+			playing: false,
+		});
 	});
 });
 
@@ -1963,7 +2098,7 @@ describe('createLayerControls', () => {
 		});
 		const temperature = oneByClass(section, 'temperature-view');
 		expect(temperature.children.map((child) => child.className)).toEqual([
-			'field',
+			'field temperature-view__show',
 			'comparison',
 			'month-controls',
 		]);
@@ -2032,6 +2167,53 @@ describe('createLayerControls', () => {
 			false,
 		);
 		expect(month.hidden).toBe(true);
+	});
+
+	it('shows the month controls alone in Terrain view while sunlight is on', () => {
+		const { controls, section } = make();
+		const temperature = oneByClass(section, 'temperature-view');
+		const show = oneByClass(section, 'temperature-view__show');
+		const month = oneByClass(section, 'month-controls');
+		controls.showView({ ...DEFAULT_PAGE_VIEW, sunlight: true }, false);
+		expect([temperature.hidden, show.hidden, month.hidden]).toEqual([
+			false,
+			true,
+			false,
+		]);
+		controls.showView(DEFAULT_PAGE_VIEW, false);
+		expect([temperature.hidden, month.hidden]).toEqual([true, true]);
+	});
+
+	it('shows the temperature controls as without sunlight in Temperature view', () => {
+		const { controls, section } = make();
+		const temperature = oneByClass(section, 'temperature-view');
+		const show = oneByClass(section, 'temperature-view__show');
+		const month = oneByClass(section, 'month-controls');
+		for (const sunlight of [false, true]) {
+			controls.showView(
+				{ ...DEFAULT_PAGE_VIEW, layer: 'temperature', sunlight },
+				false,
+			);
+			expect([temperature.hidden, show.hidden, month.hidden]).toEqual([
+				false,
+				false,
+				false,
+			]);
+			controls.showView(
+				{
+					...DEFAULT_PAGE_VIEW,
+					layer: 'temperature',
+					temperatureView: 'annualMean',
+					sunlight,
+				},
+				false,
+			);
+			expect([temperature.hidden, show.hidden, month.hidden]).toEqual([
+				false,
+				false,
+				true,
+			]);
+		}
 	});
 
 	it('offers the five views in a labelled drop-down, on the one given', () => {

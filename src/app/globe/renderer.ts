@@ -1,6 +1,6 @@
 /**
- * The globe on the page: a Three.js scene holding one mesh, drawn only when
- * something has changed.
+ * The globe on the page: a Three.js scene holding the globe's mesh and the
+ * sun's, drawn only when something has changed.
  *
  * The mesh's own coordinates are core coordinates. Its model matrix is the
  * rotation into the Three.js frame, so the shaders look elevation up with
@@ -12,11 +12,22 @@ import {
 	BufferGeometry,
 	Mesh,
 	PerspectiveCamera,
+	PlaneGeometry,
 	Scene,
 	Vector3,
 	WebGLRenderer,
 } from 'three';
-import { FACE_COUNT, type Vec3, type World } from '../../core/index';
+import {
+	DEFAULT_PLANET,
+	FACE_COUNT,
+	latLonToDirection,
+	type Rgb,
+	SUN_LONGITUDE_DEG,
+	sunColour,
+	sunDrawnSize,
+	type Vec3,
+	type World,
+} from '../../core/index';
 import {
 	CAMERA_NEAR,
 	type CameraState,
@@ -32,6 +43,7 @@ import {
 import { coreToThree } from './coords';
 import { buildSphereMesh, meshSegments } from './geometry';
 import {
+	aimSunlight,
 	type CellTexture,
 	createCellTexture,
 	createGlobeMaterial,
@@ -40,10 +52,14 @@ import {
 	MIN_EXAGGERATION,
 	type PreparedLayer,
 	replaceLayer,
+	type SunlightStyle,
 	showLayer,
+	showSunlight,
+	unitSunDirection,
 } from './material';
 import { clientToNdc, raySphere } from './picking';
 import type { ColourRamp, ValueRange } from './ramp';
+import { createSunMaterial, shapeSun, sunPosition } from './sun';
 
 /** The most device pixels drawn per CSS pixel, to bound the cost per frame. */
 const MAX_PIXEL_RATIO = 2;
@@ -136,6 +152,38 @@ export type Globe = {
 		ramp?: ColourRamp,
 	): void;
 	/**
+	 * Sets where the sun stands, how large it is drawn and its colour.
+	 *
+	 * @remarks
+	 * The sun is always drawn, hidden only by the planet in front of it. It
+	 * stays in its direction as the camera moves, as a body infinitely far
+	 * away would. The direction is also the one the globe is lit from while
+	 * sunlight is on.
+	 *
+	 * @param direction - The sun's direction in core coordinates; a finite,
+	 * non-zero vector, normalised here.
+	 * @param sizeDeg - The diameter it is drawn at, in degrees; more than 0
+	 * and less than 12.
+	 * @param colour - Its tint, each channel from 0 to 1.
+	 * @throws RangeError for a direction, size or colour outside those; the
+	 * sun is then drawn as before.
+	 */
+	setSun(direction: Vec3, sizeDeg: number, colour: Rgb): void;
+	/**
+	 * Lights the globe by the sun, or as it is lit without. It starts lit as
+	 * without the sun.
+	 *
+	 * @remarks
+	 * Lit with the night side darkened, the side facing the sun is lit and
+	 * the far side dimmed. Lit with the line, the colours are shaded as they
+	 * are without the sun and the line between day and night is drawn over
+	 * them. Either holds whatever the globe is coloured by, the height or a
+	 * data layer.
+	 *
+	 * @param style - How the globe is lit.
+	 */
+	setSunlight(style: SunlightStyle): void;
+	/**
 	 * The point of the globe under a point of the window.
 	 *
 	 * @param clientX - Horizontal position in CSS pixels from the left of
@@ -223,6 +271,9 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 			canvas,
 			antialias: true,
 			alpha: true,
+			// The sun's glow is blended in premultiplied colour, as the page
+			// composites the canvas.
+			premultipliedAlpha: true,
 			powerPreference: 'high-performance',
 		});
 	} catch (cause) {
@@ -250,6 +301,21 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 	mesh.frustumCulled = false;
 	mesh.visible = false;
 	scene.add(mesh);
+
+	// Until the page says otherwise, the Sun of Earth's settings, over the
+	// equator.
+	let sunDirection: Vec3 = latLonToDirection(0, SUN_LONGITUDE_DEG);
+	const sun = createSunMaterial(
+		sunDrawnSize(DEFAULT_PLANET),
+		sunColour(DEFAULT_PLANET),
+	);
+	const sunMesh = new Mesh(new PlaneGeometry(2, 2), sun.material);
+	// Moved with the camera at every frame and sized in its vertex shader,
+	// so its bounds say nothing and it is never culled. It is drawn after
+	// the globe, as transparent objects are.
+	sunMesh.frustumCulled = false;
+	sunMesh.renderOrder = 1;
+	scene.add(sunMesh);
 
 	let cameraState = createCameraState();
 	let elevation: CellTexture | null = null;
@@ -281,7 +347,11 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		if (disposed) {
 			return;
 		}
-		camera.position.copy(toVector3(coreToThree(cameraPosition(cameraState))));
+		const eye = cameraPosition(cameraState);
+		camera.position.copy(toVector3(coreToThree(eye)));
+		sunMesh.position.copy(
+			toVector3(coreToThree(sunPosition(eye, sunDirection))),
+		);
 		camera.up.copy(toVector3(coreToThree([0, 0, 1])));
 		camera.lookAt(0, 0, 0);
 		const brushCentre =
@@ -467,6 +537,20 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		invalidate();
 	};
 
+	const setSun = (direction: Vec3, sizeDeg: number, colour: Rgb): void => {
+		// Everything is checked before anything changes.
+		const unit = unitSunDirection(direction);
+		shapeSun(sun.uniforms, sizeDeg, colour);
+		aimSunlight(uniforms, unit);
+		sunDirection = unit;
+		invalidate();
+	};
+
+	const setSunlight = (style: SunlightStyle): void => {
+		showSunlight(uniforms, style);
+		invalidate();
+	};
+
 	const setBrush = (cursor: WindowPoint | null, radius = 0): void => {
 		if (cursor === null) {
 			if (brushCursor !== null) {
@@ -524,6 +608,8 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		layer?.texture.dispose();
 		mesh.geometry.dispose();
 		material.dispose();
+		sunMesh.geometry.dispose();
+		sun.material.dispose();
 		renderer.dispose();
 	};
 
@@ -534,6 +620,8 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		setExaggeration,
 		setGridVisible,
 		setLayer,
+		setSun,
+		setSunlight,
 		pick,
 		setBrush,
 		rotateBy,

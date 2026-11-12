@@ -1,10 +1,16 @@
 /**
  * The date line under the world's description: the world's age and, in
  * Temperature view, the month on screen or the summary shown, such as
- * `Year 0 · July`.
+ * `Year 0 · July`, and in Terrain view the month on screen while the globe
+ * is lit by the sun.
  */
 
-import { MONTH_NAMES, type PageView, TEMPERATURE_VIEW_LABELS } from '../view';
+import {
+	MONTH_NAMES,
+	offersMonth,
+	type PageView,
+	TEMPERATURE_VIEW_LABELS,
+} from '../view';
 
 /** What separates the parts of the date line. */
 const PART_SEPARATOR = ' · ';
@@ -60,20 +66,23 @@ export const formatWorldAge = (years: number): string => {
  *
  * @param years - The world's age, as for {@link formatWorldAge}.
  * @param view - What the globe shows.
- * @returns The age alone in Terrain view, such as `Year 0`; in Temperature
- * view the age and the month on screen, `Year 0 · July`, or the summary
- * shown, `Year 0 · Annual average`.
+ * @returns The age and the month on screen, `Year 0 · July`, wherever the
+ * month can be chosen, as {@link offersMonth} says: in the Month view, and
+ * in Terrain view while the globe is lit by the sun. Otherwise in
+ * Temperature view the age and the summary shown, `Year 0 · Annual
+ * average`, and in Terrain view the age alone, `Year 0`.
  */
 export const dateLineText = (years: number, view: PageView): string => {
 	const age = formatWorldAge(years);
+	if (offersMonth(view)) {
+		return [age, MONTH_NAMES[view.month]].join(PART_SEPARATOR);
+	}
 	if (view.layer !== 'temperature') {
 		return age;
 	}
-	const shown =
-		view.temperatureView === 'month'
-			? MONTH_NAMES[view.month]
-			: TEMPERATURE_VIEW_LABELS[view.temperatureView];
-	return [age, shown].join(PART_SEPARATOR);
+	return [age, TEMPERATURE_VIEW_LABELS[view.temperatureView]].join(
+		PART_SEPARATOR,
+	);
 };
 
 /** What the date line starts on and where it is written. */

@@ -11,6 +11,7 @@ const temperatureView = (
 	temperatureView: temperature,
 	source: 'simulated',
 	month,
+	sunlight: false,
 });
 
 describe('formatWorldAge', () => {
@@ -70,6 +71,24 @@ describe('dateLineText', () => {
 	});
 });
 
+describe('dateLineText, under sunlight', () => {
+	it('gives the age and the month on screen in Terrain view', () => {
+		const terrain = { ...DEFAULT_PAGE_VIEW, sunlight: true };
+		expect(dateLineText(0, terrain)).toBe('Year 0 · July');
+		expect(
+			dateLineText(0, { ...terrain, temperatureView: 'range', month: 0 }),
+		).toBe('Year 0 · January');
+	});
+
+	it('changes nothing in Temperature view', () => {
+		for (const view of ['month', 'annualMean', 'range'] as const) {
+			expect(
+				dateLineText(0, { ...temperatureView(view, 2), sunlight: true }),
+			).toBe(dateLineText(0, temperatureView(view, 2)));
+		}
+	});
+});
+
 describe('createDateLine', () => {
 	const make = (years = 0, view: PageView = DEFAULT_PAGE_VIEW) => {
 		const written: string[] = [];
@@ -103,5 +122,18 @@ describe('createDateLine', () => {
 		line.setView({ ...DEFAULT_PAGE_VIEW, month: 3 });
 		line.setView(DEFAULT_PAGE_VIEW);
 		expect(written).toEqual(['Year 0 · Annual average', 'Year 0']);
+	});
+
+	it('names the month in Terrain view while sunlight is on, and drops it after', () => {
+		const { line, written } = make();
+		line.setView({ ...DEFAULT_PAGE_VIEW, sunlight: true });
+		line.setView({ ...DEFAULT_PAGE_VIEW, sunlight: true, month: 7 });
+		line.setView({ ...DEFAULT_PAGE_VIEW, month: 7 });
+		expect(written).toEqual([
+			'Year 0',
+			'Year 0 · July',
+			'Year 0 · August',
+			'Year 0',
+		]);
 	});
 });
