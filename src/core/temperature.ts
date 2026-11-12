@@ -259,6 +259,47 @@ export type SolveTemperatureOptions = {
 	readonly tolerance?: number;
 	/** The model's constants; defaults to {@link TEMPERATURE_MODEL}. */
 	readonly model?: TemperatureModel;
+	/**
+	 * Called once as each year finishes, with how far the solve has come.
+	 *
+	 * @remarks
+	 * It is given plain numbers and nothing of the solve's own, so it cannot
+	 * change the result: a solve with it gives the same output, bit for bit,
+	 * as one without. Whatever it throws ends the solve and is thrown from
+	 * {@link solveTemperature} as it is.
+	 */
+	readonly onYear?: (progress: TemperatureProgress) => void;
+};
+
+/**
+ * How far a solve has come, as each year finishes.
+ *
+ * @remarks
+ * The solve cannot know how many years it will take: it stops when a year
+ * changes little enough, and how fast the change shrinks depends on the
+ * world and the start. {@link TemperatureProgress.estimatedYearsLeft} is
+ * a guess from the last two years, and is left out where there is no
+ * basis for one.
+ */
+export type TemperatureProgress = {
+	/** The years finished so far, from 1. */
+	readonly yearsDone: number;
+	/** The most years the solve may run: it ends by then at the latest. */
+	readonly maxYears: number;
+	/**
+	 * The year's change, in kelvin, measured as
+	 * {@link TemperatureResult.finalChangeK} is.
+	 */
+	readonly changeK: number;
+	/** The change below which the solve stops, in kelvin. */
+	readonly toleranceK: number;
+	/**
+	 * How many more years the solve will run: exactly 0 when this year is
+	 * its last, and otherwise an estimate, from 1 to the years left under
+	 * the cap, or null when there is no basis for one. See
+	 * {@link estimateYearsLeft}.
+	 */
+	readonly estimatedYearsLeft: number | null;
 };
 
 /** The temperature of a world through its year. */
@@ -1341,6 +1382,60 @@ const correctYearEnd = (
 	return solved;
 };
 
+/**
+ * A guess at how many more years a solve that has not finished will run,
+ * from how much its change shrank over the last year.
+ *
+ * @remarks
+ * It assumes the change goes on shrinking by the same factor every year,
+ * which is roughly how the slow warming or cooling of the ocean dies away,
+ * and counts the years until the change would be below the tolerance. It is
+ * a guess and no more: the factor itself changes from year to year, and in
+ * the first year or two after a start far from the answer it is a poor
+ * guide. Where the change did not shrink there is no basis for one at all.
+ *
+ * A year whose change is already below the tolerance but that did not end
+ * the solve, because some of its steps were not solved to their accuracy,
+ * counts as needing one more: the answer is then 1, whatever the year
+ * before was, and in the first year too. This is looked at before anything
+ * else, so only a change at or above the tolerance can give null.
+ *
+ * @param previousChangeK - The change of the year before, in kelvin, or
+ * null in the first year.
+ * @param changeK - The change of the year just finished, in kelvin.
+ * @param toleranceK - The change below which the solve stops, in kelvin.
+ * @param yearsLeftUnderCap - How many more years the cap allows, from 1.
+ * @returns 1 when the change of the year just finished is below the
+ * tolerance, in the first year or any other. Otherwise a whole number of
+ * years from 1 to `yearsLeftUnderCap`, or null in the first year, or when
+ * the change did not shrink or either change is not a finite number.
+ */
+export const estimateYearsLeft = (
+	previousChangeK: number | null,
+	changeK: number,
+	toleranceK: number,
+	yearsLeftUnderCap: number,
+): number | null => {
+	if (changeK < toleranceK) {
+		return Math.min(1, yearsLeftUnderCap);
+	}
+	if (
+		previousChangeK === null ||
+		!Number.isFinite(previousChangeK) ||
+		!Number.isFinite(changeK) ||
+		!(changeK < previousChangeK)
+	) {
+		return null;
+	}
+	// The fewest further years n with changeK · factorⁿ below the tolerance.
+	// Both logarithms are of numbers from 0 to 1, so their ratio is not
+	// negative and n is at least 1.
+	const factor = changeK / previousChangeK;
+	const years =
+		Math.floor(Math.log(toleranceK / changeK) / Math.log(factor)) + 1;
+	return Math.min(years, yearsLeftUnderCap);
+};
+
 const assertOptions = (maxYears: number, tolerance: number): void => {
 	if (
 		!(
@@ -1399,11 +1494,12 @@ const assertOptions = (maxYears: number, tolerance: number): void => {
  * third year that changes nothing.
  *
  * Takes time in proportion to the number of cells and the years run;
- * `npm run time:temperature` measures it.
+ * `npm run time:temperature` measures it. `onYear`, if given, hears of
+ * each year as it finishes, so that a caller can show how far it has come.
  *
  * @param world - The world. It is not changed.
- * @param options - A starting state, the most years, the tolerance and the
- * model's constants.
+ * @param options - A starting state, the most years, the tolerance, the
+ * model's constants and whom to tell as each year finishes.
  * @returns New arrays the caller owns.
  * @throws RangeError if the world's resolution, elevations or sea level are
  * not valid, if a planet setting is not a number, if `maxYears` is not a
@@ -1413,6 +1509,7 @@ const assertOptions = (maxYears: number, tolerance: number): void => {
  * {@link TemperatureState}) or twelve months of Float32Arrays of one
  * temperature per cell that, brought to sea level, lies from 2.7 to
  * 10,000 K.
+ * @throws Whatever `onYear` throws, as it is.
  */
 export const solveTemperature = (
 	world: World,
@@ -1422,6 +1519,7 @@ export const solveTemperature = (
 		maxYears = DEFAULT_MAX_YEARS,
 		tolerance = DEFAULT_TOLERANCE_K,
 		model = TEMPERATURE_MODEL,
+		onYear,
 	} = options;
 	assertOptions(maxYears, tolerance);
 	assertModel(model);
@@ -1525,9 +1623,25 @@ export const solveTemperature = (
 				(previous[cell] as number) + (value - (state[cell] as number));
 			state[cell] = value;
 		}
+		const previousChangeK = yearsRun === 1 ? null : finalChangeK;
 		finalChangeK = Math.max(drift, largestShift);
 		converged =
 			finalChangeK < tolerance && stepper.allSolved() && correctionSolved;
+		onYear?.({
+			yearsDone: yearsRun,
+			maxYears,
+			changeK: finalChangeK,
+			toleranceK: tolerance,
+			estimatedYearsLeft:
+				converged || yearsRun === maxYears
+					? 0
+					: estimateYearsLeft(
+							previousChangeK,
+							finalChangeK,
+							tolerance,
+							maxYears - yearsRun,
+						),
+		});
 	}
 
 	const months = monthSums.map((sum) => {

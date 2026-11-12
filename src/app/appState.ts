@@ -1,5 +1,6 @@
 /**
- * The world being edited, and the one way of replacing it.
+ * The world being edited, the one way of replacing it, and the word that
+ * its planet settings have changed.
  *
  * Everything on the page that shows or edits the world asks here which
  * world that is, and hears from here when another takes its place. Nothing
@@ -116,6 +117,24 @@ export type AppState = {
 	 * number from zero up. Nothing is changed.
 	 */
 	replaceWorld(world: World, options?: ReplaceWorldOptions): void;
+	/**
+	 * Has a listener told whenever the planet settings of the world being
+	 * edited have been changed in place, from now on.
+	 *
+	 * @param listener - Called with the world, after those added before it.
+	 */
+	addPlanetListener(listener: WorldListener): void;
+	/**
+	 * Tells the planet listeners that the planet settings of the world
+	 * being edited have been changed in place. Whatever changes them calls
+	 * this once afterwards; the listeners of a replacement are not told.
+	 *
+	 * @remarks
+	 * As for a replacement, a listener that throws does not stop the
+	 * others: all are called, and then its error, or an `AggregateError`
+	 * of several, is thrown from here.
+	 */
+	notifyPlanetChange(): void;
 };
 
 /**
@@ -154,8 +173,34 @@ export const createAppState = (options: AppStateOptions): AppState => {
 		return Math.min(maxM, Math.max(minM, stepped));
 	};
 	const listeners: WorldListener[] = [...(options.listeners ?? [])];
+	const planetListeners: WorldListener[] = [];
 	let current = options.world;
 	let announcing = false;
+
+	/**
+	 * Calls every listener with the world, then throws what they threw: one
+	 * error as it is, several as an `AggregateError` with the message.
+	 */
+	const announce = (
+		to: readonly WorldListener[],
+		world: World,
+		message: string,
+	): void => {
+		const errors: unknown[] = [];
+		for (const listener of [...to]) {
+			try {
+				listener(world);
+			} catch (error) {
+				errors.push(error);
+			}
+		}
+		if (errors.length === 1) {
+			throw errors[0];
+		}
+		if (errors.length > 1) {
+			throw new AggregateError(errors, message);
+		}
+	};
 
 	return {
 		get world(): World {
@@ -187,25 +232,25 @@ export const createAppState = (options: AppStateOptions): AppState => {
 			world.ageYears = ageYears;
 			current = world;
 
-			const errors: unknown[] = [];
 			announcing = true;
-			for (const listener of [...listeners]) {
-				try {
-					listener(world);
-				} catch (error) {
-					errors.push(error);
-				}
-			}
-			announcing = false;
-			if (errors.length === 1) {
-				throw errors[0];
-			}
-			if (errors.length > 1) {
-				throw new AggregateError(
-					errors,
+			try {
+				announce(
+					listeners,
+					world,
 					'Several parts of the page failed to take the new world',
 				);
+			} finally {
+				announcing = false;
 			}
 		},
+		addPlanetListener: (listener) => {
+			planetListeners.push(listener);
+		},
+		notifyPlanetChange: () =>
+			announce(
+				planetListeners,
+				current,
+				'Several parts of the page failed to take the new planet settings',
+			),
 	};
 };

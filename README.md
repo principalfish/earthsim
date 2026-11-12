@@ -45,6 +45,8 @@ The View panel sets how the world is drawn and where its sea stands:
 
 The Statistics readout at the bottom of the panel shows how much of the surface is land, the highest and deepest points, the mean height of the land and the mean depth of the ocean. It follows the terrain and the sea level, a moment after each stroke, undo, redo or move of the Sea level slider. Until the first figures arrive, and again after a new world is made, it says "Calculating…", and if the worker that computes them cannot be started or fails it says "Statistics unavailable" and hides the figures, while the rest of the page keeps working. Once the worker itself is gone it goes on saying so, for later worlds too, until the page is reloaded. The highest and deepest points are elevations on the scale of the Sea level slider; the two means are measured from the sea level.
 
+The page also works out the temperature through the year, in a worker of its own so that a slow solve never holds up the statistics. It is not shown on the globe yet. While the temperature layer is showing, which for now is always, it is worked out again a little under half a second after each stroke, undo, redo, move of the Sea level slider or new world, each solve carrying on from the last result rather than starting from nothing, except for a new world. A change made while a solve is still running ends that worker and starts a fresh one, so the newest world never waits behind an old one. While the layer is not showing, a change only marks the result out of date, and the temperature is worked out once when the layer is shown again.
+
 ## Development
 
 Requires Node.js and npm. Run `npm install` once, then:
@@ -67,24 +69,28 @@ Requires Node.js and npm. Run `npm install` once, then:
   - `src/core/temperature.ts`: the temperature model, a seasonal energy balance on the world's grid, stepped through the year until the year repeats.
   - `src/core/exchange.ts`: heat passed between neighbouring cells, and the multigrid-preconditioned solver for the implicit steps it needs.
   - `src/core/compare.ts`: area-weighted error figures between two sets of monthly fields.
+  - `src/core/testing/`: temperature results and progress of the right form, which only the tests use.
 - `src/app/`: the page, which imports the core.
-  - `src/app/main.ts`: makes the parts of the page from the document, the globe, the worker and the browser's storage, and hands them over to be joined.
+  - `src/app/main.ts`: makes the parts of the page from the document, the globe, the workers and the browser's storage, and hands them over to be joined.
   - `src/app/wiring.ts`: joins the parts of the page together: which part hears of what, and in which order.
   - `src/app/startup.ts`: what the page does once it knows what was saved before: bring the saved world back, or open the New world dialog.
-  - `src/app/appState.ts`: the world being edited, and the one way of replacing it.
+  - `src/app/appState.ts`: the world being edited, the one way of replacing it, and the word that its planet settings have changed.
   - `src/app/sculpt.ts`: sculpting with the mouse, which turns the cursor's path into dabs of a brush.
   - `src/app/undo.ts`: undo and redo of strokes, and the keys that ask for them.
-  - `src/app/refresh.ts`: when to ask the worker again after the world changes.
+  - `src/app/refresh.ts`: when to ask a worker again after the world changes.
+  - `src/app/workerService.ts`: the statistics and temperature services, each on a worker of its own: starting the worker, keeping only the newest answer, and what happens when there is no worker.
+  - `src/app/layers.ts`: the computed layers the page holds, for now the temperature, with whether it is current, out of date or being calculated.
   - `src/app/storage.ts`: the saved world in the browser's IndexedDB, and exporting and importing world files.
   - `src/app/autosave.ts`: when to save after the world changes.
   - `src/app/earthData.ts`: fetching the Earth data file the first time it is needed.
   - `src/app/globe/`: the globe's renderer, shaders, camera and picking.
   - `src/app/ui/`: the panels of controls and the New world dialog.
-  - `src/app/testing/`: stand-ins for the canvas and the browser's animation frames, which only the tests use.
-- `src/worker/`: the Web Worker that computes from a copy of the world and keeps nothing between requests.
-  - `src/worker/sim.worker.ts`: the worker itself, which only passes messages to the handler.
+  - `src/app/testing/`: stand-ins for the canvas, the browser's animation frames and timers, and a way to let settled promises run, which only the tests use.
+- `src/worker/`: the Web Worker that computes from a copy of the world and keeps nothing between requests. The page runs two of it, one for the statistics and one for the temperature.
+  - `src/worker/sim.worker.ts`: the worker itself, which only passes messages to the handler, and posts its progress and its answer, whose arrays it transfers.
   - `src/worker/handle.ts`: the message handler, a plain function that answers one request.
   - `src/worker/client.ts`: the page's side of the channel, which runs on the main thread.
+  - `src/worker/testing/`: a stand-in for the simulation worker, which only the tests use.
 - `public/data/earth-256.bin`: the Earth's elevation, served beside the page as it is.
 - `public/data/earth-temperature-1deg.bin`: the Earth's observed monthly temperature, served the same way.
 - `scripts/`: what builds the data, run with Node rather than in the browser.

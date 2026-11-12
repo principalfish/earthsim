@@ -1,17 +1,11 @@
 import './styles.css';
 import { CORE_VERSION, createBlankWorld } from '../core/index';
-import { createSimClient } from '../worker/client';
 import { createAppState } from './appState';
 import { AUTOSAVE_DELAY_MS, createAutosave } from './autosave';
 import { loadEarthData } from './earthData';
 import { attachViewInput } from './globe/input';
 import { MAX_DRAWN_SEA_LEVEL_M, MIN_DRAWN_SEA_LEVEL_M } from './globe/material';
 import { createGlobe, type Globe } from './globe/renderer';
-import {
-	createRefreshScheduler,
-	type RefreshScheduler,
-	STATS_DEBOUNCE_MS,
-} from './refresh';
 import { createSculptController } from './sculpt';
 import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
 import { openNewWorldDialog } from './ui/newWorldDialog';
@@ -19,7 +13,11 @@ import { createStatsPanel } from './ui/statsPanel';
 import { createToolPanel } from './ui/toolPanel';
 import { createViewPanel, SEA_LEVEL_SLIDER_STEP_M } from './ui/viewPanel';
 import { createWorldPanel } from './ui/worldPanel';
-import { type PageStatisticsOptions, startPage } from './wiring';
+import { startPage } from './wiring';
+import {
+	createStatisticsService,
+	createTemperatureService,
+} from './workerService';
 
 /** Looks up an element the page markup is required to contain. */
 const requireElement = <T extends Element>(
@@ -61,68 +59,19 @@ const createGlobeOrExplain = (): Globe | null => {
 	}
 };
 
-/** Starts the simulation worker, or says why there cannot be one. */
-const createWorkerOrExplain = (): Worker | null => {
-	try {
-		return new Worker(new URL('../worker/sim.worker.ts', import.meta.url), {
-			type: 'module',
-		});
-	} catch (error) {
-		console.error(error);
-		return null;
-	}
-};
-
 /**
- * Adds the statistics readout to the panel, starts the simulation worker
- * and has the readout follow the statistics it computes.
- *
- * @remarks
- * Whatever goes wrong with the worker costs only the statistics: the
- * readout says there are none, and everything else on the page works. A
- * worker that could not be started, or whose script could not be loaded,
- * never answers, so from then on the readout goes on saying so and
- * nothing more is asked of it.
- *
- * @param options - The world to compute them for, and whether a brush
- * stroke is under way, during which the statistics are not asked for.
- * @returns What to tell whenever the terrain or the sea level has changed,
- * and whenever the world has been replaced.
+ * Starts an instance of the simulation worker. Each service has one of its
+ * own, so that a slow temperature solve never holds up the statistics.
  */
-const startStatistics = (options: PageStatisticsOptions): RefreshScheduler => {
-	const readout = createStatsPanel(panel);
-	const worker = createWorkerOrExplain();
-	const client = worker === null ? null : createSimClient(worker);
-	const scheduler = createRefreshScheduler({
-		request: async () => {
-			if (client === null) {
-				throw new Error('There is no simulation worker');
-			}
-			return client.latest('terrainStats', options.currentWorld());
-		},
-		debounceMs: STATS_DEBOUNCE_MS,
-		setTimer: (callback, delayMs) => window.setTimeout(callback, delayMs),
-		clearTimer: (handle: number) => window.clearTimeout(handle),
-		isBusy: options.isStrokeActive,
-		onResult: readout.show,
-		onError: (error) => {
-			console.error(error);
-			readout.showUnavailable();
-		},
-		onPending: readout.showPending,
-		onUnavailable: readout.showUnavailable,
+const createWorker = (): Worker =>
+	new Worker(new URL('../worker/sim.worker.ts', import.meta.url), {
+		type: 'module',
 	});
-	if (worker === null) {
-		scheduler.markUnavailable();
-	} else {
-		// The worker answers every message it is sent, failures included,
-		// so this event means its script could not be loaded or has
-		// stopped: it says so once, perhaps before anything has been asked
-		// of it, and then never answers.
-		worker.addEventListener('error', () => scheduler.markUnavailable());
-	}
-	return scheduler;
-};
+
+const setTimer = (callback: () => void, delayMs: number): number =>
+	window.setTimeout(callback, delayMs);
+const clearTimer = (handle: number): void => window.clearTimeout(handle);
+const logError = (error: unknown): void => console.error(error);
 
 const globe = createGlobeOrExplain();
 if (globe !== null) {
@@ -149,12 +98,28 @@ if (globe !== null) {
 			createAutosave({
 				...options,
 				delayMs: AUTOSAVE_DELAY_MS,
-				setTimer: (callback, delayMs) => window.setTimeout(callback, delayMs),
-				clearTimer: (handle: number) => window.clearTimeout(handle),
+				setTimer,
+				clearTimer,
 			}),
 		createToolPanel: (options) => createToolPanel(panel, options),
 		createViewPanel: (options) => createViewPanel(panel, options),
-		createStatistics: startStatistics,
+		createStatistics: (options) =>
+			createStatisticsService({
+				...options,
+				createWorker,
+				readout: createStatsPanel(panel),
+				setTimer,
+				clearTimer,
+				logError,
+			}),
+		createTemperature: (options) =>
+			createTemperatureService({
+				...options,
+				createWorker,
+				setTimer,
+				clearTimer,
+				logError,
+			}),
 		openNewWorldDialog,
 		loadEarth: loadEarthData,
 		exportWorld: (world) => exportWorldFile(world),
@@ -180,6 +145,6 @@ if (globe !== null) {
 			});
 			window.addEventListener('pagehide', listener);
 		},
-		logError: (error) => console.error(error),
+		logError,
 	});
 }

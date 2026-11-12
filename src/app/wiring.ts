@@ -17,7 +17,8 @@ import type { AppState } from './appState';
 import type { Autosave, AutosaveOptions } from './autosave';
 import type { RotateButton, ViewInput } from './globe/input';
 import type { Globe } from './globe/renderer';
-import type { RefreshScheduler } from './refresh';
+import { createLayerStore, type LayerStore } from './layers';
+import type { RefreshScheduler, TemperatureScheduler } from './refresh';
 import {
 	DEFAULT_TOOL,
 	rotateButtonFor,
@@ -73,6 +74,12 @@ export type PageStatisticsOptions = {
 	readonly isStrokeActive: () => boolean;
 };
 
+/** What the page's temperature is computed from, and where it is kept. */
+export type PageTemperatureOptions = PageStatisticsOptions & {
+	/** Where the temperature is kept, for whatever shows it to read. */
+	readonly store: LayerStore;
+};
+
 /** The parts of a page, for {@link startPage} to join. */
 export type PageParts = {
 	/** The world being edited, on the world the page opens on. */
@@ -120,6 +127,10 @@ export type PageParts = {
 	readonly createStatistics: (
 		options: PageStatisticsOptions,
 	) => Pick<RefreshScheduler, 'refresh' | 'reset'>;
+	/** Starts whatever computes the temperature, not yet showing. */
+	readonly createTemperature: (
+		options: PageTemperatureOptions,
+	) => Pick<TemperatureScheduler, 'refresh' | 'reset' | 'setShowing'>;
 	/** Opens the dialog that starts a new world. */
 	readonly openNewWorldDialog: (options: NewWorldDialogOptions) => void;
 	/** Gives the Earth's elevation data, for a world that starts as Earth. */
@@ -152,14 +163,21 @@ export type PageParts = {
  *
  * @remarks
  * The parts are made in the order the panel shows them: the world
- * controls, the tools, the view controls and then the statistics.
+ * controls, the tools, the view controls and then the statistics; then the
+ * temperature, which has nothing in the panel yet.
  *
  * A world that replaces the one being edited reaches, in this order: the
  * sculpt controller, which ends a stroke still under way on the old world
  * and then has the history forget that world; the globe; the sea-level
- * control; the world's description; the statistics, which are first reset
- * and then asked for again; the panel's message, which is taken back; and
- * the autosave.
+ * control; the world's description; the statistics and then the
+ * temperature, each first reset and then asked for again; the panel's
+ * message, which is taken back; and the autosave.
+ *
+ * A committed stroke, an undo, a redo and the sea-level control each ask
+ * for the statistics and the temperature again, and mark the world
+ * changed for the autosave. A change of the planet settings, told through
+ * {@link AppState.notifyPlanetChange}, asks for the temperature again and
+ * marks the world changed; the statistics do not depend on it.
  *
  * Until the storage has answered, the panel, the globe and the history
  * shortcuts are out of reach and nothing is saved. A change made to the
@@ -253,6 +271,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		isStrokeActive: sculpt.isStrokeActive,
 		onTerrainChange: () => {
 			statistics.refresh();
+			temperature.refresh();
 			autosave.markChanged();
 		},
 		onHistoryChange: tools.setHistoryState,
@@ -280,6 +299,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			world.seaLevel = normaliseSeaLevel(metres);
 			globe.setSeaLevel(world.seaLevel);
 			statistics.refresh();
+			temperature.refresh();
 			autosave.markChanged();
 		},
 		onGridVisible: globe.setGridVisible,
@@ -289,6 +309,17 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		isStrokeActive: sculpt.isStrokeActive,
 	});
 	statistics.refresh();
+	// A part that shows the temperature and fails on a change is recorded
+	// here, and the edit that made the change carries on regardless.
+	const layers = createLayerStore(logError);
+	const temperature = parts.createTemperature({
+		currentWorld: () => state.world,
+		isStrokeActive: sculpt.isStrokeActive,
+		store: layers,
+	});
+	// The temperature counts as showing, so that it is calculated from the
+	// start; nothing yet switches it off.
+	temperature.setShowing(true);
 
 	// What a new world reaches, in this order. The sculpt controller goes
 	// first: it ends a stroke still under way while the globe and the
@@ -304,11 +335,21 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// their way: neither is to be shown as the new world's.
 	state.addListener(statistics.reset);
 	state.addListener(statistics.refresh);
+	// The temperature on hand is the old world's, and is not where the new
+	// world's solve starts from.
+	state.addListener(temperature.reset);
+	state.addListener(temperature.refresh);
 	// What the panel said of an earlier import or export is over with.
 	state.addListener(() => worldPanel.setMessage(null));
 	// The autosave takes no note of this until it is started, which is
 	// after the world brought back when the page opens is in place.
 	state.addListener(autosave.markChanged);
+	// The planet settings are saved with the world, and the temperature
+	// depends on them.
+	state.addPlanetListener(() => {
+		temperature.refresh();
+		autosave.markChanged();
+	});
 
 	// A page being hidden or closed may never run again, so what has not
 	// been saved is saved now rather than when its wait is over.

@@ -1,10 +1,17 @@
 /**
  * The simulation worker: answers every message it is sent with one
- * response, and keeps nothing between messages.
+ * response, perhaps after some messages about its progress, and keeps
+ * nothing between messages.
+ *
+ * The response's arrays are transferred, not copied: the worker has no use
+ * for them once they are sent.
  */
 
 import { handleRequest } from './handle';
 
 addEventListener('message', (event) => {
-	postMessage(handleRequest(event.data));
+	const { response, transfer } = handleRequest(event.data, (progress) =>
+		postMessage(progress),
+	);
+	postMessage(response, transfer);
 });

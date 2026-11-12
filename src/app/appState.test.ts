@@ -690,3 +690,69 @@ describe('replaceWorld keeping the sea level on a control with a step', () => {
 		}
 	});
 });
+
+describe('notifyPlanetChange', () => {
+	it('tells the planet listeners, in order, with the world being edited', () => {
+		const first = createBlankWorld(64);
+		const state = createAppState({ world: first });
+		const calls: [string, World][] = [];
+		state.addPlanetListener((world) => calls.push(['one', world]));
+		state.addPlanetListener((world) => calls.push(['two', world]));
+
+		state.notifyPlanetChange();
+		expect(calls).toEqual([
+			['one', first],
+			['two', first],
+		]);
+
+		const next = createBlankWorld(64);
+		state.replaceWorld(next);
+		calls.length = 0;
+		state.notifyPlanetChange();
+		expect(calls.map(([, world]) => world)).toEqual([next, next]);
+		expect(calls[0]?.[1]).toBe(next);
+	});
+
+	it('tells the planet listeners of no replacement, and the others of no planet change', () => {
+		const replaced: World[] = [];
+		const planets: World[] = [];
+		const state = createAppState({
+			world: createBlankWorld(64),
+			listeners: [(world) => replaced.push(world)],
+		});
+		state.addPlanetListener((world) => planets.push(world));
+
+		state.notifyPlanetChange();
+		expect(replaced).toEqual([]);
+		state.replaceWorld(createBlankWorld(64));
+		expect(planets).toHaveLength(1);
+		expect(replaced).toHaveLength(1);
+	});
+
+	it('calls every planet listener, then throws what they threw', () => {
+		const failure = new Error('no');
+		const calls: string[] = [];
+		const state = createAppState({ world: createBlankWorld(64) });
+		state.addPlanetListener(() => {
+			throw failure;
+		});
+		state.addPlanetListener(() => calls.push('after'));
+		expect(() => state.notifyPlanetChange()).toThrow(failure);
+		expect(calls).toEqual(['after']);
+
+		state.addPlanetListener(() => {
+			throw 'again';
+		});
+		let thrown: unknown;
+		try {
+			state.notifyPlanetChange();
+		} catch (error) {
+			thrown = error;
+		}
+		expect(thrown).toBeInstanceOf(AggregateError);
+		expect((thrown as AggregateError).errors).toEqual([failure, 'again']);
+		expect((thrown as AggregateError).message).toBe(
+			'Several parts of the page failed to take the new planet settings',
+		);
+	});
+});

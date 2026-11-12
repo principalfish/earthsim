@@ -67,6 +67,7 @@ describe('core', () => {
 			'STEFAN_BOLTZMANN',
 			'ZERO_CELSIUS_K',
 			'solveTemperature',
+			'estimateYearsLeft',
 			'summariseTemperature',
 			'compareFields',
 		]) {

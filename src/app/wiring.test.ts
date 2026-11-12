@@ -4,14 +4,23 @@ import {
 	DEFAULT_SEA_LEVEL_M,
 	generateWorld,
 	normaliseSeaLevel,
+	type SimRequest,
 	type World,
 	type WorldFileResult,
 } from '../core/index';
+import { temperatureOf } from '../core/testing/temperatureFixtures';
+import {
+	createFakeWorker,
+	type FakeWorker,
+} from '../worker/testing/fakeWorker';
 import { type AppState, createAppState } from './appState';
 import { MAIN_BUTTON, SECONDARY_BUTTON } from './globe/input';
+import { TEMPERATURE_DEBOUNCE_MS } from './refresh';
 import type { SculptOptions, StrokeChanges } from './sculpt';
 import { RESTORE_FAILED_MESSAGE } from './startup';
 import type { LoadOutcome } from './storage';
+import { createFakeTimers } from './testing/fakeTimers';
+import { settle } from './testing/settle';
 import {
 	FIRST_NEW_WORLD_VALUES,
 	type NewWorldDialogOptions,
@@ -28,9 +37,15 @@ import {
 import type { ShortcutEvent } from './undo';
 import {
 	type PageAutosaveOptions,
+	type PageParts,
 	type PageStatisticsOptions,
+	type PageTemperatureOptions,
 	startPage,
 } from './wiring';
+import {
+	createStatisticsService,
+	createTemperatureService,
+} from './workerService';
 
 /** A page made of stand-ins, each writing what it is asked into one log. */
 type Stage = {
@@ -59,6 +74,7 @@ type Stage = {
 	readonly toolPanelOptions: ToolPanelOptions;
 	readonly viewPanelOptions: ViewPanelOptions;
 	readonly statisticsOptions: PageStatisticsOptions;
+	readonly temperatureOptions: PageTemperatureOptions;
 	/** Presses a key as the page hears it. */
 	pressKey(press: Partial<ShortcutEvent>): void;
 	/** Says that the page is being hidden or closed. */
@@ -79,7 +95,15 @@ const required = <T>(value: T | undefined, name: string): T => {
 	return value;
 };
 
-const createStage = (world: World = createBlankWorld(64)): Stage => {
+/** The parts a test may make itself, in place of the stage's stand-ins. */
+type StageParts = Partial<
+	Pick<PageParts, 'createStatistics' | 'createTemperature'>
+>;
+
+const createStage = (
+	world: World = createBlankWorld(64),
+	own: StageParts = {},
+): Stage => {
 	const log: string[] = [];
 	const errors: unknown[] = [];
 	const saved: World[] = [];
@@ -93,6 +117,7 @@ const createStage = (world: World = createBlankWorld(64)): Stage => {
 	let toolPanelOptions: ToolPanelOptions | undefined;
 	let viewPanelOptions: ViewPanelOptions | undefined;
 	let statisticsOptions: PageStatisticsOptions | undefined;
+	let temperatureOptions: PageTemperatureOptions | undefined;
 	let keyListener: ((event: ShortcutEvent) => void) | undefined;
 	let hidingListener: (() => void) | undefined;
 	let answerLoad: ((outcome: LoadOutcome) => void) | undefined;
@@ -126,6 +151,9 @@ const createStage = (world: World = createBlankWorld(64)): Stage => {
 		},
 		get statisticsOptions() {
 			return required(statisticsOptions, 'statistics');
+		},
+		get temperatureOptions() {
+			return required(temperatureOptions, 'temperature');
 		},
 		pressKey: (press) => {
 			required(
@@ -243,9 +271,24 @@ const createStage = (world: World = createBlankWorld(64)): Stage => {
 		createStatistics: (options) => {
 			log.push('createStatistics');
 			statisticsOptions = options;
+			if (own.createStatistics !== undefined) {
+				return own.createStatistics(options);
+			}
 			return {
 				refresh: () => log.push('statistics.refresh'),
 				reset: () => log.push('statistics.reset'),
+			};
+		},
+		createTemperature: (options) => {
+			log.push('createTemperature');
+			temperatureOptions = options;
+			if (own.createTemperature !== undefined) {
+				return own.createTemperature(options);
+			}
+			return {
+				refresh: () => log.push('temperature.refresh'),
+				reset: () => log.push('temperature.reset'),
+				setShowing: (showing) => log.push(`temperature.setShowing ${showing}`),
 			};
 		},
 		openNewWorldDialog: (options) => {
@@ -272,19 +315,15 @@ const createStage = (world: World = createBlankWorld(64)): Stage => {
 };
 
 /** A stage whose storage has answered that nothing was saved. */
-const createStartedStage = async (world?: World): Promise<Stage> => {
-	const stage = createStage(world);
+const createStartedStage = async (
+	world?: World,
+	own?: StageParts,
+): Promise<Stage> => {
+	const stage = createStage(world, own);
 	stage.answerLoad({ kind: 'empty' });
 	await stage.started;
 	stage.log.length = 0;
 	return stage;
-};
-
-/** Lets every promise that is already settled run its reactions. */
-const settle = async (): Promise<void> => {
-	for (let turn = 0; turn < 10; turn++) {
-		await Promise.resolve();
-	}
 };
 
 /**
@@ -324,6 +363,8 @@ describe('startPage', () => {
 			`createViewPanel ${DEFAULT_SEA_LEVEL_M}`,
 			'createStatistics',
 			'statistics.refresh',
+			'createTemperature',
+			'temperature.setShowing true',
 			'setInert true',
 			'store.load',
 		]);
@@ -347,6 +388,18 @@ describe('startPage', () => {
 		expect(stage.statisticsOptions.isStrokeActive()).toBe(true);
 		expect(stage.autosaveOptions.isBusy?.()).toBe(true);
 	});
+
+	it('gives the temperature the world of the moment, the stroke and an empty store', async () => {
+		const stage = await createStartedStage();
+		const { temperatureOptions } = stage;
+		expect(temperatureOptions.store.temperature.status).toBe('empty');
+		const next = generateWorld({ resolution: 64, seed: 3, landFraction: 0.3 });
+		stage.state.replaceWorld(next);
+		expect(temperatureOptions.currentWorld()).toBe(next);
+		expect(temperatureOptions.isStrokeActive()).toBe(false);
+		stage.strokeActive = true;
+		expect(temperatureOptions.isStrokeActive()).toBe(true);
+	});
 });
 
 describe('a world replacement', () => {
@@ -368,6 +421,8 @@ describe('a world replacement', () => {
 			`worldPanel.setDescription ${describeWorld(next)}`,
 			'statistics.reset',
 			'statistics.refresh',
+			'temperature.reset',
+			'temperature.refresh',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
 		]);
@@ -425,6 +480,8 @@ describe('the start of the page', () => {
 			`worldPanel.setDescription ${describeWorld(world)}`,
 			'statistics.reset',
 			'statistics.refresh',
+			'temperature.reset',
+			'temperature.refresh',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
 			'worldPanel.setAutosaveState saved',
@@ -529,7 +586,7 @@ describe('the start of the page', () => {
 });
 
 describe('the history shortcuts', () => {
-	it('undo and redo, each reaching the statistics and the autosave', async () => {
+	it('undo and redo, each reaching the statistics, the temperature and the autosave', async () => {
 		const stage = await createStartedStage();
 		makeStroke(stage);
 		stage.log.length = 0;
@@ -539,6 +596,7 @@ describe('the history shortcuts', () => {
 			'globe.updateElevation',
 			'toolPanel.setHistoryState false true',
 			'statistics.refresh',
+			'temperature.refresh',
 			'autosave.markChanged',
 		]);
 		expect(stage.state.world.elevation[5]).not.toBe(1234);
@@ -549,6 +607,7 @@ describe('the history shortcuts', () => {
 			'globe.updateElevation',
 			'toolPanel.setHistoryState true false',
 			'statistics.refresh',
+			'temperature.refresh',
 			'autosave.markChanged',
 		]);
 		expect(stage.state.world.elevation[5]).toBe(1234);
@@ -593,12 +652,13 @@ describe('the history shortcuts', () => {
 });
 
 describe('what changes the terrain or the sea level', () => {
-	it('a stroke that changed something reaches the history, the statistics and the autosave', async () => {
+	it('a stroke that changed something reaches the history, the statistics, the temperature and the autosave', async () => {
 		const stage = await createStartedStage();
 		makeStroke(stage);
 		expect(stage.log).toEqual([
 			'toolPanel.setHistoryState true false',
 			'statistics.refresh',
+			'temperature.refresh',
 			'autosave.markChanged',
 		]);
 	});
@@ -620,10 +680,12 @@ describe('what changes the terrain or the sea level', () => {
 			'globe.updateElevation',
 			'toolPanel.setHistoryState false true',
 			'statistics.refresh',
+			'temperature.refresh',
 			'autosave.markChanged',
 			'globe.updateElevation',
 			'toolPanel.setHistoryState true false',
 			'statistics.refresh',
+			'temperature.refresh',
 			'autosave.markChanged',
 		]);
 	});
@@ -634,13 +696,14 @@ describe('what changes the terrain or the sea level', () => {
 		expect(stage.log).toEqual([]);
 	});
 
-	it('the sea-level slider sets the world and the globe, then both', async () => {
+	it('the sea-level slider sets the world and the globe, then the statistics, the temperature and the autosave', async () => {
 		const stage = await createStartedStage();
 		stage.viewPanelOptions.onSeaLevel(-340);
 		expect(stage.state.world.seaLevel).toBe(-340);
 		expect(stage.log).toEqual([
 			'globe.setSeaLevel -340',
 			'statistics.refresh',
+			'temperature.refresh',
 			'autosave.markChanged',
 		]);
 	});
@@ -661,6 +724,15 @@ describe('what changes the terrain or the sea level', () => {
 			'globe.setExaggeration 40',
 			'globe.setGridVisible true',
 		]);
+	});
+});
+
+describe('a change of the planet settings', () => {
+	it('reaches the temperature and the autosave, once each, and not the statistics', async () => {
+		const stage = await createStartedStage();
+		stage.state.world.planet = { ...stage.state.world.planet, axialTiltDeg: 0 };
+		stage.state.notifyPlanetChange();
+		expect(stage.log).toEqual(['temperature.refresh', 'autosave.markChanged']);
 	});
 });
 
@@ -814,5 +886,259 @@ describe('saving', () => {
 		const stage = await createStartedStage();
 		stage.hidePage();
 		expect(stage.log).toEqual(['autosave.flush']);
+	});
+});
+
+/**
+ * A started stage whose temperature runs on the real service, on fake
+ * workers and timers, with the statistics on stand-ins as elsewhere.
+ */
+const createWorkerStage = async (
+	createWorker: () => FakeWorker | null = createFakeWorker,
+) => {
+	const timers = createFakeTimers();
+	const workers: FakeWorker[] = [];
+	const logged: unknown[] = [];
+	const stage = await createStartedStage(undefined, {
+		createTemperature: (options) =>
+			createTemperatureService({
+				...options,
+				createWorker: () => {
+					const worker = createWorker();
+					if (worker !== null) {
+						workers.push(worker);
+					}
+					return worker;
+				},
+				setTimer: timers.setTimer,
+				clearTimer: timers.clearTimer,
+				logError: (error) => logged.push(error),
+			}),
+	});
+	/** Moves past the wait, and lets what follows run. */
+	const wait = async (): Promise<void> => {
+		timers.advance(TEMPERATURE_DEBOUNCE_MS);
+		await settle();
+	};
+	/** Every request posted to any worker so far. */
+	const posted = () => workers.flatMap((worker) => worker.posted);
+	return { stage, timers, workers, logged, wait, posted };
+};
+
+describe('the temperature, on its worker', () => {
+	it('is asked for once at the start, showing from the first', async () => {
+		const page = await createWorkerStage();
+		await page.wait();
+		await page.wait();
+		expect(page.posted()).toHaveLength(1);
+		expect(page.posted()[0]).toMatchObject({
+			kind: 'temperature',
+			world: page.stage.state.world,
+		});
+		expect(page.stage.temperatureOptions.store.temperature.status).toBe(
+			'calculating',
+		);
+	});
+
+	/** Makes nothing ready beyond the stroke every case starts with. */
+	const nothing = (): void => {};
+
+	it.each([
+		[
+			'a committed stroke',
+			nothing,
+			(stage: Stage) => {
+				const { elevation } = stage.state.world;
+				const before = Float32Array.of(elevation[7] as number);
+				elevation[7] = 999;
+				stage.sculptOptions.onStrokeEnd?.({ cells: Int32Array.of(7), before });
+			},
+		],
+		['an undo', nothing, (stage: Stage) => stage.pressKey(UNDO_KEYS)],
+		[
+			'a redo',
+			(stage: Stage) => stage.pressKey(UNDO_KEYS),
+			(stage: Stage) => stage.pressKey(REDO_KEYS),
+		],
+		[
+			'the undo button',
+			nothing,
+			(stage: Stage) => stage.toolPanelOptions.onHistory('undo'),
+		],
+		[
+			'the sea-level slider',
+			nothing,
+			(stage: Stage) => stage.viewPanelOptions.onSeaLevel(-500),
+		],
+		[
+			'a change of the planet',
+			nothing,
+			(stage: Stage) => stage.state.notifyPlanetChange(),
+		],
+		[
+			'a world replacement',
+			nothing,
+			(stage: Stage) => stage.state.replaceWorld(createBlankWorld(64)),
+		],
+	])('is asked for exactly once more after %s', async (_, prepare, trigger) => {
+		const page = await createWorkerStage();
+		await page.wait();
+		// Something to undo, for the triggers that need it, each change with
+		// its own request in turn.
+		makeStroke(page.stage);
+		await page.wait();
+		prepare(page.stage);
+		await page.wait();
+		const before = page.posted().length;
+
+		trigger(page.stage);
+		await page.wait();
+		await page.wait();
+		expect(page.posted().length - before).toBe(1);
+	});
+
+	it('marks the store empty, then calculating, when the world is replaced', async () => {
+		const page = await createWorkerStage();
+		await page.wait();
+		const worker = page.workers.at(-1) as FakeWorker;
+		worker.respond({
+			id: 1,
+			kind: 'temperature',
+			ok: true,
+			result: temperatureOf(1),
+		});
+		await settle();
+		const { store } = page.stage.temperatureOptions;
+		expect(store.temperature.status).toBe('current');
+		const statuses: string[] = [];
+		store.addListener((layer) => statuses.push(layer.status));
+
+		// Told apart from the world it replaces.
+		const next = createBlankWorld(64);
+		next.elevation[0] = 4321;
+		page.stage.state.replaceWorld(next);
+		expect(store.temperature).toMatchObject({ status: 'empty', result: null });
+		await page.wait();
+		expect(statuses).toEqual(['empty', 'calculating']);
+		const newest = page.posted().at(-1) as SimRequest<'temperature'>;
+		expect(newest.world).toEqual(next);
+		expect(newest.world.elevation[0]).toBe(4321);
+		expect(newest.start).toBeUndefined();
+	});
+
+	it('waits out a stroke under way and is asked for once after it', async () => {
+		const page = await createWorkerStage();
+		await page.wait();
+		page.stage.strokeActive = true;
+		page.stage.viewPanelOptions.onSeaLevel(100);
+		await page.wait();
+		await page.wait();
+		expect(page.posted()).toHaveLength(1);
+
+		page.stage.strokeActive = false;
+		await page.wait();
+		expect(page.posted()).toHaveLength(2);
+	});
+});
+
+describe('the temperature, with a part showing it that fails', () => {
+	it.each([
+		['a committed stroke', makeStroke],
+		[
+			'the sea-level slider',
+			(stage: Stage) => stage.viewPanelOptions.onSeaLevel(-500),
+		],
+	])(
+		'is still asked for, and the world still marked changed, after %s, with the error recorded',
+		async (_, change) => {
+			const page = await createWorkerStage();
+			await page.wait();
+			const worker = page.workers.at(-1) as FakeWorker;
+			worker.respond({
+				id: 1,
+				kind: 'temperature',
+				ok: true,
+				result: temperatureOf(1),
+			});
+			await settle();
+			// The store reaches whatever shows the temperature through the
+			// part that computes it, as here.
+			const { store } = page.stage.temperatureOptions;
+			expect(store.temperature.status).toBe('current');
+			const failure = new Error('could not draw');
+			store.addListener((layer) => {
+				if (layer.status === 'outOfDate') {
+					throw failure;
+				}
+			});
+			page.stage.log.length = 0;
+			const before = page.posted().length;
+
+			change(page.stage);
+			expect(page.stage.log).toContain('autosave.markChanged');
+			expect(page.stage.errors).toEqual([failure]);
+			await page.wait();
+			await page.wait();
+			expect(page.posted().length - before).toBe(1);
+		},
+	);
+});
+
+describe('a worker that fails to load', () => {
+	it('leaves both services unavailable and the page working', async () => {
+		const failing = (): FakeWorker => {
+			const worker = createFakeWorker();
+			// A script that fails to load says so once, soon after it starts.
+			queueMicrotask(() => worker.emit('error', { message: 'not found' }));
+			return worker;
+		};
+		const readout: string[] = [];
+		const timers = createFakeTimers();
+		const temperatureLog: unknown[] = [];
+		const workers: FakeWorker[] = [];
+		const make = (): FakeWorker => {
+			const worker = failing();
+			workers.push(worker);
+			return worker;
+		};
+		const stage = await createStartedStage(undefined, {
+			createStatistics: (options) =>
+				createStatisticsService({
+					...options,
+					createWorker: make,
+					readout: {
+						show: () => readout.push('show'),
+						showPending: () => readout.push('showPending'),
+						showUnavailable: () => readout.push('showUnavailable'),
+					},
+					setTimer: timers.setTimer,
+					clearTimer: timers.clearTimer,
+					logError: () => {},
+				}),
+			createTemperature: (options) =>
+				createTemperatureService({
+					...options,
+					createWorker: make,
+					setTimer: timers.setTimer,
+					clearTimer: timers.clearTimer,
+					logError: (error) => temperatureLog.push(error),
+				}),
+		});
+		await settle();
+		expect(workers).toHaveLength(2);
+		expect(readout).toContain('showUnavailable');
+		const { store } = stage.temperatureOptions;
+		expect(store.temperature.status).toBe('unavailable');
+
+		// The page goes on: a stroke and its undo still work.
+		makeStroke(stage);
+		stage.pressKey(UNDO_KEYS);
+		expect(stage.state.world.elevation[5]).not.toBe(1234);
+		timers.advance(TEMPERATURE_DEBOUNCE_MS * 2);
+		await settle();
+		expect(workers.flatMap((worker) => worker.posted)).toEqual([]);
+		expect(store.temperature.status).toBe('unavailable');
+		expect(stage.errors).toEqual([]);
+		expect(temperatureLog).toEqual([]);
 	});
 });

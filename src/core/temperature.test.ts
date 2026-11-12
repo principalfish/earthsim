@@ -13,6 +13,7 @@ import { PLANET_LIMITS, type PlanetSettings } from './planet';
 import {
 	DEFAULT_MAX_YEARS,
 	DEFAULT_TOLERANCE_K,
+	estimateYearsLeft,
 	MAX_STEP_SECONDS,
 	MIN_STEP_SECONDS,
 	type SolveTemperatureOptions,
@@ -21,6 +22,7 @@ import {
 	summariseTemperature,
 	TEMPERATURE_MODEL,
 	type TemperatureModel,
+	type TemperatureProgress,
 	type TemperatureResult,
 	type TemperatureStart,
 	type TemperatureState,
@@ -551,6 +553,108 @@ describe('solveTemperature on simple worlds', {
 		expect(again.converged).toBe(true);
 		expect(again.yearsRun).toBeLessThanOrEqual(3);
 		expect(largestDifference(again.months, blank().months)).toBeLessThan(0.2);
+	});
+});
+
+describe('solveTemperature as each year finishes', {
+	timeout: SOLVE_TIMEOUT_MS,
+}, () => {
+	it('tells of every year, ending with the last, and gives the same output bit for bit', () => {
+		const reports: TemperatureProgress[] = [];
+		const told = solveTemperature(GENERATED_HOT, {
+			...COARSE,
+			onYear: (progress) => reports.push(progress),
+		});
+		const quiet = generatedHot();
+		expect(told.months).toEqual(quiet.months);
+		expect(told.state).toEqual(quiet.state);
+		expect(told.yearsRun).toBe(quiet.yearsRun);
+		expect(told.finalChangeK).toBe(quiet.finalChangeK);
+
+		// More than two years, so that some year in the middle is told of.
+		expect(quiet.yearsRun).toBeGreaterThan(2);
+		expect(reports.map((report) => report.yearsDone)).toEqual(
+			Array.from({ length: quiet.yearsRun }, (_, year) => year + 1),
+		);
+		for (const report of reports) {
+			expect(report.maxYears).toBe(DEFAULT_MAX_YEARS);
+			expect(report.toleranceK).toBe(DEFAULT_TOLERANCE_K);
+		}
+		expect(reports.at(-1)?.changeK).toBe(quiet.finalChangeK);
+		expect(reports.at(-1)?.estimatedYearsLeft).toBe(0);
+		// The first year has no year before it to judge by.
+		expect(reports[0]?.estimatedYearsLeft).toBeNull();
+		for (const report of reports.slice(1, -1)) {
+			const left = report.estimatedYearsLeft;
+			if (left !== null) {
+				expect(Number.isInteger(left)).toBe(true);
+				expect(left).toBeGreaterThanOrEqual(1);
+				expect(left).toBeLessThanOrEqual(DEFAULT_MAX_YEARS - report.yearsDone);
+			}
+		}
+	});
+
+	it('says the year that reaches the cap is the last', () => {
+		const reports: TemperatureProgress[] = [];
+		solveTemperature(BLANK, {
+			...COARSE,
+			maxYears: 1,
+			onYear: (progress) => reports.push(progress),
+		});
+		expect(reports).toEqual([
+			{
+				yearsDone: 1,
+				maxYears: 1,
+				changeK: blankOneYear().finalChangeK,
+				toleranceK: DEFAULT_TOLERANCE_K,
+				estimatedYearsLeft: 0,
+			},
+		]);
+	});
+
+	it('ends with whatever the callback throws', () => {
+		const thrown = new Error('stop here');
+		let calls = 0;
+		expect(() =>
+			solveTemperature(BLANK, {
+				...COARSE,
+				maxYears: 3,
+				onYear: () => {
+					calls++;
+					throw thrown;
+				},
+			}),
+		).toThrow(thrown);
+		expect(calls).toBe(1);
+	});
+});
+
+describe('estimateYearsLeft', () => {
+	it('counts the years until a change shrinking at the same rate is below the tolerance', () => {
+		// 0.5, 0.25, 0.125, 0.0625, then 0.03125 is below 0.05: four years.
+		expect(estimateYearsLeft(1, 0.5, 0.05, 50)).toBe(4);
+		// 0.1 shrinking tenfold reaches 0.01, below 0.05, in one.
+		expect(estimateYearsLeft(1, 0.1, 0.05, 50)).toBe(1);
+		// Exactly at the tolerance is not below it.
+		expect(estimateYearsLeft(0.1, 0.05, 0.05, 50)).toBe(1);
+	});
+
+	it('never says more than the cap allows', () => {
+		expect(estimateYearsLeft(1, 0.99, 0.05, 50)).toBe(50);
+		expect(estimateYearsLeft(1, 0.99, 0.05, 3)).toBe(3);
+	});
+
+	it('says one more year for a change already below the tolerance', () => {
+		expect(estimateYearsLeft(1, 0.01, 0.05, 10)).toBe(1);
+		expect(estimateYearsLeft(null, 0, 0.05, 10)).toBe(1);
+	});
+
+	it('has no basis in the first year, or when the change did not shrink', () => {
+		expect(estimateYearsLeft(null, 1, 0.05, 10)).toBeNull();
+		expect(estimateYearsLeft(1, 1, 0.05, 10)).toBeNull();
+		expect(estimateYearsLeft(1, 2, 0.05, 10)).toBeNull();
+		expect(estimateYearsLeft(Number.POSITIVE_INFINITY, 1, 0.05, 10)).toBeNull();
+		expect(estimateYearsLeft(2, Number.NaN, 0.05, 10)).toBeNull();
 	});
 });
 
