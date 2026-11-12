@@ -62,6 +62,7 @@
 - The committed Earth error baseline (annual mean -0.15 K, RMS 3.93 K at 64; months' RMS 3.62 to 6.49) is accepted as the starting point for later steps: "this is good as the ocean currents will hugely change the temperature". (2026-11-12)
 - With Sunlight on, Terrain view gets the day and night sides, and Temperature view keeps its colours undimmed with the day/night edge drawn as a thin line ("Colours undimmed, edge as a line"), because the temperature ramp runs from dark to light and a darkened night would read as colder. The Month slider and Play also show in Terrain view while Sunlight is on ("Yes, show them"). (2026-11-12)
 - The sun stands off to one side, about 60° west of the opening view, not over longitude 0 ("Off to one side"), so the day/night edge is in view on opening. This replaces the earlier assumption of noon over the prime meridian. (2026-11-12)
+- The sun is left hard to bring into view ("Approve as it is"): it shows only from the night side, in the gap between the planet's edge and the edge of the view, and the README says how to find it. A further zoom-out and an edge marker pointing to the sun were offered and not taken. The user reviewed the drawing on a Mac ("looks good on mac too"). (2026-11-12)
 
 ## Open
 
