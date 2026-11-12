@@ -608,6 +608,7 @@ describe('createTemperatureService', () => {
 		expect(newest.start).toEqual({
 			months: kept?.months,
 			state: kept?.state,
+			solvedFor: kept?.solvedFor,
 		});
 
 		// The ended worker's answer is never delivered.

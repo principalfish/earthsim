@@ -57,10 +57,11 @@ import {
 	DEFAULT_PLANET,
 	normalisePlanet,
 	PLANET_LIMITS,
+	PLANET_SETTINGS,
 	type PlanetSettings,
 	yearLengthDays,
 } from './planet';
-import type { World } from './world';
+import { MAX_ELEVATION_M, MIN_ELEVATION_M, type World } from './world';
 
 /**
  * The constants of the temperature model.
@@ -129,6 +130,15 @@ export type TemperatureModel = {
 	 * stops the result counting as converged.
 	 */
 	readonly solverMaxIterations: number;
+	/**
+	 * How far the terrain may drift, in kelvin, from the world of the solve
+	 * from nothing that a starting state descends from, before the state is
+	 * set aside and the solve starts from nothing: the drift is measured as
+	 * {@link coolingDrift} measures it, against the state's
+	 * {@link TemperatureState.referenceCoolingK}, and a state at or past the
+	 * limit is set aside. Not negative; at 0 no state is carried on.
+	 */
+	readonly terrainDriftLimitK: number;
 };
 
 /**
@@ -172,6 +182,27 @@ export type TemperatureModel = {
  *   month's root-mean-square and 0.07 K in the annual mean, about a tenth
  *   of the model's error against the observed Earth, for half the time of
  *   four steps.
+ * - `terrainDriftLimitK`: chosen, not derived. Measured at 64 cells per
+ *   face edge on the Earth, a generated world and worlds near freezing: away
+ *   from a freezing tipping point, a state carried on agrees with a solve
+ *   from nothing within 0.3 K at every drift tried, up to 5.7 K (every land
+ *   cell raised 3 km). On a world that sits at such a point no limit keeps
+ *   them together: a wholly frozen Earth whose surface is lowered until a
+ *   solve from nothing thaws stays frozen when carried on, 45 K out in
+ *   places, and stays so until a solve from nothing. The limit sets how long
+ *   that can last. 0.25 K is about 40 m of height over the whole surface.
+ *   On the Earth's land it is about 25 patches of 500 km radius raised
+ *   1,000 m throughout (0.01 K each), so about every twenty-fifth such edit
+ *   is solved from nothing; or about 80 dabs of that radius raising 1,000 m
+ *   at the centre (0.003 K each), which is what the page's default brush
+ *   lays in a second, so some 80 seconds of it swept over land; or about 17
+ *   strokes of five such dabs (0.015 K each). The whole surface raised to a
+ *   3 km plateau moves the drift by 18 K.
+ *
+ *   No limit reaches one case: an edit that tips a partly frozen world to a
+ *   wholly frozen one can leave the carried solve stopped while the world
+ *   is still freezing (44 K out in places on an Earth with its sea 5 km
+ *   down), until the next solve finishes it.
  */
 export const TEMPERATURE_MODEL: TemperatureModel = Object.freeze({
 	diffusivity: 0.55,
@@ -190,7 +221,22 @@ export const TEMPERATURE_MODEL: TemperatureModel = Object.freeze({
 	stepsPerMonth: 2,
 	solverToleranceK: 5e-3,
 	solverMaxIterations: EXCHANGE_MAX_ITERATIONS,
+	terrainDriftLimitK: 0.25,
 });
+
+/**
+ * The sea level and planet a temperature result was solved for, in the
+ * forms the solver uses them: see {@link temperatureConditions}.
+ *
+ * @remarks
+ * A plain object of numbers, so that it survives a structured clone.
+ */
+export type TemperatureConditions = {
+	/** The sea level, in metres, as the single-precision number nearest it. */
+	readonly seaLevel: number;
+	/** The planet's settings, as {@link normalisePlanet} gives them. */
+	readonly planet: PlanetSettings;
+};
 
 /**
  * The state a solve ended in, from which another solve can carry on
@@ -200,9 +246,10 @@ export const TEMPERATURE_MODEL: TemperatureModel = Object.freeze({
  * @remarks
  * Plain typed arrays in a plain object, so that it survives a structured
  * clone and its arrays can be transferred. The temperatures are at sea
- * level, so they stay meaningful after the terrain, the sea level or the
- * planet change; a solve that carries on from them applies the world's own
- * lapse rate and land, as they are then.
+ * level, so they stay meaningful after the terrain changes; a solve that
+ * carries on from them applies the world's own lapse rate and land, as
+ * they are then. A state is carried on only for the sea level and planet
+ * it was solved for: see {@link solveTemperature}.
  */
 export type TemperatureState = {
 	/** Sea-level temperature at the turn of the year, kelvin, per cell. */
@@ -220,6 +267,15 @@ export type TemperatureState = {
 	 * judges how far its own world has moved (see {@link STATE_FALLBACK_K}).
 	 */
 	readonly guessK: Float64Array;
+	/**
+	 * The lapse-rate cooling of every cell's air, in kelvin, 0 at sea, in
+	 * the world of the solve from nothing that this state descends from: a
+	 * solve from nothing records its own world's, and a solve that carries
+	 * on from a state passes that state's on unchanged. A later solve
+	 * measures how far its terrain has drifted from it (see
+	 * {@link TemperatureModel.terrainDriftLimitK}).
+	 */
+	readonly referenceCoolingK: Float64Array;
 };
 
 /**
@@ -229,13 +285,21 @@ export type TemperatureState = {
  * A {@link TemperatureResult} is one. With a `state`, the solve carries on
  * from it and `months` are not read. With only `months`, as when the state
  * was not kept, the state at the turn of the year is rebuilt from them,
- * which costs a year or so more to settle.
+ * which costs a year or so more to settle. Either is used only for the sea
+ * level and planet in `solvedFor`; for any other the start is set aside. A
+ * state is also set aside once its terrain has drifted to
+ * {@link TemperatureModel.terrainDriftLimitK} or past it, or when its rough
+ * guess lies too far from the world's (see {@link STATE_FALLBACK_K}). A
+ * start set aside leaves the solve starting from nothing: see
+ * {@link solveTemperature} for the rules and their order.
  */
 export type TemperatureStart = {
 	/** A previous result's twelve monthly fields, in degrees Celsius. */
 	readonly months?: MonthlyTemperature;
 	/** A previous result's end state. */
 	readonly state?: TemperatureState;
+	/** The sea level and planet the previous result was solved for. */
+	readonly solvedFor: TemperatureConditions;
 };
 
 /** What {@link solveTemperature} may be given besides the world. */
@@ -315,6 +379,8 @@ export type TemperatureResult = {
 	readonly months: Float32Array[];
 	/** The state the solve ended in, to carry on from. */
 	readonly state: TemperatureState;
+	/** The sea level and planet the result was solved for. */
+	readonly solvedFor: TemperatureConditions;
 	/** The number of years the solve ran, from 1. */
 	readonly yearsRun: number;
 	/**
@@ -393,10 +459,12 @@ export const MAX_SOLVER_ITERATIONS = 10_000;
  * over 1,000 K, where the slow ocean takes longer to get there from the old
  * state than from the new first guess.
  *
- * Changes that leave the annual-mean sunlight alone are not seen: a cold
- * planet whose tilt goes from 90 to 0 degrees has the same rough guess, so
- * its state is carried on, and takes 5 or 6 years against 1 from nothing,
- * though it settles to the same answer.
+ * It is looked at only for a state that passes the tests before it: one
+ * recorded for the world's own sea level and planet, whose terrain has
+ * drifted less than {@link TemperatureModel.terrainDriftLimitK} (see
+ * {@link solveTemperature}). Those tests set aside any change of planet,
+ * so this one is the last guard, for a start whose record does not
+ * describe its state.
  */
 export const STATE_FALLBACK_K = 50;
 
@@ -512,6 +580,8 @@ type Setup = {
 	readonly clearAlbedo: Float64Array;
 	/** The planet's settings, within their limits. */
 	readonly planet: PlanetSettings;
+	/** The sea level, as the single-precision number nearest it. */
+	readonly seaLevel: number;
 	/** The row of {@link SUNLIGHT_ROWS} below each cell's latitude. */
 	readonly sunlightRow: Int32Array;
 	/** How far each cell's latitude lies from that row to the next, 0 to 1. */
@@ -536,8 +606,14 @@ const assertWorld = (world: World): void => {
 			`A world of resolution ${world.resolution} has ${cellCount} cells; its elevation holds ${world.elevation.length}`,
 		);
 	}
-	if (!Number.isFinite(world.seaLevel)) {
-		throw new RangeError(`A sea level must be finite; got ${world.seaLevel}`);
+	// A sea level within the elevation limits also stays finite as the
+	// single-precision number a result records it as.
+	if (
+		!(world.seaLevel >= MIN_ELEVATION_M && world.seaLevel <= MAX_ELEVATION_M)
+	) {
+		throw new RangeError(
+			`A sea level must lie from ${MIN_ELEVATION_M} to ${MAX_ELEVATION_M} m; got ${world.seaLevel}`,
+		);
 	}
 	for (let cell = 0; cell < cellCount; cell++) {
 		if (!Number.isFinite(world.elevation[cell])) {
@@ -575,7 +651,11 @@ const assertModel = (model: TemperatureModel): void => {
 			throw new RangeError(`The model's ${name} must be above zero`);
 		}
 	}
-	for (const name of ['greenhouseFactor', 'lapseRate'] as const) {
+	for (const name of [
+		'greenhouseFactor',
+		'lapseRate',
+		'terrainDriftLimitK',
+	] as const) {
 		if (!(model[name] >= 0)) {
 			throw new RangeError(`The model's ${name} must not be negative`);
 		}
@@ -624,6 +704,22 @@ const assertModel = (model: TemperatureModel): void => {
 	}
 };
 
+/**
+ * Each cell's lapse-rate cooling, in kelvin, written into `into`: the lapse
+ * rate times the cell's height above the sea level on land, 0 at sea.
+ */
+const coolingInto = (
+	world: World,
+	lapseRate: number,
+	into: Float64Array,
+): void => {
+	const level = Math.fround(world.seaLevel);
+	for (let cell = 0; cell < into.length; cell++) {
+		const height = (world.elevation[cell] as number) - level;
+		into[cell] = height > 0 ? lapseRate * height : 0;
+	}
+};
+
 const setUp = (world: World, model: TemperatureModel): Setup => {
 	const planet = normalisePlanet(world.planet);
 	const grid = getGrid(world.resolution);
@@ -631,14 +727,13 @@ const setUp = (world: World, model: TemperatureModel): Setup => {
 	const latitudes = cellLatitudes(grid);
 	const level = Math.fround(world.seaLevel);
 	const cooling = new Float64Array(cellCount);
+	coolingInto(world, model.lapseRate, cooling);
 	const landMask = new Uint8Array(cellCount);
 	const clearAlbedo = new Float64Array(cellCount);
 	for (let cell = 0; cell < cellCount; cell++) {
-		const height = (world.elevation[cell] as number) - level;
-		const land = height > 0;
+		const land = (world.elevation[cell] as number) - level > 0;
 		const sine = Math.sin((latitudes[cell] as number) * RADIANS_PER_DEGREE);
 		const legendre = 0.5 * (3 * sine * sine - 1);
-		cooling[cell] = land ? model.lapseRate * height : 0;
 		landMask[cell] = land ? 1 : 0;
 		clearAlbedo[cell] =
 			model.albedo +
@@ -668,6 +763,7 @@ const setUp = (world: World, model: TemperatureModel): Setup => {
 		land: landMask,
 		clearAlbedo,
 		planet,
+		seaLevel: level,
 		sunlightRow,
 		sunlightWeight,
 		annualSunlight,
@@ -794,20 +890,19 @@ const uniformBalance = (setup: Setup): number => {
 
 /**
  * The area-weighted mean of how far apart, in kelvin, two fields of one
- * temperature per cell lie.
+ * value per cell lie.
  */
 const distanceFrom = (
-	setup: Setup,
-	state: Float64Array,
-	guess: Float64Array,
+	areas: Float64Array,
+	first: Float64Array,
+	second: Float64Array,
 ): number => {
-	const { cellCount, areas } = setup;
 	let total = 0;
 	let area = 0;
-	for (let cell = 0; cell < cellCount; cell++) {
+	for (let cell = 0; cell < areas.length; cell++) {
 		total +=
 			(areas[cell] as number) *
-			Math.abs((state[cell] as number) - (guess[cell] as number));
+			Math.abs((first[cell] as number) - (second[cell] as number));
 		area += areas[cell] as number;
 	}
 	return total / area;
@@ -975,17 +1070,19 @@ const assertStartTemperatures = (values: Float64Array, what: string): void => {
 
 /**
  * The state at the turn of the year carried on from a previous solve's end
- * state, and the state a step before it, in kelvin.
+ * state, and the state a step before it, in kelvin, with the state's rough
+ * guess and reference cooling.
  *
  * @remarks
  * The arrays are copied first and only the copies are checked and used. If
- * this solve's steps are of another length, as when the planet's year
- * changed, the state a step before is moved so that the rate of change it
- * implies is kept, and brought within the limits of a state.
+ * this solve's steps are of another length, as when the model's steps a
+ * month differ, the state a step before is moved so that the rate of
+ * change it implies is kept, and brought within the limits of a state.
  *
  * @throws RangeError if the state is not three Float64Arrays of one
  * temperature per cell, each from {@link MIN_TEMPERATURE_K} to
- * {@link MAX_START_K}, with a step length from {@link MIN_STEP_SECONDS} to
+ * {@link MAX_START_K}, and a Float64Array of one finite cooling per cell,
+ * none negative, with a step length from {@link MIN_STEP_SECONDS} to
  * {@link MAX_STEP_SECONDS}.
  */
 const fromState = (
@@ -995,6 +1092,7 @@ const fromState = (
 	readonly state: Float64Array;
 	readonly before: Float64Array;
 	readonly guess: Float64Array;
+	readonly reference: Float64Array;
 } => {
 	const { cellCount } = setup;
 	if (typeof start !== 'object' || start === null) {
@@ -1019,9 +1117,23 @@ const fromState = (
 		cellCount,
 		"A starting state's guessK",
 	);
+	const reference = copyChecked(
+		start.referenceCoolingK,
+		'Float64Array',
+		cellCount,
+		"A starting state's referenceCoolingK",
+	);
 	assertStartTemperatures(state, "A starting state's temperatureK");
 	assertStartTemperatures(previous, "A starting state's previousK");
 	assertStartTemperatures(guess, "A starting state's guessK");
+	for (let cell = 0; cell < cellCount; cell++) {
+		const value = reference[cell] as number;
+		if (!(value >= 0 && Number.isFinite(value))) {
+			throw new RangeError(
+				`A starting state's referenceCoolingK holds ${value} K at cell ${cell}; it must be finite and not negative`,
+			);
+		}
+	}
 	if (
 		typeof stepSeconds !== 'number' ||
 		!(stepSeconds >= MIN_STEP_SECONDS && stepSeconds <= MAX_STEP_SECONDS)
@@ -1034,6 +1146,7 @@ const fromState = (
 		state,
 		before: stepBefore(state, previous, stepSeconds, stepSecondsOf(setup)),
 		guess,
+		reference,
 	};
 };
 
@@ -1468,6 +1581,182 @@ const assertOptions = (maxYears: number, tolerance: number): void => {
 };
 
 /**
+ * The sea level and planet a solve of a world is for, in the forms the
+ * solver uses them: the sea level as the single-precision number nearest
+ * it, as elevations are stored, and the planet as {@link normalisePlanet}
+ * gives it. A result's {@link TemperatureResult.solvedFor} is this for the
+ * world it was solved for.
+ *
+ * @param world - The world. It is not changed.
+ * @returns A new object.
+ * @throws RangeError if a planet setting is not a number, NaN included.
+ */
+export const temperatureConditions = (world: World): TemperatureConditions => ({
+	seaLevel: Math.fround(world.seaLevel),
+	planet: normalisePlanet(world.planet),
+});
+
+/**
+ * Each cell's lapse-rate cooling in a world, in kelvin: how much colder its
+ * air is than air at sea level, the lapse rate times the cell's height
+ * above the sea level on land, and 0 at sea.
+ *
+ * @remarks
+ * It is the cooling the solver applies to the world, and what a state's
+ * {@link TemperatureState.referenceCoolingK} holds for the world of the
+ * solve from nothing it descends from.
+ *
+ * @param world - The world. It is not changed.
+ * @param model - The model, whose lapse rate is used; defaults to
+ * {@link TEMPERATURE_MODEL}.
+ * @returns A new array, one value per cell in cell order.
+ * @throws RangeError if the world's resolution is not supported, if its
+ * elevations are not one finite value per cell, if its sea level does not
+ * lie from {@link MIN_ELEVATION_M} to {@link MAX_ELEVATION_M}, or if a model
+ * constant is missing or out of range.
+ */
+export const lapseCooling = (
+	world: World,
+	model: TemperatureModel = TEMPERATURE_MODEL,
+): Float64Array => {
+	assertModel(model);
+	assertWorld(world);
+	const cooling = new Float64Array(getGrid(world.resolution).cellCount);
+	coolingInto(world, model.lapseRate, cooling);
+	return cooling;
+};
+
+/**
+ * How far a world's terrain has drifted from a reference, in kelvin: the
+ * area-weighted mean over the globe of the absolute difference between
+ * each cell's lapse-rate cooling in the world, as {@link lapseCooling}
+ * gives it, and in the reference.
+ *
+ * @remarks
+ * It is the measure {@link solveTemperature} compares with
+ * {@link TemperatureModel.terrainDriftLimitK}, and gives the same value,
+ * bit for bit. A cell at sea has no cooling, so sea floor moved beneath
+ * the sea counts for nothing, and land lowered beneath it counts its whole
+ * former cooling. Every land cell raised by `h` metres, with no new land,
+ * drifts by the lapse rate times `h` times the share of the globe's area
+ * that is land. It is symmetric: two worlds, each measured against the
+ * other's cooling, give the same value.
+ *
+ * @param world - The world. It is not changed.
+ * @param referenceK - Each cell's cooling in the reference, in kelvin, as
+ * a state's {@link TemperatureState.referenceCoolingK} or
+ * {@link lapseCooling} gives it. It is not changed.
+ * @param model - The model, whose lapse rate is used; defaults to
+ * {@link TEMPERATURE_MODEL}.
+ * @returns The drift, in kelvin, from 0.
+ * @throws RangeError as {@link lapseCooling} does, or if `referenceK` is
+ * not a Float64Array of one value per cell.
+ */
+export const coolingDrift = (
+	world: World,
+	referenceK: Float64Array,
+	model: TemperatureModel = TEMPERATURE_MODEL,
+): number => {
+	const cooling = lapseCooling(world, model);
+	if (
+		!(referenceK instanceof Float64Array) ||
+		referenceK.length !== cooling.length
+	) {
+		throw new RangeError(
+			`A reference cooling must be a Float64Array of ${cooling.length} values`,
+		);
+	}
+	return distanceFrom(getGrid(world.resolution).areas, cooling, referenceK);
+};
+
+/**
+ * Throws unless a start's record is an object of a finite sea level and a
+ * planet whose five settings are each a finite number.
+ */
+const assertConditions = (value: unknown): void => {
+	if (typeof value !== 'object' || value === null) {
+		throw new RangeError(
+			'A start must record, as solvedFor, the sea level and planet it was solved for',
+		);
+	}
+	const { seaLevel, planet } = value as Record<string, unknown>;
+	if (typeof seaLevel !== 'number' || !Number.isFinite(seaLevel)) {
+		throw new RangeError(
+			`A start's recorded sea level must be a finite number; got ${String(seaLevel)}`,
+		);
+	}
+	if (typeof planet !== 'object' || planet === null) {
+		throw new RangeError("A start's record must hold the planet's settings");
+	}
+	for (const name of PLANET_SETTINGS) {
+		const setting: unknown = (planet as Record<string, unknown>)[name];
+		if (typeof setting !== 'number' || !Number.isFinite(setting)) {
+			throw new RangeError(
+				`A start's recorded ${name} must be a finite number; got ${String(setting)}`,
+			);
+		}
+	}
+};
+
+/**
+ * Whether a start's record, already checked, names the sea level and
+ * planet of the world being solved, both brought to the forms the solver
+ * uses and compared exactly.
+ */
+const sameConditions = (
+	setup: Setup,
+	conditions: TemperatureConditions,
+): boolean => {
+	if (Math.fround(conditions.seaLevel) !== setup.seaLevel) {
+		return false;
+	}
+	const planet = normalisePlanet(conditions.planet);
+	return PLANET_SETTINGS.every((name) => planet[name] === setup.planet[name]);
+};
+
+/**
+ * What a solve starts from: a state carried on, months rebuilt, or neither,
+ * which is a solve from nothing.
+ */
+type Beginning = {
+	readonly carried?: ReturnType<typeof fromState>;
+	readonly rebuilt?: ReturnType<typeof fromMonths>;
+};
+
+/**
+ * Reads and checks a solve's start, and sets it aside if it does not suit
+ * the world: see {@link solveTemperature} for the order of the tests.
+ *
+ * @throws RangeError if the start is not an object holding a state or
+ * months and a valid record, or if what is read of it is not valid.
+ */
+const readStart = (
+	setup: Setup,
+	start: TemperatureStart | undefined,
+): Beginning => {
+	if (start === undefined) {
+		return {};
+	}
+	if (typeof start !== 'object' || start === null) {
+		throw new RangeError('A start must be an object with a state or months');
+	}
+	const { state, months, solvedFor } = start;
+	if (state === undefined && months === undefined) {
+		throw new RangeError('A start must hold a state or months');
+	}
+	assertConditions(solvedFor);
+	if (!sameConditions(setup, solvedFor)) {
+		return {};
+	}
+	if (state === undefined) {
+		return { rebuilt: fromMonths(setup, months as MonthlyTemperature) };
+	}
+	const carried = fromState(setup, state);
+	const drift = distanceFrom(setup.areas, setup.cooling, carried.reference);
+	return drift < setup.model.terrainDriftLimitK ? { carried } : {};
+};
+
+/**
  * The near-surface air temperature of a world through its year: twelve
  * monthly means.
  *
@@ -1481,20 +1770,51 @@ const assertOptions = (maxYears: number, tolerance: number): void => {
  * sunlight and no heat capacity. With a start that has a state, it carries
  * on from that state exactly, as if the earlier solve had run on, but in
  * the world as it is now: a start from a solve that had not finished
- * settles about as fast as that solve would have. If the world's rough
- * guess lies more than {@link STATE_FALLBACK_K} from the rough guess the
- * state carries of its own world, as after a large change of the planet,
- * the state is set aside and the solve is the same as one from nothing. A
- * start of months alone is always used. The returned state is always one
- * a later solve accepts as a start. With a start that has only months, it
- * begins from the state at the turn of the year that the months imply,
- * corrected by running January so that the start's January comes out
- * again. Each year then steps through the twelve months. At the
- * end of a year, the heat each cell gained or lost over it says how far
- * the ocean is from its own repeating cycle, and the state is corrected by
- * solving the balance for that heat with no heat capacity, which removes
- * most of the slow warming or cooling the ocean would otherwise take years
- * to finish, on a year of any length.
+ * settles about as fast as that solve would have. With a start that has
+ * only months, it begins from the state at the turn of the year that the
+ * months imply, corrected by running January so that the start's January
+ * comes out again.
+ *
+ * A start is used only for a world it suits. The model has two settled
+ * climates for some worlds, an ordinary one and a frozen one, and a solve
+ * carried on from a start stays in whichever it was handed: measured at 64
+ * cells per face edge, the Earth with its sea level 6,000 m down freezes
+ * over, to a mean of −50.8 °C, and carried on from there back at 0 m it
+ * stays at −28.5 °C, where a solve from nothing gives 14.5 °C. So a start
+ * is set aside, and the solve is then the same, bit for bit, as one from
+ * nothing, at the first of these tests it fails, taken in this order:
+ *
+ * 1. Its record, `solvedFor`, must name the world's sea level and planet,
+ *    each brought to the forms of {@link temperatureConditions} and
+ *    compared exactly. This holds for a start of months alone as for one
+ *    with a state. A start set aside here costs only the comparison: its
+ *    state and months are not read.
+ * 2. Its state's terrain must have drifted from its reference, as
+ *    {@link coolingDrift} measures it against
+ *    {@link TemperatureState.referenceCoolingK}, by less than
+ *    {@link TemperatureModel.terrainDriftLimitK}. A start set aside here
+ *    costs the reading and checking of its state and the measure.
+ * 3. The world's rough guess must lie within {@link STATE_FALLBACK_K} of
+ *    the rough guess its state carries. Every solve takes its world's rough
+ *    guess, so a start set aside here costs nothing more.
+ *
+ * A start of months alone has no state, and so no reference and no rough
+ * guess: for the world's sea level and planet it is always used. Every
+ * solve that does not carry on a state, whether from nothing, from a start
+ * set aside or from months alone, returns its own world's cooling as its
+ * state's reference; one that carries on a state returns that state's
+ * reference unchanged. So a run of terrain edits, each started from the
+ * last result, carries on until the terrain has drifted past the limit
+ * from the last solve from nothing, and then starts afresh. Within the
+ * limit, a result carried on can still differ from a solve from nothing.
+ * The returned state is always one a later solve accepts as a start.
+ *
+ * Each year steps through the twelve months. At the end of a year, the
+ * heat each cell gained or lost over it says how far the ocean is from its
+ * own repeating cycle, and the state is corrected by solving the balance
+ * for that heat with no heat capacity, which removes most of the slow
+ * warming or cooling the ocean would otherwise take years to finish, on a
+ * year of any length.
  *
  * The solve stops when the last year changed by less than the tolerance,
  * as {@link TemperatureResult.converged} defines it, or when `maxYears`
@@ -1513,13 +1833,17 @@ const assertOptions = (maxYears: number, tolerance: number): void => {
  * @param options - A starting state, the most years, the tolerance, the
  * model's constants and whom to tell as each year finishes.
  * @returns New arrays the caller owns.
- * @throws RangeError if the world's resolution, elevations or sea level are
- * not valid, if a planet setting is not a number, if `maxYears` is not a
- * whole number from 1 to {@link MAX_YEARS_LIMIT}, if `tolerance` is not
- * finite and above zero, if a model constant is missing or out of range,
- * or if `start` is not an object with a valid state (see
- * {@link TemperatureState}) or twelve months of Float32Arrays of one
- * temperature per cell that, brought to sea level, lies from 2.7 to
+ * @throws RangeError if the world's resolution is not supported, if its
+ * elevations are not one finite value per cell, if its sea level does not
+ * lie from {@link MIN_ELEVATION_M} to {@link MAX_ELEVATION_M}, if a planet
+ * setting is not a number, if `maxYears` is not a whole number from 1 to
+ * {@link MAX_YEARS_LIMIT}, if `tolerance` is not finite and above zero, if
+ * a model constant is missing or out of range,
+ * if `start` is not an object with a state or months and a record of a
+ * finite sea level and five finite planet settings, or if a start that
+ * passes the first test has a state that is not valid (see
+ * {@link TemperatureState}) or months that are not twelve Float32Arrays of
+ * one temperature per cell that, brought to sea level, lies from 2.7 to
  * 10,000 K.
  * @throws Whatever `onYear` throws, as it is.
  */
@@ -1537,25 +1861,11 @@ export const solveTemperature = (
 	assertModel(model);
 	assertWorld(world);
 	const setup = setUp(world, model);
-	const { cellCount, cooling } = setup;
+	const { cellCount, cooling, areas } = setup;
 	const { stepsPerMonth } = model;
 	const grid = getGrid(world.resolution);
-	// The start is read and checked before anything costly is built.
-	const { start } = options;
-	let carried: ReturnType<typeof fromState> | undefined;
-	let rebuilt: ReturnType<typeof fromMonths> | undefined;
-	if (start !== undefined) {
-		if (typeof start !== 'object' || start === null) {
-			throw new RangeError('A start must be an object with a state or months');
-		}
-		if (start.state !== undefined) {
-			carried = fromState(setup, start.state);
-		} else if (start.months !== undefined) {
-			rebuilt = fromMonths(setup, start.months);
-		} else {
-			throw new RangeError('A start must hold a state or months');
-		}
-	}
+	// The start is read, checked and judged before anything costly is built.
+	const { carried, rebuilt } = readStart(setup, options.start);
 
 	const solver = createExchangeSolver(
 		grid,
@@ -1568,22 +1878,23 @@ export const solveTemperature = (
 	guess.advance(FALLBACK_GUESS_ITERATIONS);
 	const roughGuess = guess.state.map(clampStart);
 	let stepper: Stepper;
+	let reference: Float64Array;
 	if (
 		carried !== undefined &&
-		distanceFrom(setup, carried.guess, roughGuess) <= STATE_FALLBACK_K
+		distanceFrom(areas, carried.guess, roughGuess) <= STATE_FALLBACK_K
 	) {
 		stepper = createStepper(setup, solver, carried.state, carried.before);
+		reference = carried.reference;
 	} else if (rebuilt !== undefined) {
-		// A start of months alone has no guess to compare with, and is
-		// always used.
 		stepper = createStepper(setup, solver, rebuilt.state, rebuilt.before);
 		matchJanuary(setup, stepper, rebuilt.january);
+		reference = Float64Array.from(cooling);
 	} else {
-		// From nothing, or from a state whose world has moved too far: the
-		// first guess, carried on from the rough one, the same as if it had
-		// been taken in one go.
+		// From nothing, or from a start set aside: the first guess, carried
+		// on from the rough one, the same as if it had been taken in one go.
 		guess.advance(GUESS_ITERATIONS);
 		stepper = createStepper(setup, solver, guess.state, guess.state);
+		reference = Float64Array.from(cooling);
 	}
 	const { state, previous } = stepper;
 
@@ -1674,7 +1985,9 @@ export const solveTemperature = (
 			previousK: previous.map(clampStart),
 			guessK: roughGuess,
 			stepSeconds: stepSecondsOf(setup),
+			referenceCoolingK: reference,
 		},
+		solvedFor: { seaLevel: setup.seaLevel, planet: setup.planet },
 		yearsRun,
 		converged,
 		finalChangeK,

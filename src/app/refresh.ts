@@ -245,7 +245,8 @@ export type TemperatureSchedulerOptions<H> = {
 	 * called, as a worker service's latest-wins request does.
 	 *
 	 * @param start - Where the solve starts from: the last result to be
-	 * completed, its months and state, or nothing if there is none.
+	 * completed, its months, state and the sea level and planet it was
+	 * solved for, or nothing if there is none.
 	 * @param onProgress - To be told how far the solve has come.
 	 */
 	readonly request: (
@@ -315,10 +316,13 @@ export type TemperatureScheduler = {
  * result is kept, as current if nothing has changed since it was asked
  * for and as out of date if something has.
  *
- * Each request starts from the last result to be completed, its months
- * and state whole, so that a solve after a small edit settles in fewer
- * years. That result stays on hand, in the store, until a newer one is
- * completed: a request that is overtaken or fails costs nothing of it.
+ * Each request starts from the last result to be completed, its months,
+ * state and record of the sea level and planet it was solved for whole,
+ * so that a solve after a small edit settles in fewer years; the solver
+ * itself sets the start aside after a change of sea level or planet, or
+ * once the terrain has drifted far enough. That result stays on hand, in
+ * the store, until a newer one is completed: a request that is overtaken
+ * or fails costs nothing of it.
  * After `reset` there is none, so the first solve of a new world starts
  * from nothing.
  *
@@ -354,7 +358,11 @@ export const createTemperatureScheduler = <H>(
 			return options.request(
 				previous === null
 					? undefined
-					: { months: previous.months, state: previous.state },
+					: {
+							months: previous.months,
+							state: previous.state,
+							solvedFor: previous.solvedFor,
+						},
 				(progress) => {
 					if (mine === asked) {
 						store.setProgress(progress);

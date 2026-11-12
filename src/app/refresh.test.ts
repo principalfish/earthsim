@@ -729,6 +729,7 @@ describe('createTemperatureScheduler switched on', () => {
 		expect(harness.asked).toHaveLength(2);
 		expect(harness.asked[1]?.start?.months).toBe(first.months);
 		expect(harness.asked[1]?.start?.state).toBe(first.state);
+		expect(harness.asked[1]?.start?.solvedFor).toBe(first.solvedFor);
 	});
 
 	it('asks nothing when the result is current', async () => {
@@ -825,6 +826,7 @@ describe('createTemperatureScheduler while showing', () => {
 		expect(harness.asked[1]?.start).toEqual({
 			months: first.months,
 			state: first.state,
+			solvedFor: first.solvedFor,
 		});
 		expect(harness.store.temperature).toMatchObject({
 			status: 'calculating',

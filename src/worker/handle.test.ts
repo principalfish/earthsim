@@ -265,7 +265,7 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		expect(result.months).toEqual(direct().months);
 	});
 
-	it('transfers the buffers of the twelve months and the three state arrays, each once', () => {
+	it('transfers the buffers of the twelve months and the four state arrays, each once', () => {
 		const { response, transfer } = handled();
 		const result = resultOf(response);
 		const expected = [
@@ -273,9 +273,10 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 			result.state.temperatureK.buffer,
 			result.state.previousK.buffer,
 			result.state.guessK.buffer,
+			result.state.referenceCoolingK.buffer,
 		];
-		expect(transfer).toHaveLength(15);
-		expect(new Set(transfer).size).toBe(15);
+		expect(transfer).toHaveLength(16);
+		expect(new Set(transfer).size).toBe(16);
 		for (const buffer of expected) {
 			expect(transfer).toContain(buffer);
 		}
@@ -290,6 +291,82 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		expect(resultOf(posted).months[0]).toEqual(values);
 		expect(resultOf(response).months[0]?.byteLength).toBe(0);
 		expect(resultOf(response).state.guessK.byteLength).toBe(0);
+		expect(resultOf(response).state.referenceCoolingK.byteLength).toBe(0);
+	});
+
+	it('carries a start’s record and reference through a copy of the request and back in the result', () => {
+		// The tilted world is all sea, with no cooling of its own, so a
+		// reference of a tenth of the limit everywhere has drifted only that
+		// far: the state is carried on and passes the reference back.
+		const start = direct();
+		const reference = new Float64Array(
+			start.state.referenceCoolingK.length,
+		).fill(TEMPERATURE_MODEL.terrainDriftLimitK / 10);
+		const { response, transfer } = handleRequest(
+			structuredClone(
+				temperatureRequest({
+					id: 32,
+					start: {
+						...start,
+						state: { ...start.state, referenceCoolingK: reference },
+					},
+				}),
+			),
+		);
+		const result = resultOf(response);
+		expect(result.yearsRun).toBe(1);
+		expect(result.state.referenceCoolingK).toEqual(reference);
+		expect(result.solvedFor).toEqual(start.solvedFor);
+		expect(transfer).toContain(result.state.referenceCoolingK.buffer);
+		const posted = resultOf(structuredClone(response, { transfer }));
+		expect(posted.state.referenceCoolingK).toEqual(reference);
+		expect(posted.solvedFor).toEqual(start.solvedFor);
+	});
+
+	it('answers a start without a record, or a malformed one, with a failure rather than throwing', () => {
+		const { months, state, solvedFor } = direct();
+		for (const start of [
+			{ months, state },
+			{ state, solvedFor: { ...solvedFor, seaLevel: Number.NaN } },
+			{
+				state,
+				solvedFor: {
+					...solvedFor,
+					planet: { ...solvedFor.planet, starMass: undefined },
+				},
+			},
+			{
+				state: { ...state, referenceCoolingK: new Float32Array(3) },
+				solvedFor,
+			},
+		]) {
+			const { response, transfer } = handleRequest(
+				temperatureRequest({ start }),
+			);
+			expect(response).toMatchObject({
+				id: 30,
+				kind: 'temperature',
+				ok: false,
+				error: expect.stringContaining("A temperature request's start must"),
+			});
+			expect(transfer).toEqual([]);
+		}
+		expect(
+			respond(
+				temperatureRequest({
+					start: {
+						state: { ...state, referenceCoolingK: new Float64Array(5) },
+						solvedFor,
+					},
+				}),
+			),
+		).toEqual({
+			id: 30,
+			kind: 'temperature',
+			ok: false,
+			error:
+				"A starting state's referenceCoolingK must be a Float64Array of 24576 values",
+		});
 	});
 
 	it('tells of each year as it finishes, with the id and kind, before answering', () => {
@@ -323,7 +400,14 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 
 	it('answers a start with the wrong number of months with a failure, rather than throwing', () => {
 		expect(
-			respond(temperatureRequest({ start: { months: [new Float32Array(3)] } })),
+			respond(
+				temperatureRequest({
+					start: {
+						months: [new Float32Array(3)],
+						solvedFor: direct().solvedFor,
+					},
+				}),
+			),
 		).toMatchObject({
 			id: 30,
 			kind: 'temperature',
@@ -338,6 +422,7 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 				temperatureRequest({
 					start: {
 						months: Array.from({ length: 12 }, () => new Float32Array(3)),
+						solvedFor: direct().solvedFor,
 					},
 				}),
 			),
@@ -347,7 +432,9 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 			ok: false,
 			error: 'Month 0 of a start must be a Float32Array of 24576 values',
 		});
-		expect(respond(temperatureRequest({ start: {} }))).toEqual({
+		expect(
+			respond(temperatureRequest({ start: { solvedFor: direct().solvedFor } })),
+		).toEqual({
 			id: 30,
 			kind: 'temperature',
 			ok: false,
@@ -358,7 +445,11 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 			temperatureK: new Float64Array(5),
 		};
 		expect(
-			respond(temperatureRequest({ start: { state: short } })),
+			respond(
+				temperatureRequest({
+					start: { state: short, solvedFor: direct().solvedFor },
+				}),
+			),
 		).toMatchObject({
 			id: 30,
 			kind: 'temperature',
@@ -369,7 +460,9 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 
 	it('answers a start of the wrong form with a failure, and transfers nothing', () => {
 		const handledBadly = handleRequest(
-			temperatureRequest({ start: { state: 'last time' } }),
+			temperatureRequest({
+				start: { state: 'last time', solvedFor: direct().solvedFor },
+			}),
 		);
 		expect(handledBadly.response).toMatchObject({
 			id: 30,

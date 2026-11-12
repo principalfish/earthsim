@@ -4,10 +4,11 @@
  * not meant to be looked at.
  */
 
-import type {
-	SimProgress,
-	TemperatureProgress,
-	TemperatureResult,
+import {
+	DEFAULT_PLANET,
+	type SimProgress,
+	type TemperatureProgress,
+	type TemperatureResult,
 } from '../index';
 
 /**
@@ -17,8 +18,9 @@ import type {
  * @param cells - How many cells each month and the state hold; 2 when left
  * out.
  * @returns A new result whose arrays, the months and the state's, are all
- * zero, with a `stepSeconds` of 1, `converged` true, a `finalChangeK` of 0
- * and the years run given.
+ * zero, with a `stepSeconds` of 1, solved for a sea level of 0 m and
+ * Earth's planet, `converged` true, a `finalChangeK` of 0 and the years
+ * run given.
  */
 export const temperatureOf = (
 	yearsRun: number,
@@ -29,8 +31,10 @@ export const temperatureOf = (
 		temperatureK: new Float64Array(cells),
 		previousK: new Float64Array(cells),
 		guessK: new Float64Array(cells),
+		referenceCoolingK: new Float64Array(cells),
 		stepSeconds: 1,
 	},
+	solvedFor: { seaLevel: 0, planet: { ...DEFAULT_PLANET } },
 	yearsRun,
 	converged: true,
 	finalChangeK: 0,

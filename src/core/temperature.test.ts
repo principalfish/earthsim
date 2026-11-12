@@ -3,17 +3,20 @@ import {
 	readEarthDataFile,
 	readObservedTemperatureFile,
 } from '../../scripts/earth/dataFile.mjs';
+import { applyDab } from './brush';
 import { compareFields } from './compare';
 import { decodeEarth, earthWorld } from './earth';
 import { generateWorld } from './generate';
 import { cellAt, cellsWithin, getGrid, latLonToDirection } from './grid';
 import { cellLatitudes, MONTHS_PER_YEAR } from './insolation';
 import { decodeObservedTemperature, observedTemperature } from './observed';
-import { PLANET_LIMITS, type PlanetSettings } from './planet';
+import { PLANET_LIMITS, PLANET_SETTINGS, type PlanetSettings } from './planet';
 import {
+	coolingDrift,
 	DEFAULT_MAX_YEARS,
 	DEFAULT_TOLERANCE_K,
 	estimateYearsLeft,
+	lapseCooling,
 	MAX_STEP_SECONDS,
 	MIN_STEP_SECONDS,
 	type SolveTemperatureOptions,
@@ -21,13 +24,20 @@ import {
 	stepBefore,
 	summariseTemperature,
 	TEMPERATURE_MODEL,
+	type TemperatureConditions,
 	type TemperatureModel,
 	type TemperatureProgress,
 	type TemperatureResult,
 	type TemperatureStart,
 	type TemperatureState,
+	temperatureConditions,
 } from './temperature';
-import { createBlankWorld, type World } from './world';
+import {
+	createBlankWorld,
+	MAX_ELEVATION_M,
+	MIN_ELEVATION_M,
+	type World,
+} from './world';
 
 /**
  * Time allowed for each test here that solves a world's year. The slowest
@@ -145,6 +155,9 @@ const blank = shared(() => solveTemperature(BLANK));
 const blankOneYear = shared(() =>
 	solveTemperature(BLANK, { ...COARSE, maxYears: 1 }),
 );
+const blankTwoYears = shared(() =>
+	solveTemperature(BLANK, { ...COARSE, maxYears: 2 }),
+);
 const generatedHot = shared(() => solveTemperature(GENERATED_HOT, COARSE));
 const seasonless = shared(() =>
 	solveTemperature(seasonlessOcean(), { maxYears: 1 }),
@@ -167,6 +180,17 @@ const earthHottest = shared(() =>
 	solveTemperature(withPlanet(EARTH, HOTTEST), { ...COARSE, maxYears: 1 }),
 );
 
+/** A coarse year of the Earth from nothing, which several tests compare with. */
+const earthYear = shared(() =>
+	solveTemperature(EARTH, { ...COARSE, maxYears: 1 }),
+);
+
+/** The world with its sea level at the given height, in metres. */
+const atSeaLevel = (world: World, seaLevel: number): World => ({
+	...world,
+	seaLevel,
+});
+
 /** The Congo basin: land warm enough all year that snow never comes. */
 const CONGO = cellAt(grid, latLonToDirection(0, 22));
 
@@ -174,7 +198,9 @@ const CONGO = cellAt(grid, latLonToDirection(0, 22));
 const raisedCongo = shared(() => {
 	const raised = { ...EARTH, elevation: Float32Array.from(EARTH.elevation) };
 	raised.elevation[CONGO] = (raised.elevation[CONGO] as number) + 1000;
-	return solveTemperature(raised, { start: { state: earth().state } });
+	return solveTemperature(raised, {
+		start: { state: earth().state, solvedFor: earth().solvedFor },
+	});
 });
 
 describe('solveTemperature on the Earth', {
@@ -286,12 +312,15 @@ describe('solveTemperature on the Earth', {
 			temperatureK: Float64Array.from(state.temperatureK),
 			previousK: Float64Array.from(state.previousK),
 			guessK: Float64Array.from(state.guessK),
+			referenceCoolingK: Float64Array.from(state.referenceCoolingK),
 		};
 		// Months 40 K off the answer, which would show if they were read.
 		const hot = Array.from({ length: MONTHS_PER_YEAR }, () =>
 			new Float32Array(cellCount).fill(55),
 		);
-		const again = solveTemperature(EARTH, { start: { state, months: hot } });
+		const again = solveTemperature(EARTH, {
+			start: { state, months: hot, solvedFor: earth().solvedFor },
+		});
 		expect(again.converged).toBe(true);
 		expect(again.yearsRun).toBeLessThanOrEqual(2);
 		// The first run gave 1 year and 0.04 K.
@@ -300,30 +329,21 @@ describe('solveTemperature on the Earth', {
 		expect(state.temperatureK).toEqual(before.temperatureK);
 		expect(state.previousK).toEqual(before.previousK);
 		expect(state.guessK).toEqual(before.guessK);
+		expect(state.referenceCoolingK).toEqual(before.referenceCoolingK);
 	});
 
-	it('carries on, not afresh, after a small change of planet', () => {
-		// A star 1.1 times as bright moves the rough guess by about 7 K, well
-		// within the limit, so the Earth's state is used: the first year
-		// differs from the first year from nothing.
-		const brighter = withPlanet(EARTH, { starBrightness: 1.1 });
-		const warm = solveTemperature(brighter, {
-			...COARSE,
-			start: earth(),
-			maxYears: 1,
-		});
-		const cold = solveTemperature(brighter, { ...COARSE, maxYears: 1 });
-		expect(largestDifference(warm.months, cold.months)).toBeGreaterThan(1);
-	});
-
-	it('starts afresh after a large change of planet, and its state carries on', () => {
+	it('sets aside a state whose rough guess lies far from the world’s, even under a record of the world', () => {
+		// The record names the hottest planet, so only the rough guesses,
+		// more than the fallback limit apart, tell the Earth's state from
+		// that planet's.
 		const hot = withPlanet(EARTH, HOTTEST);
 		const cold = earthHottest();
-		const warm = solveTemperature(hot, {
-			...COARSE,
-			start: earth(),
-			maxYears: 1,
-		});
+		const start: TemperatureStart = {
+			state: earth().state,
+			solvedFor: temperatureConditions(hot),
+		};
+		expect(coolingDrift(hot, earth().state.referenceCoolingK)).toBe(0);
+		const warm = solveTemperature(hot, { ...COARSE, start, maxYears: 1 });
 		// The Earth's state is set aside: the same as from nothing.
 		expect(warm.months).toEqual(cold.months);
 		expect(warm.state).toEqual(cold.state);
@@ -340,13 +360,13 @@ describe('solveTemperature on the Earth', {
 	});
 
 	it('corrects the year without overshooting when the planet changes and the start is only months', () => {
-		// Months are never set aside, so the year-end correction has to move
-		// the Earth's year to the hottest planet's by itself: it once
-		// overshot to thousands of kelvin.
+		// Months recorded for the hottest planet are not set aside, so the
+		// year-end correction has to move the Earth's year to the hottest
+		// planet's by itself: it once overshot to thousands of kelvin.
 		const hot = withPlanet(EARTH, HOTTEST);
 		const year = solveTemperature(hot, {
 			...COARSE,
-			start: { months: earth().months },
+			start: { months: earth().months, solvedFor: temperatureConditions(hot) },
 			maxYears: 1,
 		});
 		const { temperatureK, previousK } = year.state;
@@ -417,8 +437,8 @@ describe('solveTemperature on simple worlds', {
 
 	it('gives land a larger seasonal range in a longer year and a smaller one in a shorter', () => {
 		// Star masses 0.5, 1 and 2 give years of 516, 365 and 258 days. Each
-		// carries on for a year from the Earth's answer, which is plenty for
-		// land, as it settles within weeks.
+		// runs a year from nothing, which is plenty for land, as it settles
+		// within weeks.
 		const extratropicalLand = (cell: number): boolean =>
 			(EARTH.elevation[cell] as number) > EARTH.seaLevel &&
 			Math.abs(latitudes[cell] as number) > 30;
@@ -427,7 +447,6 @@ describe('solveTemperature on simple worlds', {
 		const year = (starMass: number): TemperatureResult =>
 			solveTemperature(withPlanet(EARTH, { starMass }), {
 				...COARSE,
-				start: earth(),
 				maxYears: 1,
 			});
 		const middle = range(year(1));
@@ -539,7 +558,7 @@ describe('solveTemperature on simple worlds', {
 			start: first,
 			maxYears: 1,
 		});
-		const both = solveTemperature(BLANK, { ...COARSE, maxYears: 2 });
+		const both = blankTwoYears();
 		expect(second.months).toEqual(both.months);
 		expect(second.state).toEqual(both.state);
 		expect(second.finalChangeK).toBe(both.finalChangeK);
@@ -548,11 +567,475 @@ describe('solveTemperature on simple worlds', {
 	it('still converges from a start that has only months, leaving them as they were', () => {
 		const months = blank().months;
 		const copies = months.map((field) => Float32Array.from(field));
-		const again = solveTemperature(BLANK, { start: { months } });
+		const again = solveTemperature(BLANK, {
+			start: { months, solvedFor: blank().solvedFor },
+		});
 		expect(months).toEqual(copies);
 		expect(again.converged).toBe(true);
 		expect(again.yearsRun).toBeLessThanOrEqual(3);
 		expect(largestDifference(again.months, blank().months)).toBeLessThan(0.2);
+	});
+});
+
+describe('solveTemperature after a change of sea level or planet', {
+	timeout: SOLVE_TIMEOUT_MS,
+}, () => {
+	// A start for another sea level or planet is set aside, so the result is
+	// the one from nothing exactly, whatever the cap: a year of each solve
+	// shows it, and costs least.
+	const YEAR: SolveTemperatureOptions = { ...COARSE, maxYears: 1 };
+
+	it('gives the answer from nothing after the sea level goes 6,000 m down and back', () => {
+		const low = solveTemperature(atSeaLevel(EARTH, -6000), {
+			...YEAR,
+			start: earthYear(),
+		});
+		const back = solveTemperature(EARTH, { ...YEAR, start: low });
+		expect(back).toEqual(earthYear());
+	});
+
+	it('gives the answer from nothing at each level on the way back up, in steps of 2,000 m', () => {
+		let previous = earthYear();
+		for (const level of [-2000, -4000, -6000]) {
+			previous = solveTemperature(atSeaLevel(EARTH, level), {
+				...YEAR,
+				start: previous,
+			});
+		}
+		for (const level of [-4000, -2000, 0]) {
+			const world = atSeaLevel(EARTH, level);
+			const warm = solveTemperature(world, { ...YEAR, start: previous });
+			const cold = level === 0 ? earthYear() : solveTemperature(world, YEAR);
+			expect(warm, `at ${level} m`).toEqual(cold);
+			previous = warm;
+		}
+	});
+
+	it('gives the answer from nothing after the star dims to 0.8 and back', () => {
+		const dim = solveTemperature(withPlanet(EARTH, { starBrightness: 0.8 }), {
+			...YEAR,
+			start: earthYear(),
+		});
+		const back = solveTemperature(EARTH, { ...YEAR, start: dim });
+		expect(back).toEqual(earthYear());
+	});
+
+	const own = (): TemperatureConditions => blankOneYear().solvedFor;
+	const others: [string, () => TemperatureConditions][] = [
+		['sea level', () => ({ ...own(), seaLevel: 10 })],
+		...PLANET_SETTINGS.map((name): [string, () => TemperatureConditions] => [
+			name,
+			() => ({
+				...own(),
+				planet: { ...own().planet, [name]: own().planet[name] + 0.01 },
+			}),
+		]),
+	];
+
+	it.each(others)('sets aside a start recorded for another %s', (_, other) => {
+		// Carried on, the year would be the second year from nothing.
+		expect(blankTwoYears().months).not.toEqual(blankOneYear().months);
+		const result = solveTemperature(BLANK, {
+			...YEAR,
+			start: { ...blankOneYear(), solvedFor: other() },
+		});
+		expect(result).toEqual(blankOneYear());
+	});
+
+	it('takes as many years from a start set aside as from nothing', () => {
+		const result = solveTemperature(BLANK, {
+			start: { ...blank(), solvedFor: { ...blank().solvedFor, seaLevel: -10 } },
+		});
+		expect(blank().yearsRun).toBeGreaterThan(1);
+		expect(result).toEqual(blank());
+	});
+
+	it('sets aside a start of months alone recorded for another sea level', () => {
+		const result = solveTemperature(BLANK, {
+			...YEAR,
+			start: {
+				months: blankOneYear().months,
+				solvedFor: { ...own(), seaLevel: 10 },
+			},
+		});
+		expect(result).toEqual(blankOneYear());
+	});
+
+	it('sets aside a start recorded for another sea level before reading its state', () => {
+		const malformed: TemperatureState = {
+			...blankOneYear().state,
+			temperatureK: new Float64Array(3),
+			previousK: new Float64Array(3),
+			guessK: new Float64Array(3),
+			referenceCoolingK: new Float64Array(3),
+		};
+		const result = solveTemperature(BLANK, {
+			...YEAR,
+			start: { state: malformed, solvedFor: { ...own(), seaLevel: 10 } },
+		});
+		expect(result).toEqual(blankOneYear());
+		expect(() =>
+			solveTemperature(BLANK, {
+				...YEAR,
+				start: { state: malformed, solvedFor: own() },
+			}),
+		).toThrow(RangeError);
+	});
+
+	it('carries on a start recorded for the same sea level, compared as the single-precision number nearest it', () => {
+		// 0.1 m is not a single-precision number; the world and the record
+		// both hold it as it is.
+		const result = solveTemperature(atSeaLevel(BLANK, 0.1), {
+			...YEAR,
+			start: { ...blankOneYear(), solvedFor: { ...own(), seaLevel: 0.1 } },
+		});
+		expect(result.months).toEqual(blankTwoYears().months);
+		expect(result.solvedFor.seaLevel).toBe(Math.fround(0.1));
+	});
+
+	it('carries on a start recorded for the same planet, compared as brought within its limits', () => {
+		// Every setting of the hottest corner is at a limit, so settings
+		// beyond them name the same planet.
+		const hot = withPlanet(EARTH, HOTTEST);
+		const beyond: PlanetSettings = {
+			axialTiltDeg: 95,
+			starBrightness: 20,
+			starMass: 11,
+			orbitDistanceAu: 0.1,
+			greenhouseStrength: 5,
+		};
+		const result = solveTemperature(hot, {
+			...YEAR,
+			start: {
+				...earthHottest(),
+				solvedFor: { seaLevel: EARTH.seaLevel, planet: beyond },
+			},
+		});
+		expect(result.months).not.toEqual(earthHottest().months);
+		expect(result.solvedFor).toEqual(earthHottest().solvedFor);
+	});
+
+	it('refuses a start without a record, or with a malformed one', () => {
+		const { months, state } = earthYear();
+		const record = temperatureConditions(EARTH);
+		const { starMass: _, ...missing } = record.planet;
+		const starts: unknown[] = [
+			{ months, state },
+			{ months, state, solvedFor: undefined },
+			{ state, solvedFor: null },
+			{ months, solvedFor: 'Earth' },
+			{ state, solvedFor: { planet: record.planet } },
+			{ state, solvedFor: { ...record, seaLevel: '0' } },
+			{ state, solvedFor: { ...record, seaLevel: Number.NaN } },
+			{ state, solvedFor: { ...record, seaLevel: Number.NEGATIVE_INFINITY } },
+			{ state, solvedFor: { seaLevel: 0 } },
+			{ state, solvedFor: { ...record, planet: null } },
+			{ state, solvedFor: { ...record, planet: missing } },
+			{
+				months,
+				solvedFor: {
+					...record,
+					planet: { ...record.planet, axialTiltDeg: '23.44' },
+				},
+			},
+			{
+				state,
+				solvedFor: {
+					...record,
+					planet: {
+						...record.planet,
+						starBrightness: Number.POSITIVE_INFINITY,
+					},
+				},
+			},
+			{
+				state,
+				solvedFor: {
+					...record,
+					planet: { ...record.planet, greenhouseStrength: Number.NaN },
+				},
+			},
+		];
+		for (const start of starts) {
+			expect(() =>
+				solveTemperature(EARTH, { start: start as TemperatureStart }),
+			).toThrow(RangeError);
+		}
+	});
+});
+
+describe('solveTemperature as the terrain drifts', {
+	timeout: SOLVE_TIMEOUT_MS,
+}, () => {
+	const YEAR: SolveTemperatureOptions = { ...COARSE, maxYears: 1 };
+
+	/** The Earth with every land cell raised by 100 m, `times` times over. */
+	const landRaised = (times: number): World => {
+		const raised = { ...EARTH, elevation: Float32Array.from(EARTH.elevation) };
+		for (let cell = 0; cell < cellCount; cell++) {
+			if ((EARTH.elevation[cell] as number) > EARTH.seaLevel) {
+				raised.elevation[cell] =
+					(EARTH.elevation[cell] as number) + 100 * times;
+			}
+		}
+		return raised;
+	};
+
+	/** A year of the Earth with its land raised by 300 m, from nothing. */
+	const raisedYear = shared(() => solveTemperature(landRaised(3), YEAR));
+
+	/** The year's options with the drift limit given. */
+	const withLimit = (limit: number): SolveTemperatureOptions => ({
+		...YEAR,
+		model: { ...(YEAR.model as TemperatureModel), terrainDriftLimitK: limit },
+	});
+
+	it('carries a run of small edits on until their drift passes the limit, and then starts afresh', () => {
+		const reference = earthYear().state.referenceCoolingK;
+		expect(reference).toEqual(lapseCooling(EARTH));
+		const drifts = [1, 2, 3].map((times) =>
+			coolingDrift(landRaised(times), reference),
+		);
+		const [one, two, three] = drifts as [number, number, number];
+		// A limit between the second edit's drift and the third's, passed in
+		// so that the test does not hang on the model's own.
+		const limit = (two + three) / 2;
+		const options = withLimit(limit);
+		// Each edit on its own is well under the limit.
+		expect(
+			coolingDrift(landRaised(2), lapseCooling(landRaised(1))),
+		).toBeCloseTo(one, 9);
+		expect(one).toBeLessThan(limit);
+
+		const first = solveTemperature(landRaised(1), {
+			...options,
+			start: earthYear(),
+		});
+		const second = solveTemperature(landRaised(2), {
+			...options,
+			start: first,
+		});
+		// Carried on: each passes on the reference it was given, as values.
+		expect(first.state.referenceCoolingK).toEqual(reference);
+		expect(second.state.referenceCoolingK).toEqual(reference);
+		expect(second.state.referenceCoolingK).not.toBe(
+			first.state.referenceCoolingK,
+		);
+
+		// Past the limit: the answer from nothing, its world the reference.
+		const third = solveTemperature(landRaised(3), {
+			...options,
+			start: second,
+		});
+		expect(third).toEqual(raisedYear());
+		expect(third.state.referenceCoolingK).toEqual(lapseCooling(landRaised(3)));
+
+		// And the next edit carries on from that reference.
+		const fourth = solveTemperature(landRaised(4), {
+			...options,
+			start: third,
+		});
+		expect(fourth.state.referenceCoolingK).toEqual(
+			third.state.referenceCoolingK,
+		);
+	});
+
+	it('sets aside a state whose terrain has drifted exactly to the limit', () => {
+		const start = raisedYear();
+		const drift = coolingDrift(EARTH, start.state.referenceCoolingK);
+		expect(drift).toBeGreaterThan(0);
+		const result = solveTemperature(EARTH, { ...withLimit(drift), start });
+		expect(result).toEqual(earthYear());
+	});
+
+	it('carries no state on at a limit of 0, even for the same world', () => {
+		const result = solveTemperature(EARTH, {
+			...withLimit(0),
+			start: earthYear(),
+		});
+		expect(result).toEqual(earthYear());
+	});
+
+	it('takes its own world’s cooling as the reference from a start of months alone', () => {
+		const raised = landRaised(1);
+		const result = solveTemperature(raised, {
+			...YEAR,
+			start: { months: earthYear().months, solvedFor: earthYear().solvedFor },
+		});
+		expect(result.state.referenceCoolingK).toEqual(lapseCooling(raised));
+		expect(result.state.referenceCoolingK).not.toEqual(lapseCooling(EARTH));
+	});
+
+	it('carries an ordinary stroke on, settling in a year', () => {
+		// Five dabs of the page's default brush, 500 km in radius and raising
+		// 1,000 m at the centre, across central Africa.
+		const stroked = { ...EARTH, elevation: Float32Array.from(EARTH.elevation) };
+		for (const longitude of [14, 18, 22, 26, 30]) {
+			applyDab(stroked, {
+				direction: latLonToDirection(0, longitude),
+				radiusKm: 500,
+				strength: 1000,
+				mode: 'raise',
+			});
+		}
+		const { referenceCoolingK } = earth().state;
+		expect(coolingDrift(stroked, referenceCoolingK)).toBeGreaterThan(0);
+		expect(coolingDrift(stroked, referenceCoolingK)).toBeLessThan(
+			TEMPERATURE_MODEL.terrainDriftLimitK,
+		);
+		const warm = solveTemperature(stroked, { start: earth() });
+		expect(warm.converged).toBe(true);
+		expect(warm.yearsRun).toBe(1);
+		expect(warm.state.referenceCoolingK).toEqual(referenceCoolingK);
+	});
+
+	it('gives the answer from nothing after the whole surface is raised to a 3,000 m plateau and put back', () => {
+		const plateau = {
+			...EARTH,
+			elevation: new Float32Array(cellCount).fill(3000),
+		};
+		expect(
+			coolingDrift(plateau, earthYear().state.referenceCoolingK),
+		).toBeGreaterThanOrEqual(TEMPERATURE_MODEL.terrainDriftLimitK);
+		const raised = solveTemperature(plateau, { ...YEAR, start: earthYear() });
+		expect(raised.state.referenceCoolingK).toEqual(lapseCooling(plateau));
+		const back = solveTemperature(EARTH, { ...YEAR, start: raised });
+		expect(back).toEqual(earthYear());
+	});
+});
+
+describe('coolingDrift', () => {
+	const reference = lapseCooling(EARTH);
+	let totalArea = 0;
+	for (const area of areas) {
+		totalArea += area;
+	}
+	const isLand = (cell: number): boolean =>
+		(EARTH.elevation[cell] as number) > EARTH.seaLevel;
+	const edited = (change: (elevation: Float32Array) => void): World => {
+		const world = { ...EARTH, elevation: Float32Array.from(EARTH.elevation) };
+		change(world.elevation);
+		return world;
+	};
+
+	it('is zero for the same world', () => {
+		expect(coolingDrift(EARTH, reference)).toBe(0);
+	});
+
+	it('is the same either way round', () => {
+		const there = coolingDrift(GENERATED, reference);
+		expect(there).toBeGreaterThan(0);
+		expect(coolingDrift(EARTH, lapseCooling(GENERATED))).toBe(there);
+	});
+
+	it('weights each cell by its area', () => {
+		let smallest = -1;
+		let largest = -1;
+		for (let cell = 0; cell < cellCount; cell++) {
+			if (isLand(cell)) {
+				if (
+					smallest < 0 ||
+					(areas[cell] as number) < (areas[smallest] as number)
+				) {
+					smallest = cell;
+				}
+				if (
+					largest < 0 ||
+					(areas[cell] as number) > (areas[largest] as number)
+				) {
+					largest = cell;
+				}
+			}
+		}
+		expect(areas[largest] as number).toBeGreaterThan(
+			1.2 * (areas[smallest] as number),
+		);
+		for (const cell of [smallest, largest]) {
+			const raised = edited((elevation) => {
+				elevation[cell] = (elevation[cell] as number) + 1000;
+			});
+			const lift =
+				(raised.elevation[cell] as number) - (EARTH.elevation[cell] as number);
+			expect(coolingDrift(raised, reference)).toBeCloseTo(
+				(TEMPERATURE_MODEL.lapseRate * lift * (areas[cell] as number)) /
+					totalArea,
+				15,
+			);
+		}
+	});
+
+	it('counts the sea as having no cooling', () => {
+		let sea = 0;
+		while (isLand(sea)) {
+			sea++;
+		}
+		const deeper = edited((elevation) => {
+			elevation[sea] = (elevation[sea] as number) - 1000;
+		});
+		const shallower = edited((elevation) => {
+			elevation[sea] = EARTH.seaLevel - 1;
+		});
+		expect(coolingDrift(deeper, reference)).toBe(0);
+		expect(coolingDrift(shallower, reference)).toBe(0);
+		// Land sunk beneath the sea counts its whole former cooling.
+		expect(isLand(CONGO)).toBe(true);
+		const sunk = edited((elevation) => {
+			elevation[CONGO] = EARTH.seaLevel - 1;
+		});
+		expect(coolingDrift(sunk, reference)).toBeCloseTo(
+			((reference[CONGO] as number) * (areas[CONGO] as number)) / totalArea,
+			15,
+		);
+	});
+
+	it('is the lapse rate times the lift times the share of land when every land cell is raised', () => {
+		let landArea = 0;
+		for (let cell = 0; cell < cellCount; cell++) {
+			if (isLand(cell)) {
+				landArea += areas[cell] as number;
+			}
+		}
+		const raised = edited((elevation) => {
+			for (let cell = 0; cell < cellCount; cell++) {
+				if (isLand(cell)) {
+					elevation[cell] = (elevation[cell] as number) + 256;
+				}
+			}
+		});
+		// Within the rounding of single-precision elevations.
+		expect(coolingDrift(raised, reference)).toBeCloseTo(
+			(TEMPERATURE_MODEL.lapseRate * 256 * landArea) / totalArea,
+			5,
+		);
+	});
+
+	it('refuses a reference of the wrong form', () => {
+		for (const bad of [
+			new Float64Array(cellCount - 1),
+			new Float32Array(cellCount),
+			null,
+		]) {
+			expect(() => coolingDrift(EARTH, bad as unknown as Float64Array)).toThrow(
+				RangeError,
+			);
+		}
+	});
+});
+
+describe('lapseCooling', () => {
+	it('is the lapse rate times the height above the sea on land, and nothing at sea', () => {
+		const world = atSeaLevel(EARTH, 100);
+		const expected = Float64Array.from(world.elevation, (elevation) =>
+			elevation > 100 ? TEMPERATURE_MODEL.lapseRate * (elevation - 100) : 0,
+		);
+		expect(expected.some((value) => value > 0)).toBe(true);
+		expect(expected.some((value) => value === 0)).toBe(true);
+		expect(lapseCooling(world)).toEqual(expected);
+	});
+
+	it('takes the lapse rate of the model given', () => {
+		const model = { ...TEMPERATURE_MODEL, lapseRate: 0 };
+		expect(lapseCooling(EARTH, model).every((value) => value === 0)).toBe(true);
 	});
 });
 
@@ -753,7 +1236,10 @@ describe('solveTemperature refuses what it cannot use', () => {
 		previousK: new Float64Array(cellCount).fill(280),
 		stepSeconds: 1e6,
 		guessK: new Float64Array(cellCount).fill(280),
+		referenceCoolingK: lapseCooling(EARTH),
 	};
+	/** The Earth's own record, so that the rest of a start is read. */
+	const SOLVED_FOR = temperatureConditions(EARTH);
 	const MONTHS = Array.from({ length: MONTHS_PER_YEAR }, () =>
 		new Float32Array(cellCount).fill(10),
 	);
@@ -773,6 +1259,17 @@ describe('solveTemperature refuses what it cannot use', () => {
 			{ ...STATE, guessK: undefined },
 			{ ...STATE, guessK: new Float64Array(cellCount - 1).fill(280) },
 			{ ...STATE, guessK: nan },
+			{ ...STATE, referenceCoolingK: undefined },
+			{ ...STATE, referenceCoolingK: new Float64Array(cellCount - 1) },
+			{ ...STATE, referenceCoolingK: new Float32Array(cellCount) },
+			{ ...STATE, referenceCoolingK: nan },
+			{ ...STATE, referenceCoolingK: new Float64Array(cellCount).fill(-1) },
+			{
+				...STATE,
+				referenceCoolingK: new Float64Array(cellCount).fill(
+					Number.POSITIVE_INFINITY,
+				),
+			},
 			{ ...STATE, temperatureK: new Float64Array(cellCount).fill(10_001) },
 			{
 				...STATE,
@@ -799,14 +1296,17 @@ describe('solveTemperature refuses what it cannot use', () => {
 		for (const bad of states) {
 			expect(() =>
 				solveTemperature(EARTH, {
-					start: { state: bad as unknown as TemperatureState },
+					start: {
+						state: bad as unknown as TemperatureState,
+						solvedFor: SOLVED_FOR,
+					},
 				}),
 			).toThrow(RangeError);
 		}
 	});
 
 	it('refuses a start that is neither a state nor months', () => {
-		for (const start of [null, {}, MONTHS]) {
+		for (const start of [null, { solvedFor: SOLVED_FOR }, MONTHS]) {
 			expect(() =>
 				solveTemperature(EARTH, {
 					start: start as unknown as TemperatureStart,
@@ -857,7 +1357,10 @@ describe('solveTemperature refuses what it cannot use', () => {
 		for (const start of starts) {
 			expect(() =>
 				solveTemperature(EARTH, {
-					start: { months: start as unknown as Float32Array[] },
+					start: {
+						months: start as unknown as Float32Array[],
+						solvedFor: SOLVED_FOR,
+					},
 				}),
 			).toThrow(RangeError);
 		}
@@ -875,12 +1378,41 @@ describe('solveTemperature refuses what it cannot use', () => {
 			elevation: Float32Array.from(EARTH.elevation),
 		};
 		nanElevation.elevation[5] = Number.NaN;
-		const nanSea = { ...EARTH, seaLevel: Number.NaN };
 		const resolution = { ...EARTH, resolution: 100 } as unknown as World;
-		for (const world of [wrongLength, nanElevation, nanSea, resolution]) {
+		// A sea level beyond the elevation limits, including one whose
+		// single-precision form is infinite.
+		const seas = [
+			Number.NaN,
+			MIN_ELEVATION_M - 0.001,
+			MAX_ELEVATION_M + 0.001,
+			1e39,
+			-1e39,
+		].map((seaLevel) => atSeaLevel(EARTH, seaLevel));
+		for (const world of [wrongLength, nanElevation, resolution, ...seas]) {
 			expect(() => solveTemperature(world)).toThrow(RangeError);
+			expect(() => lapseCooling(world)).toThrow(RangeError);
+		}
+		for (const world of seas.slice(1)) {
+			expect(() => solveTemperature(world)).toThrow(
+				`from ${MIN_ELEVATION_M} to ${MAX_ELEVATION_M} m`,
+			);
 		}
 	});
+
+	it.each([MIN_ELEVATION_M, MAX_ELEVATION_M])(
+		'carries on from a result for a sea level of %d m',
+		(seaLevel) => {
+			const options: SolveTemperatureOptions = { ...COARSE, maxYears: 1 };
+			const world = atSeaLevel(BLANK, seaLevel);
+			const first = solveTemperature(world, options);
+			expect(first.solvedFor.seaLevel).toBe(seaLevel);
+			// Set aside, the start would give the first year again.
+			const next = solveTemperature(world, { ...options, start: first });
+			expect(next.months).not.toEqual(first.months);
+			expect(next.solvedFor).toEqual(first.solvedFor);
+		},
+		SOLVE_TIMEOUT_MS,
+	);
 
 	it('refuses a cap or tolerance out of range', () => {
 		for (const maxYears of [0, 1.5, 1e9, Number.NaN]) {
@@ -922,6 +1454,8 @@ describe('solveTemperature refuses what it cannot use', () => {
 			{ ...TEMPERATURE_MODEL, stepsPerMonth: 49 },
 			{ ...TEMPERATURE_MODEL, iceStartC: -10 },
 			{ ...TEMPERATURE_MODEL, iceStartC: -12 },
+			{ ...TEMPERATURE_MODEL, terrainDriftLimitK: -0.1 },
+			{ ...TEMPERATURE_MODEL, terrainDriftLimitK: Number.NaN },
 		];
 		for (const model of models) {
 			expect(() =>

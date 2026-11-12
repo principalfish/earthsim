@@ -15,9 +15,14 @@
  */
 
 import { MONTHS_PER_YEAR } from './insolation';
-import { PLANET_SETTINGS } from './planet';
+import {
+	PLANET_SETTINGS,
+	type PlanetSetting,
+	type PlanetSettings,
+} from './planet';
 import type { TerrainStats } from './stats';
 import type {
+	TemperatureConditions,
 	TemperatureProgress,
 	TemperatureResult,
 	TemperatureStart,
@@ -64,8 +69,9 @@ type SimExtras = {
 	readonly temperature: {
 		/**
 		 * Where the solve starts from: usually the previous result for the
-		 * world, its months and its state, from before an edit. Left out,
-		 * the solve starts from nothing.
+		 * world, its months, its state and the sea level and planet it was
+		 * solved for, from before an edit. Left out, the solve starts from
+		 * nothing.
 		 */
 		readonly start?: TemperatureStart;
 	};
@@ -156,23 +162,55 @@ const isStateShaped = (value: unknown): boolean =>
 	value.temperatureK instanceof Float64Array &&
 	value.previousK instanceof Float64Array &&
 	value.guessK instanceof Float64Array &&
+	value.referenceCoolingK instanceof Float64Array &&
 	typeof value.stepSeconds === 'number';
+
+/** Whether a value is a finite number. */
+const isFiniteNumber = (value: unknown): value is number =>
+	typeof value === 'number' && Number.isFinite(value);
+
+/**
+ * Whether a value is a record of what a temperature result was solved
+ * for: a finite sea level and a planet whose every setting is a finite
+ * number.
+ */
+const isConditionsShaped = (value: unknown): value is TemperatureConditions =>
+	isRecord(value) &&
+	isFiniteNumber(value.seaLevel) &&
+	isRecord(value.planet) &&
+	PLANET_SETTINGS.every((name) =>
+		isFiniteNumber((value.planet as Record<string, unknown>)[name]),
+	);
 
 /**
  * Whether a value has the form of a start for a temperature solve: an
- * object whose months, if it has them, are an array of exactly 12
- * Float32Arrays, one a month, and whose state, if it has one, is of the
- * form of a result's state.
+ * object with a record of the sea level and planet it was solved for,
+ * whose months, if it has them, are an array of exactly 12 Float32Arrays,
+ * one a month, and whose state, if it has one, is of the form of a
+ * result's state.
  *
  * @remarks
- * As for a world, only the form is checked. How many values each month
- * and the state hold and what the values are is for the solver to refuse,
- * as it does a start that has neither months nor a state.
+ * As for a world, the months and the state are checked for their form
+ * only. How many values each month and the state hold and what the values
+ * are is for the solver to refuse, as it does a start that has neither
+ * months nor a state. The record is small and is checked in full.
  */
 const isTemperatureStartShaped = (value: unknown): value is TemperatureStart =>
 	isRecord(value) &&
+	isConditionsShaped(value.solvedFor) &&
 	(value.months === undefined || isTwelveMonths(value.months)) &&
 	(value.state === undefined || isStateShaped(value.state));
+
+/** A copy of a checked record, holding only the sea level and planet. */
+const copyConditions = (
+	conditions: TemperatureConditions,
+): TemperatureConditions => {
+	const planet = {} as Record<PlanetSetting, number>;
+	for (const name of PLANET_SETTINGS) {
+		planet[name] = conditions.planet[name];
+	}
+	return { seaLevel: conditions.seaLevel, planet: planet as PlanetSettings };
+};
 
 /**
  * Whether a value is an array of exactly 12 Float32Arrays, none missing.
@@ -218,10 +256,17 @@ const PAYLOADS: {
 			return { world };
 		}
 		if (!isTemperatureStartShaped(start)) {
-			return "A temperature request's start must be an object whose months, if any, are 12 Float32Arrays and whose state, if any, has temperatureK, previousK and guessK as Float64Arrays and stepSeconds as a number";
+			return "A temperature request's start must be an object whose solvedFor has a finite seaLevel and a planet of finite settings, whose months, if any, are 12 Float32Arrays and whose state, if any, has temperatureK, previousK, guessK and referenceCoolingK as Float64Arrays and stepSeconds as a number";
 		}
 		// Only what a solve starts from is taken, whatever else came with it.
-		return { world, start: { months: start.months, state: start.state } };
+		return {
+			world,
+			start: {
+				months: start.months,
+				state: start.state,
+				solvedFor: copyConditions(start.solvedFor),
+			},
+		};
 	},
 };
 

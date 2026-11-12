@@ -57,6 +57,7 @@ const temperatureBuffers = (result: TemperatureResult): ArrayBufferLike[] => [
 	result.state.temperatureK.buffer,
 	result.state.previousK.buffer,
 	result.state.guessK.buffer,
+	result.state.referenceCoolingK.buffer,
 ];
 
 /** The buffers each kind of result can hand over, which may repeat. */
@@ -108,7 +109,7 @@ const reasonOf = (error: unknown): string =>
  * @param onProgress - Told how far the computation has come, while it
  * runs, with the request's id and kind. Left out, nobody is told.
  * @returns The response to post back, and its transfer list: for a
- * temperature result, the buffers of its twelve months and of the three
+ * temperature result, the buffers of its twelve months and of the four
  * arrays of its state; for anything else, nothing.
  */
 export const handleRequest = (

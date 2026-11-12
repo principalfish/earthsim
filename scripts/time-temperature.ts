@@ -5,10 +5,16 @@
  * Run with `npm run time:temperature`. It prints Markdown tables:
  *
  * - solve times at every resolution for the Earth preset and a generated
- *   world, from nothing and carrying on from the converged answer's end
- *   state after two small edits (a patch of land raised by 500 m, and the
- *   sea level raised by 10 m), with the years each solve ran and whether it
- *   converged;
+ *   world, from nothing and started from the converged answer after two
+ *   small edits (a patch of land raised by 500 m, which carries on from the
+ *   answer's end state, and the sea level raised by 10 m, which sets the
+ *   start aside and so is a solve from nothing), with the years each solve
+ *   ran and whether it converged;
+ * - the Earth at the coarsest resolution with its sea level taken 6,000 m
+ *   down and back up in steps of 500 m, each solve started from the last
+ *   result as the page starts it: at each level on the way up, the largest
+ *   difference from a solve of that world from nothing, which is 0 when
+ *   each start is set aside, as a change of sea level sets it;
  * - the simulated Earth against the observed temperature at every
  *   resolution: the area-weighted mean and root-mean-square difference for
  *   each month and for the annual mean, the global and tropical means, the
@@ -67,6 +73,11 @@ const EARTH_EDIT_LONGITUDE = 100;
 
 /** The sea-level edit, in metres. */
 const SEA_LEVEL_RISE_M = 10;
+
+/** How far the sea level goes down in the run down and back, in metres. */
+const SEA_RUN_DEPTH_M = 6000;
+/** The step of that run, in metres. */
+const SEA_RUN_STEP_M = 500;
 
 /** The bounds of the tropics, in degrees either side of the equator. */
 const TROPICS_DEG = 20;
@@ -217,10 +228,87 @@ const timeWorld = (
 	timings.push({
 		world: name,
 		resolution: world.resolution,
-		start: `warm, sea level ${SEA_LEVEL_RISE_M} m higher`,
+		start: `sea level ${SEA_LEVEL_RISE_M} m higher, start set aside`,
 		...risen,
 	});
 	return cold.result;
+};
+
+/** The largest difference between two sets of monthly fields, in kelvin. */
+const largestDifference = (
+	a: readonly Float32Array[],
+	b: readonly Float32Array[],
+): number => {
+	let largest = 0;
+	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
+		const first = a[month] as Float32Array;
+		const second = b[month] as Float32Array;
+		for (let cell = 0; cell < first.length; cell++) {
+			largest = Math.max(
+				largest,
+				Math.abs((first[cell] as number) - (second[cell] as number)),
+			);
+		}
+	}
+	return largest;
+};
+
+/** One level of the sea level's run back up. */
+type SeaLevelStep = {
+	readonly seaLevel: number;
+	readonly warm: TemperatureResult;
+	readonly cold: TemperatureResult;
+	readonly meanC: number;
+};
+
+/**
+ * Takes a world's sea level down by {@link SEA_RUN_DEPTH_M} and back in
+ * steps of {@link SEA_RUN_STEP_M}, each solve started from the last result,
+ * and solves each level on the way back up from nothing as well. Every step
+ * changes the sea level, so every start is set aside and the two solves at
+ * a level are the same, bit for bit.
+ *
+ * @returns Each level on the way back up, from one step above the lowest to
+ * the world's own, with both solves there and the started one's global
+ * annual mean.
+ */
+const runSeaLevel = (world: World): SeaLevelStep[] => {
+	const atSeaLevel = (seaLevel: number): World => ({
+		...world,
+		seaLevel: normaliseSeaLevel(seaLevel),
+	});
+	let previous = solveTemperature(world);
+	for (
+		let drop = SEA_RUN_STEP_M;
+		drop <= SEA_RUN_DEPTH_M;
+		drop += SEA_RUN_STEP_M
+	) {
+		previous = solveTemperature(atSeaLevel(world.seaLevel - drop), {
+			start: previous,
+		});
+	}
+	const steps: SeaLevelStep[] = [];
+	for (
+		let drop = SEA_RUN_DEPTH_M - SEA_RUN_STEP_M;
+		drop >= 0;
+		drop -= SEA_RUN_STEP_M
+	) {
+		const level = atSeaLevel(world.seaLevel - drop);
+		const warm = solveTemperature(level, { start: previous });
+		const cold = solveTemperature(level);
+		steps.push({
+			seaLevel: level.seaLevel,
+			warm,
+			cold,
+			meanC: meanWhere(
+				level,
+				summariseTemperature(warm.months).annualMean,
+				() => true,
+			),
+		});
+		previous = warm;
+	}
+	return steps;
 };
 
 /** Area-weighted means over the cells a test picks, one per field. */
@@ -475,10 +563,12 @@ export const main = (args: readonly string[]): void => {
 		);
 	}
 
+	const seaRun = runSeaLevel(earthWorld(earth, SUPPORTED_RESOLUTIONS[0]));
+
 	say('## Solve times');
 	say();
 	say(
-		'Warm starts carry on from the end state of the cold solve for the world before the edit, which is how the page is to use it: `solveTemperature(edited, { start: result })`. The patch is raised around the Tibetan Plateau’s edge on the Earth and around the highest point on the generated world.',
+		'Each edited world starts from the cold solve for the world before the edit, which is how the page uses it: `solveTemperature(edited, { start: result })`. The raised patch carries on from that result’s end state; the change of sea level sets the start aside, so its solve is one from nothing. The patch is raised around the Tibetan Plateau’s edge on the Earth and around the highest point on the generated world.',
 	);
 	say();
 	table(
@@ -497,6 +587,29 @@ export const main = (args: readonly string[]): void => {
 			fixed(seconds, 2),
 			String(result.yearsRun),
 			result.converged ? 'yes' : `no (${fixed(result.finalChangeK, 3)} K)`,
+		]),
+	);
+
+	say('## Sea level down and back');
+	say();
+	say(
+		`The Earth at ${SUPPORTED_RESOLUTIONS[0]} cells per face edge, its sea level taken ${SEA_RUN_DEPTH_M.toLocaleString('en-GB')} m down and back up in steps of ${SEA_RUN_STEP_M} m, each solve started from the last result. At each level on the way back up: the global annual mean, the years run, those a solve from nothing ran, and the largest difference from that solve in any month and cell. Every step changes the sea level, so a difference of 0 confirms that each start was set aside and the solve started from nothing.`,
+	);
+	say();
+	table(
+		[
+			'Sea level, m',
+			'Global mean, °C',
+			'Years run',
+			'Years from nothing',
+			'Largest difference, K',
+		],
+		seaRun.map(({ seaLevel, warm, cold, meanC }) => [
+			String(seaLevel),
+			fixed(meanC),
+			String(warm.yearsRun),
+			String(cold.yearsRun),
+			fixed(largestDifference(warm.months, cold.months), 3),
 		]),
 	);
 	reportErrors(figures);
