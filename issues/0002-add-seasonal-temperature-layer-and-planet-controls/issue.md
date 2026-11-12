@@ -14,7 +14,7 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 
 ## Plan
 
-_2026-11-12 · 4 of 11 pieces done · now: waiting on a decision (when temperature recalculates)_
+_2026-11-12 · 4 of 11 pieces done · now: waiting on the go-ahead for piece 5_
 
 - [x] **1/11 Planet settings and date on the world** · `8390675`
   Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.

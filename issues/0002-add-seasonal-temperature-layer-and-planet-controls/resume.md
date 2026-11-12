@@ -10,13 +10,9 @@ _Updated 2026-11-12, after piece 4 was committed._
 
 ## Pending with the user (put to them 2026-11-12)
 
-1. **Recalculation trigger:** only while the temperature layer is showing (builder's and planner's recommendation), or always.
-2. **Progress indicator:** years-done progress from the worker (new protocol work in piece 5), or a plain "calculating" marker.
-3. **256 worlds solved on the 128 grid** with height cooling applied at full resolution (about five times faster at 256; changes the settled "own grid" decision). Not built; the user decides whether it goes into this issue, a later one, or nowhere.
-4. **Deviations in piece 4 to accept or question:** outgoing heat in emissivity form on a kelvin state where the plan said linear; new file `src/core/exchange.ts`; the result carries a resumable state; sea ice lowers ocean heat capacity and land has its own spreading rate; "converged" leaves answers within about 0.2 K of the repeating year; `scripts/earth/cells.test.ts` counts differing cells in one assertion.
-5. **Trust band for the sunlight note (piece 8):** builder suggests 0.85 to 1.25 times Earth's sunlight; the real edge moves with greenhouse strength.
+The go-ahead for piece 5, and whether it commits when clean or pauses for a diff review. The piece 5 briefing has been given.
 
-Checkpoint 4 in `plan.md` is ticked by the builder for the code; its last clause (the user has chosen the trigger) is true only once item 1 is answered. Record the answers in `decisions.md` and `plan.md` Notes, then give the piece 5 briefing.
+Answered on 2026-11-12 and recorded in `decisions.md`: trigger "Only while showing"; progress "Years done"; the 128-grid solve for 256 worlds "Decide after piece 8" (raise it again then); piece 4's deviations "Accept all six". Still to raise at piece 8: the trust band for the sunlight note (builder suggests 0.85 to 1.25 times Earth's sunlight).
 
 ## Figures from piece 4 (`npm run time:temperature`, Node, one thread)
 
