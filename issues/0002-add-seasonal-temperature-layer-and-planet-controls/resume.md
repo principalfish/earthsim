@@ -1,6 +1,6 @@
 # Resume: add-seasonal-temperature-layer-and-planet-controls
 
-_Updated 2026-11-12, with piece 9 committed and piece 10 waiting for its briefing and the user's go-ahead._
+_Updated 2026-11-12, with piece 10 built and waiting for its manual review._
 
 ## Where it stands
 
