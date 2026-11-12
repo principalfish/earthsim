@@ -14,7 +14,7 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 
 ## Plan
 
-_2026-11-12 · 11 of 14 pieces done · now: waiting on the go-ahead for piece 12_
+_2026-11-12 · 11 of 14 pieces done · now: piece 12 in progress_
 
 - [x] **1/14 Planet settings and date on the world** · `8390675`
   Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
@@ -38,7 +38,7 @@ _2026-11-12 · 11 of 14 pieces done · now: waiting on the go-ahead for piece 12
   Sliders for tilt, star brightness, star mass, orbit and greenhouse strength, with sunlight received and year length shown.
 - [x] **11/14 Value under the cursor** (was 9) · `a85c004`
   A readout of position, elevation and temperature at the point under the pointer.
-- [ ] **12/14 Earth comparison view and error baseline** (was 10) · not started
+- [ ] **12/14 Earth comparison view and error baseline** (was 10) · in progress
   On the Earth preset: simulated, observed or difference, with error figures and a committed baseline.
 - [ ] **13/14 The sun in the scene** (was 11) · not started · added 2026-11-11: the user asked for the sun to be drawn
   The star drawn in the scene, following the star settings and the months, with a Sunlight toggle that lights the globe from it.

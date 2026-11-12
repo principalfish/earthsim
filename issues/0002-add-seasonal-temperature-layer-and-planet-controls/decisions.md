@@ -56,6 +56,9 @@
 - The side panel's sections become expandable, as a new last piece of this issue (14): "the right bar sections need to be expandable - start with them all collapse i think - except maybe new world . put as the last piece of this issue". On a first visit only World is open. Which sections are open is remembered in the browser ("Yes, remember"). The temperature legend moves to the main window, bottom right of the globe, when Temperature is selected (the user's own suggestion, chosen over the planner's three options); the planner reads this as always there while Temperature is showing, whatever the Layers section's state. The piece has a manual review ("Yes"). (2026-11-12)
 - The side panel's sections run in the order World, Layers, View, Planet, Tools, Statistics ("also i think we want to go world layers view planet tools stats"), done in piece 14. (2026-11-12)
 - The value under the cursor is shown in a strip over the globe at the bottom left ("Over the globe, bottom left"), not in the side panel, with temperature in whole degrees ("Whole degrees"). (2026-11-12)
+- The Earth comparison (Simulated, Observed, Difference) is offered only on an untouched Earth ("Only an untouched Earth"), chosen over the recommended "any world that started as Earth, with a note": the choice goes after the first stroke, sea-level change or planet change and returns when the world matches the measured Earth again. This refines the earlier assumption that it is offered whenever the world started as the Earth preset. (2026-11-12)
+- The Difference view's scale is fixed at ±20 °C ("Fixed at ±20 °C"), so later steps visibly fade the map as the model improves. (2026-11-12)
+- No solver constants are tuned in the Earth comparison piece ("No tuning now"); the committed baseline records the model as it is (annual RMS 3.93 °C at 64), and the user's look at the difference map decides any later tuning. (2026-11-12)
 
 ## Open
 
