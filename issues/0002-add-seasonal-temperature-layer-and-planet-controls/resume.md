@@ -8,20 +8,17 @@ _Updated 2026-11-12, with piece 7 committed and piece 8 waiting for its briefing
 - Piece 7 was committed on 2026-11-12 after the user's second manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 8 and starts it only on the user's go-ahead.
 - Pieces 8 to 13 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user
+## Pending with the user (put to them 2026-11-12)
 
-Nothing. The user approved piece 7 on 2026-11-12 after the second manual review ("Tried it, approve"); the builder commits and pushes it, then stops with a look-ahead for piece 8. Then: tick piece 7, brief piece 8 (including the builder's "B+" drift-limit refinement as a choice, and whether to keep the proposed manual reviews on pieces 8 and 9), and ask before it starts.
+Piece 7 is committed and pushed (`fd8e21f`). The piece 8 briefing has been given. Waiting on:
+1. Plain "Fresh on sea or planet change" (already chosen) or the builder's "B+" refinement: also start fresh once terrain edits have drifted past a limit from the last fresh solve (about every 25th ordinary stroke at a 0.25 K limit, to be measured; fixes the plateau-and-undo case).
+2. Whether to keep piece 8's proposed manual review (the user's freeze sequence).
+3. The go-ahead to start piece 8.
+Stated, not asked: the record of sea level and planet sits on the result beside the months and state; a start with no record is refused; the stepwise test runs in 2,000 m steps in the suite and 500 m steps in the timing script; sea-level drags at 256 are slower (about 22 s against 15 s) until piece 9.
 
-Context kept from before:
-Nothing. On 2026-11-12 the user answered the questions from piece 7's manual review and the plan was changed to 13 pieces (see `plan.md` Notes, "Renumbering"):
-- Piece 7 (uncommitted, HEAD `533ef95`) is being changed: seasonal range "Reshape ramp, finer ticks"; temperature scale "Yes, fit the middle 99%". The builder then sends a new review request; the user tries it again before approving (relay approval only when their words say they tried it). The freeze is still present at that review; it is fixed in piece 8.
-- New piece 8, re-solves that depend only on the world: "Fresh on sea or planet change". Manual review: the user's own freeze sequence.
-- New piece 9, solver speed-ups: "let us also implement the speed up ideas", "All four", "Yes, 128 too". Manual review of the coarser solve's look. Brief the user on 8 and 9 before each starts; the manual reviews on 8 and 9 were proposed by the planner and are still to be confirmed with the user in those briefings.
-- To put to the user in piece 8's briefing: the builder's refinement "B+" (a drift limit for terrain edits on top of the chosen rule; see `plan.md` Notes, 2026-11-12), which the user has not yet seen.
-- Lower sea level cooling the planet: "Keep it".
-- Then the planet panel (now 10), cursor readout (11), Earth comparison (12), the sun (13).
+After piece 8: brief piece 9 (solver speed-ups: "All four", "Yes, 128 too"; confirm its proposed manual review). Then the planet panel (10), cursor readout (11), Earth comparison (12), the sun (13).
 
-Still to raise later: at the planet panel (now piece 10), the trust band for the sunlight note (builder suggests 0.85 to 1.25 times Earth's sunlight). Known model weakness, told to the user, nothing decided: seasonal range is low in deserts and mid-latitude oceans (Australia 46% of observed, Sahara 63%, North Pacific 50%). Unrelated follow-up the builder noticed: in Terrain view a world exactly at sea level shows speckled land and sea colours (predates this issue; the user was told, nothing decided).
+Still to raise later: at the planet panel (now piece 10), the trust band for the sunlight note (builder suggests 0.85 to 1.25 times Earth's sunlight). Known model weakness, told to the user, nothing decided: seasonal range is low in deserts and mid-latitude oceans. Unrelated follow-up the builder noticed: in Terrain view a world exactly at sea level shows speckled land and sea colours (predates this issue; nothing decided).
 
 ## Figures
 

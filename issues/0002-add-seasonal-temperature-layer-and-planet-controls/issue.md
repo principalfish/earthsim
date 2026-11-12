@@ -14,7 +14,7 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 
 ## Plan
 
-_2026-11-12 · 6 of 13 pieces done · now: piece 7 approved, being committed_
+_2026-11-12 · 7 of 13 pieces done · now: waiting on the go-ahead for piece 8_
 
 - [x] **1/13 Planet settings and date on the world** · `8390675`
   Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
@@ -28,7 +28,7 @@ _2026-11-12 · 6 of 13 pieces done · now: piece 7 approved, being committed_
   Temperature calculated in its own Web Worker and recalculated automatically after edits.
 - [x] **6/13 Temperature layer on the globe** · `533ef95`
   The globe coloured by temperature with relief and coastlines kept, a Terrain or Temperature picker, and a legend.
-- [ ] **7/13 Month slider, annual summaries and date** · in progress
+- [x] **7/13 Month slider, annual summaries and date** · `fd8e21f`
   Step or play through the twelve months, view annual summaries, and see the world's date. After its manual review: a seasonal-range ramp that shows small ranges, and a temperature scale fitted to the middle 99% of the surface.
 - [ ] **8/13 Re-solves that depend only on the world** · not started · added 2026-11-12: the manual review found a frozen climate carried over after a sea-level change
   A re-solve after a sea-level or planet change starts fresh, so the result no longer depends on the order of edits.
