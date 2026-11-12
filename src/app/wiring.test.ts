@@ -25,7 +25,11 @@ import { RESTORE_FAILED_MESSAGE } from './startup';
 import type { LoadOutcome } from './storage';
 import { createFakeTimers } from './testing/fakeTimers';
 import { settle } from './testing/settle';
-import { createLayerPanel, type LayerControlsOptions } from './ui/layerPanel';
+import {
+	createLayerPanel,
+	type LayerControlsOptions,
+	type ShownTemperature,
+} from './ui/layerPanel';
 import {
 	FIRST_NEW_WORLD_VALUES,
 	type NewWorldDialogOptions,
@@ -46,6 +50,7 @@ import {
 	type PageAutosaveOptions,
 	type PageLayerOptions,
 	type PageParts,
+	type PageReadoutOptions,
 	type PageStatisticsOptions,
 	type PageTemperatureOptions,
 	startPage,
@@ -85,6 +90,13 @@ type Stage = {
 	readonly statisticsOptions: PageStatisticsOptions;
 	readonly temperatureOptions: PageTemperatureOptions;
 	readonly layerOptions: PageLayerOptions;
+	readonly readoutOptions: PageReadoutOptions;
+	/** What the stand-in for the cursor readout was asked to do, in order. */
+	readonly readoutCalls: string[];
+	/** What the stand-in for the layer panel says the globe shows. */
+	shownTemperature: ShownTemperature | null;
+	/** Turns or zooms the camera, as the view's input says it does. */
+	moveCamera(): void;
 	/** Presses a key as the page hears it. */
 	pressKey(press: Partial<ShortcutEvent>): void;
 	/** Says that the page is being hidden or closed. */
@@ -137,6 +149,9 @@ const createStage = (
 	let statisticsOptions: PageStatisticsOptions | undefined;
 	let temperatureOptions: PageTemperatureOptions | undefined;
 	let layerOptions: PageLayerOptions | undefined;
+	let readoutOptions: PageReadoutOptions | undefined;
+	let onCameraMove: (() => void) | undefined;
+	const readoutCalls: string[] = [];
 	let keyListener: ((event: ShortcutEvent) => void) | undefined;
 	let hidingListener: (() => void) | undefined;
 	let answerLoad: ((outcome: LoadOutcome) => void) | undefined;
@@ -180,6 +195,12 @@ const createStage = (
 		get layerOptions() {
 			return required(layerOptions, 'layer panel');
 		},
+		get readoutOptions() {
+			return required(readoutOptions, 'cursor readout');
+		},
+		readoutCalls,
+		shownTemperature: null,
+		moveCamera: () => required(onCameraMove, 'view input')(),
 		pressKey: (press) => {
 			required(
 				keyListener,
@@ -210,8 +231,9 @@ const createStage = (
 			setGridVisible: (visible) => log.push(`globe.setGridVisible ${visible}`),
 			updateElevation: () => log.push('globe.updateElevation'),
 		},
-		createViewInput: (rotateButton) => {
+		createViewInput: (rotateButton, onMove) => {
 			log.push(`createViewInput ${rotateButton}`);
+			onCameraMove = onMove;
 			return {
 				setRotateButton: (button) =>
 					log.push(`viewInput.setRotateButton ${button}`),
@@ -331,7 +353,18 @@ const createStage = (
 			if (own.createLayerPanel !== undefined) {
 				return own.createLayerPanel(options);
 			}
-			return { resetMonth: () => log.push('layerPanel.resetMonth') };
+			return {
+				resetMonth: () => log.push('layerPanel.resetMonth'),
+				shown: () => stage.shownTemperature,
+			};
+		},
+		createCursorReadout: (options) => {
+			log.push('createCursorReadout');
+			readoutOptions = options;
+			return {
+				invalidate: () => readoutCalls.push('invalidate'),
+				clear: () => readoutCalls.push('clear'),
+			};
 		},
 		openNewWorldDialog: (options) => {
 			log.push(`openNewWorldDialog ${options.notice ?? 'no notice'}`);
@@ -365,6 +398,7 @@ const createStartedStage = async (
 	stage.answerLoad({ kind: 'empty' });
 	await stage.started;
 	stage.log.length = 0;
+	stage.readoutCalls.length = 0;
 	return stage;
 };
 
@@ -409,6 +443,7 @@ describe('startPage', () => {
 			'createLayerPanel',
 			'createStatistics',
 			'statistics.refresh',
+			'createCursorReadout',
 			'setInert true',
 			'store.load',
 		]);
@@ -1263,6 +1298,126 @@ describe('the temperature, on its worker', () => {
 		page.stage.strokeActive = false;
 		await page.wait();
 		expect(page.posted()).toHaveLength(2);
+	});
+});
+
+describe('the cursor readout', () => {
+	it('reads the world of the moment, the stroke, and what the layer panel says the globe shows', async () => {
+		const stage = await createStartedStage();
+		const next = generateWorld({ resolution: 64, seed: 3, landFraction: 0.3 });
+		stage.state.replaceWorld(next);
+		expect(stage.readoutOptions.currentWorld()).toBe(next);
+		expect(stage.readoutOptions.isStrokeActive()).toBe(false);
+		stage.strokeActive = true;
+		expect(stage.readoutOptions.isStrokeActive()).toBe(true);
+		expect(stage.readoutOptions.shownTemperature()).toBeNull();
+		const shown: ShownTemperature = {
+			field: new Float32Array(next.elevation.length),
+			view: 'warmest',
+			month: 6,
+			current: true,
+		};
+		stage.shownTemperature = shown;
+		expect(stage.readoutOptions.shownTemperature()).toBe(shown);
+	});
+
+	it('looks again after each turn and zoom of the camera', async () => {
+		const stage = await createStartedStage();
+		stage.moveCamera();
+		stage.moveCamera();
+		expect(stage.readoutCalls).toEqual(['invalidate', 'invalidate']);
+	});
+
+	it.each([
+		['a committed stroke', (stage: Stage) => makeStroke(stage)],
+		[
+			'an undo and a redo',
+			(stage: Stage) => {
+				makeStroke(stage);
+				stage.readoutCalls.length = 0;
+				stage.pressKey(UNDO_KEYS);
+				stage.pressKey(REDO_KEYS);
+			},
+		],
+		[
+			'the sea-level slider',
+			(stage: Stage) => stage.viewPanelOptions.onSeaLevel(-500),
+		],
+		[
+			'a new world',
+			(stage: Stage) => stage.state.replaceWorld(createBlankWorld(64)),
+		],
+	])('looks again after %s', async (_name, act) => {
+		const stage = await createStartedStage();
+		act(stage);
+		expect(stage.readoutCalls.length).toBeGreaterThan(0);
+		expect(stage.readoutCalls.every((call) => call === 'invalidate')).toBe(
+			true,
+		);
+	});
+
+	it('looks again at each change of the view settings and of the temperature store', async () => {
+		const stage = await createStartedStage();
+		stage.layerOptions.onView({
+			layer: 'temperature',
+			temperatureView: 'month',
+			month: 3,
+		});
+		expect(stage.readoutCalls).toEqual(['invalidate']);
+		stage.layerOptions.store.markCalculating();
+		stage.layerOptions.store.setResult(temperatureOf(1), true);
+		expect(stage.readoutCalls).toEqual([
+			'invalidate',
+			'invalidate',
+			'invalidate',
+		]);
+	});
+
+	it('does not look again for a change of the planet alone, which changes nothing on screen', async () => {
+		const stage = await createStartedStage();
+		stage.state.notifyPlanetChange();
+		expect(stage.readoutCalls).toEqual([]);
+	});
+
+	it('is cleared when the New world dialog opens, as the stroke ends', async () => {
+		const stage = await createStartedStage();
+		stage.worldPanelOptions.onNewWorld();
+		expect(stage.readoutCalls).toEqual(['clear']);
+		expect(stage.log.slice(0, 2)).toEqual([
+			'sculpt.endStroke',
+			'openNewWorldDialog no notice',
+		]);
+	});
+
+	it('reads what the globe shows from the real layer panel', async () => {
+		let choose: ((layer: 'terrain' | 'temperature') => void) | undefined;
+		const stage = await createStartedStage(undefined, {
+			createLayerPanel: (options) =>
+				createLayerPanel({
+					...options,
+					globe: { setLayer: () => {} },
+					setTimer: () => 0,
+					clearTimer: () => {},
+					reportError: () => {},
+					createControls: (controls) => {
+						choose = controls.onLayer;
+						return { showLegend: () => {}, showView: () => {} };
+					},
+				}),
+		});
+		required(choose, 'layer controls')('temperature');
+		expect(stage.readoutOptions.shownTemperature()).toBeNull();
+		const result = temperatureOf(1, stage.state.world.elevation.length);
+		stage.layerOptions.store.markCalculating();
+		stage.layerOptions.store.setResult(result, true);
+		expect(stage.readoutOptions.shownTemperature()).toEqual({
+			field: result.months[DEFAULT_MONTH],
+			view: 'month',
+			month: DEFAULT_MONTH,
+			current: true,
+		});
+		stage.layerOptions.store.markOutOfDate();
+		expect(stage.readoutOptions.shownTemperature()?.current).toBe(false);
 	});
 });
 

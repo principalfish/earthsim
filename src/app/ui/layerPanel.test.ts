@@ -1062,6 +1062,121 @@ describe('createLayerPanel, the summaries', () => {
 	});
 });
 
+describe('createLayerPanel, what the globe shows', () => {
+	it('shows nothing in Terrain view, nor in Temperature view before a result', () => {
+		const stage = createStage();
+		expect(stage.panel.shown()).toBeNull();
+		stage.arrive(resultWith());
+		expect(stage.panel.shown()).toBeNull();
+		stage.controls.onLayer('temperature');
+		stage.store.clear();
+		expect(stage.panel.shown()).toBeNull();
+		stage.store.markCalculating();
+		expect(stage.panel.shown()).toBeNull();
+	});
+
+	it('gives the field the globe was last given, with its month, current', () => {
+		const stage = createStage();
+		stage.controls.onLayer('temperature');
+		const result = resultWith();
+		stage.arrive(result);
+		const shown = stage.panel.shown();
+		expect(shown).toEqual({
+			field: result.months[DEFAULT_MONTH],
+			view: 'month',
+			month: DEFAULT_MONTH,
+			current: true,
+		});
+		expect(shown?.field).toBe(stage.shown.at(-1)?.field);
+
+		stage.controls.onMonth(2);
+		expect(stage.panel.shown()?.month).toBe(2);
+		expect(stage.panel.shown()?.field).toBe(result.months[2]);
+	});
+
+	it('names the summary on show, with the array sent to the globe', () => {
+		const stage = createStage();
+		stage.controls.onLayer('temperature');
+		stage.arrive(resultWith());
+		for (const view of ['annualMean', 'warmest', 'coldest', 'range'] as const) {
+			stage.controls.onTemperatureView(view);
+			expect(stage.panel.shown()?.view).toBe(view);
+			expect(stage.panel.shown()?.field).toBe(stage.shown.at(-1)?.field);
+			expect(stage.panel.shown()?.current).toBe(true);
+		}
+	});
+
+	it('is not current while the result is out of date, calculated again or no longer calculable', () => {
+		const stage = createStage();
+		stage.controls.onLayer('temperature');
+		const result = resultWith();
+		stage.arrive(result);
+		const field = result.months[DEFAULT_MONTH];
+
+		stage.store.markOutOfDate();
+		expect(stage.lastLegend()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
+		expect(stage.panel.shown()).toMatchObject({ field, current: false });
+
+		stage.store.markCalculating();
+		expect(stage.panel.shown()).toMatchObject({ field, current: false });
+
+		stage.store.setResult(result, true);
+		expect(stage.panel.shown()).toMatchObject({ field, current: true });
+
+		stage.store.markUnavailable();
+		expect(stage.lastLegend()?.status).toBe(LEGEND_UNAVAILABLE_TEXT);
+		expect(stage.panel.shown()).toMatchObject({ field, current: false });
+	});
+
+	it('keeps the earlier field and its month, not current, while the globe refuses the one chosen', () => {
+		const stage = createStage();
+		stage.controls.onLayer('temperature');
+		const first = resultWith();
+		stage.arrive(first);
+
+		stage.failNext(new RangeError('Refused once'));
+		const second = resultWith(5);
+		stage.store.markCalculating();
+		stage.store.setResult(second, true);
+		expect(stage.store.temperature.status).toBe('current');
+		expect(stage.lastLegend()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
+		expect(stage.panel.shown()).toEqual({
+			field: first.months[DEFAULT_MONTH],
+			view: 'month',
+			month: DEFAULT_MONTH,
+			current: false,
+		});
+
+		stage.failNext(new RangeError('Refused again'));
+		expect(() => stage.controls.onMonth(0)).toThrow('Refused again');
+		expect(stage.panel.shown()).toMatchObject({
+			field: first.months[DEFAULT_MONTH],
+			month: DEFAULT_MONTH,
+			current: false,
+		});
+
+		stage.controls.onMonth(1);
+		expect(stage.panel.shown()).toEqual({
+			field: second.months[1],
+			view: 'month',
+			month: 1,
+			current: true,
+		});
+	});
+
+	it('shows nothing again once the globe is back on the height colours', () => {
+		const stage = createStage();
+		stage.controls.onLayer('temperature');
+		stage.arrive(resultWith());
+		stage.controls.onLayer('terrain');
+		expect(stage.panel.shown()).toBeNull();
+		stage.controls.onLayer('temperature');
+		expect(stage.panel.shown()).not.toBeNull();
+		stage.store.clear();
+		expect(stage.panel.shown()).toBeNull();
+	});
+});
+
 describe('createLayerControls', () => {
 	let fake: FakeDocument;
 	beforeEach(() => {

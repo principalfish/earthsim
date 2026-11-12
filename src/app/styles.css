@@ -9,6 +9,8 @@
   --color-accent-strong: #8cc4f0;
   --color-danger: #f28b82;
   --color-backdrop: rgb(0 0 0 / 60%);
+  /* The page's background, see-through enough to show what is under it. */
+  --color-overlay-bg: color-mix(in srgb, var(--color-bg) 80%, transparent);
   --space-xs: 0.25rem;
   --space-sm: 0.5rem;
   --space-md: 1rem;
@@ -44,9 +46,14 @@ body {
 }
 
 /* Layout */
+/* One cell, the globe's area, which the globe fills and the cursor readout
+   is laid over; neither can stretch it. */
 .viewport {
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
+  overflow: hidden;
 }
 
 .viewport__message {
@@ -59,6 +66,7 @@ body {
 }
 
 .globe {
+  grid-area: 1 / 1;
   display: block;
   width: 100%;
   height: 100%;
@@ -681,6 +689,61 @@ body {
   width: 100%;
   height: 0.25rem;
   accent-color: var(--color-accent);
+}
+
+/* What lies under the pointer, laid over the bottom-left corner of the
+   globe's area. The pointer passes through it to the globe, so it never
+   stops a stroke or a drag. Its width is fixed, with room in a wide font for
+   the longest usual line, `Annual average −30 °C · out of date`, so it keeps
+   its size as the values change and leaves the bottom-right corner free; in
+   a window narrower than that it is as wide as the area allows. Each part
+   has a line of its own and a part with nothing to say takes none, so the
+   strip is two lines high in Terrain view and three in Temperature view:
+   its height changes only with what is shown, not with the values. */
+.cursor-readout {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-self: end;
+  justify-self: start;
+  inline-size: min(20.5em, 100% - 2 * var(--space-sm));
+  margin: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  color: var(--color-text);
+  background: var(--color-overlay-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+}
+
+/* Hidden by the page, which the display set on it would otherwise undo. */
+.cursor-readout[hidden] {
+  display: none;
+}
+
+/* One line each, never wrapped: a line longer than the strip is cut short
+   with an ellipsis, so a narrow window neither makes the strip taller nor
+   scrolls. */
+.cursor-readout__position,
+.cursor-readout__elevation,
+.cursor-readout__temperature {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The end of the temperature's line, after a middle dot that is hidden
+   with it. */
+.cursor-readout__status {
+  color: var(--color-text-muted);
+}
+
+.cursor-readout__status::before {
+  content: " · ";
 }
 
 /* Utilities */

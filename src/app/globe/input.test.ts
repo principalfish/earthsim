@@ -301,6 +301,51 @@ describe('attachViewInput wheel and context menu', () => {
 	});
 });
 
+describe('attachViewInput, telling of the camera moving', () => {
+	it('tells after each turn and each zoom, once the globe has moved', () => {
+		const fake = createFakeCanvas(800, 600);
+		const log: string[] = [];
+		const globe = {
+			rotateBy: () => log.push('rotate'),
+			zoomBy: () => log.push('zoom'),
+		} as unknown as Globe;
+		attachViewInput(fake.canvas, globe, MAIN_BUTTON, () => log.push('moved'));
+
+		fake.dispatch('pointerdown', { pointerId: 1, buttons: MAIN_HELD });
+		fake.dispatch('pointermove', {
+			pointerId: 1,
+			buttons: MAIN_HELD,
+			clientX: 5,
+		});
+		fake.dispatch('pointerup', { pointerId: 1 });
+		fake.dispatch('wheel', { deltaY: 100 });
+		expect(log).toEqual(['rotate', 'moved', 'zoom', 'moved']);
+	});
+
+	it('tells nothing for a move that turns nothing', () => {
+		const fake = createFakeCanvas(800, 600);
+		let told = 0;
+		const globe = {
+			rotateBy: () => {},
+			zoomBy: () => {},
+		} as unknown as Globe;
+		attachViewInput(fake.canvas, globe, SECONDARY_BUTTON, () => told++);
+
+		fake.dispatch('pointermove', { pointerId: 1, clientX: 5 });
+		fake.dispatch('pointerdown', {
+			pointerId: 1,
+			button: MAIN_BUTTON,
+			buttons: MAIN_HELD,
+		});
+		fake.dispatch('pointermove', {
+			pointerId: 1,
+			buttons: MAIN_HELD,
+			clientX: 9,
+		});
+		expect(told).toBe(0);
+	});
+});
+
 describe('setRotateButton', () => {
 	it('stops a drag under way when the button changes', () => {
 		const { fake, input, turns } = createStage();

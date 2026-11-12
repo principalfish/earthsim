@@ -8,6 +8,7 @@ import { MAX_DRAWN_SEA_LEVEL_M, MIN_DRAWN_SEA_LEVEL_M } from './globe/material';
 import { createGlobe, type Globe } from './globe/renderer';
 import { createSculptController } from './sculpt';
 import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
+import { createCursorReadout, createReadoutStrip } from './ui/cursorReadout';
 import { createLayerControls, createLayerPanel } from './ui/layerPanel';
 import { openNewWorldDialog } from './ui/newWorldDialog';
 import { createPlanetPanel } from './ui/planetPanel';
@@ -44,6 +45,7 @@ const showFailure = (canvas: HTMLCanvasElement, reason: string): void => {
 
 const canvas = requireElement('#globe', HTMLCanvasElement);
 const panel = requireElement('#panel', HTMLElement);
+const viewport = requireElement('.viewport', HTMLElement);
 
 document.documentElement.dataset.coreVersion = CORE_VERSION;
 
@@ -90,8 +92,8 @@ if (globe !== null) {
 			},
 		}),
 		globe,
-		createViewInput: (rotateButton) =>
-			attachViewInput(canvas, globe, rotateButton),
+		createViewInput: (rotateButton, onCameraMove) =>
+			attachViewInput(canvas, globe, rotateButton, onCameraMove),
 		createSculpt: (world, options) =>
 			createSculptController(globe, world, { canvas, ...options }),
 		createWorldPanel: (options) => createWorldPanel(panel, options),
@@ -131,6 +133,13 @@ if (globe !== null) {
 				clearTimer,
 				reportError: logError,
 				createControls: (controls) => createLayerControls(panel, controls),
+			}),
+		createCursorReadout: (options) =>
+			createCursorReadout({
+				...options,
+				canvas,
+				globe,
+				show: createReadoutStrip(viewport).show,
 			}),
 		openNewWorldDialog,
 		loadEarth: loadEarthData,

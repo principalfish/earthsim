@@ -100,12 +100,15 @@ export const wheelPixels = (
  * @param globe - The globe to control.
  * @param rotateButton - The button whose drag turns the globe at first; the
  * main button by default.
+ * @param onCameraMove - Called after each turn and zoom, so that what
+ * follows a still pointer can look again; optional.
  * @returns The controls, to change the button or remove them again.
  */
 export const attachViewInput = (
 	canvas: HTMLCanvasElement,
 	globe: Globe,
 	rotateButton: RotateButton = MAIN_BUTTON,
+	onCameraMove?: () => void,
 ): ViewInput => {
 	const controller = new AbortController();
 	const { signal } = controller;
@@ -161,6 +164,7 @@ export const attachViewInput = (
 			globe.rotateBy(event.clientX - lastX, event.clientY - lastY);
 			lastX = event.clientX;
 			lastY = event.clientY;
+			onCameraMove?.();
 		},
 		{ signal },
 	);
@@ -173,6 +177,7 @@ export const attachViewInput = (
 			// touchpad would zoom the whole page instead.
 			event.preventDefault();
 			globe.zoomBy(wheelPixels(event, canvas.clientHeight));
+			onCameraMove?.();
 		},
 		{ signal, passive: false },
 	);

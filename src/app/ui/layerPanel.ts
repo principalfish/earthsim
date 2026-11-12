@@ -134,6 +134,29 @@ export type LayerPanelOptions = Pick<
 	readonly reportError: (error: unknown) => void;
 };
 
+/** What the globe shows of the temperature, as the layer panel gave it. */
+export type ShownTemperature = {
+	/**
+	 * The field the globe was last given: one value per cell, in cell order.
+	 * It belongs to the panel and must not be changed.
+	 */
+	readonly field: Float32Array;
+	/** What of the year the field is. */
+	readonly view: TemperatureView;
+	/**
+	 * The month on screen when the field was given, from January at 0; what
+	 * the field is for the Month view.
+	 */
+	readonly month: number;
+	/**
+	 * Whether the field is the store's current result as chosen: false while
+	 * the result is out of date, being calculated or no longer calculable,
+	 * and while the globe keeps an earlier field than the one chosen, so
+	 * whenever the legend marks what it shows as not current.
+	 */
+	readonly current: boolean;
+};
+
 /** The layer panel, as the page tells it of a new world. */
 export type LayerPanel = {
 	/**
@@ -141,12 +164,21 @@ export type LayerPanel = {
 	 * new world does. The layer and the temperature view are kept.
 	 */
 	resetMonth(): void;
+	/**
+	 * What the globe shows of the temperature: exactly what it was last
+	 * given, as of the panel's latest update, which follows every change of
+	 * the view settings and of the store. Null while it shows the height
+	 * colours, as in Terrain view and before there is a result.
+	 */
+	shown(): ShownTemperature | null;
 };
 
 /** What the globe is given to show of the temperature, and how. */
 type Shown = {
 	readonly field: Float32Array;
 	readonly source: LegendSource;
+	readonly view: TemperatureView;
+	readonly month: number;
 };
 
 /**
@@ -236,6 +268,8 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	let derived: Derived | null = null;
 	/** What the globe was last given to show, or null for the heights. */
 	let shown: Shown | null = null;
+	/** What {@link LayerPanel.shown} gives, as of the latest update. */
+	let shownTemperature: ShownTemperature | null = null;
 
 	const yearScale = (from: Derived): FittedScale => {
 		const { months } = from.result;
@@ -265,6 +299,8 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		): Shown => ({
 			field,
 			source: { range, ramp, caption, beyond, tickStep },
+			view: temperatureView,
+			month: playback.month,
 		});
 		switch (temperatureView) {
 			case 'month':
@@ -313,13 +349,19 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			// it shows, and so `shown` and the scale drawn from it, as they
 			// were. The globe shows the store's result as chosen when the
 			// field it has is the one chosen.
+			const showsResult = shown !== null && shown.field === field;
+			shownTemperature =
+				shown === null
+					? null
+					: {
+							field: shown.field,
+							view: shown.view,
+							month: shown.month,
+							current: showsResult && store.temperature.status === 'current',
+						};
 			controls.showLegend(
 				layer === 'temperature'
-					? legendContent(
-							store.temperature,
-							shown?.source ?? null,
-							shown !== null && shown.field === field,
-						)
+					? legendContent(store.temperature, shown?.source ?? null, showsResult)
 					: null,
 			);
 		}
@@ -411,6 +453,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			announce();
 			update();
 		},
+		shown: () => shownTemperature,
 	};
 };
 

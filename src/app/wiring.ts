@@ -27,8 +27,9 @@ import {
 } from './sculpt';
 import { applyStartup, decideStartup, type StartupRead } from './startup';
 import type { WorldStore } from './storage';
+import type { CursorReadout } from './ui/cursorReadout';
 import { createDateLine } from './ui/dateLine';
-import type { LayerPanel } from './ui/layerPanel';
+import type { LayerPanel, ShownTemperature } from './ui/layerPanel';
 import {
 	FIRST_NEW_WORLD_VALUES,
 	type NewWorldDialogOptions,
@@ -94,6 +95,12 @@ export type PageLayerOptions = {
 	readonly onView: (view: PageView) => void;
 };
 
+/** What the cursor readout reads of the page. */
+export type PageReadoutOptions = PageStatisticsOptions & {
+	/** What the globe shows of the temperature, at the time it is asked. */
+	readonly shownTemperature: () => ShownTemperature | null;
+};
+
 /** The parts of a page, for {@link startPage} to join. */
 export type PageParts = {
 	/** The world being edited, on the world the page opens on. */
@@ -104,9 +111,11 @@ export type PageParts = {
 	 * Attaches the mouse's control of the view.
 	 *
 	 * @param rotateButton - The button whose drag turns the globe at first.
+	 * @param onCameraMove - To be called after each turn and zoom it makes.
 	 */
 	readonly createViewInput: (
 		rotateButton: RotateButton,
+		onCameraMove: () => void,
 	) => Pick<ViewInput, 'setRotateButton'>;
 	/**
 	 * Attaches the sculpting tools to the globe.
@@ -157,7 +166,14 @@ export type PageParts = {
 	 */
 	readonly createLayerPanel: (
 		options: PageLayerOptions,
-	) => Pick<LayerPanel, 'resetMonth'>;
+	) => Pick<LayerPanel, 'resetMonth' | 'shown'>;
+	/**
+	 * Lays the cursor readout over the globe, hidden until the pointer is
+	 * over it, and has it follow the pointer.
+	 */
+	readonly createCursorReadout: (
+		options: PageReadoutOptions,
+	) => Pick<CursorReadout, 'invalidate' | 'clear'>;
 	/** Opens the dialog that starts a new world. */
 	readonly openNewWorldDialog: (options: NewWorldDialogOptions) => void;
 	/** Gives the Earth's elevation data, for a world that starts as Earth. */
@@ -200,6 +216,15 @@ export type PageParts = {
  * world controls are made, and follows the world's age and every change of
  * the view settings.
  *
+ * The cursor readout over the globe is made after the statistics, and reads
+ * what the globe shows of the temperature from the layer panel. Besides
+ * following the pointer, it looks again at what lies under a pointer held
+ * still after each turn and zoom of the camera, each change of the terrain
+ * or the sea level, each new world, each change of the view settings and
+ * each change of the temperature store. Opening the New world dialog hides
+ * it until the next pointer event on the canvas: a move, a press or a
+ * release.
+ *
  * A world that replaces the one being edited reaches, in this order: the
  * sculpt controller, which ends a stroke still under way on the old world
  * and then has the history forget that world; the globe; the sea-level
@@ -234,7 +259,9 @@ export type PageParts = {
 export const startPage = (parts: PageParts): Promise<void> => {
 	const { state, globe, logError } = parts;
 	globe.setWorld(state.world);
-	const viewInput = parts.createViewInput(rotateButtonFor(DEFAULT_TOOL));
+	const viewInput = parts.createViewInput(rotateButtonFor(DEFAULT_TOOL), () =>
+		readout.invalidate(),
+	);
 	// The history is cleared from the sculpt controller's own hook, so that
 	// replacing the world through `sculpt.setWorld` can never leave the
 	// strokes of the old one to be undone on the new.
@@ -245,8 +272,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	const openDialog = (values: NewWorldValues, notice?: string): void => {
 		// A stroke is driven by animation frames, which a modal dialog
 		// does not stop, so one left under way would keep sculpting
-		// behind the dialog.
+		// behind the dialog. The readout goes too: the canvas no longer
+		// hears the pointer, so it would not hear it leave.
 		sculpt.endStroke();
+		readout.clear();
 		parts.openNewWorldDialog({
 			values,
 			createWorld: (choice) =>
@@ -320,6 +349,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			statistics.refresh();
 			temperature.refresh();
 			autosave.markChanged();
+			readout.invalidate();
 		},
 		onHistoryChange: tools.setHistoryState,
 	});
@@ -348,6 +378,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			statistics.refresh();
 			temperature.refresh();
 			autosave.markChanged();
+			readout.invalidate();
 		},
 		onGridVisible: globe.setGridVisible,
 	});
@@ -366,13 +397,24 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	const layerPanel = parts.createLayerPanel({
 		store: layers,
 		temperature,
-		onView: date.setView,
+		onView: (next) => {
+			date.setView(next);
+			readout.invalidate();
+		},
 	});
 	const statistics = parts.createStatistics({
 		currentWorld: () => state.world,
 		isStrokeActive: sculpt.isStrokeActive,
 	});
 	statistics.refresh();
+	const readout = parts.createCursorReadout({
+		currentWorld: () => state.world,
+		isStrokeActive: sculpt.isStrokeActive,
+		shownTemperature: layerPanel.shown,
+	});
+	// Told after the layer panel, which brings what the globe shows up to
+	// date first.
+	layers.addListener(() => readout.invalidate());
 
 	// What a new world reaches, in this order. The sculpt controller goes
 	// first: it ends a stroke still under way while the globe and the
@@ -399,6 +441,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// the new world's age with that month.
 	state.addListener(layerPanel.resetMonth);
 	state.addListener((world) => date.setYears(world.ageYears));
+	state.addListener(() => readout.invalidate());
 	// What the panel said of an earlier import or export is over with.
 	state.addListener(() => worldPanel.setMessage(null));
 	// The autosave takes no note of this until it is started, which is
