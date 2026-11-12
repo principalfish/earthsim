@@ -55,6 +55,7 @@
 - The planet panel's "results are rough" note takes greenhouse strength into account as well as sunlight received ("Sunlight and greenhouse"), falling back to sunlight alone only if the builder's measurements show no single measure works, in which case the user is told. Planet changes stay out of the undo history; the reset-to-Earth button is the way back ("No, reset button only"). (2026-11-12)
 - The side panel's sections become expandable, as a new last piece of this issue (14): "the right bar sections need to be expandable - start with them all collapse i think - except maybe new world . put as the last piece of this issue". On a first visit only World is open. Which sections are open is remembered in the browser ("Yes, remember"). The temperature legend moves to the main window, bottom right of the globe, when Temperature is selected (the user's own suggestion, chosen over the planner's three options); the planner reads this as always there while Temperature is showing, whatever the Layers section's state. The piece has a manual review ("Yes"). (2026-11-12)
 - The side panel's sections run in the order World, Layers, View, Planet, Tools, Statistics ("also i think we want to go world layers view planet tools stats"), done in piece 14. (2026-11-12)
+- The value under the cursor is shown in a strip over the globe at the bottom left ("Over the globe, bottom left"), not in the side panel, with temperature in whole degrees ("Whole degrees"). (2026-11-12)
 
 ## Open
 
