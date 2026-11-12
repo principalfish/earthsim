@@ -8,7 +8,9 @@ _Updated 2026-11-12, with piece 8 built and waiting for its manual review._
 - Piece 7 was committed on 2026-11-12 after the user's second manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 8 and starts it only on the user's go-ahead.
 - Pieces 8 to 13 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user
+## Pending with the user (put to them 2026-11-12)
+
+**Piece 8's review request:** built, uncommitted (HEAD `fd8e21f`, 13 files). The user repeats their freeze sequence on their own dev server (http://localhost:5176/; reload so the worker reloads): Earth at 64, Temperature, sculpt a tall mountain, sea level to -6,000 m (the world freezes, as the model says it should), back to 0 m (the legend and colours return to what they were), one more stroke (a quick one-year re-solve). Relay approval only when their words say they tried it. Told to them: every sea-level change is now a fresh solve (about 25 to 29 s at 256 until piece 9); a new refusal of worlds with sea level outside ±12,000 m; the test suite is about 8 s slower. After the commit: brief piece 9 and confirm its proposed manual review.
 
 Nothing. The user confirmed the drift limit with the corrected figures on 2026-11-12 ("Keep 0.25 K"; about 83 seconds of default brushing on land between fresh solves). Piece 8 is built and uncommitted; the builder finishes its fixes and review checks, then sends the review request. Lead the review briefing with the manual review (sculpt a mountain, sea level down by thousands of metres and back to 0 m, temperatures return), and relay approval only when the user's words say they tried it.
 
