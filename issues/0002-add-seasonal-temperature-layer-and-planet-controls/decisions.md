@@ -60,6 +60,8 @@
 - The Difference view's scale is fixed at ±20 °C ("Fixed at ±20 °C"), so later steps visibly fade the map as the model improves. (2026-11-12)
 - No solver constants are tuned in the Earth comparison piece ("No tuning now"); the committed baseline records the model as it is (annual RMS 3.93 °C at 64), and the user's look at the difference map decides any later tuning. (2026-11-12)
 - The committed Earth error baseline (annual mean -0.15 K, RMS 3.93 K at 64; months' RMS 3.62 to 6.49) is accepted as the starting point for later steps: "this is good as the ocean currents will hugely change the temperature". (2026-11-12)
+- With Sunlight on, Terrain view gets the day and night sides, and Temperature view keeps its colours undimmed with the day/night edge drawn as a thin line ("Colours undimmed, edge as a line"), because the temperature ramp runs from dark to light and a darkened night would read as colder. The Month slider and Play also show in Terrain view while Sunlight is on ("Yes, show them"). (2026-11-12)
+- The sun stands off to one side, about 60° west of the opening view, not over longitude 0 ("Off to one side"), so the day/night edge is in view on opening. This replaces the earlier assumption of noon over the prime meridian. (2026-11-12)
 
 ## Open
 
