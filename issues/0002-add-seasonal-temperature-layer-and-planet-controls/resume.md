@@ -8,7 +8,9 @@ _Updated 2026-11-12, with piece 7 committed and piece 8 waiting for its briefing
 - Piece 7 was committed on 2026-11-12 after the user's second manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 8 and starts it only on the user's go-ahead.
 - Pieces 8 to 13 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user (put to them 2026-11-12)
+## Pending with the user
+
+Nothing. The user confirmed the drift limit with the corrected figures on 2026-11-12 ("Keep 0.25 K"; about 83 seconds of default brushing on land between fresh solves). Piece 8 is built and uncommitted; the builder finishes its fixes and review checks, then sends the review request. Lead the review briefing with the manual review (sculpt a mountain, sea level down by thousands of metres and back to 0 m, temperatures return), and relay approval only when the user's words say they tried it.
 
 **Confirm or change the drift limit.** The user chose "0.25 K" on the builder's figure of "about 25 ordinary land strokes", which was wrong: it counted a 1,000 km patch raised 1,000 m, not a brush stroke. Measured with the page's default brush (500 km, 1,000 m/s) on land, drift is 0.003 K per second of brushing, so 0.25 K is about 83 seconds of brushing between fresh solves (about 80 one-second dabs, 28 three-second strokes, 17 five-second ones); 0.1 K is about 33 s and 1 K about 330 s. Bigger brushes reach it far sooner (1,000 km: about 20 s; the largest and strongest: every stroke). Average stroke at 64 stays 0.26 to 0.29 s at 0.25 K, and 0.27 to 0.34 s at 0.1 K. The planner put the corrected figures to the user and asked whether to keep 0.25 K. The limit stays 0.25 K unless they say otherwise; piece 8's fixes carry on.
 
