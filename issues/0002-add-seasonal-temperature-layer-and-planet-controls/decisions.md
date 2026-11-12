@@ -59,6 +59,7 @@
 - The Earth comparison (Simulated, Observed, Difference) is offered only on an untouched Earth ("Only an untouched Earth"), chosen over the recommended "any world that started as Earth, with a note": the choice goes after the first stroke, sea-level change or planet change and returns when the world matches the measured Earth again. This refines the earlier assumption that it is offered whenever the world started as the Earth preset. (2026-11-12)
 - The Difference view's scale is fixed at ±20 °C ("Fixed at ±20 °C"), so later steps visibly fade the map as the model improves. (2026-11-12)
 - No solver constants are tuned in the Earth comparison piece ("No tuning now"); the committed baseline records the model as it is (annual RMS 3.93 °C at 64), and the user's look at the difference map decides any later tuning. (2026-11-12)
+- The committed Earth error baseline (annual mean -0.15 K, RMS 3.93 K at 64; months' RMS 3.62 to 6.49) is accepted as the starting point for later steps: "this is good as the ocean currents will hugely change the temperature". (2026-11-12)
 
 ## Open
 
