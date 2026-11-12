@@ -8,13 +8,12 @@ _Updated 2026-11-12, with piece 7 built and waiting for its manual review._
 - Piece 6 was committed on 2026-11-12 after the user's manual review ("Tried it, ramp A"). Piece 7 was started on the user's "Start it" and is built, uncommitted in the builder's worktree (HEAD still `533ef95`); checks pass and the analysis loop is clean. The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has sent its review request and commits only on the user's approval relayed with their words.
 - Pieces 7 to 11 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user
+## Pending with the user (put to them 2026-11-12)
 
-Nothing. The user started piece 7 on 2026-11-12 ("Start it") with: seasonal range "Its own ramp"; date wording "Follow the view"; date placement "In the panel". The builder stops with a review request; give the review briefing leading with the manual review, and relay approval only when the user's words say they tried it.
+1. **Piece 7's review request:** built, uncommitted (HEAD `533ef95`, 20 files). The user tries it on their own dev server (http://localhost:5176/, served from the builder's worktree): the date line, the Show choice, the month slider, Play, each summary, Terrain and back, a sculpt on another month, a new world resetting to July, and optionally a fast drag at 256. Relay approval only when their words say they tried it. Things told to them for their eye: the panel is taller than a 900 px window in Temperature view (Statistics scrolls); the seasonal range caption wraps to two lines; the Play button keeps the label "Play" and shows as pressed; ages round down.
+2. **The speed-up question, still open:** add the speed-ups (three small solver fixes, then solving 256 worlds on the 128 grid; about 5.5 times at 256 together, 0.07 K RMS; `investigations/2026-11-12-temperature-solver-speed-up-assessment.md`) to this issue as a new piece before the planet panel, or keep "Decide after piece 8". If added, the piece needs planning first: where the resumable state lives for a 256 world, a cheap stand-in for the warm-start fallback test, and whether 128 worlds also solve one level coarser.
 
-The speed-up assessment is done and filed as `investigations/2026-11-12-temperature-solver-speed-up-assessment.md`. Its findings were fed back to the user on 2026-11-12 with a question still open: add the speed-ups (three small solver fixes, then solving 256 worlds on the 128 grid; about 5.5 times at 256 together, 0.07 K RMS) to this issue as a new piece before the planet panel, or keep "Decide after piece 8". If added, the piece needs planning first: where the resumable state lives for a 256 world, a cheap stand-in for the warm-start fallback test, and whether 128 worlds also solve one level coarser.
-
-Still to raise later: after piece 8, solving 256 worlds on the 128 grid ("Decide after piece 8"); at piece 8, the trust band for the sunlight note (builder suggests 0.85 to 1.25 times Earth's sunlight). Unrelated follow-up the builder noticed: in Terrain view a world exactly at sea level shows speckled land and sea colours (predates this issue; the user was told, nothing decided).
+Still to raise later: at piece 8, the trust band for the sunlight note (builder suggests 0.85 to 1.25 times Earth's sunlight). Unrelated follow-up the builder noticed: in Terrain view a world exactly at sea level shows speckled land and sea colours (predates this issue; the user was told, nothing decided).
 
 ## Figures
 
