@@ -8,14 +8,9 @@ _Updated 2026-11-12, with piece 6 committed and piece 7 waiting for the user's g
 - Piece 6 was committed on 2026-11-12 after the user's manual review ("Tried it, ramp A"), with ramp B and the Ramp A | B switch removed first. The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 7 and starts it only on the user's go-ahead.
 - Pieces 7 to 11 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user (put to them 2026-11-12)
+## Pending with the user
 
-Piece 6 is committed and pushed (`533ef95`). The piece 7 briefing has been given. Waiting on:
-1. Seasonal range colours: its own single-hue ramp (recommended) or the temperature ramp.
-2. The date line when no month is on screen: "Year 0" alone in Terrain and "Year 0 · Annual average" style for summaries (recommended), or always keep the month.
-3. Where the date line goes: in the panel under the world line (recommended) or over the globe.
-4. The go-ahead to start piece 7.
-Defaults stated, not asked: playback at one month a second; the legend keeps its reserved status line (about 28 px when empty).
+Nothing. The user started piece 7 on 2026-11-12 ("Start it") with: seasonal range "Its own ramp"; date wording "Follow the view"; date placement "In the panel". The builder stops with a review request; give the review briefing leading with the manual review, and relay approval only when the user's words say they tried it.
 
 An independent subagent of the planner chat is still assessing solver speed-ups (see Notes); feed its findings back to the user when it reports.
 

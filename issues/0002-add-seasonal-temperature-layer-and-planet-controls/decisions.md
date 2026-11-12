@@ -39,6 +39,8 @@
 - A solve in progress shows on the legend as a text line with a thin bar, such as "Calculating · year 3, about 2 to go", falling back to the year alone when the solver has no estimate ("Text line and thin bar"). (2026-11-12)
 - The temperature colour ramp is chosen by the user at piece 6's manual review from two candidates switchable on the globe: dark blue through red to pale yellow, and a weather-map style blue, white, red ("Compare two on the globe"). The loser and the switch are removed before the commit. (2026-11-12)
 - The temperature colour ramp is A, dark blue through red to pale yellow, chosen by the user after trying both on the globe at piece 6's manual review ("Tried it, ramp A"). The blue, white, red candidate and the switch are removed. (2026-11-12)
+- The Seasonal range view has its own ramp, a single hue from pale (little change) to dark (large swing), on its own scale from zero ("Its own ramp"). (2026-11-12)
+- The date line follows the view: "Year 0" alone in Terrain view, "Year 0 · Annual average" style on a summary, "Year 0 · July" on a month ("Follow the view"). It sits in the side panel under the world's line ("In the panel"). (2026-11-12)
 
 ## Open
 
