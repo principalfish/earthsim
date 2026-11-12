@@ -47,6 +47,7 @@
 - Lowering the sea level cools the planet, because land height is measured from the sea (-500 m gives 12.7 °C, -3,000 m gives -5 °C against 14.5 °C); this stays as it is ("Keep it"). (2026-11-12)
 - The Seasonal range view keeps its purple ramp and linear scale, with the colour stops moved so colour changes fastest at the low end, and ticks every 5 K ("Reshape ramp, finer ticks"). (2026-11-12)
 - The temperature colour scale is fitted to the middle 99% of the world's surface over the year (0.5 to 99.5% of area-months), not to the single coldest and hottest cells; values beyond take the end colours and the legend's ends say "and below" and "and above" ("Yes, fit the middle 99%"). This refines "Fitted to each world". (2026-11-12)
+- The freeze fix also gets a drift limit for terrain edits: a re-solve starts fresh once the terrain has drifted past a limit from the world of the last fresh solve, so a stale climate can survive at most the limit's worth of sculpting and the plateau-and-undo case is fixed too ("Yes, add the limit"). The limit is measured during piece 8; the builder suggested about 0.25 K of mean cooling change, roughly every 25th ordinary stroke. Piece 8 keeps a manual review, the user's own freeze sequence ("Keep it"). (2026-11-12)
 
 ## Open
 

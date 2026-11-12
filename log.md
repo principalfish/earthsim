@@ -35,3 +35,4 @@
 - 2026-11-12 10:31 · add-seasonal-temperature-layer-and-planet-controls (0002) · plan changed to 13 pieces: new 8 (freeze fix) and 9 (speed-ups); piece 7 changes decided
 - 2026-11-12 13:08 · add-seasonal-temperature-layer-and-planet-controls (0002) · piece 7 approved by the user after the second manual review
 - 2026-11-12 13:10 · add-seasonal-temperature-layer-and-planet-controls (0002) · piece 7 committed fd8e21f; builder stopped before piece 8
+- 2026-11-12 13:12 · add-seasonal-temperature-layer-and-planet-controls (0002) · piece 8 started on the user's go-ahead, with the drift limit

@@ -8,13 +8,9 @@ _Updated 2026-11-12, with piece 7 committed and piece 8 waiting for its briefing
 - Piece 7 was committed on 2026-11-12 after the user's second manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 8 and starts it only on the user's go-ahead.
 - Pieces 8 to 13 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user (put to them 2026-11-12)
+## Pending with the user
 
-Piece 7 is committed and pushed (`fd8e21f`). The piece 8 briefing has been given. Waiting on:
-1. Plain "Fresh on sea or planet change" (already chosen) or the builder's "B+" refinement: also start fresh once terrain edits have drifted past a limit from the last fresh solve (about every 25th ordinary stroke at a 0.25 K limit, to be measured; fixes the plateau-and-undo case).
-2. Whether to keep piece 8's proposed manual review (the user's freeze sequence).
-3. The go-ahead to start piece 8.
-Stated, not asked: the record of sea level and planet sits on the result beside the months and state; a start with no record is refused; the stepwise test runs in 2,000 m steps in the suite and 500 m steps in the timing script; sea-level drags at 256 are slower (about 22 s against 15 s) until piece 9.
+Nothing. The user started piece 8 on 2026-11-12 ("Start it") with "Yes, add the limit" (the drift limit) and manual review "Keep it". The builder stops with a review request before committing; lead the review briefing with the manual review (sculpt a mountain, sea level down by thousands of metres and back to 0 m, temperatures return), report the measured limit, and relay approval only when the user's words say they tried it. The builder stops earlier if no limit between about 0.1 and 1 K works.
 
 After piece 8: brief piece 9 (solver speed-ups: "All four", "Yes, 128 too"; confirm its proposed manual review). Then the planet panel (10), cursor readout (11), Earth comparison (12), the sun (13).
 
