@@ -14,31 +14,33 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 
 ## Plan
 
-_2026-11-12 · 9 of 13 pieces done · now: piece 10 in progress_
+_2026-11-12 · 9 of 14 pieces done · now: piece 10 in progress_
 
-- [x] **1/13 Planet settings and date on the world** · `8390675`
+- [x] **1/14 Planet settings and date on the world** · `8390675`
   Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
-- [x] **2/13 Sunlight by latitude and season** · `0c19852`
+- [x] **2/14 Sunlight by latitude and season** · `0c19852`
   Exact daily and monthly sunlight for any tilt from 0 to 90 degrees.
-- [x] **3/13 Observed Earth temperature data** · `4a1e290`
+- [x] **3/14 Observed Earth temperature data** · `4a1e290`
   NOAA's 20th Century Reanalysis v3 monthly climatology, processed into a small committed file and regridded to the world's cells.
-- [x] **4/13 Temperature solver, timing run and first error figures** · `1445e44`
+- [x] **4/14 Temperature solver, timing run and first error figures** · `1445e44`
   The seasonal energy-balance solver, a table of how long it takes at each resolution, and how far the simulated Earth is from the observed one.
-- [x] **5/13 Temperature worker and recalculation** · `ff500c7`
+- [x] **5/14 Temperature worker and recalculation** · `ff500c7`
   Temperature calculated in its own Web Worker and recalculated automatically after edits.
-- [x] **6/13 Temperature layer on the globe** · `533ef95`
+- [x] **6/14 Temperature layer on the globe** · `533ef95`
   The globe coloured by temperature with relief and coastlines kept, a Terrain or Temperature picker, and a legend.
-- [x] **7/13 Month slider, annual summaries and date** · `fd8e21f`
+- [x] **7/14 Month slider, annual summaries and date** · `fd8e21f`
   Step or play through the twelve months, view annual summaries, and see the world's date. After its manual review: a seasonal-range ramp that shows small ranges, and a temperature scale fitted to the middle 99% of the surface.
-- [x] **8/13 Re-solves that depend only on the world** · `63364cf` · added 2026-11-12: the manual review found a frozen climate carried over after a sea-level change
+- [x] **8/14 Re-solves that depend only on the world** · `63364cf` · added 2026-11-12: the manual review found a frozen climate carried over after a sea-level change
   A re-solve after a sea-level or planet change starts fresh, so the result no longer depends on the order of edits.
-- [x] **9/13 Solver speed-ups** · `140a260` · added 2026-11-12: the user asked for the measured speed-ups to be built
+- [x] **9/14 Solver speed-ups** · `140a260` · added 2026-11-12: the user asked for the measured speed-ups to be built
   Worlds above 64 solve one grid coarser with height cooling at full resolution, plus smaller solver fixes; about five times faster at 256.
-- [ ] **10/13 Planet panel** (was 8) · in progress
+- [ ] **10/14 Planet panel** (was 8) · in progress
   Sliders for tilt, star brightness, star mass, orbit and greenhouse strength, with sunlight received and year length shown.
-- [ ] **11/13 Value under the cursor** (was 9) · not started
+- [ ] **11/14 Value under the cursor** (was 9) · not started
   A readout of position, elevation and temperature at the point under the pointer.
-- [ ] **12/13 Earth comparison view and error baseline** (was 10) · not started
+- [ ] **12/14 Earth comparison view and error baseline** (was 10) · not started
   On the Earth preset: simulated, observed or difference, with error figures and a committed baseline.
-- [ ] **13/13 The sun in the scene** (was 11) · not started · added 2026-11-11: the user asked for the sun to be drawn
+- [ ] **13/14 The sun in the scene** (was 11) · not started · added 2026-11-11: the user asked for the sun to be drawn
   The star drawn in the scene, following the star settings and the months, with a Sunlight toggle that lights the globe from it.
+- [ ] **14/14 Collapsible panel sections and the legend over the globe** · not started · added 2026-11-12: the user asked for the side panel's sections to be expandable
+  Every side-panel section opens and closes, with only World open on a first visit and the state remembered; the temperature legend moves to the bottom right of the globe.
