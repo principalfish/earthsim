@@ -1,10 +1,11 @@
 # Resume: add-seasonal-temperature-layer-and-planet-controls
 
-_Updated 2026-11-12, with piece 10 built and waiting for its manual review._
+_Updated 2026-11-12, with piece 10 committed and piece 11 waiting for its briefing and the user's go-ahead._
 
 ## Where it stands
 
-- Pieces 1 to 9 of 13 are committed and pushed: `8390675`, `0c19852`, `4a1e290`, `1445e44`, `ff500c7`, `533ef95`, `fd8e21f`, `63364cf`, `140a260`. Branch `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa`, draft PR #4, GitHub issue #3.
+- Pieces 1 to 10 of 14 are committed and pushed: `8390675`, `0c19852`, `4a1e290`, `1445e44`, `ff500c7`, `533ef95`, `fd8e21f`, `63364cf`, `140a260`, `90889e2`. Branch `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa`, draft PR #4, GitHub issue #3.
+- Piece 10 was committed on 2026-11-12 after the user's manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 11 and starts it only on the user's go-ahead.
 - Piece 9 was committed on 2026-11-12 after the user's manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 10 and starts it only on the user's go-ahead.
 - Piece 8 was committed on 2026-11-12 after the user's manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 9 and starts it only on the user's go-ahead.
 - Piece 7 was committed on 2026-11-12 after the user's second manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 8 and starts it only on the user's go-ahead.
