@@ -8,9 +8,16 @@ _Updated 2026-11-12, with piece 6 committed and piece 7 waiting for the user's g
 - Piece 6 was committed on 2026-11-12 after the user's manual review ("Tried it, ramp A"), with ramp B and the Ramp A | B switch removed first. The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 7 and starts it only on the user's go-ahead.
 - Pieces 7 to 11 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user
+## Pending with the user (put to them 2026-11-12)
 
-The go-ahead for piece 7 (month slider, annual summaries and date), after its briefing. Choices the builder expects it to need: where the date line sits and its wording ("Year 0 · July"); the playback speed (the builder suggests one month a second); the legend's caption for each view; whether the legend's status line keeps its reserved line while empty (it does now; collapsing it would move Statistics by about 28 px each time the line fills).
+Piece 6 is committed and pushed (`533ef95`). The piece 7 briefing has been given. Waiting on:
+1. Seasonal range colours: its own single-hue ramp (recommended) or the temperature ramp.
+2. The date line when no month is on screen: "Year 0" alone in Terrain and "Year 0 · Annual average" style for summaries (recommended), or always keep the month.
+3. Where the date line goes: in the panel under the world line (recommended) or over the globe.
+4. The go-ahead to start piece 7.
+Defaults stated, not asked: playback at one month a second; the legend keeps its reserved status line (about 28 px when empty).
+
+An independent subagent of the planner chat is still assessing solver speed-ups (see Notes); feed its findings back to the user when it reports.
 
 Still to raise later: after piece 8, solving 256 worlds on the 128 grid ("Decide after piece 8"); at piece 8, the trust band for the sunlight note (builder suggests 0.85 to 1.25 times Earth's sunlight). Unrelated follow-up the builder noticed: in Terrain view a world exactly at sea level shows speckled land and sea colours (predates this issue; the user was told, nothing decided).
 
