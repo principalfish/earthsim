@@ -43,4 +43,4 @@ _2026-11-12 · 9 of 14 pieces done · now: piece 10 in progress_
 - [ ] **13/14 The sun in the scene** (was 11) · not started · added 2026-11-11: the user asked for the sun to be drawn
   The star drawn in the scene, following the star settings and the months, with a Sunlight toggle that lights the globe from it.
 - [ ] **14/14 Collapsible panel sections and the legend over the globe** · not started · added 2026-11-12: the user asked for the side panel's sections to be expandable
-  Every side-panel section opens and closes, with only World open on a first visit and the state remembered; the temperature legend moves to the bottom right of the globe.
+  Every side-panel section opens and closes, with only World open on a first visit and the state remembered; the sections run World, Layers, View, Planet, Tools, Statistics; the temperature legend moves to the bottom right of the globe.
