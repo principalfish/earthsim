@@ -14,7 +14,7 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 
 ## Plan
 
-_2026-11-12 · 13 of 14 pieces done · now: waiting on the go-ahead for piece 14_
+_2026-11-12 · 13 of 14 pieces done · now: piece 14 in progress_
 
 - [x] **1/14 Planet settings and date on the world** · `8390675`
   Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
@@ -42,5 +42,5 @@ _2026-11-12 · 13 of 14 pieces done · now: waiting on the go-ahead for piece 14
   On the Earth preset: simulated, observed or difference, with error figures and a committed baseline.
 - [x] **13/14 The sun in the scene** (was 11) · `a698c5a` · added 2026-11-11: the user asked for the sun to be drawn
   The star drawn in the scene, following the star settings and the months, with a Sunlight toggle that lights the globe from it.
-- [ ] **14/14 Collapsible panel sections and the legend over the globe** · not started · added 2026-11-12: the user asked for the side panel's sections to be expandable
+- [ ] **14/14 Collapsible panel sections and the legend over the globe** · in progress · added 2026-11-12: the user asked for the side panel's sections to be expandable
   Every side-panel section opens and closes, with only World open on a first visit and the state remembered; the sections run World, Layers, View, Planet, Tools, Statistics; the temperature legend moves to the bottom right of the globe.
