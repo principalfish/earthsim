@@ -41,6 +41,8 @@
 - The temperature colour ramp is A, dark blue through red to pale yellow, chosen by the user after trying both on the globe at piece 6's manual review ("Tried it, ramp A"). The blue, white, red candidate and the switch are removed. (2026-11-12)
 - The Seasonal range view has its own ramp, a single hue from pale (little change) to dark (large swing), on its own scale from zero ("Its own ramp"). (2026-11-12)
 - The date line follows the view: "Year 0" alone in Terrain view, "Year 0 · Annual average" style on a summary, "Year 0 · July" on a month ("Follow the view"). It sits in the side panel under the world's line ("In the panel"). (2026-11-12)
+- Solver speed-ups are added to this issue as a new piece right after piece 7, before the planet panel ("let us also implement the speed up ideas"), drawing on the assessment in `investigations/2026-11-12-temperature-solver-speed-up-assessment.md`. This replaces "Decide after piece 8". Scope is all four ideas ("All four"): three small solver fixes that leave the answer unchanged; solving on a coarser grid; and the two follow-ons that were only estimated (a structured-stencil inner loop, a coarse first guess), which the builder measures and keeps only if they pay. (2026-11-12)
+- Every world above 64 is solved one grid coarser, 256 on the 128 grid and 128 on the 64 grid, with height cooling applied at the world's own resolution ("Yes, 128 too"; the planner recommended 256 only). This reverses, for the temperature solve, the earlier decision that climate uses the world's own grid; 64 worlds are unchanged. Measured cost: about 0.07 to 0.10 K RMS and about 1 to 1.4 K in the worst cell against the full-resolution solve. (2026-11-12)
 
 ## Open
 
