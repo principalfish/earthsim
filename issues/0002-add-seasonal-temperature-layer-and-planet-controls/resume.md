@@ -15,7 +15,13 @@ _Updated 2026-11-12, with all 14 pieces committed and the issue in review._
 - Piece 7 was committed on 2026-11-12 after the user's second manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 8 and starts it only on the user's go-ahead.
 - Pieces 8 to 13 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user
+## Pending with the user (put to them 2026-11-12)
+
+All 14 pieces are committed and pushed; the head is `d0f873a`, the state is `review`, draft PR #4 is open at that head. The all-pieces recap has been given. Waiting on the user to run `/review self add-seasonal-temperature-layer-and-planet-controls` in this chat (the builder keeps its worktree for the review's fixes, and has the whole-branch coverage figures: 97%, 66 of 3,182 changed lines not run, all with accepted reasons). Then `/publish`; merging is the user's.
+
+For the review, from the builder: look first at `src/app/ui/layerPanel.ts`, `src/core/temperature.ts` with `src/core/coarsen.ts`, `src/app/wiring.ts`, the shader text in `src/app/globe/material.ts` and `src/app/globe/sun.ts`, `src/app/layers.ts` and `src/app/refresh.ts`, the README end to end, and names that changed late. Never checked by hand or only in Edge: Firefox; screen readers; touch and high-density screens; blocked storage in a real browser; the production build since piece 9; importing a pre-issue world file in the page.
+
+Open follow-ups, nothing decided: a fixed-scale option (a frozen planet is drawn in much the same colours as a warm one); the Terrain speckle on a world wholly at sea level (predates this issue); the build's 500 kB chunk warning (predates this issue); whether to widen `coverage-changed.sh` to `scripts/`.
 
 Nothing. The user approved piece 14, the last piece, on 2026-11-12 after the manual review ("Tried it, approve"). The builder commits and pushes it, sets the state to review and sends the all-pieces-done note with the whole-branch coverage report. Then: tick piece 14, give the all-pieces recap (each piece and its commit, deviations and decisions along the way, known limits and follow-ups, what was never checked by hand), and suggest `/review self add-seasonal-temperature-layer-and-planet-controls` in this chat, then `/publish`. Merging is the user's.
 
