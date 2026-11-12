@@ -35,6 +35,9 @@
 - While a solve runs the page shows determinate progress, filling as the solver finishes each simulated year; the worker sends progress messages ("Years done"). The solver does not know its year count in advance, so the total shown is an estimate. (2026-11-12)
 - The builder's suggestion to solve 256 worlds on the 128 grid and apply height cooling at full resolution (about five times faster at 256 by its estimate, unverified; coastlines blurred to 75 km in the layer) is left out for now and put to the user again after piece 8, once the planet sliders exist ("Decide after piece 8"). Climate stays on the world's own grid until then. (2026-11-12)
 - Piece 4's deviations from the plan are accepted ("Accept all six"): outgoing heat as emissivity times sigma T^4 on a kelvin state where the plan said linear; the new `src/core/exchange.ts`; results that carry a resumable state; sea ice lowering ocean heat capacity and land having its own heat-spreading rate; "converged" leaving answers within about 0.2 K of the repeating year; one count assertion in `scripts/earth/cells.test.ts` in place of one per cell. (2026-11-12)
+- The page opens on the Terrain layer; nothing is calculated until Temperature is chosen ("Terrain"). (2026-11-12)
+- A solve in progress shows on the legend as a text line with a thin bar, such as "Calculating · year 3, about 2 to go", falling back to the year alone when the solver has no estimate ("Text line and thin bar"). (2026-11-12)
+- The temperature colour ramp is chosen by the user at piece 6's manual review from two candidates switchable on the globe: dark blue through red to pale yellow, and a weather-map style blue, white, red ("Compare two on the globe"). The loser and the switch are removed before the commit. (2026-11-12)
 
 ## Open
 

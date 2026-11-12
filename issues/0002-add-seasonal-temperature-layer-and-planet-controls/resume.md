@@ -5,17 +5,12 @@ _Updated 2026-11-12, after piece 5 was committed._
 ## Where it stands
 
 - Pieces 1 to 5 of 11 are committed and pushed: `8390675`, `0c19852`, `4a1e290`, `1445e44`, `ff500c7`. Branch `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa`, draft PR #4, GitHub issue #3.
-- The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`, on `claude-opus-5-5`) is stopped after piece 5 and starts piece 6 only on the user's word relayed from the planner chat.
+- The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`, on `claude-opus-5-5`) is building piece 6 and stops for its manual review before committing.
 - Pieces 6 to 11 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user (put to them 2026-11-12)
+## Pending with the user
 
-The piece 6 briefing has been given. Waiting on:
-1. Which layer the page opens on (Terrain recommended, so nothing is solved until Temperature is chosen).
-2. How progress is drawn (a legend line such as "Calculating · year 3, about 2 to go" with a thin bar, recommended).
-3. The colour ramp (recommended: build two candidates and compare them on the globe at the manual review).
-4. The go-ahead to start piece 6.
-Default stated, not asked: the layer shows July until the month slider exists (piece 7).
+Nothing. The user started piece 6 on 2026-11-12 ("Start it") with: opens on "Terrain"; progress "Text line and thin bar"; colour ramp "Compare two on the globe" (two candidates with a temporary switch; the user picks at the manual review; the loser and the switch go before the commit). The builder stops with a review request; give the review briefing leading with the manual review, ask which ramp, and relay approval only when the user's words say they tried it.
 
 Still to raise later: after piece 8, solving 256 worlds on the 128 grid ("Decide after piece 8"); at piece 8, the trust band for the sunlight note (builder suggests 0.85 to 1.25 times Earth's sunlight).
 

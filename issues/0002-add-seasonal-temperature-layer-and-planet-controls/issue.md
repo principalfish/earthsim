@@ -14,7 +14,7 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 
 ## Plan
 
-_2026-11-12 · 5 of 11 pieces done · now: waiting on the go-ahead for piece 6_
+_2026-11-12 · 5 of 11 pieces done · now: piece 6 in progress_
 
 - [x] **1/11 Planet settings and date on the world** · `8390675`
   Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
@@ -26,7 +26,7 @@ _2026-11-12 · 5 of 11 pieces done · now: waiting on the go-ahead for piece 6_
   The seasonal energy-balance solver, a table of how long it takes at each resolution, and how far the simulated Earth is from the observed one.
 - [x] **5/11 Temperature worker and recalculation** · `ff500c7`
   Temperature calculated in its own Web Worker and recalculated automatically after edits.
-- [ ] **6/11 Temperature layer on the globe** · not started
+- [ ] **6/11 Temperature layer on the globe** · in progress
   The globe coloured by temperature with relief and coastlines kept, a Terrain or Temperature picker, and a legend.
 - [ ] **7/11 Month slider, annual summaries and date** · not started
   Step or play through the twelve months, view annual summaries, and see the world's date.
