@@ -8,9 +8,11 @@ _Updated 2026-11-12, with piece 7 committed and piece 8 waiting for its briefing
 - Piece 7 was committed on 2026-11-12 after the user's second manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 8 and starts it only on the user's go-ahead.
 - Pieces 8 to 13 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user
+## Pending with the user (put to them 2026-11-12)
 
-Nothing. The user started piece 8 on 2026-11-12 ("Start it") with "Yes, add the limit" (the drift limit) and manual review "Keep it". The builder stops with a review request before committing; lead the review briefing with the manual review (sculpt a mountain, sea level down by thousands of metres and back to 0 m, temperatures return), report the measured limit, and relay approval only when the user's words say they tried it. The builder stops earlier if no limit between about 0.1 and 1 K works.
+**Piece 8, builder's question: the drift limit's value.** The builder's measurement (64 grid) does not single one out: away from a freezing tipping point warm and cold agree within 0.3 K at any drift up to 5.7 K; exactly at a tipping point no limit works, and the limit only sets how long a wrong climate lasts. Options put to the user: 0.25 K (builder's and planner's recommendation; about 25 land strokes, average stroke 0.28 s at 64), 0.1 K (10 strokes, 0.32 s), 1 K (100 strokes, 0.26 s), or always start fresh (0.96 s every stroke; removes the limit from the piece). The user asked first what a freezing tipping point is ("can you explain this further - what is the freezing tipping point exactly"); the planner explained and asked again. The implementation runs with 0.25 K meanwhile and the builder holds its review request for the answer. Relay the answer quoting the user's words.
+
+Known limit, told to the user and left alone: when a stroke tips a partly frozen world to wholly frozen, that one result can be far off (44 K in the builder's test) because the convergence test stops early; the next solve corrects it.
 
 After piece 8: brief piece 9 (solver speed-ups: "All four", "Yes, 128 too"; confirm its proposed manual review). Then the planet panel (10), cursor readout (11), Earth comparison (12), the sun (13).
 
