@@ -38,6 +38,7 @@
 - The page opens on the Terrain layer; nothing is calculated until Temperature is chosen ("Terrain"). (2026-11-12)
 - A solve in progress shows on the legend as a text line with a thin bar, such as "Calculating · year 3, about 2 to go", falling back to the year alone when the solver has no estimate ("Text line and thin bar"). (2026-11-12)
 - The temperature colour ramp is chosen by the user at piece 6's manual review from two candidates switchable on the globe: dark blue through red to pale yellow, and a weather-map style blue, white, red ("Compare two on the globe"). The loser and the switch are removed before the commit. (2026-11-12)
+- The temperature colour ramp is A, dark blue through red to pale yellow, chosen by the user after trying both on the globe at piece 6's manual review ("Tried it, ramp A"). The blue, white, red candidate and the switch are removed. (2026-11-12)
 
 ## Open
 

@@ -8,15 +8,11 @@ _Updated 2026-11-12, with piece 6 built and waiting for its manual review._
 - The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`, on `claude-opus-5-5`) has built piece 6 (uncommitted in its worktree, HEAD still `ff500c7`; checks pass and the analysis loop is clean) and has sent its review request. It commits only on the user's approval relayed with their words, after their ramp choice, when it removes the losing ramp and the Ramp A | B switch.
 - Pieces 6 to 11 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user (put to them 2026-11-12)
+## Pending with the user
 
-Piece 6's review request is with the user: built, uncommitted (HEAD `ff500c7`, 23 files). Waiting on, after they try it on their own dev server (http://localhost:5176/, served from the builder's worktree):
-1. The manual review (eight steps in the builder's request: Earth at 64 and 256, Temperature layer, seams, coastline, legend, Terrain round trip, sculpting, two workers and statistics staying responsive).
-2. The ramp: A (dark blue through red to pale yellow) or B (blue, white, red; white sits mid-range, about -8 °C on Earth, and the builder offers to pin it at 0 °C). If B wins, change the plan's Tests line for piece 6 (no "monotonic in lightness").
-3. Approval of the diff and the commit message. Relay approval only when their words say they tried it; then the builder removes the losing ramp and the A | B switch and commits.
-Also told to the user: the legend's 28 px gap when current; the first-year bar may not show; ramp A is mostly yellow to orange on a July Earth; a speckle in Terrain view on a world exactly at sea level, which predates this issue (not touched).
+Nothing. The user approved piece 6 on 2026-11-12 after the manual review ("Tried it, ramp A"). The builder removes ramp B and the switch, re-checks, commits, pushes, and stops with a look-ahead for piece 7. Then: tick piece 6, give the piece 7 briefing (manual review; defaults to raise: the date line's wording and placement, "Year 0 · July"), and ask before it starts.
 
-Still to raise later: after piece 8, solving 256 worlds on the 128 grid ("Decide after piece 8"); at piece 8, the trust band for the sunlight note (builder suggests 0.85 to 1.25 times Earth's sunlight).
+Still to raise later: after piece 8, solving 256 worlds on the 128 grid ("Decide after piece 8"); at piece 8, the trust band for the sunlight note (builder suggests 0.85 to 1.25 times Earth's sunlight). Unrelated follow-up the builder noticed: in Terrain view a world exactly at sea level shows speckled land and sea colours (predates this issue; the user was told, nothing decided).
 
 ## Figures
 
