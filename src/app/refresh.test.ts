@@ -647,6 +647,12 @@ const solved = (
 	result: TemperatureResult,
 ): LatestOutcome<TemperatureResult> => ({ superseded: false, result });
 
+/** The start a result makes: its state and its record, and nothing more. */
+const startOf = (result: TemperatureResult): TemperatureStart => ({
+	state: result.state,
+	solvedFor: result.solvedFor,
+});
+
 /** Moves the clock past the wait and lets what follows run. */
 const wait = async (harness: TemperatureHarness): Promise<void> => {
 	harness.timers.advance(WAIT_MS);
@@ -727,9 +733,7 @@ describe('createTemperatureScheduler switched on', () => {
 		await wait(harness);
 		await wait(harness);
 		expect(harness.asked).toHaveLength(2);
-		expect(harness.asked[1]?.start?.months).toBe(first.months);
-		expect(harness.asked[1]?.start?.state).toBe(first.state);
-		expect(harness.asked[1]?.start?.solvedFor).toBe(first.solvedFor);
+		expect(harness.asked[1]?.start).toEqual(startOf(first));
 	});
 
 	it('asks nothing when the result is current', async () => {
@@ -809,7 +813,7 @@ describe('createTemperatureScheduler switched off', () => {
 });
 
 describe('createTemperatureScheduler while showing', () => {
-	it('asks once after a run of changes, starting from the last result whole', async () => {
+	it('asks once after a run of changes, starting from the last result', async () => {
 		const first = temperatureOf(1);
 		const harness = await createAnsweredHarness(first);
 		harness.scheduler.refresh();
@@ -823,15 +827,24 @@ describe('createTemperatureScheduler while showing', () => {
 		harness.timers.advance(WAIT_MS / 2);
 		await settle();
 		expect(harness.asked).toHaveLength(2);
-		expect(harness.asked[1]?.start).toEqual({
-			months: first.months,
-			state: first.state,
-			solvedFor: first.solvedFor,
-		});
+		expect(harness.asked[1]?.start).toEqual(startOf(first));
 		expect(harness.store.temperature).toMatchObject({
 			status: 'calculating',
 			result: first,
 		});
+	});
+
+	it("hands on the last result's state and record without its months", async () => {
+		const first = temperatureOf(1);
+		const harness = await createAnsweredHarness(first);
+		harness.scheduler.refresh();
+		await wait(harness);
+		const start = harness.asked[1]?.start;
+		expect(start).toBeDefined();
+		expect(Object.keys(start ?? {}).sort()).toEqual(['solvedFor', 'state']);
+		expect(start).not.toHaveProperty('months');
+		expect(start?.state).toBe(first.state);
+		expect(start?.solvedFor).toBe(first.solvedFor);
 	});
 
 	it('holds a request during a stroke and makes it once after', async () => {
@@ -864,7 +877,7 @@ describe('createTemperatureScheduler while showing', () => {
 
 		await wait(harness);
 		expect(harness.asked).toHaveLength(2);
-		expect(harness.asked[1]?.start?.months).toBe(early.months);
+		expect(harness.asked[1]?.start).toEqual(startOf(early));
 	});
 
 	it('keeps only the newest result: an overtaken request changes nothing', async () => {

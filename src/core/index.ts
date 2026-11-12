@@ -2,6 +2,7 @@
 export const CORE_VERSION = '0.0.0';
 
 export * from './brush';
+export * from './coarsen';
 export * from './compare';
 export * from './earth';
 export * from './exchange';

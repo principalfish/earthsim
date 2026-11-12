@@ -28,11 +28,17 @@
  * {@link createExchangeSolver}); reflectivity and heat capacity are read at
  * that expected end. The year is repeated until it stops changing.
  *
+ * A world of more than 64 cells per face edge is worked out on the grid a
+ * step coarser (see {@link solveResolution}) and its sea-level temperatures
+ * carried back to the world's own grid, where each cell's air is cooled by
+ * its own height: see {@link solveTemperature}.
+ *
  * The constants are those of published simple energy-balance models, then
  * tuned against the observed Earth; they are tuning parameters, not
  * physical truth.
  */
 
+import { coarsenWorld, refineField } from './coarsen';
 import {
 	createExchangeSolver,
 	EXCHANGE_MAX_ITERATIONS,
@@ -44,6 +50,7 @@ import {
 	getGrid,
 	isSupportedResolution,
 	NEIGHBOUR_COUNT,
+	type Resolution,
 	SUPPORTED_RESOLUTIONS,
 } from './grid';
 import {
@@ -139,6 +146,14 @@ export type TemperatureModel = {
 	 * limit is set aside. Not negative; at 0 no state is carried on.
 	 */
 	readonly terrainDriftLimitK: number;
+	/**
+	 * The largest correction at the end of a year, in kelvin, below which the
+	 * first pass of the correction is kept as it is and the later passes are
+	 * not solved: they refine the slope of the outgoing heat over the shift,
+	 * which for a shift this small is the tangent already. Not negative; at
+	 * 0 every pass is solved.
+	 */
+	readonly correctionRefineK: number;
 };
 
 /**
@@ -203,6 +218,9 @@ export type TemperatureModel = {
  *   wholly frozen one can leave the carried solve stopped while the world
  *   is still freezing (44 K out in places on an Earth with its sea 5 km
  *   down), until the next solve finishes it.
+ * - `correctionRefineK`: chosen by measurement. On the Earth at 64 cells per
+ *   face edge, solving only the first pass of a correction under 1 K moves
+ *   no monthly value by more than 0.001 K.
  */
 export const TEMPERATURE_MODEL: TemperatureModel = Object.freeze({
 	diffusivity: 0.55,
@@ -222,6 +240,7 @@ export const TEMPERATURE_MODEL: TemperatureModel = Object.freeze({
 	solverToleranceK: 5e-3,
 	solverMaxIterations: EXCHANGE_MAX_ITERATIONS,
 	terrainDriftLimitK: 0.25,
+	correctionRefineK: 1,
 });
 
 /**
@@ -250,6 +269,11 @@ export type TemperatureConditions = {
  * carries on from them applies the world's own lapse rate and land, as
  * they are then. A state is carried on only for the sea level and planet
  * it was solved for: see {@link solveTemperature}.
+ *
+ * Its arrays hold one value per cell of the grid the world is solved on,
+ * {@link solveResolution} of the world's (or the world's own, for a solve
+ * with {@link SolveTemperatureOptions.fullResolution}): for a world of 128
+ * cells per face edge, the 64 grid's cells.
  */
 export type TemperatureState = {
 	/** Sea-level temperature at the turn of the year, kelvin, per cell. */
@@ -262,42 +286,31 @@ export type TemperatureState = {
 	 */
 	readonly stepSeconds: number;
 	/**
-	 * The rough guess of the world the state was solved for, kelvin, per
-	 * cell: the first guess two iterations in, from which a later solve
-	 * judges how far its own world has moved (see {@link STATE_FALLBACK_K}).
-	 */
-	readonly guessK: Float64Array;
-	/**
 	 * The lapse-rate cooling of every cell's air, in kelvin, 0 at sea, in
-	 * the world of the solve from nothing that this state descends from: a
-	 * solve from nothing records its own world's, and a solve that carries
-	 * on from a state passes that state's on unchanged. A later solve
-	 * measures how far its terrain has drifted from it (see
-	 * {@link TemperatureModel.terrainDriftLimitK}).
+	 * the world of the solve from nothing that this state descends from, on
+	 * the grid that world was solved on: a solve from nothing records its
+	 * own world's, and a solve that carries on from a state passes that
+	 * state's on unchanged. A later solve measures how far its terrain has
+	 * drifted from it (see {@link TemperatureModel.terrainDriftLimitK}).
 	 */
 	readonly referenceCoolingK: Float64Array;
 };
 
 /**
- * Where a solve may start from: a previous result, or the parts of one.
+ * Where a solve may start from: a previous result's end state and the sea
+ * level and planet it was solved for.
  *
  * @remarks
- * A {@link TemperatureResult} is one. With a `state`, the solve carries on
- * from it and `months` are not read. With only `months`, as when the state
- * was not kept, the state at the turn of the year is rebuilt from them,
- * which costs a year or so more to settle. Either is used only for the sea
- * level and planet in `solvedFor`; for any other the start is set aside. A
- * state is also set aside once its terrain has drifted to
- * {@link TemperatureModel.terrainDriftLimitK} or past it, or when its rough
- * guess lies too far from the world's (see {@link STATE_FALLBACK_K}). A
- * start set aside leaves the solve starting from nothing: see
- * {@link solveTemperature} for the rules and their order.
+ * A {@link TemperatureResult} is one. The state is used only for the sea
+ * level and planet in `solvedFor`; for any other the start is set aside.
+ * It is also set aside once its terrain has drifted to
+ * {@link TemperatureModel.terrainDriftLimitK} or past it. A start set aside
+ * leaves the solve starting from nothing: see {@link solveTemperature} for
+ * the rules and their order.
  */
 export type TemperatureStart = {
-	/** A previous result's twelve monthly fields, in degrees Celsius. */
-	readonly months?: MonthlyTemperature;
 	/** A previous result's end state. */
-	readonly state?: TemperatureState;
+	readonly state: TemperatureState;
 	/** The sea level and planet the previous result was solved for. */
 	readonly solvedFor: TemperatureConditions;
 };
@@ -323,6 +336,19 @@ export type SolveTemperatureOptions = {
 	readonly tolerance?: number;
 	/** The model's constants; defaults to {@link TEMPERATURE_MODEL}. */
 	readonly model?: TemperatureModel;
+	/**
+	 * Whether to solve on the world's own grid whatever its resolution,
+	 * rather than on {@link solveResolution} of it; defaults to false.
+	 *
+	 * @remarks
+	 * For the tests and the timing script, which measure how far the coarser
+	 * solve lies from the full one; it takes about four times as long at 128
+	 * cells per face edge and five times at 256. The page never asks for it,
+	 * and the worker takes nothing from a message but the world and a start,
+	 * so no message can. A result's state is on the grid it was solved on,
+	 * and is carried on only by a solve on the same grid.
+	 */
+	readonly fullResolution?: boolean;
 	/**
 	 * Called once as each year finishes, with how far the solve has come.
 	 *
@@ -371,13 +397,19 @@ export type TemperatureResult = {
 	/**
 	 * Twelve fields, January to December, of the mean near-surface air
 	 * temperature over each month, in degrees Celsius, one value per cell
-	 * in cell order: the month's mean sea-level temperature, cooled by the
-	 * lapse rate. That is the mean of the air temperature itself everywhere
-	 * except where the cooling is limited to half the sea-level temperature,
-	 * on the high ground of the coldest planets.
+	 * of the world's own grid in cell order: the month's mean sea-level
+	 * temperature, cooled by the lapse rate for the cell's own height. That
+	 * is the mean of the air temperature itself everywhere except where the
+	 * cooling is limited to half the sea-level temperature, on the high
+	 * ground of the coldest planets. Above 64 cells per face edge the
+	 * sea-level temperature is carried from the grid the world was solved on
+	 * by {@link refineField}.
 	 */
 	readonly months: Float32Array[];
-	/** The state the solve ended in, to carry on from. */
+	/**
+	 * The state the solve ended in, to carry on from, on the grid the world
+	 * was solved on.
+	 */
 	readonly state: TemperatureState;
 	/** The sea level and planet the result was solved for. */
 	readonly solvedFor: TemperatureConditions;
@@ -386,8 +418,7 @@ export type TemperatureResult = {
 	/**
 	 * Whether the last year changed by less than the tolerance, and every
 	 * step of that year, and its end's correction, were solved to their
-	 * accuracy. The first guess and the matching of January to a start's
-	 * months are not counted.
+	 * accuracy. The first guess is not counted.
 	 *
 	 * @remarks
 	 * The last year changed by less than the tolerance when no cell's
@@ -440,36 +471,6 @@ export const MAX_STEPS_PER_MONTH = 48;
 
 /** The most iterations the model may allow one solve. */
 export const MAX_SOLVER_ITERATIONS = 10_000;
-
-/**
- * How far a world may have moved from the one a starting state was solved
- * for, before the state is set aside and the solve starts from the first
- * guess, exactly as from nothing: the area-weighted mean difference, in
- * kelvin, between the two worlds' rough guesses (the first guess two
- * iterations in).
- *
- * @remarks
- * The rough guesses are compared rather than the state with the new
- * world's guess, because a seasonal or hot planet's own answer lies far
- * from its annual-mean guess, so that measure would set aside the state
- * even for the same world. Measured at 64 cells per face edge: a 500 m
- * patch moves the rough guess by under 0.01 K and a 3 km plateau by about
- * 1 K on any planet; a star 1.1 times as bright, 7 K; a moderately
- * different planet, 55 K; a jump between corners of the settings, 250 to
- * over 1,000 K, where the slow ocean takes longer to get there from the old
- * state than from the new first guess.
- *
- * It is looked at only for a state that passes the tests before it: one
- * recorded for the world's own sea level and planet, whose terrain has
- * drifted less than {@link TemperatureModel.terrainDriftLimitK} (see
- * {@link solveTemperature}). Those tests set aside any change of planet,
- * so this one is the last guard, for a start whose record does not
- * describe its state.
- */
-export const STATE_FALLBACK_K = 50;
-
-/** First-guess iterations in a rough guess. */
-const FALLBACK_GUESS_ITERATIONS = 2;
 
 const SECONDS_PER_DAY = 86_400;
 
@@ -530,19 +531,6 @@ const SUNLIGHT_ROWS = Math.round(180 / SUNLIGHT_STEP_DEG) + 1;
  */
 const MIN_DAMPING_SHARE = 0.5;
 
-/**
- * How far the whole starting state is moved, in kelvin, to measure how
- * much each cell's January mean follows its starting temperature.
- */
-const JANUARY_NUDGE_K = 1;
-
-/**
- * The least share of a starting error a cell's January mean is taken to
- * carry when it is corrected, which bounds the correction to this many
- * times its January error over.
- */
-const MIN_JANUARY_RESPONSE = 0.25;
-
 /** Times the year-end correction is solved, each with a better slope. */
 const CORRECTION_PASSES = 4;
 
@@ -564,12 +552,10 @@ const GUESS_CHANGE_K = 0.1;
 const airTemperature = (seaLevelK: number, cooling: number): number =>
 	seaLevelK - Math.min(cooling, 0.5 * seaLevelK);
 
-/** The inverse of {@link airTemperature}. */
-const seaLevelTemperature = (airK: number, cooling: number): number =>
-	airK >= cooling ? airK + cooling : 2 * airK;
-
 /** Everything about a world the model needs, worked out once per solve. */
 type Setup = {
+	/** Cells along a face edge of the grid solved on. */
+	readonly resolution: Resolution;
 	readonly cellCount: number;
 	readonly areas: Float64Array;
 	/** Lapse-rate cooling of each cell's air, in kelvin; 0 at sea. */
@@ -655,6 +641,7 @@ const assertModel = (model: TemperatureModel): void => {
 		'greenhouseFactor',
 		'lapseRate',
 		'terrainDriftLimitK',
+		'correctionRefineK',
 	] as const) {
 		if (!(model[name] >= 0)) {
 			throw new RangeError(`The model's ${name} must not be negative`);
@@ -757,6 +744,7 @@ const setUp = (world: World, model: TemperatureModel): Setup => {
 		}
 	}
 	return {
+		resolution: world.resolution,
 		cellCount,
 		areas,
 		cooling,
@@ -862,14 +850,6 @@ const clearShareSlope = (airK: number, model: TemperatureModel): number => {
 	return (6 * share * (1 - share)) / width;
 };
 
-/** A first guess being worked out: see {@link startGuess}. */
-type Guess = {
-	/** The guess so far, sea-level temperature in kelvin. */
-	readonly state: Float64Array;
-	/** Takes up to this many more iterations, stopping once settled. */
-	advance(iterations: number): void;
-};
-
 /**
  * The one temperature, in kelvin, at which the whole world would radiate
  * what it absorbs of the year's mean sunlight with its ground clear of ice.
@@ -917,11 +897,10 @@ const distanceFrom = (
  * the previous iterate, from a uniform temperature that balances the
  * global mean sunlight. A first guess for a solve from nothing, which
  * spares most of the years the ocean would otherwise take to warm up.
- * It is taken a few iterations at a time, so that a rough guess can be had
- * first and carried on to the full one, which is then the same as if it
- * had been run in one go.
+ *
+ * @returns The guess, sea-level temperature in kelvin, in a new array.
  */
-const startGuess = (setup: Setup, solver: ExchangeSolver): Guess => {
+const startGuess = (setup: Setup, solver: ExchangeSolver): Float64Array => {
 	const {
 		cellCount,
 		areas,
@@ -935,44 +914,80 @@ const startGuess = (setup: Setup, solver: ExchangeSolver): Guess => {
 	const mass = new Float64Array(cellCount);
 	const rhs = new Float64Array(cellCount);
 	const next = new Float64Array(cellCount);
-	let taken = 0;
-	let settled = false;
-	const advance = (iterations: number): void => {
-		for (
-			let iteration = 0;
-			iteration < iterations && taken < GUESS_ITERATIONS && !settled;
-			iteration++
-		) {
-			for (let cell = 0; cell < cellCount; cell++) {
-				const t = state[cell] as number;
-				const clear = clearShare(
-					airTemperature(t, cooling[cell] as number),
-					model,
-				);
-				const albedo =
-					model.iceAlbedo +
-					((clearAlbedo[cell] as number) - model.iceAlbedo) * clear;
-				const radiation = emission * t * t * t;
-				const cellArea = areas[cell] as number;
-				mass[cell] = cellArea * 4 * radiation;
-				rhs[cell] =
-					cellArea *
-					((1 - albedo) * (annualSunlight[cell] as number) + 3 * radiation * t);
-			}
-			solver.setMass(mass);
-			next.set(state);
-			solver.solve(rhs, next, model.solverToleranceK);
-			let change = 0;
-			for (let cell = 0; cell < cellCount; cell++) {
-				const value = Math.max(MIN_TEMPERATURE_K, next[cell] as number);
-				change = Math.max(change, Math.abs(value - (state[cell] as number)));
-				state[cell] = value;
-			}
-			taken++;
-			settled = change < GUESS_CHANGE_K;
+	for (let iteration = 0; iteration < GUESS_ITERATIONS; iteration++) {
+		for (let cell = 0; cell < cellCount; cell++) {
+			const t = state[cell] as number;
+			const clear = clearShare(
+				airTemperature(t, cooling[cell] as number),
+				model,
+			);
+			const albedo =
+				model.iceAlbedo +
+				((clearAlbedo[cell] as number) - model.iceAlbedo) * clear;
+			const radiation = emission * t * t * t;
+			const cellArea = areas[cell] as number;
+			mass[cell] = cellArea * 4 * radiation;
+			rhs[cell] =
+				cellArea *
+				((1 - albedo) * (annualSunlight[cell] as number) + 3 * radiation * t);
 		}
-	};
-	return { state, advance };
+		solver.setMass(mass);
+		next.set(state);
+		solver.solve(rhs, next, model.solverToleranceK);
+		let change = 0;
+		for (let cell = 0; cell < cellCount; cell++) {
+			const value = Math.max(MIN_TEMPERATURE_K, next[cell] as number);
+			change = Math.max(change, Math.abs(value - (state[cell] as number)));
+			state[cell] = value;
+		}
+		if (change < GUESS_CHANGE_K) {
+			break;
+		}
+	}
+	return state;
+};
+
+/** {@link annualBalance} for arguments already checked. */
+const balanceOnGrid = (world: World, model: TemperatureModel): Float64Array => {
+	const setup = setUp(world, model);
+	const grid = getGrid(world.resolution);
+	const solver = createExchangeSolver(
+		grid,
+		coupling(setup, grid),
+		model.solverMaxIterations,
+	);
+	return startGuess(setup, solver);
+};
+
+/**
+ * The balance with the year's mean sunlight and no heat capacity of a world
+ * on its own grid: where each cell's absorbed sunlight, outgoing heat and
+ * exchange cancel, as sea-level temperature in kelvin.
+ *
+ * @remarks
+ * Worked out to within 0.1 K a step, in at most 20 steps of Newton's method
+ * on the outgoing heat, from a uniform temperature. It is the first guess of
+ * a solve from nothing on the coarsest grid; on a finer grid a solve from
+ * nothing starts from this balance for {@link coarsenWorld} of its world,
+ * carried to its own grid by {@link refineField}: see
+ * {@link solveTemperature}.
+ *
+ * @param world - The world. It is not changed.
+ * @param model - The model; defaults to {@link TEMPERATURE_MODEL}.
+ * @returns A new array, one value per cell in cell order.
+ * @throws RangeError if the world's resolution is not supported, if its
+ * elevations are not one finite value per cell, if its sea level does not
+ * lie from {@link MIN_ELEVATION_M} to {@link MAX_ELEVATION_M}, if a planet
+ * setting is not a number, or if a model constant is missing or out of
+ * range.
+ */
+export const annualBalance = (
+	world: World,
+	model: TemperatureModel = TEMPERATURE_MODEL,
+): Float64Array => {
+	assertModel(model);
+	assertWorld(world);
+	return balanceOnGrid(world, model);
 };
 
 /**
@@ -1070,8 +1085,8 @@ const assertStartTemperatures = (values: Float64Array, what: string): void => {
 
 /**
  * The state at the turn of the year carried on from a previous solve's end
- * state, and the state a step before it, in kelvin, with the state's rough
- * guess and reference cooling.
+ * state, and the state a step before it, in kelvin, with the state's
+ * reference cooling.
  *
  * @remarks
  * The arrays are copied first and only the copies are checked and used. If
@@ -1079,11 +1094,11 @@ const assertStartTemperatures = (values: Float64Array, what: string): void => {
  * month differ, the state a step before is moved so that the rate of
  * change it implies is kept, and brought within the limits of a state.
  *
- * @throws RangeError if the state is not three Float64Arrays of one
- * temperature per cell, each from {@link MIN_TEMPERATURE_K} to
- * {@link MAX_START_K}, and a Float64Array of one finite cooling per cell,
- * none negative, with a step length from {@link MIN_STEP_SECONDS} to
- * {@link MAX_STEP_SECONDS}.
+ * @throws RangeError if the state is not two Float64Arrays of one
+ * temperature per cell of the grid the world is solved on, each from
+ * {@link MIN_TEMPERATURE_K} to {@link MAX_START_K}, and a Float64Array of
+ * one finite cooling per cell, none negative, with a step length from
+ * {@link MIN_STEP_SECONDS} to {@link MAX_STEP_SECONDS}.
  */
 const fromState = (
 	setup: Setup,
@@ -1091,16 +1106,23 @@ const fromState = (
 ): {
 	readonly state: Float64Array;
 	readonly before: Float64Array;
-	readonly guess: Float64Array;
 	readonly reference: Float64Array;
 } => {
 	const { cellCount } = setup;
 	if (typeof start !== 'object' || start === null) {
 		throw new RangeError('A starting state must be an object');
 	}
-	const { stepSeconds } = start;
+	const { stepSeconds, temperatureK } = start;
+	if (
+		temperatureK instanceof Float64Array &&
+		temperatureK.length !== cellCount
+	) {
+		throw new RangeError(
+			`A starting state must be on the grid of ${setup.resolution} cells per face edge, which this world is solved on, ${cellCount} values an array; its temperatureK holds ${temperatureK.length}`,
+		);
+	}
 	const state = copyChecked(
-		start.temperatureK,
+		temperatureK,
 		'Float64Array',
 		cellCount,
 		"A starting state's temperatureK",
@@ -1111,12 +1133,6 @@ const fromState = (
 		cellCount,
 		"A starting state's previousK",
 	);
-	const guess = copyChecked(
-		start.guessK,
-		'Float64Array',
-		cellCount,
-		"A starting state's guessK",
-	);
 	const reference = copyChecked(
 		start.referenceCoolingK,
 		'Float64Array',
@@ -1125,7 +1141,6 @@ const fromState = (
 	);
 	assertStartTemperatures(state, "A starting state's temperatureK");
 	assertStartTemperatures(previous, "A starting state's previousK");
-	assertStartTemperatures(guess, "A starting state's guessK");
 	for (let cell = 0; cell < cellCount; cell++) {
 		const value = reference[cell] as number;
 		if (!(value >= 0 && Number.isFinite(value))) {
@@ -1145,7 +1160,6 @@ const fromState = (
 	return {
 		state,
 		before: stepBefore(state, previous, stepSeconds, stepSecondsOf(setup)),
-		guess,
 		reference,
 	};
 };
@@ -1153,69 +1167,6 @@ const fromState = (
 /** The length of each step of a solve, in seconds. */
 const stepSecondsOf = (setup: Setup): number =>
 	setup.yearSeconds / (MONTHS_PER_YEAR * setup.model.stepsPerMonth);
-
-/**
- * The sea-level temperature at the start of January rebuilt from a previous
- * result's months, the temperature one step before it, and that result's
- * January mean, all in kelvin.
- *
- * @remarks
- * The months are copied first and only the copies are checked and used.
- * The previous result is air temperature, so each land cell's lapse-rate
- * cooling, for the world as it is now, is added back, and every month must
- * then be a temperature a state may hold. The state at the turn of the year
- * and its rate of change are those of the cubic whose means over November
- * to February are the result's; the state a step earlier follows from the
- * rate, so that the second-order stepping starts at full accuracy. Both are
- * brought within the limits of a state.
- */
-const fromMonths = (
-	setup: Setup,
-	start: MonthlyTemperature,
-): {
-	readonly state: Float64Array;
-	readonly before: Float64Array;
-	readonly january: Float64Array;
-} => {
-	const { cellCount, cooling, model } = setup;
-	if (!Array.isArray(start) || start.length !== MONTHS_PER_YEAR) {
-		throw new RangeError(
-			`A start's months must be ${MONTHS_PER_YEAR} fields; got ${Array.isArray(start) ? start.length : typeof start}`,
-		);
-	}
-	const seaLevel: Float64Array[] = [];
-	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
-		const what = `Month ${month} of a start`;
-		const field = copyChecked(start[month], 'Float32Array', cellCount, what);
-		for (let cell = 0; cell < cellCount; cell++) {
-			const value = field[cell] as number;
-			// NaN and infinities are refused just below, after conversion.
-			field[cell] = Number.isFinite(value)
-				? seaLevelTemperature(value + ZERO_CELSIUS_K, cooling[cell] as number)
-				: Number.NaN;
-		}
-		assertStartTemperatures(field, what);
-		seaLevel.push(field);
-	}
-	const january = seaLevel[0] as Float64Array;
-	const february = seaLevel[1] as Float64Array;
-	const november = seaLevel[MONTHS_PER_YEAR - 2] as Float64Array;
-	const december = seaLevel[MONTHS_PER_YEAR - 1] as Float64Array;
-	const state = new Float64Array(cellCount);
-	const before = new Float64Array(cellCount);
-	for (let cell = 0; cell < cellCount; cell++) {
-		const nov = november[cell] as number;
-		const dec = december[cell] as number;
-		const jan = january[cell] as number;
-		const feb = february[cell] as number;
-		const turn = (7 * (dec + jan) - (nov + feb)) / 12;
-		// Kelvin per month.
-		const rate = (15 * (jan - dec) - (feb - nov)) / 12;
-		state[cell] = clampStart(turn);
-		before[cell] = clampStart(turn - rate / model.stepsPerMonth);
-	}
-	return { state, before, january };
-};
 
 /** The time stepping of one solve, holding the state it steps. */
 type Stepper = {
@@ -1362,70 +1313,6 @@ const createStepper = (
 };
 
 /**
- * Corrects a starting state rebuilt from monthly means so that January
- * comes out as the start says.
- *
- * @remarks
- * Monthly means do not fix the temperature at the turn of the year
- * exactly, least of all where the sea freezes, and an error there that the
- * ocean remembers takes years to go. So January is run twice: once from
- * the rebuilt state, and once from that state 1 K warmer everywhere. The
- * difference between the two runs' January means is how much of a
- * starting error each cell's January carries: nearly all of it over open
- * ocean, less over land and ice, which forget their start within weeks.
- * Each cell is then moved by its January error divided by that share, one
- * step of Newton's method, with the share held between
- * {@link MIN_JANUARY_RESPONSE} and 1: at most 1, so no cell is moved by
- * less than its error, and at least the minimum, so no cell is moved by
- * more than its error over the minimum. Both the state and the state a
- * step before it move by the same amount, and the stepper's year sums are
- * cleared again.
- *
- * After an edit, January differs from the start's for real, not only by
- * the rebuilding's error, and the correction holds the first January back
- * towards the old one; the years that follow begin from the stepping's own
- * state and are not affected.
- *
- * @param january - The start's January mean, at sea level, in kelvin.
- */
-const matchJanuary = (
-	setup: Setup,
-	stepper: Stepper,
-	january: Float64Array,
-): void => {
-	const { cellCount, model } = setup;
-	const { state, previous } = stepper;
-	const steps = model.stepsPerMonth;
-	const state0 = Float64Array.from(state);
-	const previous0 = Float64Array.from(previous);
-	const reset = (shift: number): void => {
-		for (let cell = 0; cell < cellCount; cell++) {
-			state[cell] = (state0[cell] as number) + shift;
-			previous[cell] = (previous0[cell] as number) + shift;
-		}
-	};
-	const base = new Float64Array(cellCount);
-	const nudged = new Float64Array(cellCount);
-	stepper.runMonth(0, base);
-	reset(JANUARY_NUDGE_K);
-	stepper.runMonth(0, nudged);
-	for (let cell = 0; cell < cellCount; cell++) {
-		const error = (base[cell] as number) / steps - (january[cell] as number);
-		const response =
-			((nudged[cell] as number) - (base[cell] as number)) /
-			(steps * JANUARY_NUDGE_K);
-		const shift =
-			-error / Math.min(1, Math.max(MIN_JANUARY_RESPONSE, response));
-		state[cell] = Math.max(MIN_TEMPERATURE_K, (state0[cell] as number) + shift);
-		previous[cell] = Math.max(
-			MIN_TEMPERATURE_K,
-			(previous0[cell] as number) + shift,
-		);
-	}
-	stepper.startYear();
-};
-
-/**
  * The correction for the heat each cell gained or lost over the year,
  * into `correction`, in kelvin: zero exactly when the year ended where it
  * began.
@@ -1447,7 +1334,9 @@ const matchJanuary = (
  * of the chord of `ε σ T⁴` from the cell's temperature `a` (the one whose
  * rise is the year's mean) to `a` plus the shift, and the correction is
  * solved again with it, {@link CORRECTION_PASSES} times in all. For a small
- * shift the chord is the tangent and nothing changes.
+ * shift the chord is the tangent and nothing changes, so a first pass whose
+ * largest correction is under {@link TemperatureModel.correctionRefineK}
+ * is kept and the later passes are not solved.
  *
  * @returns Whether every solve came within the solver's tolerance.
  */
@@ -1491,8 +1380,20 @@ const correctYearEnd = (
 		if (!solver.solve(rhs, correction, model.solverToleranceK).converged) {
 			solved = false;
 		}
+		if (pass === 0 && largestMagnitude(correction) < model.correctionRefineK) {
+			break;
+		}
 	}
 	return solved;
+};
+
+/** The largest absolute value in an array. */
+const largestMagnitude = (values: Float64Array): number => {
+	let largest = 0;
+	for (let cell = 0; cell < values.length; cell++) {
+		largest = Math.max(largest, Math.abs(values[cell] as number));
+	}
+	return largest;
 };
 
 /**
@@ -1602,9 +1503,11 @@ export const temperatureConditions = (world: World): TemperatureConditions => ({
  * above the sea level on land, and 0 at sea.
  *
  * @remarks
- * It is the cooling the solver applies to the world, and what a state's
- * {@link TemperatureState.referenceCoolingK} holds for the world of the
- * solve from nothing it descends from.
+ * It is the cooling the solver applies to the world's air. For the world
+ * a solve is worked out on, which is {@link coarsenWorld} of the world above
+ * 64 cells per face edge, it is what a state's
+ * {@link TemperatureState.referenceCoolingK} holds for the solve from
+ * nothing the state descends from.
  *
  * @param world - The world. It is not changed.
  * @param model - The model, whose lapse rate is used; defaults to
@@ -1633,7 +1536,9 @@ export const lapseCooling = (
  * gives it, and in the reference.
  *
  * @remarks
- * It is the measure {@link solveTemperature} compares with
+ * Measured for the world a solve is worked out on, which is
+ * {@link coarsenWorld} of the world above 64 cells per face edge, it is the
+ * measure {@link solveTemperature} compares with
  * {@link TemperatureModel.terrainDriftLimitK}, and gives the same value,
  * bit for bit. A cell at sea has no cooling, so sea floor moved beneath
  * the sea counts for nothing, and land lowered beneath it counts its whole
@@ -1715,185 +1620,176 @@ const sameConditions = (
 };
 
 /**
- * What a solve starts from: a state carried on, months rebuilt, or neither,
- * which is a solve from nothing.
- */
-type Beginning = {
-	readonly carried?: ReturnType<typeof fromState>;
-	readonly rebuilt?: ReturnType<typeof fromMonths>;
-};
-
-/**
  * Reads and checks a solve's start, and sets it aside if it does not suit
  * the world: see {@link solveTemperature} for the order of the tests.
  *
- * @throws RangeError if the start is not an object holding a state or
- * months and a valid record, or if what is read of it is not valid.
+ * @returns The state to carry on from, or nothing for a solve from nothing.
+ * @throws RangeError if the start is not an object holding a state and a
+ * valid record, or if a state that is read is not valid.
  */
 const readStart = (
 	setup: Setup,
 	start: TemperatureStart | undefined,
-): Beginning => {
+): ReturnType<typeof fromState> | undefined => {
 	if (start === undefined) {
-		return {};
+		return undefined;
 	}
 	if (typeof start !== 'object' || start === null) {
-		throw new RangeError('A start must be an object with a state or months');
+		throw new RangeError('A start must be an object with a state');
 	}
-	const { state, months, solvedFor } = start;
-	if (state === undefined && months === undefined) {
-		throw new RangeError('A start must hold a state or months');
+	const { state, solvedFor } = start;
+	if (state === undefined) {
+		throw new RangeError('A start must hold a state');
 	}
 	assertConditions(solvedFor);
 	if (!sameConditions(setup, solvedFor)) {
-		return {};
-	}
-	if (state === undefined) {
-		return { rebuilt: fromMonths(setup, months as MonthlyTemperature) };
+		return undefined;
 	}
 	const carried = fromState(setup, state);
 	const drift = distanceFrom(setup.areas, setup.cooling, carried.reference);
-	return drift < setup.model.terrainDriftLimitK ? { carried } : {};
+	return drift < setup.model.terrainDriftLimitK ? carried : undefined;
 };
 
 /**
- * The near-surface air temperature of a world through its year: twelve
- * monthly means.
+ * The cells along a face edge of the grid a world's temperature is worked
+ * out on: a step coarser than the world's own above 64 cells per face edge,
+ * so 64 for a world of 128 and 128 for one of 256, and the world's own at
+ * 64.
  *
  * @remarks
- * A pure function of the world and the options: the same input gives the
- * same output, bit for bit. The world's planet is passed through
- * {@link normalisePlanet} first, so a setting beyond its limits is brought
- * to the limit and one that is not a number is refused.
+ * A solve costs four to five times as much on each finer grid (the Earth
+ * from nothing, in Node: 0.88 s on the 64 grid, 3.5 s on the 128 grid,
+ * 16.7 s on the 256 grid), and the coarser grid's answer, carried back to
+ * the world's grid with each cell cooled by its own height, lies close to
+ * the full one: measured on the Earth, 0.10 K root-mean-square,
+ * area-weighted over all cells and months, and 1.36 K in the worst cell
+ * and month at 128; 0.065 K and 0.92 K at 256, the worst cells at coasts.
+ * See {@link solveTemperature}.
  *
- * Without a start, the solve begins from the balance with the year's mean
- * sunlight and no heat capacity. With a start that has a state, it carries
- * on from that state exactly, as if the earlier solve had run on, but in
- * the world as it is now: a start from a solve that had not finished
- * settles about as fast as that solve would have. With a start that has
- * only months, it begins from the state at the turn of the year that the
- * months imply, corrected by running January so that the start's January
- * comes out again.
- *
- * A start is used only for a world it suits. The model has two settled
- * climates for some worlds, an ordinary one and a frozen one, and a solve
- * carried on from a start stays in whichever it was handed: measured at 64
- * cells per face edge, the Earth with its sea level 6,000 m down freezes
- * over, to a mean of −50.8 °C, and carried on from there back at 0 m it
- * stays at −28.5 °C, where a solve from nothing gives 14.5 °C. So a start
- * is set aside, and the solve is then the same, bit for bit, as one from
- * nothing, at the first of these tests it fails, taken in this order:
- *
- * 1. Its record, `solvedFor`, must name the world's sea level and planet,
- *    each brought to the forms of {@link temperatureConditions} and
- *    compared exactly. This holds for a start of months alone as for one
- *    with a state. A start set aside here costs only the comparison: its
- *    state and months are not read.
- * 2. Its state's terrain must have drifted from its reference, as
- *    {@link coolingDrift} measures it against
- *    {@link TemperatureState.referenceCoolingK}, by less than
- *    {@link TemperatureModel.terrainDriftLimitK}. A start set aside here
- *    costs the reading and checking of its state and the measure.
- * 3. The world's rough guess must lie within {@link STATE_FALLBACK_K} of
- *    the rough guess its state carries. Every solve takes its world's rough
- *    guess, so a start set aside here costs nothing more.
- *
- * A start of months alone has no state, and so no reference and no rough
- * guess: for the world's sea level and planet it is always used. Every
- * solve that does not carry on a state, whether from nothing, from a start
- * set aside or from months alone, returns its own world's cooling as its
- * state's reference; one that carries on a state returns that state's
- * reference unchanged. So a run of terrain edits, each started from the
- * last result, carries on until the terrain has drifted past the limit
- * from the last solve from nothing, and then starts afresh. Within the
- * limit, a result carried on can still differ from a solve from nothing.
- * The returned state is always one a later solve accepts as a start.
- *
- * Each year steps through the twelve months. At the end of a year, the
- * heat each cell gained or lost over it says how far the ocean is from its
- * own repeating cycle, and the state is corrected by solving the balance
- * for that heat with no heat capacity, which removes most of the slow
- * warming or cooling the ocean would otherwise take years to finish, on a
- * year of any length.
- *
- * The solve stops when the last year changed by less than the tolerance,
- * as {@link TemperatureResult.converged} defines it, or when `maxYears`
- * have run; the result says which. A year's change is measured as each
- * cell's change from the year's start to its end, not as the change of its
- * annual mean from the year before: after an edit, the first year's annual
- * mean is off because that year began from the old state, which is gone by
- * the second year's start, and comparing annual means would ask for a
- * third year that changes nothing.
- *
- * Takes time in proportion to the number of cells and the years run;
- * `npm run time:temperature` measures it. `onYear`, if given, hears of
- * each year as it finishes, so that a caller can show how far it has come.
- *
- * @param world - The world. It is not changed.
- * @param options - A starting state, the most years, the tolerance, the
- * model's constants and whom to tell as each year finishes.
- * @returns New arrays the caller owns.
- * @throws RangeError if the world's resolution is not supported, if its
- * elevations are not one finite value per cell, if its sea level does not
- * lie from {@link MIN_ELEVATION_M} to {@link MAX_ELEVATION_M}, if a planet
- * setting is not a number, if `maxYears` is not a whole number from 1 to
- * {@link MAX_YEARS_LIMIT}, if `tolerance` is not finite and above zero, if
- * a model constant is missing or out of range,
- * if `start` is not an object with a state or months and a record of a
- * finite sea level and five finite planet settings, or if a start that
- * passes the first test has a state that is not valid (see
- * {@link TemperatureState}) or months that are not twelve Float32Arrays of
- * one temperature per cell that, brought to sea level, lies from 2.7 to
- * 10,000 K.
- * @throws Whatever `onYear` throws, as it is.
+ * @param resolution - The world's cells along a face edge; one of
+ * {@link SUPPORTED_RESOLUTIONS}.
+ * @throws RangeError if the resolution is not supported.
  */
-export const solveTemperature = (
+export const solveResolution = (resolution: number): Resolution => {
+	if (!isSupportedResolution(resolution)) {
+		throw new RangeError(
+			`Unsupported world resolution ${resolution}: expected one of ${SUPPORTED_RESOLUTIONS.join(', ')}`,
+		);
+	}
+	const index = SUPPORTED_RESOLUTIONS.indexOf(resolution);
+	return SUPPORTED_RESOLUTIONS[Math.max(0, index - 1)] as Resolution;
+};
+
+/**
+ * Twelve monthly fields of sea-level temperature carried onto a world's grid
+ * from the grid a step coarser, and each cell's air cooled by its own
+ * height: the near-surface air temperature, in degrees Celsius.
+ *
+ * @remarks
+ * The sea-level temperature is carried by {@link refineField}, bilinear in
+ * each face's coordinates and, beside a cube edge, linear along it on
+ * either side and across it, without regard to land and sea, so that the
+ * coarse grid's contrast between a coast's land and sea is spread over
+ * about one coarse cell either side of it. Each cell is then cooled by the
+ * lapse rate for its own height above the sea level, limited to half its
+ * sea-level temperature, as on the grid solved on: a peak narrower than a
+ * coarse cell keeps its own cold. This is how
+ * {@link solveTemperature} makes a coarser solve's months.
+ *
+ * @param seaLevelK - Twelve fields, January to December, of the monthly
+ * mean sea-level temperature in kelvin, one value per cell of the grid a
+ * step coarser than the world's. They are not changed.
+ * @param world - The world the months are for, of more than 64 cells per
+ * face edge. It is not changed.
+ * @param model - The model, whose lapse rate is used; defaults to
+ * {@link TEMPERATURE_MODEL}.
+ * @returns Twelve new fields, one value per cell of the world's grid.
+ * @throws RangeError if there are not twelve fields of one value per cell
+ * of the coarser grid, if the world is not valid or is of 64 cells per face
+ * edge, which has no coarser grid, or if a model constant is missing or out
+ * of range.
+ */
+export const refineMonths = (
+	seaLevelK: readonly ArrayLike<number>[],
 	world: World,
-	options: SolveTemperatureOptions = {},
-): TemperatureResult => {
-	const {
-		maxYears = DEFAULT_MAX_YEARS,
-		tolerance = DEFAULT_TOLERANCE_K,
-		model = TEMPERATURE_MODEL,
-		onYear,
-	} = options;
-	assertOptions(maxYears, tolerance);
-	assertModel(model);
-	assertWorld(world);
+	model: TemperatureModel = TEMPERATURE_MODEL,
+): Float32Array[] => {
+	const cooling = lapseCooling(world, model);
+	if (!Array.isArray(seaLevelK) || seaLevelK.length !== MONTHS_PER_YEAR) {
+		throw new RangeError(
+			`A year has ${MONTHS_PER_YEAR} months to refine; got ${Array.isArray(seaLevelK) ? seaLevelK.length : typeof seaLevelK}`,
+		);
+	}
+	return refineInto(seaLevelK, world.resolution, cooling);
+};
+
+/** {@link refineMonths} for arguments already checked. */
+const refineInto = (
+	seaLevelK: readonly ArrayLike<number>[],
+	resolution: Resolution,
+	cooling: Float64Array,
+): Float32Array[] => {
+	const fine = new Float64Array(cooling.length);
+	return seaLevelK.map((month) => {
+		refineField(month, resolution, fine);
+		const field = new Float32Array(cooling.length);
+		for (let cell = 0; cell < field.length; cell++) {
+			field[cell] =
+				airTemperature(fine[cell] as number, cooling[cell] as number) -
+				ZERO_CELSIUS_K;
+		}
+		return field;
+	});
+};
+
+/** A year solved on one grid, before its months are made air temperatures. */
+type GridSolve = Omit<TemperatureResult, 'months' | 'solvedFor'> & {
+	/** The monthly mean sea-level temperature, in kelvin, per cell. */
+	readonly seaLevelMonths: Float64Array[];
+	readonly setup: Setup;
+};
+
+/**
+ * The solve of a world on its own grid, its months left as sea-level
+ * temperatures: everything of {@link solveTemperature} but making them air
+ * temperatures on the world's grid.
+ */
+const solveOnGrid = (
+	world: World,
+	start: TemperatureStart | undefined,
+	maxYears: number,
+	tolerance: number,
+	model: TemperatureModel,
+	onYear: SolveTemperatureOptions['onYear'],
+): GridSolve => {
 	const setup = setUp(world, model);
-	const { cellCount, cooling, areas } = setup;
+	const { cellCount, cooling } = setup;
 	const { stepsPerMonth } = model;
 	const grid = getGrid(world.resolution);
 	// The start is read, checked and judged before anything costly is built.
-	const { carried, rebuilt } = readStart(setup, options.start);
+	const carried = readStart(setup, start);
 
 	const solver = createExchangeSolver(
 		grid,
 		coupling(setup, grid),
 		model.solverMaxIterations,
 	);
-	// Every solve takes the rough guess of its world, which it returns with
-	// its state for a later solve to compare its own world with.
-	const guess = startGuess(setup, solver);
-	guess.advance(FALLBACK_GUESS_ITERATIONS);
-	const roughGuess = guess.state.map(clampStart);
 	let stepper: Stepper;
 	let reference: Float64Array;
-	if (
-		carried !== undefined &&
-		distanceFrom(areas, carried.guess, roughGuess) <= STATE_FALLBACK_K
-	) {
+	if (carried !== undefined) {
 		stepper = createStepper(setup, solver, carried.state, carried.before);
 		reference = carried.reference;
-	} else if (rebuilt !== undefined) {
-		stepper = createStepper(setup, solver, rebuilt.state, rebuilt.before);
-		matchJanuary(setup, stepper, rebuilt.january);
-		reference = Float64Array.from(cooling);
 	} else {
-		// From nothing, or from a start set aside: the first guess, carried
-		// on from the rough one, the same as if it had been taken in one go.
-		guess.advance(GUESS_ITERATIONS);
-		stepper = createStepper(setup, solver, guess.state, guess.state);
+		// Above the coarsest grid the balance is worked out a grid coarser:
+		// see solveTemperature.
+		const guess =
+			world.resolution === SUPPORTED_RESOLUTIONS[0]
+				? startGuess(setup, solver)
+				: refineField(
+						balanceOnGrid(coarsenWorld(world), model),
+						world.resolution,
+					);
+		stepper = createStepper(setup, solver, guess, guess);
 		reference = Float64Array.from(cooling);
 	}
 	const { state, previous } = stepper;
@@ -1967,26 +1863,185 @@ export const solveTemperature = (
 		});
 	}
 
-	const months = monthSums.map((sum) => {
-		const field = new Float32Array(cellCount);
+	for (const sum of monthSums) {
 		for (let cell = 0; cell < cellCount; cell++) {
-			field[cell] =
-				airTemperature(
-					(sum[cell] as number) / stepsPerMonth,
-					cooling[cell] as number,
-				) - ZERO_CELSIUS_K;
+			sum[cell] = (sum[cell] as number) / stepsPerMonth;
 		}
-		return field;
-	});
+	}
 	return {
-		months,
+		seaLevelMonths: monthSums,
+		setup,
 		state: {
 			temperatureK: state.map(clampStart),
 			previousK: previous.map(clampStart),
-			guessK: roughGuess,
 			stepSeconds: stepSecondsOf(setup),
 			referenceCoolingK: reference,
 		},
+		yearsRun,
+		converged,
+		finalChangeK,
+	};
+};
+
+/**
+ * The near-surface air temperature of a world through its year: twelve
+ * monthly means.
+ *
+ * @remarks
+ * A pure function of the world and the options: the same input gives the
+ * same output, bit for bit. The world's planet is passed through
+ * {@link normalisePlanet} first, so a setting beyond its limits is brought
+ * to the limit and one that is not a number is refused.
+ *
+ * A world of 64 cells per face edge is solved on its own grid. One of more
+ * is solved on the grid a step coarser, {@link solveResolution} of its own:
+ * the world is averaged onto that grid by {@link coarsenWorld}, where a
+ * coarse cell is land by the mean elevation of the four cells it covers,
+ * and solved there as a world of its own; its monthly mean sea-level
+ * temperatures are then carried back to the world's grid and each cell
+ * cooled by its own height, by {@link refineMonths}. Land and sea differ
+ * smoothly across a coast, over about one coarse cell (156 km on a world
+ * of 128, 78 km on one of 256), and an island or a neck of land narrower
+ * than a coarse cell does not shape the solve, though it keeps the cooling
+ * of its own height. `fullResolution` solves on the world's own grid
+ * instead, for tests and measurement.
+ *
+ * Everything below is about the grid the world is solved on: the state a
+ * result ends in is on it, its terrain drift and the balance it solves are
+ * of the world on it, and a start must be on it too. The result's months
+ * are on the world's own grid.
+ *
+ * Without a start, the solve begins from the balance with the year's mean
+ * sunlight and no heat capacity, {@link annualBalance}. On the coarsest
+ * grid it is worked out on the grid solved on; on a finer one, for the
+ * world on the grid a step coarser, by {@link coarsenWorld}, and carried
+ * to the grid solved on by {@link refineField}. Measured in Node, a solve
+ * from nothing on the 128 grid then runs the same years in 9 to 12% less
+ * time than one from the balance worked out on the 128 grid (the Earth:
+ * 3.29 s against 3.74 s, the median of seven; a generated world: 3.92 s
+ * against 4.33 s), and their months differ by at most 0.004 K in any cell
+ * and month, within what each year's change allows of a converged answer.
+ *
+ * With a start, it carries on from the start's state exactly, as if the
+ * earlier solve had run on, but in the world as it is now: a start from a
+ * solve that had not finished settles about as fast as that solve would
+ * have.
+ *
+ * A start is used only for a world it suits. The model has two settled
+ * climates for some worlds, an ordinary one and a frozen one, and a solve
+ * carried on from a start stays in whichever it was handed: measured at 64
+ * cells per face edge, the Earth with its sea level 6,000 m down freezes
+ * over, to a mean of −50.8 °C, and carried on from there back at 0 m it
+ * stays at −28.5 °C, where a solve from nothing gives 14.5 °C. So a start
+ * is set aside, and the solve is then the same, bit for bit, as one from
+ * nothing, at the first of these tests it fails, taken in this order:
+ *
+ * 1. Its record, `solvedFor`, must name the world's sea level and planet,
+ *    each brought to the forms of {@link temperatureConditions} and
+ *    compared exactly. A start set aside here costs only the comparison:
+ *    its state is not read.
+ * 2. Its state's terrain must have drifted from its reference, as
+ *    {@link coolingDrift} measures it against
+ *    {@link TemperatureState.referenceCoolingK} for the world on the grid
+ *    solved on, by less than {@link TemperatureModel.terrainDriftLimitK}. A
+ *    start set aside here costs the reading and checking of its state and
+ *    the measure.
+ *
+ * Every solve that does not carry on a state, whether from nothing or from
+ * a start set aside, returns its own world's cooling on the grid solved on
+ * as its state's reference; one that carries on a state returns that
+ * state's reference unchanged. So a run of terrain edits, each started from
+ * the last result, carries on until the terrain has drifted past the limit
+ * from the last solve from nothing, and then starts afresh. Within the
+ * limit, a result carried on can still differ from a solve from nothing.
+ * The returned state is always one a later solve of a world of the same
+ * resolution, solved the same way, accepts as a start.
+ *
+ * Each year steps through the twelve months. At the end of a year, the
+ * heat each cell gained or lost over it says how far the ocean is from its
+ * own repeating cycle, and the state is corrected by solving the balance
+ * for that heat with no heat capacity, which removes most of the slow
+ * warming or cooling the ocean would otherwise take years to finish, on a
+ * year of any length.
+ *
+ * The solve stops when the last year changed by less than the tolerance,
+ * as {@link TemperatureResult.converged} defines it, or when `maxYears`
+ * have run; the result says which. A year's change is measured as each
+ * cell's change from the year's start to its end, not as the change of its
+ * annual mean from the year before: after an edit, the first year's annual
+ * mean is off because that year began from the old state, which is gone by
+ * the second year's start, and comparing annual means would ask for a
+ * third year that changes nothing.
+ *
+ * Takes time in proportion to the number of cells solved on and the years
+ * run; `npm run time:temperature` measures it. `onYear`, if given, hears
+ * of each year as it finishes, so that a caller can show how far it has
+ * come.
+ *
+ * @param world - The world. It is not changed.
+ * @param options - A starting state, the most years, the tolerance, the
+ * model's constants, whether to solve on the world's own grid and whom to
+ * tell as each year finishes.
+ * @returns New arrays the caller owns.
+ * @throws RangeError if the world's resolution is not supported, if its
+ * elevations are not one finite value per cell, if its sea level does not
+ * lie from {@link MIN_ELEVATION_M} to {@link MAX_ELEVATION_M}, if a planet
+ * setting is not a number, if `maxYears` is not a whole number from 1 to
+ * {@link MAX_YEARS_LIMIT}, if `tolerance` is not finite and above zero, if
+ * a model constant is missing or out of range, if `start` is not an object
+ * with a state and a record of a finite sea level and five finite planet
+ * settings, or if a start that passes the first test has a state that is
+ * not valid (see {@link TemperatureState}), on another grid included.
+ * @throws Whatever `onYear` throws, as it is.
+ */
+export const solveTemperature = (
+	world: World,
+	options: SolveTemperatureOptions = {},
+): TemperatureResult => {
+	const {
+		maxYears = DEFAULT_MAX_YEARS,
+		tolerance = DEFAULT_TOLERANCE_K,
+		model = TEMPERATURE_MODEL,
+		fullResolution = false,
+		onYear,
+	} = options;
+	assertOptions(maxYears, tolerance);
+	assertModel(model);
+	assertWorld(world);
+	const coarse =
+		fullResolution || solveResolution(world.resolution) === world.resolution
+			? null
+			: coarsenWorld(world);
+	const solved = solveOnGrid(
+		coarse ?? world,
+		options.start,
+		maxYears,
+		tolerance,
+		model,
+		onYear,
+	);
+	const { seaLevelMonths, setup, state, yearsRun, converged, finalChangeK } =
+		solved;
+	let months: Float32Array[];
+	if (coarse === null) {
+		const { cooling } = setup;
+		months = seaLevelMonths.map((month) => {
+			const field = new Float32Array(month.length);
+			for (let cell = 0; cell < field.length; cell++) {
+				field[cell] =
+					airTemperature(month[cell] as number, cooling[cell] as number) -
+					ZERO_CELSIUS_K;
+			}
+			return field;
+		});
+	} else {
+		const cooling = new Float64Array(world.elevation.length);
+		coolingInto(world, model.lapseRate, cooling);
+		months = refineInto(seaLevelMonths, world.resolution, cooling);
+	}
+	return {
+		months,
+		state,
 		solvedFor: { seaLevel: setup.seaLevel, planet: setup.planet },
 		yearsRun,
 		converged,

@@ -606,7 +606,6 @@ describe('createTemperatureService', () => {
 		const newest = temperature.workers.last()
 			.posted[0] as SimRequest<'temperature'>;
 		expect(newest.start).toEqual({
-			months: kept?.months,
 			state: kept?.state,
 			solvedFor: kept?.solvedFor,
 		});

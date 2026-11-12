@@ -12,6 +12,7 @@ import {
 	solveTemperature,
 	TEMPERATURE_MODEL,
 	type TemperatureResult,
+	temperatureConditions,
 	type World,
 } from '../core/index';
 import { handleRequest } from './handle';
@@ -265,18 +266,17 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		expect(result.months).toEqual(direct().months);
 	});
 
-	it('transfers the buffers of the twelve months and the four state arrays, each once', () => {
+	it('transfers the buffers of the twelve months and the three state arrays, each once', () => {
 		const { response, transfer } = handled();
 		const result = resultOf(response);
 		const expected = [
 			...result.months.map((month) => month.buffer),
 			result.state.temperatureK.buffer,
 			result.state.previousK.buffer,
-			result.state.guessK.buffer,
 			result.state.referenceCoolingK.buffer,
 		];
-		expect(transfer).toHaveLength(16);
-		expect(new Set(transfer).size).toBe(16);
+		expect(transfer).toHaveLength(15);
+		expect(new Set(transfer).size).toBe(15);
 		for (const buffer of expected) {
 			expect(transfer).toContain(buffer);
 		}
@@ -290,7 +290,7 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		const posted = structuredClone(response, { transfer });
 		expect(resultOf(posted).months[0]).toEqual(values);
 		expect(resultOf(response).months[0]?.byteLength).toBe(0);
-		expect(resultOf(response).state.guessK.byteLength).toBe(0);
+		expect(resultOf(response).state.previousK.byteLength).toBe(0);
 		expect(resultOf(response).state.referenceCoolingK.byteLength).toBe(0);
 	});
 
@@ -398,48 +398,21 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		expect(start.state.temperatureK).toEqual(before);
 	});
 
-	it('answers a start with the wrong number of months with a failure, rather than throwing', () => {
-		expect(
-			respond(
-				temperatureRequest({
-					start: {
-						months: [new Float32Array(3)],
-						solvedFor: direct().solvedFor,
-					},
-				}),
-			),
-		).toMatchObject({
-			id: 30,
-			kind: 'temperature',
-			ok: false,
-			error: expect.stringContaining('12 Float32Arrays'),
-		});
+	it('answers a start of months alone with a failure, rather than throwing', () => {
+		for (const start of [
+			{ months: direct().months, solvedFor: direct().solvedFor },
+			{ solvedFor: direct().solvedFor },
+		]) {
+			expect(respond(temperatureRequest({ start }))).toMatchObject({
+				id: 30,
+				kind: 'temperature',
+				ok: false,
+				error: expect.stringContaining("A temperature request's start must"),
+			});
+		}
 	});
 
 	it('answers a start the solver refuses with its reason, rather than throwing', () => {
-		expect(
-			respond(
-				temperatureRequest({
-					start: {
-						months: Array.from({ length: 12 }, () => new Float32Array(3)),
-						solvedFor: direct().solvedFor,
-					},
-				}),
-			),
-		).toEqual({
-			id: 30,
-			kind: 'temperature',
-			ok: false,
-			error: 'Month 0 of a start must be a Float32Array of 24576 values',
-		});
-		expect(
-			respond(temperatureRequest({ start: { solvedFor: direct().solvedFor } })),
-		).toEqual({
-			id: 30,
-			kind: 'temperature',
-			ok: false,
-			error: 'A start must hold a state or months',
-		});
 		const short = {
 			...direct().state,
 			temperatureK: new Float64Array(5),
@@ -456,6 +429,51 @@ describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
 			ok: false,
 			error: expect.stringContaining('temperatureK'),
 		});
+	});
+
+	it('answers a start on another grid than the world is solved on with a failure, rather than throwing', () => {
+		// A world of 128 cells per face edge is solved on the 64 grid, so a
+		// state on its own grid is on the wrong one.
+		const world = createBlankWorld(128);
+		const cells = 6 * 128 * 128;
+		const fine = {
+			temperatureK: new Float64Array(cells).fill(280),
+			previousK: new Float64Array(cells).fill(280),
+			referenceCoolingK: new Float64Array(cells),
+			stepSeconds: direct().state.stepSeconds,
+		};
+		const { response, transfer } = handleRequest(
+			structuredClone({
+				id: 33,
+				kind: 'temperature',
+				world,
+				start: { state: fine, solvedFor: temperatureConditions(world) },
+			}),
+		);
+		expect(response).toEqual({
+			id: 33,
+			kind: 'temperature',
+			ok: false,
+			error:
+				'A starting state must be on the grid of 64 cells per face edge, which this world is solved on, 24576 values an array; its temperatureK holds 98304',
+		});
+		expect(transfer).toEqual([]);
+	});
+
+	it('cannot be made to solve on the world’s own grid by a message', () => {
+		const world = createBlankWorld(128);
+		const { response } = handleRequest(
+			structuredClone({
+				id: 34,
+				kind: 'temperature',
+				world,
+				fullResolution: true,
+				options: { fullResolution: true },
+			}),
+		);
+		const result = resultOf(response);
+		expect(result.months[0]).toHaveLength(6 * 128 * 128);
+		expect(result.state.temperatureK).toHaveLength(6 * 64 * 64);
 	});
 
 	it('answers a start of the wrong form with a failure, and transfers nothing', () => {

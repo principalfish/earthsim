@@ -14,7 +14,6 @@
  * plain data that survives a structured clone.
  */
 
-import { MONTHS_PER_YEAR } from './insolation';
 import {
 	PLANET_SETTINGS,
 	type PlanetSetting,
@@ -69,9 +68,8 @@ type SimExtras = {
 	readonly temperature: {
 		/**
 		 * Where the solve starts from: usually the previous result for the
-		 * world, its months, its state and the sea level and planet it was
-		 * solved for, from before an edit. Left out, the solve starts from
-		 * nothing.
+		 * world, its state and the sea level and planet it was solved for,
+		 * from before an edit. Left out, the solve starts from nothing.
 		 */
 		readonly start?: TemperatureStart;
 	};
@@ -161,7 +159,6 @@ const isStateShaped = (value: unknown): boolean =>
 	isRecord(value) &&
 	value.temperatureK instanceof Float64Array &&
 	value.previousK instanceof Float64Array &&
-	value.guessK instanceof Float64Array &&
 	value.referenceCoolingK instanceof Float64Array &&
 	typeof value.stepSeconds === 'number';
 
@@ -184,22 +181,18 @@ const isConditionsShaped = (value: unknown): value is TemperatureConditions =>
 
 /**
  * Whether a value has the form of a start for a temperature solve: an
- * object with a record of the sea level and planet it was solved for,
- * whose months, if it has them, are an array of exactly 12 Float32Arrays,
- * one a month, and whose state, if it has one, is of the form of a
- * result's state.
+ * object with a record of the sea level and planet it was solved for and a
+ * state of the form of a result's state.
  *
  * @remarks
- * As for a world, the months and the state are checked for their form
- * only. How many values each month and the state hold and what the values
- * are is for the solver to refuse, as it does a start that has neither
- * months nor a state. The record is small and is checked in full.
+ * As for a world, the state is checked for its form only. How many values
+ * its arrays hold, the grid they are on included, and what the values are
+ * is for the solver to refuse. The record is small and is checked in full.
  */
 const isTemperatureStartShaped = (value: unknown): value is TemperatureStart =>
 	isRecord(value) &&
 	isConditionsShaped(value.solvedFor) &&
-	(value.months === undefined || isTwelveMonths(value.months)) &&
-	(value.state === undefined || isStateShaped(value.state));
+	isStateShaped(value.state);
 
 /** A copy of a checked record, holding only the sea level and planet. */
 const copyConditions = (
@@ -210,31 +203,6 @@ const copyConditions = (
 		planet[name] = conditions.planet[name];
 	}
 	return { seaLevel: conditions.seaLevel, planet: planet as PlanetSettings };
-};
-
-/**
- * Whether a value is an array of exactly 12 Float32Arrays, none missing.
- *
- * @remarks
- * The number of months is checked before any month is looked at. An array
- * can claim a length of up to 2^32 - 1 while holding nothing, and it keeps
- * that length through the copy a worker is sent; walking every place in it
- * would hold up the worker for as long as that takes.
- *
- * Then each of the 12 places is looked at in turn, rather than with
- * `every`, which passes over an empty place in a sparse array: an empty
- * place is a missing month, and refused as one.
- */
-const isTwelveMonths = (value: unknown): boolean => {
-	if (!Array.isArray(value) || value.length !== MONTHS_PER_YEAR) {
-		return false;
-	}
-	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
-		if (!(value[month] instanceof Float32Array)) {
-			return false;
-		}
-	}
-	return true;
 };
 
 /**
@@ -256,13 +224,12 @@ const PAYLOADS: {
 			return { world };
 		}
 		if (!isTemperatureStartShaped(start)) {
-			return "A temperature request's start must be an object whose solvedFor has a finite seaLevel and a planet of finite settings, whose months, if any, are 12 Float32Arrays and whose state, if any, has temperatureK, previousK, guessK and referenceCoolingK as Float64Arrays and stepSeconds as a number";
+			return "A temperature request's start must be an object whose solvedFor has a finite seaLevel and a planet of finite settings and whose state has temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number";
 		}
 		// Only what a solve starts from is taken, whatever else came with it.
 		return {
 			world,
 			start: {
-				months: start.months,
 				state: start.state,
 				solvedFor: copyConditions(start.solvedFor),
 			},
@@ -318,8 +285,10 @@ export const simFailure = (
  * @remarks
  * The request is built afresh from the fields its kind carries, so that
  * nothing else in the message reaches whatever computes it: a temperature
- * request is not given the solver's cap, tolerance or constants, whatever
- * the message says.
+ * request is not given the solver's cap, tolerance or constants, nor asked
+ * to solve on the world's own grid, whatever the message says, and of its
+ * start only the state and the record are taken, so the months of a whole
+ * result sent as a start are left behind.
  *
  * @param message - What arrived, of any type at all.
  * @returns The request, or the failure to answer it with: for a message

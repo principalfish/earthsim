@@ -37,8 +37,9 @@ export type HandledRequest = {
  * @remarks
  * Only what the request carries is passed on. A temperature request in
  * particular has no say over the solver's cap, tolerance or constants,
- * which are always the solver's own, so that no message can make a solve
- * run longer than the solver allows by default.
+ * which are always the solver's own, nor over the grid it is solved on, so
+ * that no message can make a solve run longer than the solver allows by
+ * default.
  */
 const COMPUTE: {
 	readonly [K in SimKind]: (
@@ -56,7 +57,6 @@ const temperatureBuffers = (result: TemperatureResult): ArrayBufferLike[] => [
 	...result.months.map((month) => month.buffer),
 	result.state.temperatureK.buffer,
 	result.state.previousK.buffer,
-	result.state.guessK.buffer,
 	result.state.referenceCoolingK.buffer,
 ];
 
@@ -96,10 +96,12 @@ const reasonOf = (error: unknown): string =>
  * error thrown by `onProgress`, which ends the computation.
  *
  * A temperature request is solved with the start it carries, if any, and
- * the solver's own cap, tolerance and constants. Its planet settings are
- * brought within their limits by the solver, as for any other caller.
- * While it runs, `onProgress` hears of each year as it finishes; nothing
- * else reports progress.
+ * the solver's own cap, tolerance, constants and grid. A start on another
+ * grid than the one the world is solved on, which the solver refuses, comes
+ * back as a failure like any other. Its planet settings are brought within
+ * their limits by the solver, as for any other caller. While it runs,
+ * `onProgress` hears of each year as it finishes; nothing else reports
+ * progress.
  *
  * Nothing is kept between calls, and the world and start in the request
  * are only read, never changed.
@@ -109,7 +111,7 @@ const reasonOf = (error: unknown): string =>
  * @param onProgress - Told how far the computation has come, while it
  * runs, with the request's id and kind. Left out, nobody is told.
  * @returns The response to post back, and its transfer list: for a
- * temperature result, the buffers of its twelve months and of the four
+ * temperature result, the buffers of its twelve months and of the three
  * arrays of its state; for anything else, nothing.
  */
 export const handleRequest = (

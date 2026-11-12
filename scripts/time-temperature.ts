@@ -5,21 +5,29 @@
  * Run with `npm run time:temperature`. It prints Markdown tables:
  *
  * - solve times at every resolution for the Earth preset and a generated
- *   world, from nothing and started from the converged answer after two
- *   small edits (a patch of land raised by 500 m, which carries on from the
+ *   world, from nothing as the page solves it (on the grid a step coarser
+ *   above 64 cells per face edge) and, above 64, on the world's own grid
+ *   beside it, and started from the page's converged answer after two small
+ *   edits (a patch of land raised by 500 m, which carries on from the
  *   answer's end state, and the sea level raised by 10 m, which sets the
  *   start aside and so is a solve from nothing), with the years each solve
  *   ran and whether it converged;
+ * - above 64 cells per face edge, how far the page's solve lies from the
+ *   one on the world's own grid: the area-weighted root-mean-square
+ *   difference over every cell and month, and the worst cells, where they
+ *   are, whether land or sea, their height and whether they lie within one
+ *   coarse cell of a coast;
  * - the Earth at the coarsest resolution with its sea level taken 6,000 m
  *   down and back up in steps of 500 m, each solve started from the last
  *   result as the page starts it: at each level on the way up, the largest
  *   difference from a solve of that world from nothing, which is 0 when
  *   each start is set aside, as a change of sea level sets it;
- * - the simulated Earth against the observed temperature at every
- *   resolution: the area-weighted mean and root-mean-square difference for
- *   each month and for the annual mean, the global and tropical means, the
- *   mean by bands of latitude, July less January by hemisphere over land
- *   and ocean, and the bands and months with the largest errors.
+ * - the simulated Earth, as the page solves it, against the observed
+ *   temperature at every resolution: the area-weighted mean and
+ *   root-mean-square difference for each month and for the annual mean, the
+ *   global and tropical means, the mean by bands of latitude, July less
+ *   January by hemisphere over land and ocean, and the bands and months with
+ *   the largest errors.
  *
  * One solve is run first and not timed, so that the times do not include
  * the JavaScript engine's warming up. The output depends on the machine
@@ -37,6 +45,7 @@ import {
 	compareFields,
 	decodeEarth,
 	decodeObservedTemperature,
+	directionToLatLon,
 	earthWorld,
 	generateWorld,
 	getGrid,
@@ -45,6 +54,7 @@ import {
 	normaliseSeaLevel,
 	observedTemperature,
 	SUPPORTED_RESOLUTIONS,
+	solveResolution,
 	solveTemperature,
 	summariseTemperature,
 	type TemperatureResult,
@@ -87,6 +97,12 @@ const BAND_DEG = 10;
 
 /** How many of the largest errors by band and month are listed. */
 const LARGEST_ERRORS = 5;
+
+/**
+ * How many of the cells where the page's solve of the Earth lies furthest
+ * from the full one are listed.
+ */
+const WORST_CELLS = 10;
 
 const MONTH_NAMES = [
 	'January',
@@ -133,10 +149,13 @@ const signed = (value: number, digits = 1): string =>
 /** A solve and how long it took, in seconds. */
 const timed = (
 	world: World,
-	start?: TemperatureResult,
+	options: { readonly start?: TemperatureResult; readonly full?: boolean } = {},
 ): { readonly result: TemperatureResult; readonly seconds: number } => {
 	const began = performance.now();
-	const result = solveTemperature(world, start === undefined ? {} : { start });
+	const result = solveTemperature(world, {
+		...(options.start === undefined ? {} : { start: options.start }),
+		...(options.full === true ? { fullResolution: true } : {}),
+	});
 	return { result, seconds: (performance.now() - began) / 1000 };
 };
 
@@ -193,45 +212,217 @@ const highestPoint = (
 type Timing = {
 	readonly world: string;
 	readonly resolution: number;
+	/** The cells along a face edge of the grid the solve was worked out on. */
+	readonly solvedOn: number;
 	readonly start: string;
 	readonly seconds: number;
 	readonly result: TemperatureResult;
 };
 
-/** Times a world from nothing and after each edit. */
+/** A world's page solve from nothing, and its full solve where it has one. */
+type ColdSolves = {
+	readonly name: string;
+	readonly world: World;
+	readonly page: TemperatureResult;
+	/** On the world's own grid; left out at 64, where it is the page's. */
+	readonly full?: TemperatureResult;
+};
+
+/**
+ * Times a world from nothing, as the page solves it and, above 64 cells per
+ * face edge, on its own grid, and after each edit from the page's answer.
+ */
 const timeWorld = (
 	name: string,
 	world: World,
 	edit: { readonly latitude: number; readonly longitude: number },
 	timings: Timing[],
-): TemperatureResult => {
-	const cold = timed(world);
-	timings.push({
+): ColdSolves => {
+	const pageGrid = solveResolution(world.resolution);
+	const row = (start: string, solvedOn: number) => ({
 		world: name,
 		resolution: world.resolution,
-		start: 'cold',
-		...cold,
+		solvedOn,
+		start,
 	});
-	const raised = timed(
-		raisedPatch(world, edit.latitude, edit.longitude),
-		cold.result,
-	);
+	const cold = timed(world);
+	timings.push({ ...row('cold', pageGrid), ...cold });
+	let full: TemperatureResult | undefined;
+	if (pageGrid !== world.resolution) {
+		const fullCold = timed(world, { full: true });
+		timings.push({
+			...row('cold, on the world’s own grid', world.resolution),
+			...fullCold,
+		});
+		full = fullCold.result;
+	}
+	const raised = timed(raisedPatch(world, edit.latitude, edit.longitude), {
+		start: cold.result,
+	});
 	timings.push({
-		world: name,
-		resolution: world.resolution,
-		start: `warm, ${EDIT_RADIUS_DEG * 2}° patch raised ${EDIT_RAISE_M} m`,
+		...row(
+			`warm, ${EDIT_RADIUS_DEG * 2}° patch raised ${EDIT_RAISE_M} m`,
+			pageGrid,
+		),
 		...raised,
 	});
 	const flooded = copyWorld(world);
 	flooded.seaLevel = normaliseSeaLevel(world.seaLevel + SEA_LEVEL_RISE_M);
-	const risen = timed(flooded, cold.result);
+	const risen = timed(flooded, { start: cold.result });
 	timings.push({
-		world: name,
-		resolution: world.resolution,
-		start: `sea level ${SEA_LEVEL_RISE_M} m higher, start set aside`,
+		...row(`sea level ${SEA_LEVEL_RISE_M} m higher, start set aside`, pageGrid),
 		...risen,
 	});
-	return cold.result;
+	return {
+		name,
+		world,
+		page: cold.result,
+		...(full === undefined ? {} : { full }),
+	};
+};
+
+/** One cell where the page's solve and the full one differ. */
+type CellDifference = {
+	readonly cell: number;
+	/** The page's less the full, in kelvin, in the month it is largest. */
+	readonly differenceK: number;
+	readonly month: number;
+};
+
+/** How far the page's solve of a world lies from its full solve. */
+type CoarseAgainstFull = {
+	/** Area-weighted root-mean-square over every cell and month, kelvin. */
+	readonly rmsK: number;
+	/** Every cell, the largest difference first. */
+	readonly cells: readonly CellDifference[];
+};
+
+/** Compares the page's solve of a world with its full solve. */
+const coarseAgainstFull = (
+	world: World,
+	page: TemperatureResult,
+	full: TemperatureResult,
+): CoarseAgainstFull => {
+	const { areas, cellCount } = getGrid(world.resolution);
+	let squares = 0;
+	let area = 0;
+	const cells: CellDifference[] = [];
+	for (let cell = 0; cell < cellCount; cell++) {
+		let worst: CellDifference = { cell, differenceK: 0, month: 0 };
+		for (let month = 0; month < MONTHS_PER_YEAR; month++) {
+			const difference =
+				((page.months[month] as Float32Array)[cell] as number) -
+				((full.months[month] as Float32Array)[cell] as number);
+			squares += (areas[cell] as number) * difference * difference;
+			area += areas[cell] as number;
+			if (Math.abs(difference) > Math.abs(worst.differenceK)) {
+				worst = { cell, differenceK: difference, month };
+			}
+		}
+		cells.push(worst);
+	}
+	cells.sort((a, b) => Math.abs(b.differenceK) - Math.abs(a.differenceK));
+	return { rmsK: Math.sqrt(squares / area), cells };
+};
+
+/**
+ * Where a cell is and what it stands on: its latitude and longitude, land
+ * or sea and its height, and whether a cell of the other kind lies within
+ * the width of one cell of the grid the world is solved on.
+ */
+const describeCell = (world: World, cell: number): string[] => {
+	const grid = getGrid(world.resolution);
+	const direction = [
+		grid.centres[3 * cell] as number,
+		grid.centres[3 * cell + 1] as number,
+		grid.centres[3 * cell + 2] as number,
+	] as const;
+	const { latitudeDeg, longitudeDeg } = directionToLatLon(direction);
+	const isLand = (index: number): boolean =>
+		(world.elevation[index] as number) > world.seaLevel;
+	const land = isLand(cell);
+	const coarseWidth = getGrid(solveResolution(world.resolution)).cellWidth;
+	const nearCoast = cellsWithin(grid, direction, coarseWidth).some(
+		(other) => isLand(other) !== land,
+	);
+	return [
+		`${fixed(Math.abs(latitudeDeg))}°${latitudeDeg >= 0 ? 'N' : 'S'}`,
+		`${fixed(Math.abs(longitudeDeg))}°${longitudeDeg >= 0 ? 'E' : 'W'}`,
+		land ? 'land' : 'sea',
+		String(Math.round(world.elevation[cell] as number)),
+		nearCoast ? 'yes' : 'no',
+	];
+};
+
+const reportCoarseAgainstFull = (solves: readonly ColdSolves[]): void => {
+	say('## The page’s solve against the full one');
+	say();
+	say(
+		'Above 64 cells per face edge the page solves a world on the grid a step coarser and carries the sea-level temperatures back to the world’s grid, each cell then cooled by its own height. Here that is compared with the solve on the world’s own grid: the page’s less the full, in kelvin, as the root-mean-square over every cell and month weighted by area, and the cell and month where it is largest. Its height is in metres against the datum; “near a coast” means a cell of the other kind, land or sea, lies within one coarse cell’s width.',
+	);
+	say();
+	const compared = solves.flatMap((solve) =>
+		solve.full === undefined
+			? []
+			: [
+					{
+						...solve,
+						against: coarseAgainstFull(solve.world, solve.page, solve.full),
+					},
+				],
+	);
+	table(
+		[
+			'World',
+			'Cells per face edge',
+			'RMS, K',
+			'Worst, K',
+			'Month',
+			'Latitude',
+			'Longitude',
+			'Land or sea',
+			'Height, m',
+			'Near a coast',
+		],
+		compared.map(({ name, world, against }) => {
+			const worst = against.cells[0] as CellDifference;
+			return [
+				name,
+				String(world.resolution),
+				fixed(against.rmsK, 3),
+				signed(worst.differenceK, 2),
+				MONTH_NAMES[worst.month] as string,
+				...describeCell(world, worst.cell),
+			];
+		}),
+	);
+	for (const { name, world, against } of compared) {
+		if (world.origin.kind !== 'earth') {
+			continue;
+		}
+		say(
+			`The ${WORST_CELLS} worst cells of the ${name} at ${world.resolution}:`,
+		);
+		say();
+		table(
+			[
+				'Difference, K',
+				'Month',
+				'Latitude',
+				'Longitude',
+				'Land or sea',
+				'Height, m',
+				'Near a coast',
+			],
+			against.cells
+				.slice(0, WORST_CELLS)
+				.map(({ cell, differenceK, month }) => [
+					signed(differenceK, 2),
+					MONTH_NAMES[month] as string,
+					...describeCell(world, cell),
+				]),
+		);
+	}
 };
 
 /** The largest difference between two sets of monthly fields, in kelvin. */
@@ -353,7 +544,7 @@ const reportErrors = (figures: readonly EarthFigures[]): void => {
 	say('## Simulated Earth against observed');
 	say();
 	say(
-		'Simulated less observed, in kelvin, weighted by area. The annual row compares the annual means (the mean of the twelve months, cell by cell).',
+		'Simulated less observed, in kelvin, weighted by area, the simulated Earth as the page solves it. The annual row compares the annual means (the mean of the twelve months, cell by cell).',
 	);
 	say();
 	const comparisons = figures.map(({ world, simulated, observed }) =>
@@ -535,17 +726,19 @@ export const main = (args: readonly string[]): void => {
 
 	const timings: Timing[] = [];
 	const figures: EarthFigures[] = [];
+	const solves: ColdSolves[] = [];
 	for (const resolution of SUPPORTED_RESOLUTIONS) {
 		const world = earthWorld(earth, resolution);
-		const simulated = timeWorld(
+		const cold = timeWorld(
 			'Earth',
 			world,
 			{ latitude: EARTH_EDIT_LATITUDE, longitude: EARTH_EDIT_LONGITUDE },
 			timings,
 		);
+		solves.push(cold);
 		figures.push({
 			world,
-			simulated: simulated.months,
+			simulated: cold.page.months,
 			observed: observedTemperature(observedData, resolution),
 		});
 	}
@@ -555,11 +748,13 @@ export const main = (args: readonly string[]): void => {
 			seed: GENERATED_SEED,
 			landFraction: GENERATED_LAND_FRACTION,
 		});
-		timeWorld(
-			`Generated (seed ${GENERATED_SEED}, ${GENERATED_LAND_FRACTION * 100}% land)`,
-			world,
-			highestPoint(world),
-			timings,
+		solves.push(
+			timeWorld(
+				`Generated (seed ${GENERATED_SEED}, ${GENERATED_LAND_FRACTION * 100}% land)`,
+				world,
+				highestPoint(world),
+				timings,
+			),
 		);
 	}
 
@@ -568,27 +763,30 @@ export const main = (args: readonly string[]): void => {
 	say('## Solve times');
 	say();
 	say(
-		'Each edited world starts from the cold solve for the world before the edit, which is how the page uses it: `solveTemperature(edited, { start: result })`. The raised patch carries on from that result’s end state; the change of sea level sets the start aside, so its solve is one from nothing. The patch is raised around the Tibetan Plateau’s edge on the Earth and around the highest point on the generated world.',
+		'Each world is solved from nothing as the page solves it, on the grid a step coarser above 64 cells per face edge, and above 64 on the world’s own grid as well, for comparison. Each edited world starts from the page’s cold solve for the world before the edit, which is how the page uses it: `solveTemperature(edited, { start: result })`. The raised patch carries on from that result’s end state; the change of sea level sets the start aside, so its solve is one from nothing. The patch is raised around the Tibetan Plateau’s edge on the Earth and around the highest point on the generated world.',
 	);
 	say();
 	table(
 		[
 			'World',
 			'Cells per face edge',
+			'Solved on',
 			'Start',
 			'Seconds',
 			'Years run',
 			'Converged',
 		],
-		timings.map(({ world, resolution, start, seconds, result }) => [
+		timings.map(({ world, resolution, solvedOn, start, seconds, result }) => [
 			world,
 			String(resolution),
+			String(solvedOn),
 			start,
 			fixed(seconds, 2),
 			String(result.yearsRun),
 			result.converged ? 'yes' : `no (${fixed(result.finalChangeK, 3)} K)`,
 		]),
 	);
+	reportCoarseAgainstFull(solves);
 
 	say('## Sea level down and back');
 	say();

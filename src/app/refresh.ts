@@ -244,9 +244,9 @@ export type TemperatureSchedulerOptions<H> = {
 	 * Asks for the temperature of the world as it is at the moment it is
 	 * called, as a worker service's latest-wins request does.
 	 *
-	 * @param start - Where the solve starts from: the last result to be
-	 * completed, its months, state and the sea level and planet it was
-	 * solved for, or nothing if there is none.
+	 * @param start - Where the solve starts from: the state of the last
+	 * result to be completed and the sea level and planet it was solved for,
+	 * without its months, or nothing if there is none.
 	 * @param onProgress - To be told how far the solve has come.
 	 */
 	readonly request: (
@@ -316,15 +316,17 @@ export type TemperatureScheduler = {
  * result is kept, as current if nothing has changed since it was asked
  * for and as out of date if something has.
  *
- * Each request starts from the last result to be completed, its months,
- * state and record of the sea level and planet it was solved for whole,
- * so that a solve after a small edit settles in fewer years; the solver
- * itself sets the start aside after a change of sea level or planet, or
- * once the terrain has drifted far enough. That result stays on hand, in
- * the store, until a newer one is completed: a request that is overtaken
- * or fails costs nothing of it.
- * After `reset` there is none, so the first solve of a new world starts
- * from nothing.
+ * Each request starts from the last result to be completed, so that a
+ * solve after a small edit settles in fewer years: its state and its
+ * record of the sea level and planet it was solved for are handed on, and
+ * its months are not, since a start has no use for them and they are the
+ * bulk of a result (about 19 MB on a world of 256 cells per face edge),
+ * which a request would copy to the worker. The solver itself sets the
+ * start aside after a change of sea level or planet, or once the terrain
+ * has drifted far enough. That result stays on hand, in the store, until a
+ * newer one is completed: a request that is overtaken or fails costs
+ * nothing of it. After `reset` there is none, so the first solve of a new
+ * world starts from nothing.
  *
  * In the store, the status becomes `calculating` when a request is made
  * and the progress follows the solve of the newest request. Progress from
@@ -355,20 +357,15 @@ export const createTemperatureScheduler = <H>(
 			const mine = ++asked;
 			store.markCalculating();
 			const previous = store.temperature.result;
-			return options.request(
+			const start: TemperatureStart | undefined =
 				previous === null
 					? undefined
-					: {
-							months: previous.months,
-							state: previous.state,
-							solvedFor: previous.solvedFor,
-						},
-				(progress) => {
-					if (mine === asked) {
-						store.setProgress(progress);
-					}
-				},
-			);
+					: { state: previous.state, solvedFor: previous.solvedFor };
+			return options.request(start, (progress) => {
+				if (mine === asked) {
+					store.setProgress(progress);
+				}
+			});
 		},
 		debounceMs: options.debounceMs,
 		setTimer: options.setTimer,

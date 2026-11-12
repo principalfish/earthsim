@@ -122,6 +122,11 @@ type Level = {
 	readonly mass: Float64Array;
 	/** The diagonal of the matrix: mass plus coupling sum. */
 	readonly diagonal: Float64Array;
+	/**
+	 * One over the diagonal, so that a sweep multiplies where it would
+	 * divide.
+	 */
+	readonly inverseDiagonal: Float64Array;
 	/** The coarse cell each cell merges into; empty on the coarsest level. */
 	readonly parent: Int32Array;
 	/** The level's answer. */
@@ -159,6 +164,7 @@ const newLevel = (
 		couplingSum,
 		mass: new Float64Array(count),
 		diagonal: new Float64Array(count),
+		inverseDiagonal: new Float64Array(count),
 		parent: new Int32Array(n > COARSEST_N ? count : 0),
 		x: x ?? new Float64Array(count),
 		b: b ?? new Float64Array(count),
@@ -257,7 +263,7 @@ const multiply = (level: Level, x: Float64Array, y: Float64Array): number => {
  * cells, or backwards.
  */
 const sweep = (level: Level, forwards: boolean): void => {
-	const { count, neighbours, coupling, diagonal, x, b } = level;
+	const { count, neighbours, coupling, inverseDiagonal, x, b } = level;
 	const step = forwards ? 1 : -1;
 	const end = forwards ? count : -1;
 	for (let cell = forwards ? 0 : count - 1; cell !== end; cell += step) {
@@ -271,8 +277,8 @@ const sweep = (level: Level, forwards: boolean): void => {
 				(coupling[first + 2] as number) *
 					(x[neighbours[first + 2] as number] as number) +
 				(coupling[first + 3] as number) *
-					(x[neighbours[first + 3] as number] as number)) /
-			(diagonal[cell] as number);
+					(x[neighbours[first + 3] as number] as number)) *
+			(inverseDiagonal[cell] as number);
 	}
 };
 
@@ -437,8 +443,10 @@ export const createExchangeSolver = (
 		}
 		for (const level of levels) {
 			for (let cell = 0; cell < level.count; cell++) {
-				level.diagonal[cell] =
+				const diagonal =
 					(level.mass[cell] as number) + (level.couplingSum[cell] as number);
+				level.diagonal[cell] = diagonal;
+				level.inverseDiagonal[cell] = 1 / diagonal;
 			}
 		}
 		factor.fill(0);

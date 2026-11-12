@@ -25,7 +25,6 @@ const world = createBlankWorld(64);
 const state = (): TemperatureState => ({
 	temperatureK: new Float64Array(3),
 	previousK: new Float64Array(3),
-	guessK: new Float64Array(3),
 	referenceCoolingK: new Float64Array(3),
 	stepSeconds: 1,
 });
@@ -40,7 +39,7 @@ const months = (): Float32Array[] =>
 	Array.from({ length: 12 }, () => new Float32Array(3));
 
 const BAD_START =
-	"A temperature request's start must be an object whose solvedFor has a finite seaLevel and a planet of finite settings, whose months, if any, are 12 Float32Arrays and whose state, if any, has temperatureK, previousK, guessK and referenceCoolingK as Float64Arrays and stepSeconds as a number";
+	"A temperature request's start must be an object whose solvedFor has a finite seaLevel and a planet of finite settings and whose state has temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number";
 
 const PROGRESS: TemperatureProgress = {
 	yearsDone: 2,
@@ -282,7 +281,7 @@ describe('parseSimRequest for temperature', () => {
 		});
 	});
 
-	it('keeps the very months and state of a start, a copy of its record, and nothing else of it', () => {
+	it('keeps the very state of a start and a copy of its record, and nothing else of it, a whole result’s months included', () => {
 		const record = solvedFor();
 		const start = {
 			months: months(),
@@ -305,10 +304,10 @@ describe('parseSimRequest for temperature', () => {
 			id: 3,
 			kind: 'temperature',
 			world,
-			start: { months: start.months, state: start.state, solvedFor: record },
+			start: { state: start.state, solvedFor: record },
 		});
 		const { start: kept } = parsed as SimRequest<'temperature'>;
-		expect(kept?.months).toBe(start.months);
+		expect(kept).not.toHaveProperty('months');
 		expect(kept?.state).toBe(start.state);
 		expect(kept?.state?.referenceCoolingK).toBe(start.state.referenceCoolingK);
 		expect(kept).not.toHaveProperty('yearsRun');
@@ -332,7 +331,7 @@ describe('parseSimRequest for temperature', () => {
 		);
 	});
 
-	it('takes no cap, tolerance, constants or callback from the message', () => {
+	it('takes no cap, tolerance, constants, grid or callback from the message', () => {
 		const parsed = parseSimRequest({
 			id: 4,
 			kind: 'temperature',
@@ -340,18 +339,29 @@ describe('parseSimRequest for temperature', () => {
 			maxYears: 1,
 			tolerance: 100,
 			model: { stepsPerMonth: 1 },
+			fullResolution: true,
 			onYear: 'call me',
 		});
 		expect(parsed).toEqual({ id: 4, kind: 'temperature', world });
 		expect(Object.keys(parsed)).toEqual(['id', 'kind', 'world']);
+		const started = parseSimRequest({
+			id: 4,
+			kind: 'temperature',
+			world,
+			start: { state: state(), solvedFor: solvedFor(), fullResolution: true },
+		}) as SimRequest<'temperature'>;
+		expect(Object.keys(started.start ?? {})).toEqual(['state', 'solvedFor']);
 	});
 
 	it('leaves the lengths of the fields and the values of a start for the solver to judge', () => {
 		for (const start of [
-			{ solvedFor: solvedFor() },
-			Object.assign([], { solvedFor: solvedFor() }),
+			Object.assign([], { state: state(), solvedFor: solvedFor() }),
 			{
-				months: Array.from({ length: 12 }, () => new Float32Array(1)),
+				state: {
+					...state(),
+					temperatureK: new Float64Array(6 * 128 * 128),
+					previousK: new Float64Array(6 * 128 * 128),
+				},
 				solvedFor: solvedFor(),
 			},
 			{
@@ -375,18 +385,13 @@ describe('parseSimRequest for temperature', () => {
 			null,
 			'last time',
 			5,
-			{ months: 'twelve' },
-			{ months: [new Float64Array(3)] },
-			{ months: [[1, 2, 3]] },
-			{ months: [...months().slice(1), null] },
-			{ months: [] },
-			{ months: months().slice(1) },
-			{ months: [...months(), new Float32Array(3)] },
+			{},
+			{ months: months() },
 			{ state: null },
 			{ state: [] },
 			{ state: { ...state(), temperatureK: new Float32Array(3) } },
 			{ state: { ...state(), previousK: [0, 0, 0] } },
-			{ state: { ...state(), guessK: undefined } },
+			{ state: { ...state(), previousK: undefined } },
 			{ state: { ...state(), referenceCoolingK: undefined } },
 			{ state: { ...state(), referenceCoolingK: new Float32Array(3) } },
 			{ state: { ...state(), referenceCoolingK: [0, 0, 0] } },
@@ -426,15 +431,11 @@ describe('parseSimRequest for temperature', () => {
 			},
 			{ ...record, planet: { ...record.planet, orbitDistanceAu: Number.NaN } },
 		]) {
-			for (const start of [
-				{ state: state(), solvedFor: solved },
-				{ months: months(), solvedFor: solved },
-			]) {
-				expect(
-					refusal({ id: 6, kind: 'temperature', world, start }),
-					JSON.stringify(solved),
-				).toEqual({ id: 6, kind: 'temperature', ok: false, error: BAD_START });
-			}
+			const start = { state: state(), solvedFor: solved };
+			expect(
+				refusal({ id: 6, kind: 'temperature', world, start }),
+				JSON.stringify(solved),
+			).toEqual({ id: 6, kind: 'temperature', ok: false, error: BAD_START });
 		}
 		expect(
 			refusal({
@@ -444,39 +445,6 @@ describe('parseSimRequest for temperature', () => {
 				start: { months: months(), state: state() },
 			}),
 		).toEqual({ id: 6, kind: 'temperature', ok: false, error: BAD_START });
-	});
-
-	it('refuses months that claim an enormous length at once, without walking them', () => {
-		// Holds nothing, so walking every place in it would take seconds
-		// rather than the moment this test takes.
-		const huge: unknown[] = [];
-		huge.length = 2 ** 32 - 1;
-		expect(
-			refusal({
-				id: 6,
-				kind: 'temperature',
-				world,
-				start: { months: huge, solvedFor: solvedFor() },
-			}),
-		).toEqual({ id: 6, kind: 'temperature', ok: false, error: BAD_START });
-	});
-
-	it('refuses months with an empty place as missing a month', () => {
-		const empty: unknown[] = [];
-		empty.length = 12;
-		const holed: unknown[] = months();
-		delete holed[5];
-		for (const sparse of [empty, holed]) {
-			expect(sparse).toHaveLength(12);
-			expect(
-				refusal({
-					id: 6,
-					kind: 'temperature',
-					world,
-					start: { months: sparse, solvedFor: solvedFor() },
-				}),
-			).toEqual({ id: 6, kind: 'temperature', ok: false, error: BAD_START });
-		}
 	});
 
 	it('takes no start for the statistics, whatever it holds', () => {

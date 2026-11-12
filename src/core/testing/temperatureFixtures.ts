@@ -30,7 +30,6 @@ export const temperatureOf = (
 	state: {
 		temperatureK: new Float64Array(cells),
 		previousK: new Float64Array(cells),
-		guessK: new Float64Array(cells),
 		referenceCoolingK: new Float64Array(cells),
 		stepSeconds: 1,
 	},
