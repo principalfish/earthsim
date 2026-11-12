@@ -1,11 +1,11 @@
 # Resume: add-seasonal-temperature-layer-and-planet-controls
 
-_Updated 2026-11-12, with piece 6 committed and piece 7 waiting for the user's go-ahead._
+_Updated 2026-11-12, with piece 7 built and waiting for its manual review._
 
 ## Where it stands
 
 - Pieces 1 to 6 of 11 are committed and pushed: `8390675`, `0c19852`, `4a1e290`, `1445e44`, `ff500c7`, `533ef95`. Branch `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa`, draft PR #4, GitHub issue #3.
-- Piece 6 was committed on 2026-11-12 after the user's manual review ("Tried it, ramp A"), with ramp B and the Ramp A | B switch removed first. The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 7 and starts it only on the user's go-ahead.
+- Piece 6 was committed on 2026-11-12 after the user's manual review ("Tried it, ramp A"). Piece 7 was started on the user's "Start it" and is built, uncommitted in the builder's worktree (HEAD still `533ef95`); checks pass and the analysis loop is clean. The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has sent its review request and commits only on the user's approval relayed with their words.
 - Pieces 7 to 11 each have a manual review: relay an approval only when the user's words say they tried it.
 
 ## Pending with the user
