@@ -12,7 +12,7 @@ _Updated 2026-11-12, with piece 6 committed and piece 7 waiting for the user's g
 
 Nothing. The user started piece 7 on 2026-11-12 ("Start it") with: seasonal range "Its own ramp"; date wording "Follow the view"; date placement "In the panel". The builder stops with a review request; give the review briefing leading with the manual review, and relay approval only when the user's words say they tried it.
 
-An independent subagent of the planner chat is still assessing solver speed-ups (see Notes); feed its findings back to the user when it reports.
+The speed-up assessment is done and filed as `investigations/2026-11-12-temperature-solver-speed-up-assessment.md`. Its findings were fed back to the user on 2026-11-12 with a question still open: add the speed-ups (three small solver fixes, then solving 256 worlds on the 128 grid; about 5.5 times at 256 together, 0.07 K RMS) to this issue as a new piece before the planet panel, or keep "Decide after piece 8". If added, the piece needs planning first: where the resumable state lives for a 256 world, a cheap stand-in for the warm-start fallback test, and whether 128 worlds also solve one level coarser.
 
 Still to raise later: after piece 8, solving 256 worlds on the 128 grid ("Decide after piece 8"); at piece 8, the trust band for the sunlight note (builder suggests 0.85 to 1.25 times Earth's sunlight). Unrelated follow-up the builder noticed: in Terrain view a world exactly at sea level shows speckled land and sea colours (predates this issue; the user was told, nothing decided).
 
