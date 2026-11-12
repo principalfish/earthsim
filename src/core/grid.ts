@@ -152,6 +152,31 @@ export type Grid = {
 	readonly neighbours: Int32Array;
 };
 
+/**
+ * The geometry of the edges between neighbouring cells, which heat or any
+ * other quantity crosses when it passes from cell to cell.
+ *
+ * @remarks
+ * Every array is `4 * cellCount` long and laid out like
+ * {@link Grid.neighbours}: the entry at `4c + k` belongs to the edge between
+ * cell `c` and its `k`th neighbour. Each edge appears twice, once from each
+ * side, and both entries hold the same value exactly. All lengths are on the
+ * unit sphere, in radians.
+ */
+export type EdgeGeometry = {
+	/** The great-circle length of the edge the two cells share. */
+	readonly lengths: Float64Array;
+	/** The great-circle distance between the two cells' centres. */
+	readonly distances: Float64Array;
+	/**
+	 * The length of the shared edge over the distance between the centres:
+	 * a positive, dimensionless number near 1. A flux down a gradient
+	 * between two cells, `D · (T_j − T_i) / distance` per unit edge length,
+	 * crosses the whole edge as `D · weight · (T_j − T_i)`.
+	 */
+	readonly weights: Float64Array;
+};
+
 /** Working memory for {@link cellsWithin}, kept per grid between calls. */
 type FloodScratch = {
 	/** The search that last reached each cell. */
@@ -168,6 +193,7 @@ const MAX_SEARCH = 0xffffffff;
 
 const GRIDS = new Map<number, Grid>();
 const FLOOD_SCRATCH = new WeakMap<Grid, FloodScratch>();
+const EDGE_GEOMETRY = new WeakMap<Grid, EdgeGeometry>();
 
 const dot = (a: Vec3, b: Vec3): number =>
 	a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -594,6 +620,151 @@ export const cellAt = (grid: Grid, direction: Vec3): number => {
 	const i = Math.min(n - 1, Math.max(0, Math.floor(s * n)));
 	const j = Math.min(n - 1, Math.max(0, Math.floor(t * n)));
 	return (face * n + j) * n + i;
+};
+
+/**
+ * The great-circle angle between two unit vectors held in arrays, in
+ * radians.
+ *
+ * @remarks
+ * The arctangent of the cross product's length over the dot product keeps
+ * full precision for the small angles between neighbouring points, where an
+ * arccosine of the dot product would lose half its digits.
+ */
+const arcBetween = (
+	a: Float64Array,
+	aOffset: number,
+	b: Float64Array,
+	bOffset: number,
+): number => {
+	const ax = a[aOffset] as number;
+	const ay = a[aOffset + 1] as number;
+	const az = a[aOffset + 2] as number;
+	const bx = b[bOffset] as number;
+	const by = b[bOffset + 1] as number;
+	const bz = b[bOffset + 2] as number;
+	const cx = ay * bz - az * by;
+	const cy = az * bx - ax * bz;
+	const cz = ax * by - ay * bx;
+	return Math.atan2(
+		Math.sqrt(cx * cx + cy * cy + cz * cz),
+		ax * bx + ay * by + az * bz,
+	);
+};
+
+/**
+ * The directions of the corners of one face's cells: corner `(i, j)`, for
+ * `i` and `j` from 0 to n, at `3 * (j * (n + 1) + i)`.
+ */
+const faceCorners = (n: number, face: number): Float64Array => {
+	const { normal, u, v } = faceAxes(face);
+	const stride = n + 1;
+	const tangents = new Float64Array(stride);
+	for (let k = 0; k <= n; k++) {
+		tangents[k] = Math.tan((k / n - 0.5) * HALF_PI);
+	}
+	// The face edges exactly, so that corners on a cube edge are the same
+	// points seen from either face.
+	tangents[0] = -1;
+	tangents[n] = 1;
+	const corners = new Float64Array(3 * stride * stride);
+	let offset = 0;
+	for (let j = 0; j <= n; j++) {
+		const b = tangents[j] as number;
+		for (let i = 0; i <= n; i++) {
+			const a = tangents[i] as number;
+			const scale = 1 / Math.sqrt(1 + a * a + b * b);
+			corners[offset] = (normal[0] + a * u[0] + b * v[0]) * scale;
+			corners[offset + 1] = (normal[1] + a * u[1] + b * v[1]) * scale;
+			corners[offset + 2] = (normal[2] + a * u[2] + b * v[2]) * scale;
+			offset += 3;
+		}
+	}
+	return corners;
+};
+
+const buildEdgeGeometry = (grid: Grid): EdgeGeometry => {
+	const { n, cellCount, centres, neighbours: all } = grid;
+	const size = NEIGHBOUR_COUNT * cellCount;
+	const lengths = new Float64Array(size);
+	const distances = new Float64Array(size);
+	const weights = new Float64Array(size);
+	const stride = n + 1;
+	// The corners at the two ends of each side of a cell, in neighbour
+	// order (-i, +i, -j, +j), as offsets from the cell's corner (i, j).
+	const firstEnd = [0, 1, 0, stride];
+	const secondEnd = [stride, stride + 1, 1, stride + 1];
+	let cell = 0;
+	for (let face = 0; face < FACE_COUNT; face++) {
+		const corners = faceCorners(n, face);
+		for (let j = 0; j < n; j++) {
+			for (let i = 0; i < n; i++) {
+				const low = j * stride + i;
+				for (let side = 0; side < NEIGHBOUR_COUNT; side++) {
+					const neighbour = all[NEIGHBOUR_COUNT * cell + side] as number;
+					// Each pair is measured once, from the lower-numbered cell,
+					// and written to both sides, so the two entries are equal
+					// exactly.
+					if (neighbour < cell) {
+						continue;
+					}
+					const length = arcBetween(
+						corners,
+						3 * (low + (firstEnd[side] as number)),
+						corners,
+						3 * (low + (secondEnd[side] as number)),
+					);
+					const distance = arcBetween(
+						centres,
+						3 * cell,
+						centres,
+						3 * neighbour,
+					);
+					const weight = length / distance;
+					const back = NEIGHBOUR_COUNT * neighbour;
+					let reverse = 0;
+					while (all[back + reverse] !== cell) {
+						reverse++;
+					}
+					const entry = NEIGHBOUR_COUNT * cell + side;
+					lengths[entry] = length;
+					distances[entry] = distance;
+					weights[entry] = weight;
+					lengths[back + reverse] = length;
+					distances[back + reverse] = distance;
+					weights[back + reverse] = weight;
+				}
+				cell++;
+			}
+		}
+	}
+	return { lengths, distances, weights };
+};
+
+/**
+ * The length of every edge between neighbouring cells, the distance between
+ * their centres and the ratio of the two, built on first use for each grid
+ * and then shared.
+ *
+ * @remarks
+ * Each edge is measured once, from whichever of its two cells has the lower
+ * index, and the values are written to both cells' entries, so they agree
+ * exactly; a flux computed from them and applied with opposite signs to the
+ * two cells moves a quantity without creating or losing any. An edge on a
+ * cube edge is measured between corners placed exactly on it, so it is the
+ * same arc seen from either face.
+ *
+ * The arrays are shared and must be treated as read-only.
+ *
+ * @param grid - The grid whose edges to measure.
+ */
+export const edgeGeometry = (grid: Grid): EdgeGeometry => {
+	let geometry = EDGE_GEOMETRY.get(grid);
+	if (geometry === undefined) {
+		geometry = buildEdgeGeometry(grid);
+		EDGE_GEOMETRY.set(grid, geometry);
+	}
+	return geometry;
 };
 
 const floodScratch = (grid: Grid): FloodScratch => {

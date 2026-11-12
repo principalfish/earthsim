@@ -9,6 +9,7 @@ import {
 	DEFAULT_RESOLUTION,
 	directionToFace,
 	directionToLatLon,
+	edgeGeometry,
 	FACE_AXES,
 	FACE_COUNT,
 	faceToDirection,
@@ -756,3 +757,142 @@ describe.each(SUPPORTED_RESOLUTIONS)('grid at %i cells per face edge', (n) => {
 		expect(first).toEqual(copy);
 	});
 });
+
+describe.each(SUPPORTED_RESOLUTIONS)(
+	'edge geometry at %i cells per face edge',
+	(n) => {
+		const grid = getGrid(n);
+		const { lengths, distances, weights } = edgeGeometry(grid);
+
+		/** The side of `neighbour` that faces `cell`. */
+		const sideFacing = (neighbour: number, cell: number): number => {
+			for (let side = 0; side < NEIGHBOUR_COUNT; side++) {
+				if (grid.neighbours[NEIGHBOUR_COUNT * neighbour + side] === cell) {
+					return side;
+				}
+			}
+			throw new Error(`Cell ${neighbour} does not neighbour ${cell}`);
+		};
+
+		it('is built once per grid and laid out like the neighbours', () => {
+			expect(edgeGeometry(grid)).toBe(edgeGeometry(grid));
+			for (const values of [lengths, distances, weights]) {
+				expect(values).toHaveLength(NEIGHBOUR_COUNT * grid.cellCount);
+			}
+		});
+
+		it('gives each edge exactly the same values from both sides', () => {
+			let mismatches = 0;
+			for (let cell = 0; cell < grid.cellCount; cell++) {
+				for (let side = 0; side < NEIGHBOUR_COUNT; side++) {
+					const entry = NEIGHBOUR_COUNT * cell + side;
+					const neighbour = grid.neighbours[entry] as number;
+					const back =
+						NEIGHBOUR_COUNT * neighbour + sideFacing(neighbour, cell);
+					if (
+						weights[entry] !== weights[back] ||
+						lengths[entry] !== lengths[back] ||
+						distances[entry] !== distances[back]
+					) {
+						mismatches++;
+					}
+				}
+			}
+			expect(mismatches).toBe(0);
+		});
+
+		it('is positive and finite everywhere, and the weight is length over distance', () => {
+			let bad = 0;
+			for (let entry = 0; entry < weights.length; entry++) {
+				const weight = weights[entry] as number;
+				const length = lengths[entry] as number;
+				const distance = distances[entry] as number;
+				if (
+					!(weight > 0 && Number.isFinite(weight)) ||
+					!(length > 0 && length < grid.cellWidth * 1.01) ||
+					!(distance > 0 && distance < 2 * grid.cellWidth) ||
+					weight !== length / distance
+				) {
+					bad++;
+				}
+			}
+			expect(bad).toBe(0);
+		});
+
+		it('weighs edges near 1 at the middle of each face', () => {
+			for (let face = 0; face < FACE_COUNT; face++) {
+				const cell = cellIndex(grid, face, n / 2, n / 2);
+				for (let side = 0; side < NEIGHBOUR_COUNT; side++) {
+					expect(weights[NEIGHBOUR_COUNT * cell + side]).toBeCloseTo(1, 3);
+				}
+			}
+		});
+
+		it('measures edges whose lengths add up along the great circles of the grid', () => {
+			// The line between columns n/2 − 1 and n/2 of a face is a quarter of
+			// a great circle, from one edge of the face to the other.
+			for (let face = 0; face < FACE_COUNT; face++) {
+				let total = 0;
+				for (let j = 0; j < n; j++) {
+					const cell = cellIndex(grid, face, n / 2, j);
+					total += lengths[NEIGHBOUR_COUNT * cell] as number;
+				}
+				expect(total).toBeCloseTo(HALF_PI, 12);
+			}
+		});
+
+		it('measures the cube edges as twelve arcs of arccos(1/3)', () => {
+			// Each edge crossing a cube edge is counted from both sides.
+			let total = 0;
+			for (let cell = 0; cell < grid.cellCount; cell++) {
+				const face = Math.floor(cell / (n * n));
+				for (let side = 0; side < NEIGHBOUR_COUNT; side++) {
+					const entry = NEIGHBOUR_COUNT * cell + side;
+					const neighbour = grid.neighbours[entry] as number;
+					if (Math.floor(neighbour / (n * n)) !== face) {
+						total += lengths[entry] as number;
+					}
+				}
+			}
+			expect(total / 2).toBeCloseTo(12 * Math.acos(1 / 3), 11);
+		});
+
+		it('is the same on every face, as the cube is', () => {
+			// Every face is a turned copy of face 0, with its own axes laid out
+			// the same way, so the weight of a side depends only on where the
+			// cell sits on its face.
+			let largest = 0;
+			for (let face = 1; face < FACE_COUNT; face++) {
+				for (let j = 0; j < n; j++) {
+					for (let i = 0; i < n; i++) {
+						for (let side = 0; side < NEIGHBOUR_COUNT; side++) {
+							const a =
+								weights[NEIGHBOUR_COUNT * cellIndex(grid, 0, i, j) + side];
+							const b =
+								weights[NEIGHBOUR_COUNT * cellIndex(grid, face, i, j) + side];
+							largest = Math.max(
+								largest,
+								Math.abs((a as number) - (b as number)),
+							);
+						}
+					}
+				}
+			}
+			expect(largest).toBeLessThan(1e-12);
+		});
+
+		it('is mirror symmetric across the middle of a face', () => {
+			let largest = 0;
+			for (let j = 0; j < n; j++) {
+				for (let i = 0; i < n; i++) {
+					// The +i side of (i, j) mirrors the -i side of (n - 1 - i, j).
+					const a = weights[NEIGHBOUR_COUNT * cellIndex(grid, 2, i, j) + 1];
+					const b =
+						weights[NEIGHBOUR_COUNT * cellIndex(grid, 2, n - 1 - i, j) + 0];
+					largest = Math.max(largest, Math.abs((a as number) - (b as number)));
+				}
+			}
+			expect(largest).toBeLessThan(1e-12);
+		});
+	},
+);

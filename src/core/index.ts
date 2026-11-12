@@ -2,7 +2,9 @@
 export const CORE_VERSION = '0.0.0';
 
 export * from './brush';
+export * from './compare';
 export * from './earth';
+export * from './exchange';
 export * from './generate';
 export * from './grid';
 export * from './history';
@@ -13,4 +15,5 @@ export * from './planet';
 export * from './protocol';
 export * from './serialize';
 export * from './stats';
+export * from './temperature';
 export * from './world';

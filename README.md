@@ -56,6 +56,7 @@ Requires Node.js and npm. Run `npm install` once, then:
 - `npm run typecheck`: type-check every part of the source.
 - `npm run build:earth`: rebuild the Earth's elevation data from its source; see [Data](#data).
 - `npm run build:observed-temperature`: rebuild the Earth's observed temperature data from its source; see [Data](#data).
+- `npm run time:temperature`: time the temperature solver at every resolution, from nothing and after small edits, on the Earth and a generated world, and print the simulated Earth's error against the observed temperature, as Markdown tables. It takes a few minutes.
 
 ### Layout
 
@@ -63,6 +64,9 @@ Requires Node.js and npm. Run `npm install` once, then:
   - `src/core/serialize.ts`: the world file format, and the checks a file must pass to be read as a world.
   - `src/core/earth.ts`: reading the Earth data file, and the Earth as a world at each resolution.
   - `src/core/observed.ts`: reading the observed temperature file, and taking it onto a world's cells.
+  - `src/core/temperature.ts`: the temperature model, a seasonal energy balance on the world's grid, stepped through the year until the year repeats.
+  - `src/core/exchange.ts`: heat passed between neighbouring cells, and the multigrid-preconditioned solver for the implicit steps it needs.
+  - `src/core/compare.ts`: area-weighted error figures between two sets of monthly fields.
 - `src/app/`: the page, which imports the core.
   - `src/app/main.ts`: makes the parts of the page from the document, the globe, the worker and the browser's storage, and hands them over to be joined.
   - `src/app/wiring.ts`: joins the parts of the page together: which part hears of what, and in which order.
@@ -88,6 +92,7 @@ Requires Node.js and npm. Run `npm install` once, then:
   - `scripts/build-observed-temperature.ts`: downloads the source and writes `public/data/earth-temperature-1deg.bin`.
   - `scripts/download.ts`: downloads a source file into `.cache/` once, checked against the length and SHA-256 pinned for it.
   - `scripts/earth/`: the parts of those scripts that touch no file: what each source file must be and the checks on its download, reading the TIFF and netCDF formats, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data files for the tests, and `testing/` writes small netCDF files for them.
+  - `scripts/time-temperature.ts`: the solver's timings and the simulated Earth's error figures.
   - `scripts/run-with-vite.mjs`: runs a TypeScript script through Vite, so that it can import the core.
 
 The core is compiled without the DOM type library, and the worker and its handler with the worker's in place of it, so a `document` or `window` reference in either fails `npm run typecheck`. The project does not depend on Node's type package either, so nothing under `src/` can use a Node API; the scripts are type-checked against the few Node functions they call, declared by hand in `scripts/node.d.ts`.

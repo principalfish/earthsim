@@ -46,4 +46,31 @@ describe('core', () => {
 			expect(core, name).toHaveProperty(name);
 		}
 	});
+
+	it('exports the temperature solver and its comparison with observed', () => {
+		for (const name of [
+			'edgeGeometry',
+			'createExchangeSolver',
+			'exchangeHeat',
+			'uniformCoupling',
+			'EXCHANGE_MAX_ITERATIONS',
+			'TEMPERATURE_MODEL',
+			'DEFAULT_MAX_YEARS',
+			'DEFAULT_TOLERANCE_K',
+			'MAX_YEARS_LIMIT',
+			'MAX_STEPS_PER_MONTH',
+			'MAX_SOLVER_ITERATIONS',
+			'STATE_FALLBACK_K',
+			'MIN_STEP_SECONDS',
+			'MAX_STEP_SECONDS',
+			'stepBefore',
+			'STEFAN_BOLTZMANN',
+			'ZERO_CELSIUS_K',
+			'solveTemperature',
+			'summariseTemperature',
+			'compareFields',
+		]) {
+			expect(core, name).toHaveProperty(name);
+		}
+	});
 });

@@ -331,9 +331,15 @@ describe('encodeEarth', () => {
 		const bytes = encodeEarth(means);
 		expect(bytes.length).toBe(EARTH_DATA_BYTES);
 		const { elevation } = decodeEarth(bytes);
+		// One assertion over a count, not one per cell: several hundred
+		// thousand assertions take seconds when the run is instrumented.
+		let different = 0;
 		for (let cell = 0; cell < EARTH_DATA_CELLS; cell++) {
-			expect(elevation[cell]).toBe(means[cell]);
+			if (elevation[cell] !== means[cell]) {
+				different++;
+			}
 		}
+		expect(different).toBe(0);
 	});
 
 	it('rounds each mean to the nearest metre', () => {
