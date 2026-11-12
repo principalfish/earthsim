@@ -10,13 +10,8 @@
 import {
 	BufferAttribute,
 	BufferGeometry,
-	CubeTexture,
-	DataTexture,
-	FloatType,
 	Mesh,
-	NearestFilter,
 	PerspectiveCamera,
-	RedFormat,
 	Scene,
 	Vector3,
 	WebGLRenderer,
@@ -37,12 +32,18 @@ import {
 import { coreToThree } from './coords';
 import { buildSphereMesh, meshSegments } from './geometry';
 import {
+	type CellTexture,
+	createCellTexture,
 	createGlobeMaterial,
 	drawnSeaLevel,
 	MAX_EXAGGERATION,
 	MIN_EXAGGERATION,
+	type PreparedLayer,
+	replaceLayer,
+	showLayer,
 } from './material';
 import { clientToNdc, raySphere } from './picking';
+import type { ColourRamp, ValueRange } from './ramp';
 
 /** The most device pixels drawn per CSS pixel, to bound the cost per frame. */
 const MAX_PIXEL_RATIO = 2;
@@ -67,7 +68,9 @@ export type Globe = {
 	 * The globe keeps hold of the world's elevation array without copying
 	 * it and takes the sea level from the world, drawing it as
 	 * {@link Globe.setSeaLevel} would. After editing the array in place,
-	 * call {@link Globe.updateElevation}.
+	 * call {@link Globe.updateElevation}. A data layer shown for the world
+	 * before is dropped, so the height colours show until one is set for
+	 * this world.
 	 */
 	setWorld(world: World): void;
 	/**
@@ -104,6 +107,34 @@ export type Globe = {
 	setExaggeration(factor: number): void;
 	/** Shows or hides the outlines of the grid's cells. */
 	setGridVisible(visible: boolean): void;
+	/**
+	 * Colours the globe by a per-cell data field in place of the height, or
+	 * goes back to the height colours.
+	 *
+	 * @remarks
+	 * The relief is still raised and shaded, and the coastline is drawn as a
+	 * thin line. With no field, the globe is drawn exactly as it is when no
+	 * layer has ever been set. The globe keeps hold of the field without
+	 * copying it, so it must not be changed while shown; to show other
+	 * values, set the layer again.
+	 *
+	 * @param field - One value per cell of the world on show, in cell order,
+	 * or null to show the height colours.
+	 * @param range - The values the ramp is stretched over: below `min` is
+	 * drawn as its first colour and above `max` as its last. Needed with a
+	 * field.
+	 * @param ramp - The colours to draw the field with. Needed with a field.
+	 * @throws RangeError if a field is given without a range and a ramp, with
+	 * a range whose ends are not finite or not in order, with a ramp the
+	 * globe cannot draw, or with a length other than the world's number of
+	 * cells, or before any world is shown. The layer on show is then left as
+	 * it was.
+	 */
+	setLayer(
+		field: Float32Array | null,
+		range?: ValueRange,
+		ramp?: ColourRamp,
+	): void;
 	/**
 	 * The point of the globe under a point of the window.
 	 *
@@ -170,39 +201,7 @@ export type Globe = {
 	dispose(): void;
 };
 
-/** The elevation texture of one world and the views it uploads from. */
-type ElevationTexture = {
-	readonly texture: CubeTexture;
-	readonly resolution: number;
-	/** Each face's cells: a view into the world's array, not a copy. */
-	readonly faces: readonly Float32Array[];
-};
-
 const toVector3 = (v: Vec3): Vector3 => new Vector3(v[0], v[1], v[2]);
-
-const createElevationTexture = (world: World): ElevationTexture => {
-	const n = world.resolution;
-	const faces: Float32Array[] = [];
-	for (let face = 0; face < FACE_COUNT; face++) {
-		faces.push(world.elevation.subarray(face * n * n, (face + 1) * n * n));
-	}
-	// The grid lays its faces out as a cube map in core coordinates, so the
-	// faces go in as they are, in order and unflipped: cell (face, i, j) is
-	// texel (i, j) of that face.
-	const texture = new CubeTexture(
-		faces.map((data) => new DataTexture(data, n, n, RedFormat, FloatType)),
-	);
-	texture.format = RedFormat;
-	texture.type = FloatType;
-	// Linear filtering of float textures is an optional extension, and its
-	// blend weights are too coarse for a cell magnified over many pixels.
-	texture.magFilter = NearestFilter;
-	texture.minFilter = NearestFilter;
-	texture.generateMipmaps = false;
-	texture.flipY = false;
-	texture.needsUpdate = true;
-	return { texture, resolution: n, faces };
-};
 
 /**
  * Starts drawing a globe on a canvas.
@@ -253,7 +252,8 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 	scene.add(mesh);
 
 	let cameraState = createCameraState();
-	let elevation: ElevationTexture | null = null;
+	let elevation: CellTexture | null = null;
+	let layer: PreparedLayer | null = null;
 	let segments = 0;
 	let fullUploadPending = false;
 	let brushCursor: WindowPoint | null = null;
@@ -355,8 +355,11 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 
 	const setWorld = (world: World): void => {
 		elevation?.texture.dispose();
-		elevation = createElevationTexture(world);
+		elevation = createCellTexture(world.elevation, world.resolution);
 		fullUploadPending = true;
+		layer?.texture.dispose();
+		layer = null;
+		showLayer(uniforms, null);
 		uniforms.uElevation.value = elevation.texture;
 		uniforms.uResolution.value = world.resolution;
 		uniforms.uSeaLevel.value = drawnSeaLevel(world.seaLevel);
@@ -448,6 +451,22 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		invalidate();
 	};
 
+	const setLayer = (
+		field: Float32Array | null,
+		range?: ValueRange,
+		ramp?: ColourRamp,
+	): void => {
+		layer = replaceLayer(
+			uniforms,
+			layer,
+			elevation?.resolution ?? null,
+			field,
+			range,
+			ramp,
+		);
+		invalidate();
+	};
+
 	const setBrush = (cursor: WindowPoint | null, radius = 0): void => {
 		if (cursor === null) {
 			if (brushCursor !== null) {
@@ -502,6 +521,7 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		pixelRatioQuery.removeEventListener('change', onPixelRatioChange);
 		canvas.removeEventListener('webglcontextrestored', invalidate);
 		elevation?.texture.dispose();
+		layer?.texture.dispose();
 		mesh.geometry.dispose();
 		material.dispose();
 		renderer.dispose();
@@ -513,6 +533,7 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		setSeaLevel,
 		setExaggeration,
 		setGridVisible,
+		setLayer,
 		pick,
 		setBrush,
 		rotateBy,

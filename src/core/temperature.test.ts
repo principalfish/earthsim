@@ -640,8 +640,18 @@ describe('estimateYearsLeft', () => {
 	});
 
 	it('never says more than the cap allows', () => {
-		expect(estimateYearsLeft(1, 0.99, 0.05, 50)).toBe(50);
-		expect(estimateYearsLeft(1, 0.99, 0.05, 3)).toBe(3);
+		// 0.7 shrinking by 0.7 a year is below 0.05 after eight more.
+		expect(estimateYearsLeft(1, 0.7, 0.05, 50)).toBe(8);
+		expect(estimateYearsLeft(1, 0.7, 0.05, 3)).toBe(3);
+	});
+
+	it('has no guess for a change that shrank by less than a quarter', () => {
+		// Shrinking to three quarters is the slowest it goes by: ten more.
+		expect(estimateYearsLeft(1, 0.75, 0.05, 50)).toBe(10);
+		expect(estimateYearsLeft(1, 0.76, 0.05, 50)).toBeNull();
+		// As in the third year of a solve of the Earth, which the fourth
+		// then settles: not dozens of years to go.
+		expect(estimateYearsLeft(0.7455, 0.7375, 0.05, 57)).toBeNull();
 	});
 
 	it('says one more year for a change already below the tolerance', () => {

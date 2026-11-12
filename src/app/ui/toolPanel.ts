@@ -22,6 +22,7 @@ import {
 	createButton,
 	createElement,
 	createRangeField,
+	createSegmentedPicker,
 	type RangeScale,
 } from './fields';
 
@@ -211,53 +212,13 @@ export const historyFocusAfter = (
 	return null;
 };
 
-/** What a group of radio buttons choosing the tool is built from. */
-type ToolPickerOptions = {
-	readonly tool: Tool;
-	readonly onTool: (tool: Tool) => void;
-};
-
-/**
- * The tools as radio buttons drawn as one row of segments. Being radio
- * buttons, they are one tab stop and the arrow keys move between them.
- */
-const createToolPicker = (options: ToolPickerOptions): HTMLElement => {
-	const picker = createElement('fieldset', 'tool-picker');
-	const legend = createElement('legend', 'u-visually-hidden');
-	legend.textContent = 'Tool';
-	const row = createElement('div', 'tool-picker__options');
-
-	for (const tool of TOOLS) {
-		const option = createElement('label', 'tool-picker__option');
-
-		const input = createElement('input', 'tool-picker__input');
-		input.type = 'radio';
-		input.name = 'tool';
-		input.value = tool;
-		input.checked = tool === options.tool;
-		input.addEventListener('change', () => {
-			if (input.checked) {
-				options.onTool(tool);
-			}
-		});
-
-		const label = createElement('span', 'tool-picker__label');
-		label.textContent = TOOL_LABELS[tool];
-
-		option.append(input, label);
-		row.append(option);
-	}
-
-	picker.append(legend, row);
-	return picker;
-};
-
 /**
  * Adds the tool controls to the side panel.
  *
  * @remarks
  * The undo and redo buttons come first, side by side. A button with nothing
- * to do is disabled, which takes it out of the tab order.
+ * to do is disabled, which takes it out of the tab order. The tools follow
+ * as one row of segments.
  *
  * The two sliders belong to the brushes: with the move tool chosen they are
  * greyed out. The strength slider sets the strength of raising and lowering
@@ -340,9 +301,12 @@ export const createToolPanel = (
 	section.append(
 		heading,
 		historyRow,
-		createToolPicker({
-			tool,
-			onTool: (next) => {
+		createSegmentedPicker({
+			name: 'tool',
+			legend: 'Tool',
+			choices: TOOLS.map((value) => ({ value, label: TOOL_LABELS[value] })),
+			value: tool,
+			onChange: (next) => {
 				showTool(next);
 				options.onTool(next);
 			},

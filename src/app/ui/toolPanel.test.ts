@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	DEFAULT_BRUSH_RADIUS_KM,
 	DEFAULT_BRUSH_STRENGTH,
@@ -12,8 +12,16 @@ import {
 	TOOLS,
 } from '../sculpt';
 import {
+	byClass,
+	createFakeDocument,
+	type FakeDocument,
+	type FakeElement,
+	findAll,
+} from '../testing/fakeDocument';
+import {
 	BRUSH_RADIUS_SLIDER_STEP_KM,
 	BRUSH_STRENGTH_SLIDER_STEP,
+	createToolPanel,
 	formatKm,
 	formatSmoothSetting,
 	formatStrength,
@@ -182,5 +190,115 @@ describe('historyFocusAfter', () => {
 		for (const state of [BOTH, ONLY_UNDO, ONLY_REDO, NEITHER]) {
 			expect(historyFocusAfter(null, state)).toBeNull();
 		}
+	});
+});
+
+/** The value written beside a field's label. */
+const shownValueIn = (field: FakeElement): string | null =>
+	byClass(field, 'field__value')[0]?.textContent ?? null;
+
+describe('createToolPanel', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const make = () => {
+		const told: string[] = [];
+		const panel = fake.createElement('aside');
+		const { setHistoryState } = createToolPanel(
+			panel as unknown as HTMLElement,
+			{
+				onHistory: (action) => told.push(action),
+				onTool: (tool) => told.push(`tool ${tool}`),
+				onRadius: (km) => told.push(`radius ${km}`),
+				onStrength: (strength) => told.push(`strength ${strength}`),
+				onSmoothSetting: (setting) => told.push(`smooth ${setting}`),
+			},
+		);
+		const [section] = panel.children as [FakeElement];
+		const tools = byClass(section, 'segmented__input');
+		const field = (id: string): FakeElement => {
+			const [input] = findAll(section, (element) => element.id === id);
+			const found = input?.parentNode;
+			if (input === undefined || found === null || found === undefined) {
+				throw new Error(`No field ${id}`);
+			}
+			return found;
+		};
+		const shownValue = (id: string): string | null =>
+			byClass(field(id), 'field__value')[0]?.textContent ?? null;
+		return { told, section, tools, field, shownValue, setHistoryState };
+	};
+
+	it('offers every tool in one row of segments, starting on Move', () => {
+		const { section, tools } = make();
+		expect(tools.map((tool) => [tool.name, tool.value, tool.checked])).toEqual(
+			TOOLS.map((tool) => ['tool', tool, tool === 'move']),
+		);
+		expect(
+			byClass(section, 'segmented__label').map((label) => label.textContent),
+		).toEqual(TOOLS.map((tool) => TOOL_LABELS[tool]));
+	});
+
+	it('greys out the brush sliders for Move and brings them back for a brush', () => {
+		const { tools, field, told } = make();
+		expect(field('tool-radius').classList.contains('is-disabled')).toBe(true);
+		expect(field('tool-strength').classList.contains('is-disabled')).toBe(true);
+		fake.pick(tools[1] as FakeElement);
+		expect(told).toEqual(['tool raise']);
+		expect(field('tool-radius').classList.contains('is-disabled')).toBe(false);
+		expect(field('tool-strength').classList.contains('is-disabled')).toBe(
+			false,
+		);
+	});
+
+	it('shows the smoothing setting on the strength slider for Smooth', () => {
+		const { tools, shownValue, told } = make();
+		expect(shownValue('tool-strength')).toBe(
+			formatStrength('move', DEFAULT_BRUSH_STRENGTH),
+		);
+		fake.pick(tools[3] as FakeElement);
+		expect(told).toEqual(['tool smooth']);
+		expect(shownValue('tool-strength')).toBe(
+			formatSmoothSetting(DEFAULT_SMOOTH_SETTING),
+		);
+	});
+
+	it('passes on the radius as its slider moves', () => {
+		const { field, told } = make();
+		const [input] = findAll(
+			field('tool-radius'),
+			(element) => element.id === 'tool-radius',
+		);
+		if (input === undefined) {
+			throw new Error('No radius slider');
+		}
+		input.value = '1250';
+		input.fire('input');
+		expect(told).toEqual(['radius 1250']);
+		expect(shownValueIn(field('tool-radius'))).toBe('1,250 km');
+	});
+
+	it('moves the focus to redo when the focused undo button is disabled', () => {
+		const { section, setHistoryState } = make();
+		const [undo, redo] = byClass(section, 'button');
+		setHistoryState({ canUndo: true, canRedo: false });
+		undo?.focus();
+		setHistoryState({ canUndo: false, canRedo: true });
+		expect(undo?.disabled).toBe(true);
+		expect(fake.document.activeElement).toBe(redo);
+	});
+
+	it('passes on undo and redo from their buttons', () => {
+		const { section, told } = make();
+		const [undo, redo] = byClass(section, 'button');
+		undo?.fire('click');
+		redo?.fire('click');
+		expect(told).toEqual(['undo', 'redo']);
 	});
 });

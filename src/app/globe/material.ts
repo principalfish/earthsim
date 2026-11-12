@@ -8,23 +8,42 @@
  * reaches past a face edge reads the neighbouring face's cells, so the
  * surface is continuous over the whole sphere.
  *
+ * A data layer, such as the temperature, reaches the GPU the same way, as
+ * a second cube texture laid out like the elevation, and is read by the same
+ * sampling functions, which take the texture to read as a parameter.
+ *
  * Shape and colour are kept apart. The vertex shader raises the surface;
- * the fragment shader asks `surfaceColour` what colour a point is and then
- * shades it. A different colour source can replace `surfaceColour` without
- * touching the rest.
+ * the fragment shader asks `surfaceColour` what colour a point is, or
+ * `layerColour` while a data layer is shown, and then shades it the same
+ * way either way.
  *
  * Colours are authored and blended as display (sRGB) values and written to
  * the canvas unchanged.
  */
 
 import {
-	type CubeTexture,
+	CubeTexture,
+	DataTexture,
+	FloatType,
 	GLSL3,
 	type IUniform,
+	NearestFilter,
 	RawShaderMaterial,
+	RedFormat,
+	Vector2,
 	Vector3,
 } from 'three';
-import { normaliseSeaLevel, PLANET_RADIUS_KM } from '../../core/index';
+import {
+	FACE_COUNT,
+	normaliseSeaLevel,
+	PLANET_RADIUS_KM,
+} from '../../core/index';
+import {
+	type ColourRamp,
+	checkRamp,
+	MAX_RAMP_STOPS,
+	type ValueRange,
+} from './ramp';
 
 /** The lowest relief exaggeration the view offers: true scale. */
 export const MIN_EXAGGERATION = 1;
@@ -40,6 +59,26 @@ export const MIN_DRAWN_SEA_LEVEL_M = -6000;
 
 /** The highest sea level the globe draws, in metres against the datum. */
 export const MAX_DRAWN_SEA_LEVEL_M = 6000;
+
+/**
+ * The change in the surface's height above sea level, in metres a pixel,
+ * below which the coastline drawn over a data layer counts the surface as
+ * level and draws no line there.
+ *
+ * @remarks
+ * While a layer is shown, the height above sea level is blended from each
+ * cell's own height above it, so a stretch of cells all at the sea level,
+ * such as a blank world with the sea level moved to its floor, comes out as
+ * exactly zero, with no change from pixel to pixel at all, and has no coast
+ * to draw. A level stretch a little above or below the sea level has none
+ * either, but its height still changes from pixel to pixel by rounding,
+ * about a ten-millionth of the height, so the test is a floor on the change
+ * rather than a test for no change at all. The floor is far below the
+ * change a pixel across any real shore: even one rising a centimetre a cell
+ * changes by tens of times the floor a pixel when the view is as close as
+ * it goes.
+ */
+export const COAST_MIN_CHANGE_M = 1e-6;
 
 /**
  * The sea level the globe draws for a sea level it is given.
@@ -142,14 +181,19 @@ export const glslRamp = (name: string, stops: readonly RampStop[]): string => {
 };
 
 /**
- * Declarations and elevation sampling shared by both shaders.
+ * Declarations and the sampling of per-cell values shared by both shaders.
+ *
+ * The sampling functions read whichever cube texture they are handed, laid
+ * out one texel per cell as the elevation is, so a data layer is blended
+ * across cube edges and corners exactly as the elevation is.
+ * `elevationAt` and `elevationLinear` are those functions on the elevation.
  *
  * `faceOf` finds the cube face a direction passes through. The two in-face
  * axes it returns are not the grid's `u` and `v`: every use below treats
  * the two axes alike and is unchanged by flipping or swapping them, so any
  * pair will do.
  *
- * `cellElevation` reads one cell, addressed by whole steps along those axes
+ * `cellValue` reads one cell, addressed by whole steps along those axes
  * from the face's low corner. A cube lookup is linear in texels along each
  * face axis, so aiming at a texel centre needs no trigonometry. A cell one
  * step past an edge is the neighbouring face's nearest cell in the same
@@ -211,13 +255,13 @@ vec2 cellPosition(vec2 q) {
 	return (atan(q) / QUARTER_PI + 1.0) * 0.5 * uResolution;
 }
 
-float cellElevation(vec3 n, vec3 u, vec3 v, vec2 cell) {
+float cellValue(samplerCube field, vec3 n, vec3 u, vec3 v, vec2 cell) {
 	vec2 w = (2.0 * cell + 1.0) / uResolution - 1.0;
 	vec2 over = max(abs(w) - 1.0, 0.0);
 	vec3 lookup = (1.0 - max(over.x, over.y)) * n
 		+ clamp(w.x, -1.0, 1.0) * u
 		+ clamp(w.y, -1.0, 1.0) * v;
-	return textureLod(uElevation, lookup, 0.0).r;
+	return textureLod(field, lookup, 0.0).r;
 }
 
 // How far, in cells, the neighbouring face's cells sit along an edge from
@@ -233,9 +277,12 @@ vec2 edgeShift(vec2 p) {
 		* smoothstep(0.0, CORNER_FADE_CELLS, toCorner);
 }
 
-// Elevation in metres as a smooth surface through the cells: a quadratic
-// B-spline over the 3 x 3 cells around the point, with a continuous slope.
-float elevationAt(vec3 d) {
+// A field's value less 'offset' as a smooth surface through the cells: a
+// quadratic B-spline over the 3 x 3 cells around the point, with a
+// continuous slope. The offset is taken from each cell before the cells are
+// blended, so where every cell equals it the result is exactly zero; an
+// offset of 0.0 leaves each cell, and so the result, exactly as it is.
+float smoothValue(samplerCube field, vec3 d, float offset) {
 	vec3 n, u, v;
 	vec2 q;
 	faceOf(d, n, u, v, q);
@@ -257,15 +304,15 @@ float elevationAt(vec3 d) {
 	vec2 wm = 0.75 - f * f;
 	vec2 wh = 0.5 * (0.5 + f) * (0.5 + f);
 
-	float mm = cellElevation(n, u, v, c);
-	float lm = cellElevation(n, u, v, c + vec2(-1.0, 0.0));
-	float hm = cellElevation(n, u, v, c + vec2(1.0, 0.0));
-	float ml = cellElevation(n, u, v, c + vec2(0.0, -1.0));
-	float mh = cellElevation(n, u, v, c + vec2(0.0, 1.0));
-	float ll = cellElevation(n, u, v, c + vec2(-1.0, -1.0));
-	float hl = cellElevation(n, u, v, c + vec2(1.0, -1.0));
-	float lh = cellElevation(n, u, v, c + vec2(-1.0, 1.0));
-	float hh = cellElevation(n, u, v, c + vec2(1.0, 1.0));
+	float mm = cellValue(field, n, u, v, c) - offset;
+	float lm = cellValue(field, n, u, v, c + vec2(-1.0, 0.0)) - offset;
+	float hm = cellValue(field, n, u, v, c + vec2(1.0, 0.0)) - offset;
+	float ml = cellValue(field, n, u, v, c + vec2(0.0, -1.0)) - offset;
+	float mh = cellValue(field, n, u, v, c + vec2(0.0, 1.0)) - offset;
+	float ll = cellValue(field, n, u, v, c + vec2(-1.0, -1.0)) - offset;
+	float hl = cellValue(field, n, u, v, c + vec2(1.0, -1.0)) - offset;
+	float lh = cellValue(field, n, u, v, c + vec2(-1.0, 1.0)) - offset;
+	float hh = cellValue(field, n, u, v, c + vec2(1.0, 1.0)) - offset;
 
 	bvec2 low = lessThan(c, vec2(0.5));
 	bvec2 high = greaterThan(c, last - 0.5);
@@ -279,9 +326,9 @@ float elevationAt(vec3 d) {
 		+ wh.y * (wl.x * lh + wm.x * mh + wh.x * hh);
 }
 
-// Elevation in metres blended linearly between the four nearest cell
-// centres: continuous, cheaper than elevationAt, with a slope that jumps.
-float elevationLinear(vec3 d) {
+// A field's value blended linearly between the four nearest cell centres:
+// continuous, cheaper than smoothValue, with a slope that jumps.
+float linearValue(samplerCube field, vec3 d) {
 	vec3 n, u, v;
 	vec2 q;
 	faceOf(d, n, u, v, q);
@@ -297,10 +344,10 @@ float elevationLinear(vec3 d) {
 
 	c = floor(p);
 	f = p - c;
-	float ll = cellElevation(n, u, v, c);
-	float hl = cellElevation(n, u, v, c + vec2(1.0, 0.0));
-	float lh = cellElevation(n, u, v, c + vec2(0.0, 1.0));
-	float hh = cellElevation(n, u, v, c + vec2(1.0, 1.0));
+	float ll = cellValue(field, n, u, v, c);
+	float hl = cellValue(field, n, u, v, c + vec2(1.0, 0.0));
+	float lh = cellValue(field, n, u, v, c + vec2(0.0, 1.0));
+	float hh = cellValue(field, n, u, v, c + vec2(1.0, 1.0));
 
 	bvec2 low = lessThan(c, vec2(-0.5));
 	bvec2 high = greaterThan(c, last - 0.5);
@@ -310,6 +357,16 @@ float elevationLinear(vec3 d) {
 	if (high.x && high.y) hh = (ll + hl + lh) / 3.0;
 
 	return mix(mix(ll, hl, f.x), mix(lh, hh, f.x), f.y);
+}
+
+// Elevation in metres, smooth.
+float elevationAt(vec3 d) {
+	return smoothValue(uElevation, d, 0.0);
+}
+
+// Elevation in metres, blended linearly.
+float elevationLinear(vec3 d) {
+	return linearValue(uElevation, d);
 }
 `;
 
@@ -364,6 +421,22 @@ void main() {
  * edges unbroken and lies on the relief like a line drawn on the ground.
  * The line is light with a dark edge on each side, so it shows against both
  * sea and snow.
+ *
+ * While a data layer is shown, its value sets the colour in place of the
+ * height, through the ramp in the `uRamp` uniforms stretched over
+ * `uLayerRange`, and is shaded as the height colours are, so the relief
+ * still reads. The sea no longer differs in colour from the land there, so
+ * the coast is drawn as a thin line where the smooth elevation crosses the
+ * sea level, dark over light colours and light over dark ones. For the line,
+ * the height above sea level is blended from each cell's own height above
+ * it rather than found by taking the sea level from the blended elevation:
+ * where every cell is at the sea level it is then exactly zero, not rounding
+ * noise about zero that would speckle the line over the whole stretch, and
+ * where the surface changes by less than {@link COAST_MIN_CHANGE_M} a pixel
+ * it is level, with no crossing to mark, and gets no line. That height also
+ * decides what is land there; it differs from the terrain's only by
+ * rounding. With no layer shown, every step is as it was without one: the
+ * terrain is drawn exactly as before.
  */
 const FRAGMENT_GLSL = /* glsl */ `
 ${ELEVATION_GLSL}
@@ -371,6 +444,15 @@ uniform mat3 normalMatrix;
 uniform float uGridOpacity;
 uniform vec3 uBrushCentre;
 uniform float uBrushRadius;
+
+const int MAX_RAMP_STOPS = ${MAX_RAMP_STOPS};
+
+uniform bool uLayerShown;
+uniform samplerCube uLayer;
+uniform vec2 uLayerRange;
+uniform int uRampCount;
+uniform float uRampAt[MAX_RAMP_STOPS];
+uniform vec3 uRampColour[MAX_RAMP_STOPS];
 
 in vec3 vSurface;
 
@@ -398,6 +480,14 @@ const float GRID_FADE_TO = 7.0;
 const float BRUSH_LINE_HALF_WIDTH = 0.75;
 const float BRUSH_EDGE_WIDTH = 1.0;
 const float BRUSH_EDGE_OPACITY = 0.55;
+// Half the width of the coastline drawn over a data layer, in pixels, how
+// strongly it shows, and the brightness above which it is drawn dark.
+const float COAST_HALF_WIDTH = 0.6;
+const float COAST_OPACITY = 0.8;
+const float COAST_DARK_ABOVE = 0.45;
+// Change in the height above sea level, in metres a pixel, below which the
+// surface is level and the coastline is not drawn.
+const float COAST_MIN_CHANGE = ${glslFloat(COAST_MIN_CHANGE_M)};
 
 ${glslRamp('landColour', LAND_RAMP)}
 
@@ -407,6 +497,39 @@ ${glslRamp('oceanColour', OCEAN_RAMP)}
 // 'land' of the fragment, 0 to 1, is land.
 vec3 surfaceColour(float above, float land) {
 	return mix(oceanColour(-above), landColour(above), land);
+}
+
+// Colour along the data ramp at t, 0 at the low end and 1 at the high end,
+// blended between the stops as glslRamp's functions are.
+vec3 rampColour(float t) {
+	vec3 colour = uRampColour[0];
+	for (int i = 1; i < MAX_RAMP_STOPS; i++) {
+		if (i >= uRampCount) {
+			break;
+		}
+		float span = uRampAt[i] - uRampAt[i - 1];
+		colour = mix(colour, uRampColour[i], clamp((t - uRampAt[i - 1]) / span, 0.0, 1.0));
+	}
+	return colour;
+}
+
+// Colour of the data layer at d.
+vec3 layerColour(vec3 d) {
+	float value = smoothValue(uLayer, d, 0.0);
+	return rampColour((value - uLayerRange.x) / (uLayerRange.y - uLayerRange.x));
+}
+
+// How much of the fragment the coastline covers, 0 to 1, where the surface
+// is 'above' metres above sea level, changing by 'change' metres a pixel.
+// The line is the same width in pixels on any slope, however gentle; a
+// surface changing by less than COAST_MIN_CHANGE is level, with no crossing
+// to mark, and gets none.
+float coastCoverage(float above, float change) {
+	if (change < COAST_MIN_CHANGE) {
+		return 0.0;
+	}
+	float pixels = abs(above) / change;
+	return 1.0 - smoothstep(COAST_HALF_WIDTH - 0.5, COAST_HALF_WIDTH + 0.5, pixels);
 }
 
 // Unit normal of the exaggerated terrain at d, in core coordinates.
@@ -466,10 +589,19 @@ vec2 brushCoverage(vec3 d) {
 
 void main() {
 	vec3 d = normalize(vSurface);
-	float above = elevationAt(d) - uSeaLevel;
-	float land = clamp(above / max(fwidth(above), 1e-4), 0.0, 1.0);
+	// Over a data layer the sea level is taken from each cell before they
+	// are blended, so a stretch at the sea level is exactly zero.
+	float above;
+	if (uLayerShown) {
+		above = smoothValue(uElevation, d, uSeaLevel);
+	} else {
+		above = elevationAt(d) - uSeaLevel;
+	}
+	float change = fwidth(above);
+	float perPixel = max(change, 1e-4);
+	float land = clamp(above / perPixel, 0.0, 1.0);
 
-	vec3 colour = surfaceColour(above, land);
+	vec3 colour = uLayerShown ? layerColour(d) : surfaceColour(above, land);
 
 	float shade = 1.0;
 	if (land > 0.0) {
@@ -478,6 +610,12 @@ void main() {
 	float facing = 0.5 + 0.5 * dot(normalize(normalMatrix * d), GLOBE_LIGHT);
 	shade *= mix(GLOBE_SHADE, 1.0, facing);
 	colour *= shade;
+
+	if (uLayerShown) {
+		float brightness = dot(colour, vec3(0.2126, 0.7152, 0.0722));
+		vec3 ink = vec3(brightness > COAST_DARK_ABOVE ? 0.0 : 1.0);
+		colour = mix(colour, ink, COAST_OPACITY * coastCoverage(above, change));
+	}
 
 	if (uGridOpacity > 0.0) {
 		// Light lines over the sea and dark ones over the land.
@@ -518,6 +656,27 @@ export type GlobeUniforms = {
 	 * drawn.
 	 */
 	readonly uBrushRadius: IUniform<number>;
+	/** Whether a data layer colours the globe in place of the height. */
+	readonly uLayerShown: IUniform<boolean>;
+	/**
+	 * The data layer's values, one texel per cell, laid out as the elevation
+	 * is; null while no layer is shown.
+	 */
+	readonly uLayer: IUniform<CubeTexture | null>;
+	/** The values the ramp is stretched over: x the low end, y the high. */
+	readonly uLayerRange: IUniform<Vector2>;
+	/** How many of the ramp's stops are in use. */
+	readonly uRampCount: IUniform<number>;
+	/**
+	 * Where each stop of the ramp sits, 0 to 1, for {@link MAX_RAMP_STOPS}
+	 * stops; those past the count are not read.
+	 */
+	readonly uRampAt: IUniform<Float32Array>;
+	/**
+	 * Each stop's colour as display (sRGB) red, green and blue from 0 to 1,
+	 * one after another, for {@link MAX_RAMP_STOPS} stops.
+	 */
+	readonly uRampColour: IUniform<Float32Array>;
 };
 
 /** The globe's material and the uniforms that drive it. */
@@ -530,7 +689,8 @@ export type GlobeMaterial = {
  * Creates the material that draws the globe.
  *
  * @returns The material together with its uniforms, typed. The elevation
- * texture starts empty, the grid hidden and no brush outline drawn.
+ * texture starts empty, the grid hidden, no brush outline drawn and no data
+ * layer shown.
  */
 export const createGlobeMaterial = (): GlobeMaterial => {
 	const uniforms: GlobeUniforms = {
@@ -541,6 +701,12 @@ export const createGlobeMaterial = (): GlobeMaterial => {
 		uGridOpacity: { value: 0 },
 		uBrushCentre: { value: new Vector3(1, 0, 0) },
 		uBrushRadius: { value: 0 },
+		uLayerShown: { value: false },
+		uLayer: { value: null },
+		uLayerRange: { value: new Vector2(0, 1) },
+		uRampCount: { value: 0 },
+		uRampAt: { value: new Float32Array(MAX_RAMP_STOPS) },
+		uRampColour: { value: new Float32Array(MAX_RAMP_STOPS * 3) },
 	};
 	const material = new RawShaderMaterial({
 		name: 'globe',
@@ -550,4 +716,176 @@ export const createGlobeMaterial = (): GlobeMaterial => {
 		fragmentShader: FRAGMENT_GLSL,
 	});
 	return { material, uniforms };
+};
+
+/** Per-cell values as a cube texture, and the views it uploads from. */
+export type CellTexture = {
+	readonly texture: CubeTexture;
+	/** Cells along a face edge. */
+	readonly resolution: number;
+	/** Each face's cells: a view into the values given, not a copy. */
+	readonly faces: readonly Float32Array[];
+};
+
+/**
+ * Makes the cube texture the shaders read per-cell values from, one texel
+ * per cell.
+ *
+ * @remarks
+ * The grid lays its faces out as a cube map in core coordinates, so the
+ * faces go in as they are, in order and unflipped: cell (face, i, j) is
+ * texel (i, j) of that face. The texture keeps hold of the values without
+ * copying them, and is uploaded when it is next drawn.
+ *
+ * @param values - One value per cell of the grid, in cell order.
+ * @param resolution - Cells along a face edge.
+ * @returns The texture, with the views of each face.
+ * @throws RangeError if `values` does not hold exactly one value per cell.
+ */
+export const createCellTexture = (
+	values: Float32Array,
+	resolution: number,
+): CellTexture => {
+	const n = resolution;
+	if (values.length !== FACE_COUNT * n * n) {
+		throw new RangeError(
+			`Per-cell values for resolution ${n} need ${FACE_COUNT * n * n} values; got ${values.length}`,
+		);
+	}
+	const faces: Float32Array[] = [];
+	for (let face = 0; face < FACE_COUNT; face++) {
+		faces.push(values.subarray(face * n * n, (face + 1) * n * n));
+	}
+	const texture = new CubeTexture(
+		faces.map((data) => new DataTexture(data, n, n, RedFormat, FloatType)),
+	);
+	texture.format = RedFormat;
+	texture.type = FloatType;
+	// Linear filtering of float textures is an optional extension, and its
+	// blend weights are too coarse for a cell magnified over many pixels.
+	texture.magFilter = NearestFilter;
+	texture.minFilter = NearestFilter;
+	texture.generateMipmaps = false;
+	texture.flipY = false;
+	texture.needsUpdate = true;
+	return { texture, resolution: n, faces };
+};
+
+/** A data layer made ready for the shaders. */
+export type PreparedLayer = CellTexture & {
+	/** The values the ramp is stretched over. */
+	readonly range: ValueRange;
+	/** The ramp it is drawn with. */
+	readonly ramp: ColourRamp;
+};
+
+/**
+ * Checks a data layer and makes its texture.
+ *
+ * @param field - One value per cell, in cell order; kept, not copied.
+ * @param resolution - Cells along a face edge of the world on show.
+ * @param range - The values the ramp is stretched over.
+ * @param ramp - The ramp to draw it with.
+ * @returns The layer, ready for {@link showLayer}.
+ * @throws RangeError if the range or the ramp is missing, if the range's
+ * ends are not finite with `min` below `max`, if the ramp fails
+ * {@link checkRamp}, or if the field does not hold one value per cell.
+ */
+export const prepareLayer = (
+	field: Float32Array,
+	resolution: number,
+	range: ValueRange | undefined,
+	ramp: ColourRamp | undefined,
+): PreparedLayer => {
+	if (range === undefined || ramp === undefined) {
+		throw new RangeError('A data layer needs a range and a ramp');
+	}
+	if (
+		!Number.isFinite(range.min) ||
+		!Number.isFinite(range.max) ||
+		!(range.min < range.max)
+	) {
+		throw new RangeError(
+			`A data layer's range must run up from one finite value to another; got ${range.min} to ${range.max}`,
+		);
+	}
+	checkRamp(ramp);
+	return {
+		...createCellTexture(field, resolution),
+		range: { min: range.min, max: range.max },
+		ramp,
+	};
+};
+
+/**
+ * Sets the uniforms that draw a data layer, or that draw the height
+ * colours instead.
+ *
+ * @param uniforms - The globe's uniforms.
+ * @param layer - The layer to show, or null to show none.
+ */
+export const showLayer = (
+	uniforms: GlobeUniforms,
+	layer: PreparedLayer | null,
+): void => {
+	if (layer === null) {
+		uniforms.uLayerShown.value = false;
+		uniforms.uLayer.value = null;
+		return;
+	}
+	uniforms.uLayerShown.value = true;
+	uniforms.uLayer.value = layer.texture;
+	uniforms.uLayerRange.value.set(layer.range.min, layer.range.max);
+	const { stops } = layer.ramp;
+	uniforms.uRampCount.value = stops.length;
+	uniforms.uRampAt.value.fill(0);
+	uniforms.uRampColour.value.fill(0);
+	stops.forEach((stop, index) => {
+		uniforms.uRampAt.value[index] = stop.at;
+		uniforms.uRampColour.value.set(
+			[16, 8, 0].map((shift) => ((stop.colour >> shift) & 0xff) / 255),
+			index * 3,
+		);
+	});
+};
+
+/**
+ * Puts a data layer on show in place of the one shown, or shows none.
+ *
+ * @remarks
+ * The new layer is checked and made before anything else is touched, so a
+ * layer that is refused leaves the one shown as it was: still shown, its
+ * texture whole. Only once the new layer is made is the old one's texture
+ * disposed of, once, and the new one shown.
+ *
+ * @param uniforms - The globe's uniforms.
+ * @param shown - The layer on show, or null for none.
+ * @param resolution - Cells along a face edge of the world on show, or null
+ * before any world is shown.
+ * @param field - One value per cell, in cell order, kept, not copied; or
+ * null to show no layer.
+ * @param range - The values the ramp is stretched over. Needed with a field.
+ * @param ramp - The ramp to draw it with. Needed with a field.
+ * @returns The layer now on show, or null for none.
+ * @throws RangeError for a field before any world is shown, and whenever
+ * {@link prepareLayer} refuses the field, the range or the ramp.
+ */
+export const replaceLayer = (
+	uniforms: GlobeUniforms,
+	shown: PreparedLayer | null,
+	resolution: number | null,
+	field: Float32Array | null,
+	range?: ValueRange,
+	ramp?: ColourRamp,
+): PreparedLayer | null => {
+	let next: PreparedLayer | null = null;
+	if (field !== null) {
+		if (resolution === null) {
+			throw new RangeError('A data layer needs a world to be shown first');
+		}
+		next = prepareLayer(field, resolution, range, ramp);
+	}
+	shown?.texture.dispose();
+	showLayer(uniforms, next);
+	return next;
 };

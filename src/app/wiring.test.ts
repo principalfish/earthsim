@@ -21,6 +21,7 @@ import { RESTORE_FAILED_MESSAGE } from './startup';
 import type { LoadOutcome } from './storage';
 import { createFakeTimers } from './testing/fakeTimers';
 import { settle } from './testing/settle';
+import { createLayerPanel } from './ui/layerPanel';
 import {
 	FIRST_NEW_WORLD_VALUES,
 	type NewWorldDialogOptions,
@@ -37,6 +38,7 @@ import {
 import type { ShortcutEvent } from './undo';
 import {
 	type PageAutosaveOptions,
+	type PageLayerOptions,
 	type PageParts,
 	type PageStatisticsOptions,
 	type PageTemperatureOptions,
@@ -75,6 +77,7 @@ type Stage = {
 	readonly viewPanelOptions: ViewPanelOptions;
 	readonly statisticsOptions: PageStatisticsOptions;
 	readonly temperatureOptions: PageTemperatureOptions;
+	readonly layerOptions: PageLayerOptions;
 	/** Presses a key as the page hears it. */
 	pressKey(press: Partial<ShortcutEvent>): void;
 	/** Says that the page is being hidden or closed. */
@@ -97,7 +100,7 @@ const required = <T>(value: T | undefined, name: string): T => {
 
 /** The parts a test may make itself, in place of the stage's stand-ins. */
 type StageParts = Partial<
-	Pick<PageParts, 'createStatistics' | 'createTemperature'>
+	Pick<PageParts, 'createStatistics' | 'createTemperature' | 'createLayerPanel'>
 >;
 
 const createStage = (
@@ -118,6 +121,7 @@ const createStage = (
 	let viewPanelOptions: ViewPanelOptions | undefined;
 	let statisticsOptions: PageStatisticsOptions | undefined;
 	let temperatureOptions: PageTemperatureOptions | undefined;
+	let layerOptions: PageLayerOptions | undefined;
 	let keyListener: ((event: ShortcutEvent) => void) | undefined;
 	let hidingListener: (() => void) | undefined;
 	let answerLoad: ((outcome: LoadOutcome) => void) | undefined;
@@ -154,6 +158,9 @@ const createStage = (
 		},
 		get temperatureOptions() {
 			return required(temperatureOptions, 'temperature');
+		},
+		get layerOptions() {
+			return required(layerOptions, 'layer panel');
 		},
 		pressKey: (press) => {
 			required(
@@ -291,6 +298,11 @@ const createStage = (
 				setShowing: (showing) => log.push(`temperature.setShowing ${showing}`),
 			};
 		},
+		createLayerPanel: (options) => {
+			log.push('createLayerPanel');
+			layerOptions = options;
+			own.createLayerPanel?.(options);
+		},
 		openNewWorldDialog: (options) => {
 			log.push(`openNewWorldDialog ${options.notice ?? 'no notice'}`);
 			dialogs.push(options);
@@ -361,10 +373,10 @@ describe('startPage', () => {
 			'createAutosave',
 			'createToolPanel',
 			`createViewPanel ${DEFAULT_SEA_LEVEL_M}`,
+			'createTemperature',
+			'createLayerPanel',
 			'createStatistics',
 			'statistics.refresh',
-			'createTemperature',
-			'temperature.setShowing true',
 			'setInert true',
 			'store.load',
 		]);
@@ -387,6 +399,17 @@ describe('startPage', () => {
 		stage.strokeActive = true;
 		expect(stage.statisticsOptions.isStrokeActive()).toBe(true);
 		expect(stage.autosaveOptions.isBusy?.()).toBe(true);
+	});
+
+	it('gives the layer panel the store the temperature writes, and the temperature', async () => {
+		const stage = await createStartedStage();
+		expect(stage.layerOptions.store).toBe(stage.temperatureOptions.store);
+		stage.layerOptions.temperature.setShowing(true);
+		stage.layerOptions.temperature.setShowing(false);
+		expect(stage.log).toEqual([
+			'temperature.setShowing true',
+			'temperature.setShowing false',
+		]);
 	});
 
 	it('gives the temperature the world of the moment, the stroke and an empty store', async () => {
@@ -892,29 +915,38 @@ describe('saving', () => {
 /**
  * A started stage whose temperature runs on the real service, on fake
  * workers and timers, with the statistics on stand-ins as elsewhere.
+ *
+ * @param options - Whether the temperature is chosen in the Layers section
+ * once the page has started, as most cases need (true when left out), and
+ * the layer panel to make in place of the stand-in.
  */
 const createWorkerStage = async (
-	createWorker: () => FakeWorker | null = createFakeWorker,
+	options: {
+		readonly showing?: boolean;
+		readonly createLayerPanel?: PageParts['createLayerPanel'];
+	} = {},
 ) => {
 	const timers = createFakeTimers();
 	const workers: FakeWorker[] = [];
 	const logged: unknown[] = [];
 	const stage = await createStartedStage(undefined, {
-		createTemperature: (options) =>
+		createTemperature: (temperatureOptions) =>
 			createTemperatureService({
-				...options,
+				...temperatureOptions,
 				createWorker: () => {
-					const worker = createWorker();
-					if (worker !== null) {
-						workers.push(worker);
-					}
+					const worker = createFakeWorker();
+					workers.push(worker);
 					return worker;
 				},
 				setTimer: timers.setTimer,
 				clearTimer: timers.clearTimer,
 				logError: (error) => logged.push(error),
 			}),
+		createLayerPanel: options.createLayerPanel,
 	});
+	if (options.showing ?? true) {
+		stage.layerOptions.temperature.setShowing(true);
+	}
 	/** Moves past the wait, and lets what follows run. */
 	const wait = async (): Promise<void> => {
 		timers.advance(TEMPERATURE_DEBOUNCE_MS);
@@ -926,8 +958,24 @@ const createWorkerStage = async (
 };
 
 describe('the temperature, on its worker', () => {
-	it('is asked for once at the start, showing from the first', async () => {
-		const page = await createWorkerStage();
+	it('is not asked for while the page shows the terrain, as it opens', async () => {
+		const page = await createWorkerStage({ showing: false });
+		makeStroke(page.stage);
+		page.stage.viewPanelOptions.onSeaLevel(-500);
+		await page.wait();
+		await page.wait();
+		expect(page.workers).toHaveLength(1);
+		expect(page.posted()).toEqual([]);
+		expect(page.stage.temperatureOptions.store.temperature.status).toBe(
+			'empty',
+		);
+	});
+
+	it('is asked for once when the temperature is chosen', async () => {
+		const page = await createWorkerStage({ showing: false });
+		makeStroke(page.stage);
+		await page.wait();
+		page.stage.layerOptions.temperature.setShowing(true);
 		await page.wait();
 		await page.wait();
 		expect(page.posted()).toHaveLength(1);
@@ -938,6 +986,39 @@ describe('the temperature, on its worker', () => {
 		expect(page.stage.temperatureOptions.store.temperature.status).toBe(
 			'calculating',
 		);
+	});
+
+	it('reaches the globe through the real layer panel once chosen there', async () => {
+		const shown: (Float32Array | null)[] = [];
+		let choose: ((layer: 'terrain' | 'temperature') => void) | undefined;
+		const page = await createWorkerStage({
+			showing: false,
+			createLayerPanel: (options) =>
+				createLayerPanel({
+					...options,
+					globe: { setLayer: (field) => shown.push(field) },
+					createControls: (controls) => {
+						choose = controls.onLayer;
+						return { showLegend: () => {} };
+					},
+				}),
+		});
+		await page.wait();
+		expect(page.posted()).toEqual([]);
+
+		required(choose, 'layer controls')('temperature');
+		await page.wait();
+		expect(page.posted()).toHaveLength(1);
+		const result = temperatureOf(1, page.stage.state.world.elevation.length);
+		(page.workers.at(-1) as FakeWorker).respond({
+			id: 1,
+			kind: 'temperature',
+			ok: true,
+			result,
+		});
+		await settle();
+		expect(shown).toEqual([result.months[6]]);
+		expect(shown[0]).toBe(result.months[6]);
 	});
 
 	/** Makes nothing ready beyond the stroke every case starts with. */

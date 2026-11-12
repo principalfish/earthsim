@@ -8,6 +8,7 @@ import { MAX_DRAWN_SEA_LEVEL_M, MIN_DRAWN_SEA_LEVEL_M } from './globe/material';
 import { createGlobe, type Globe } from './globe/renderer';
 import { createSculptController } from './sculpt';
 import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
+import { createLayerControls, createLayerPanel } from './ui/layerPanel';
 import { openNewWorldDialog } from './ui/newWorldDialog';
 import { createStatsPanel } from './ui/statsPanel';
 import { createToolPanel } from './ui/toolPanel';
@@ -119,6 +120,12 @@ if (globe !== null) {
 				setTimer,
 				clearTimer,
 				logError,
+			}),
+		createLayerPanel: (options) =>
+			createLayerPanel({
+				...options,
+				globe,
+				createControls: (controls) => createLayerControls(panel, controls),
 			}),
 		openNewWorldDialog,
 		loadEarth: loadEarthData,

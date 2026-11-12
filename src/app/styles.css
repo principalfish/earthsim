@@ -260,55 +260,56 @@ body {
   color: var(--color-text-muted);
 }
 
-.tool-picker {
+.segmented {
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.tool-picker__options {
+.segmented__options {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   overflow: hidden;
   font-size: var(--font-size-sm);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
 
-.tool-picker__option {
+.segmented__option {
   position: relative;
   display: grid;
   cursor: pointer;
 }
 
-.tool-picker__option + .tool-picker__option {
+.segmented__option + .segmented__option {
   border-inline-start: 1px solid var(--color-border);
 }
 
 /* Kept in the page, unseen, so that it still takes focus and the keys. */
-.tool-picker__input {
+.segmented__input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
-.tool-picker__label {
+.segmented__label {
   padding: var(--space-sm) var(--space-xs);
   text-align: center;
 }
 
-.tool-picker__label:hover {
+.segmented__label:hover {
   background: var(--color-border);
 }
 
-.tool-picker__input:checked + .tool-picker__label {
+.segmented__input:checked + .segmented__label {
   font-weight: 600;
   color: var(--color-bg);
   background: var(--color-accent);
 }
 
-.tool-picker__input:focus-visible + .tool-picker__label {
+.segmented__input:focus-visible + .segmented__label {
   outline: 2px solid var(--color-text);
   outline-offset: -2px;
 }
@@ -471,6 +472,76 @@ body {
 .stats__note {
   font-size: var(--font-size-sm);
   line-height: 1.4;
+}
+
+.legend {
+  display: grid;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* A part of the legend with nothing to show is hidden, which the display
+   set on it would otherwise undo. */
+.legend[hidden],
+.legend [hidden] {
+  display: none;
+}
+
+.legend__scale {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.legend__caption,
+.legend__status {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* The status line is left empty rather than hidden when there is nothing
+   to say, so that a screen reader announces what is written into it; its
+   one line is kept either way, so the legend does not shift as it fills. */
+.legend__status {
+  min-height: 1.4em;
+  color: var(--color-text-muted);
+}
+
+.legend__ramp {
+  height: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* Each value sits under its mark, centred on it; room is kept for one line
+   of them. */
+.legend__ticks {
+  position: relative;
+  height: 1.4em;
+}
+
+.legend__tick {
+  position: absolute;
+  top: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  transform: translateX(-50%);
+}
+
+/* The mark itself: a short line up to the ramp. */
+.legend__tick::before {
+  position: absolute;
+  top: calc(-1 * var(--space-xs) - 0.25rem);
+  left: 50%;
+  width: 1px;
+  height: 0.5rem;
+  content: "";
+  background: var(--color-text);
+}
+
+.legend__bar {
+  width: 100%;
+  height: 0.25rem;
+  accent-color: var(--color-accent);
 }
 
 /* Utilities */

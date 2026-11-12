@@ -60,6 +60,28 @@ export type ButtonOptions = {
 	readonly onClick: () => void;
 };
 
+/** One of the things a segmented picker offers. */
+export type SegmentedChoice<T extends string> = {
+	/** What choosing it gives. */
+	readonly value: T;
+	/** The text on its segment. */
+	readonly label: string;
+};
+
+/** What a segmented picker is built from. */
+export type SegmentedPickerOptions<T extends string> = {
+	/** The name of its group of radio buttons, unique on the page. */
+	readonly name: string;
+	/** What is being chosen, as a screen reader names the group. */
+	readonly legend: string;
+	/** What it offers, in the order the segments show them. */
+	readonly choices: readonly SegmentedChoice<T>[];
+	/** The value chosen at first. */
+	readonly value: T;
+	/** Called with the value when another is chosen. */
+	readonly onChange: (value: T) => void;
+};
+
 /** Class a field carries while its control cannot be used. */
 const DISABLED_CLASS = 'is-disabled';
 
@@ -153,6 +175,50 @@ export const createCheckField = (options: CheckFieldOptions): HTMLElement => {
 
 	field.append(input, label);
 	return field;
+};
+
+/**
+ * Creates a choice of one of a few things, drawn as one row of segments.
+ *
+ * @remarks
+ * The segments are radio buttons, so the picker is one tab stop and the
+ * arrow keys move between them. The group's name is for screen readers
+ * alone: it is not shown.
+ *
+ * @param options - What it offers, the starting choice and the callback.
+ * @returns The picker, to put in a panel.
+ */
+export const createSegmentedPicker = <T extends string>(
+	options: SegmentedPickerOptions<T>,
+): HTMLElement => {
+	const picker = createElement('fieldset', 'segmented');
+	const legend = createElement('legend', 'u-visually-hidden');
+	legend.textContent = options.legend;
+	const row = createElement('div', 'segmented__options');
+
+	for (const choice of options.choices) {
+		const option = createElement('label', 'segmented__option');
+
+		const input = createElement('input', 'segmented__input');
+		input.type = 'radio';
+		input.name = options.name;
+		input.value = choice.value;
+		input.checked = choice.value === options.value;
+		input.addEventListener('change', () => {
+			if (input.checked) {
+				options.onChange(choice.value);
+			}
+		});
+
+		const label = createElement('span', 'segmented__label');
+		label.textContent = choice.label;
+
+		option.append(input, label);
+		row.append(option);
+	}
+
+	picker.append(legend, row);
+	return picker;
 };
 
 /**

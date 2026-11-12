@@ -80,6 +80,14 @@ export type PageTemperatureOptions = PageStatisticsOptions & {
 	readonly store: LayerStore;
 };
 
+/** What the Layers section shows, and what it switches on and off. */
+export type PageLayerOptions = {
+	/** Where the temperature is kept: the store the temperature writes. */
+	readonly store: LayerStore;
+	/** What calculates the temperature, told whether it is showing. */
+	readonly temperature: Pick<TemperatureScheduler, 'setShowing'>;
+};
+
 /** The parts of a page, for {@link startPage} to join. */
 export type PageParts = {
 	/** The world being edited, on the world the page opens on. */
@@ -131,6 +139,11 @@ export type PageParts = {
 	readonly createTemperature: (
 		options: PageTemperatureOptions,
 	) => Pick<TemperatureScheduler, 'refresh' | 'reset' | 'setShowing'>;
+	/**
+	 * Adds the Layers section to the panel, which chooses what the globe is
+	 * coloured by and so whether the temperature is showing.
+	 */
+	readonly createLayerPanel: (options: PageLayerOptions) => void;
 	/** Opens the dialog that starts a new world. */
 	readonly openNewWorldDialog: (options: NewWorldDialogOptions) => void;
 	/** Gives the Earth's elevation data, for a world that starts as Earth. */
@@ -163,8 +176,11 @@ export type PageParts = {
  *
  * @remarks
  * The parts are made in the order the panel shows them: the world
- * controls, the tools, the view controls and then the statistics; then the
- * temperature, which has nothing in the panel yet.
+ * controls, the tools, the view controls, the layers and then the
+ * statistics. The temperature, which has nothing of its own in the panel,
+ * is made just before the layers, which switch it on and off. The page
+ * opens on the height colours with the temperature not showing, so nothing
+ * asks for the temperature until it is chosen.
  *
  * A world that replaces the one being edited reaches, in this order: the
  * sculpt controller, which ends a stroke still under way on the old world
@@ -304,11 +320,6 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		},
 		onGridVisible: globe.setGridVisible,
 	});
-	const statistics = parts.createStatistics({
-		currentWorld: () => state.world,
-		isStrokeActive: sculpt.isStrokeActive,
-	});
-	statistics.refresh();
 	// A part that shows the temperature and fails on a change is recorded
 	// here, and the edit that made the change carries on regardless.
 	const layers = createLayerStore(logError);
@@ -317,9 +328,12 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		isStrokeActive: sculpt.isStrokeActive,
 		store: layers,
 	});
-	// The temperature counts as showing, so that it is calculated from the
-	// start; nothing yet switches it off.
-	temperature.setShowing(true);
+	parts.createLayerPanel({ store: layers, temperature });
+	const statistics = parts.createStatistics({
+		currentWorld: () => state.world,
+		isStrokeActive: sculpt.isStrokeActive,
+	});
+	statistics.refresh();
 
 	// What a new world reaches, in this order. The sculpt controller goes
 	// first: it ends a stroke still under way while the globe and the

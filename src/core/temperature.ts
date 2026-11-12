@@ -1383,6 +1383,13 @@ const correctYearEnd = (
 };
 
 /**
+ * The most of the year before's change that a year's change may be for the
+ * two to give a guess at the years left: a change that shrank by less than
+ * a quarter says too little about how fast the solve is settling.
+ */
+const SLOWEST_SHRINK_TRUSTED = 0.75;
+
+/**
  * A guess at how many more years a solve that has not finished will run,
  * from how much its change shrank over the last year.
  *
@@ -1392,7 +1399,11 @@ const correctYearEnd = (
  * and counts the years until the change would be below the tolerance. It is
  * a guess and no more: the factor itself changes from year to year, and in
  * the first year or two after a start far from the answer it is a poor
- * guide. Where the change did not shrink there is no basis for one at all.
+ * guide. Where the change did not shrink there is no basis for one at all,
+ * and where it shrank by less than a quarter there is none worth giving: a
+ * year that barely moved the change, as the second or third of a solve
+ * sometimes does before the next settles it, would otherwise be read as
+ * dozens of years still to run.
  *
  * A year whose change is already below the tolerance but that did not end
  * the solve, because some of its steps were not solved to their accuracy,
@@ -1408,7 +1419,8 @@ const correctYearEnd = (
  * @returns 1 when the change of the year just finished is below the
  * tolerance, in the first year or any other. Otherwise a whole number of
  * years from 1 to `yearsLeftUnderCap`, or null in the first year, or when
- * the change did not shrink or either change is not a finite number.
+ * the change shrank by less than a quarter or not at all, or either change
+ * is not a finite number.
  */
 export const estimateYearsLeft = (
 	previousChangeK: number | null,
@@ -1423,7 +1435,7 @@ export const estimateYearsLeft = (
 		previousChangeK === null ||
 		!Number.isFinite(previousChangeK) ||
 		!Number.isFinite(changeK) ||
-		!(changeK < previousChangeK)
+		!(changeK <= SLOWEST_SHRINK_TRUSTED * previousChangeK)
 	) {
 		return null;
 	}
