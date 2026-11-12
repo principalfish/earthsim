@@ -24,3 +24,4 @@
 - 2026-11-11 16:37 · add-seasonal-temperature-layer-and-planet-controls (0002) · branch = claude/add-seasonal-temperature-layer-and-planet-controls-f645fa
 - 2026-11-11 16:37 · add-seasonal-temperature-layer-and-planet-controls (0002) · planned → building
 - 2026-11-11 16:52 · add-seasonal-temperature-layer-and-planet-controls (0002) · PR #4
+- 2026-11-12 00:35 · add-seasonal-temperature-layer-and-planet-controls (0002) · piece 4 committed 1445e44; builder stopped for the recalculation-trigger decision
