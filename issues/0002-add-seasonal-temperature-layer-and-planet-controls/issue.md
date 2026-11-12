@@ -14,7 +14,7 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 
 ## Plan
 
-_2026-11-12 · 9 of 14 pieces done · now: waiting on review of piece 10_
+_2026-11-12 · 9 of 14 pieces done · now: piece 10 approved, being committed_
 
 - [x] **1/14 Planet settings and date on the world** · `8390675`
   Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
@@ -34,7 +34,7 @@ _2026-11-12 · 9 of 14 pieces done · now: waiting on review of piece 10_
   A re-solve after a sea-level or planet change starts fresh, so the result no longer depends on the order of edits.
 - [x] **9/14 Solver speed-ups** · `140a260` · added 2026-11-12: the user asked for the measured speed-ups to be built
   Worlds above 64 solve one grid coarser with height cooling at full resolution, plus smaller solver fixes; about five times faster at 256.
-- [ ] **10/14 Planet panel** (was 8) · waiting on you
+- [ ] **10/14 Planet panel** (was 8) · in progress
   Sliders for tilt, star brightness, star mass, orbit and greenhouse strength, with sunlight received and year length shown.
 - [ ] **11/14 Value under the cursor** (was 9) · not started
   A readout of position, elevation and temperature at the point under the pointer.
