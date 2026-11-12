@@ -8,9 +8,9 @@ _Updated 2026-11-12, with piece 7 changed as the user chose and waiting for its 
 - Piece 6 was committed on 2026-11-12 after the user's manual review ("Tried it, ramp A"). Piece 7's first review found two problems; the user's chosen changes (seasonal ramp reshaped with ticks every 5 degrees; temperature scale fitted to the middle 99% by area with "and below" / "and above" on the legend) are built, uncommitted in the builder's worktree (HEAD still `533ef95`); checks pass and the analysis loop is clean. The freeze after a large sea-level drop is still present and is piece 8's. The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has sent a new review request and commits only on the user's approval relayed with their words.
 - Pieces 7 to 11 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user (put to them 2026-11-12)
+## Pending with the user
 
-**Piece 7's second review request:** the user's two changes are built, uncommitted (HEAD `533ef95`, 25 files). The user tries it on their own dev server (http://localhost:5176/): the seasonal range (Sahara, Arabia and India now a clear lavender; ticks every 5), the temperature legend with "−34 and below" and "30 and above", a tall peak no longer stretching the scale, then the slider, Play, summaries, date line and new world as before. The freeze after a large sea-level drop is still present at this review and is fixed in piece 8; the user was told. Relay approval only when their words say they tried it. After the commit: brief piece 8, including the builder's "B+" drift-limit refinement and whether to keep the proposed manual reviews on 8 and 9.
+Nothing. The user approved piece 7 on 2026-11-12 after the second manual review ("Tried it, approve"); the builder commits and pushes it, then stops with a look-ahead for piece 8. Then: tick piece 7, brief piece 8 (including the builder's "B+" drift-limit refinement as a choice, and whether to keep the proposed manual reviews on pieces 8 and 9), and ask before it starts.
 
 Context kept from before:
 Nothing. On 2026-11-12 the user answered the questions from piece 7's manual review and the plan was changed to 13 pieces (see `plan.md` Notes, "Renumbering"):
