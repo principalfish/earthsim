@@ -18,7 +18,7 @@ _Updated 2026-11-12, with piece 13 committed and the builder stopped before piec
 
 Nothing. The user approved piece 13, the sun in the scene, on 2026-11-12 after reviewing it on their Mac ("Approve as it is"; "looks good on mac too"). The builder commits and pushes it, then stops with a look-ahead for piece 14, the last piece: collapsible panel sections and the legend over the globe. Then: tick piece 13, brief piece 14 (manual review confirmed; raise how the 364 px cursor strip and the legend share the bottom edge in a narrow globe area, and whether a section opens by itself when something in it becomes relevant), and ask before it starts. After piece 14: the all-pieces recap, `/review self`, `/publish`.
 
-Reaching the dev server from the user's other machines: WSL has an SSH server on port 2222 and the user's own way is an SSH tunnel (their `tunnel.ps1` on another Windows machine; the planner gave them the Mac equivalent on 2026-11-12). The temporary Caddy route to port 5176 at http://192.168.1.148/ is still in place; the planner offered to remove it once the tunnel is in use.
+Reaching the dev server from the user's other machines: WSL has an SSH server on port 2222 and the user's own way is an SSH tunnel (their `tunnel.ps1` on another Windows machine; the planner gave them the Mac equivalent on 2026-11-12). The temporary Caddy route at http://192.168.1.148/ was removed on 2026-11-12 at the user's word ("Yes, remove it"); manual reviews from the Mac now go through the tunnel to http://localhost:5176 (check the dev server's port before quoting it).
 
 ## Figures
 
