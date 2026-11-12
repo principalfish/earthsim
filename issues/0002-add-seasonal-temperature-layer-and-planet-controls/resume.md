@@ -9,7 +9,9 @@ _Updated 2026-11-12, with piece 8 committed and piece 9 waiting for its briefing
 - Piece 7 was committed on 2026-11-12 after the user's second manual review ("Tried it, approve"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 8 and starts it only on the user's go-ahead.
 - Pieces 8 to 13 each have a manual review: relay an approval only when the user's words say they tried it.
 
-## Pending with the user (put to them 2026-11-12)
+## Pending with the user
+
+Nothing. The user started piece 9 on 2026-11-12 ("Start it"; manual review "Keep it"; scope "All four", "Yes, 128 too"). The builder stops with a review request before committing, or earlier if an acceptance bound fails (it then reports the figures; the choice may include keeping 128 worlds on their own grid). Lead the review briefing with the manual review (the coarser solve's look at 128 and 256: speed, sharp mountains, no blocky coasts, no seams, a small island and a narrow land bridge), give the timing table before and after, and relay approval only when the user's words say they tried it. After piece 9: the planet panel (10), where the trust band for the sunlight note is raised.
 
 Piece 8 is committed and pushed (`63364cf`). The piece 9 briefing has been given. Waiting on: whether to keep piece 9's proposed manual review (the coarser solve's look at 128 and 256), and the go-ahead to start. Set by the planner from the builder's look-ahead and told to the user: the rough guess and its 50 K fallback are removed outright (the drift limit replaces them); interpolation is carried across cube edges; sea-level temperature is interpolated without regard to land and sea (the assessment found a coast-aware version worse); a coarse cell is land by its area-mean elevation, so islands and land bridges narrower than a coarse cell vanish from the solve; months-only starts are dropped; if an acceptance bound fails the builder reports the figures and stops. The builder thinks the 2 K worst-cell bound is the likeliest to fail, at coasts, and more so for 128 worlds on the 64 grid.
 
