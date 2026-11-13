@@ -65,7 +65,7 @@ Keep this section current when a step is merged.
 | 1 Globe, grid and sculpting | Done, merged 2026-11-11 | 0001, GitHub #1, PR #2 |
 | 2 Sunlight and seasonal temperature | Done, merged 2026-11-13 | 0002, GitHub #3, PR #4 |
 | 3 Winds | Building | 0003, GitHub #5, PR #6 |
-| 3a Core folders by component (refactor, no behaviour change) | Not started; after step 3 merges, before step 4 | |
+| 3a Core folders by component, page folders by role (refactor, no behaviour change) | Not started; after step 3 merges, before step 4 | |
 | 4 Moisture, rainfall and Köppen zones | Not started | |
 | 5 Ocean currents | Not started | |
 | 6 Ice sheets and sea ice | Not started | |
@@ -73,10 +73,10 @@ Keep this section current when a step is merged.
 | 8 Biome map | Not started | |
 | 9 Plate tectonics and time stepping | Not started | |
 
-### Step 3a: core folders by component
+### Step 3a: core folders by component, page folders by role
 `src/core/` is flat today, except `src/core/wind/`, which step 3 started because it holds several models. With five more layers to come, a flat folder would pass 40 files, so the core moves into one folder per component in one refactor, between steps 3 and 4. It is a pure move: no behaviour change, checked by the existing tests and the temperature baseline. It waits for step 3's merge because that branch edits the files that would move.
 - **Small blast radius:** the page, the worker and the scripts import the core only through `src/core/index.ts`, except one script that imports `baseline/earthTemperature`. So the move rewrites the core's own imports and tests, and that one script.
-- **Layout, a proposal to settle when it is planned:**
+- **Core layout, agreed by the user 2026-11-13 ("layout looks good for core"):**
   - `grid/`: `grid`, `vector`, `coarsen`, `quantile` (grid maths every layer shares)
   - `world/`: `world`, `generate`, `noise`, `brush`, `history`, `stats`, `serialize`
   - `planet/`: `planet`, `star`, `insolation`
@@ -85,6 +85,14 @@ Keep this section current when a step is merged.
   - `wind/`: as step 3 leaves it, plus `observedWind`
   - left flat: `index`, `protocol`, `compare`; `testing/` stays
 - Each later step (rain, ocean, ice, storms, tectonics) then starts its own folder.
+- **Page (`src/app/`), in the same refactor, agreed by the user 2026-11-13 ("Yes, add it"):** the page stays organised by role, not by simulation layer, since its legend, layer panel and pointer readout serve every layer. `globe/` and `ui/` stay as they are; the 17 top-level files go into three role folders:
+  - `editing/`: `appState`, `sculpt`, `undo`
+  - `saving/`: `storage`, `autosave`, `startup`
+  - `layers/`: `layers`, `view`, `refresh`, `workerService`, `playback`, `earthData`, `observedData` (and later layers' observed-data fetchers)
+  - left flat: `main`, `wiring`, `panelMemory`, `styles.css`
+  - Unlike the core, the page's files import each other directly, so this touches more import lines; still mechanical.
+- **Worker (`src/worker/`):** left as it is (three small files). Split the handlers into `worker/handlers/` only if `handle.ts` grows unwieldy as layers are added.
+- **Watch file size:** `globe/material.ts` (1,035 lines) and `ui/layerPanel.ts` (1,013) grow with every layer. Step 3's piece 12 (scalar layers made general) is where to keep a new layer a data entry rather than more code in them.
 - Probably `/quick-build` once the layout is agreed, since it is one mechanical commit; `/planner refactor` if the layout needs discussion.
 
 ### What step 2 built that later steps rely on
