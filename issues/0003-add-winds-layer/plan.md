@@ -210,7 +210,7 @@ earth_sim is a browser planet simulator for worldbuilding: believable results an
 
 - [x] 1. Observed winds and pressure data
 - [x] 2. Vector maths on the grid
-- [ ] 3. Day length on the world
+- [x] 3. Day length on the world
 - [ ] 4. Wind report with the observed Earth
 - [ ] 5. Prototype: rules plus a pressure map
 - [ ] 6. Prototype: a simulated atmosphere, and the choice (**stop here for the user's choice of model; the planner revises pieces 7 onward**)
