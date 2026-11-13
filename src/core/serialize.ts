@@ -7,8 +7,11 @@
  * 2. The format version: an unsigned 32-bit integer.
  * 3. The length of the header in bytes: an unsigned 32-bit integer, at most
  *    {@link MAX_WORLD_FILE_HEADER_BYTES}.
- * 4. The header: a JSON object in ASCII holding the world's settings, such
- *    as `{"resolution":64,"seaLevel":0,"origin":{"kind":"blank"}}`.
+ * 4. The header: a JSON object in ASCII holding the world's settings and
+ *    date, such as `{"resolution":64,"seaLevel":0,"origin":{"kind":"blank"},
+ *    "planet":{"axialTiltDeg":23.44,...},"ageYears":0}`. The planet and the
+ *    date may be left out, as files written before they were added leave
+ *    them out; such a file reads as Earth's settings at year zero.
  * 5. The elevation of every cell in metres, in the grid's cell order: `6 *
  *    n * n` 32-bit floats for a resolution of `n`.
  *
@@ -28,6 +31,16 @@ import {
 } from './grid';
 import { isSeed } from './noise';
 import {
+	DEFAULT_AGE_YEARS,
+	DEFAULT_PLANET,
+	isAgeYears,
+	normaliseAgeYears,
+	PLANET_LIMITS,
+	PLANET_SETTINGS,
+	type PlanetSetting,
+	type PlanetSettings,
+} from './planet';
+import {
 	MAX_ELEVATION_M,
 	MIN_ELEVATION_M,
 	normaliseSeaLevel,
@@ -43,7 +56,7 @@ export const WORLD_FILE_VERSION = 1;
 
 /**
  * The longest header a world file may declare, in bytes. The header this
- * module writes is under 150 bytes; the rest is room for fields that later
+ * module writes is under 400 bytes; the rest is room for fields that later
  * writers of the same version may add.
  */
 export const MAX_WORLD_FILE_HEADER_BYTES = 4096;
@@ -97,6 +110,10 @@ export const MAX_WORLD_FILE_BYTES =
  *   or its sea level or origin is missing or not valid.
  * - `bad-resolution`: the header's resolution is missing or is not a
  *   supported resolution.
+ * - `bad-planet`: the header holds planet settings, and they are not an
+ *   object holding every setting as a number within its limits.
+ * - `bad-age`: the header holds a date that is not a finite number of years
+ *   from zero up.
  * - `bad-length`: bytes are left over after the elevation of the header's
  *   resolution.
  * - `not-finite`: an elevation is NaN or infinite.
@@ -104,8 +121,9 @@ export const MAX_WORLD_FILE_BYTES =
  * A file with several faults gives the one found first, reading from the
  * start: the marker, that the version and header length are all there, the
  * version, the header length, that the header is all there, that it is a
- * JSON object, its resolution, its sea level and origin, the number of
- * bytes after it, and last the elevations in cell order.
+ * JSON object, its resolution, its sea level and origin, its planet, its
+ * date, the number of bytes after it, and last the elevations in cell
+ * order.
  */
 export type WorldFileError =
 	| 'bad-marker'
@@ -114,6 +132,8 @@ export type WorldFileError =
 	| 'header-too-long'
 	| 'bad-header'
 	| 'bad-resolution'
+	| 'bad-planet'
+	| 'bad-age'
 	| 'bad-length'
 	| 'not-finite';
 
@@ -134,7 +154,10 @@ export type WorldFileResult =
 	| WorldFileFailure;
 
 /** The settings a header holds, once every one has been checked. */
-type Header = Pick<World, 'resolution' | 'seaLevel' | 'origin'>;
+type Header = Pick<
+	World,
+	'resolution' | 'seaLevel' | 'origin' | 'planet' | 'ageYears'
+>;
 
 const failure = (error: WorldFileError): WorldFileFailure => ({
 	ok: false,
@@ -202,6 +225,31 @@ const parseOrigin = (value: unknown): WorldOrigin | null => {
 };
 
 /**
+ * Reads planet settings as a header holds them.
+ *
+ * @returns New settings holding only the five settings, or null if the
+ * value is not an object holding every one of them as a number within its
+ * limits.
+ */
+const parsePlanet = (value: unknown): PlanetSettings | null => {
+	if (!isPlainObject(value)) {
+		return null;
+	}
+	const planet: Record<PlanetSetting, number> = { ...DEFAULT_PLANET };
+	for (const name of PLANET_SETTINGS) {
+		const setting = ownField(value, name);
+		const { min, max } = PLANET_LIMITS[name];
+		if (typeof setting !== 'number' || !(setting >= min && setting <= max)) {
+			return null;
+		}
+		// A negative zero is within the limits of a setting whose lowest
+		// value is zero, and is stored as zero.
+		planet[name] = setting + 0;
+	}
+	return planet;
+};
+
+/**
  * Reads a header's bytes as a world's settings, narrowing each field from
  * nothing known about it.
  *
@@ -239,7 +287,25 @@ const parseHeader = (bytes: Uint8Array): Header | WorldFileFailure => {
 	if (origin === null) {
 		return failure('bad-header');
 	}
-	return { resolution, seaLevel: normaliseSeaLevel(seaLevel), origin };
+	const planetField = ownField(parsed, 'planet');
+	const planet =
+		planetField === undefined
+			? { ...DEFAULT_PLANET }
+			: parsePlanet(planetField);
+	if (planet === null) {
+		return failure('bad-planet');
+	}
+	const ageField = ownField(parsed, 'ageYears');
+	if (ageField !== undefined && !isAgeYears(ageField)) {
+		return failure('bad-age');
+	}
+	return {
+		resolution,
+		seaLevel: normaliseSeaLevel(seaLevel),
+		origin,
+		planet,
+		ageYears: ageField === undefined ? DEFAULT_AGE_YEARS : ageField + 0,
+	};
 };
 
 /**
@@ -247,11 +313,12 @@ const parseHeader = (bytes: Uint8Array): Header | WorldFileFailure => {
  *
  * @remarks
  * What is written is the world and nothing else: its resolution, its sea
- * level, how it started and its elevation. Reading the bytes back with
- * {@link deserializeWorld} gives a world equal to this one, with every
- * elevation bit for bit the same, a negative zero included. Only a sea
- * level of negative zero comes back changed, as zero, which is the same
- * level.
+ * level, how it started, its planet's settings, its date and its
+ * elevation. Reading the bytes back with {@link deserializeWorld} gives a
+ * world equal to this one, with every elevation bit for bit the same, a
+ * negative zero included, and every setting and the date exactly the same.
+ * Only a sea level, a setting or a date of negative zero comes back
+ * changed, as zero, which is the same value.
  *
  * Elevations are written as they are. A world that broke its own rule and
  * holds one that is not finite gives a file that is refused when read.
@@ -261,7 +328,9 @@ const parseHeader = (bytes: Uint8Array): Header | WorldFileFailure => {
  * else refers to.
  * @throws RangeError if the world's resolution is not supported, its
  * elevation array is not the length its resolution needs, or its sea level
- * is not finite: no file read back could give such a world.
+ * is not finite, a planet setting is not a number within its limits, or
+ * its date is not a finite number from zero up: no file read back could
+ * give such a world.
  */
 export const serializeWorld = (world: World): Uint8Array<ArrayBuffer> => {
 	const { resolution, seaLevel, elevation } = world;
@@ -281,12 +350,21 @@ export const serializeWorld = (world: World): Uint8Array<ArrayBuffer> => {
 			`A sea level must be a finite number of metres; got ${seaLevel}`,
 		);
 	}
+	const planet = parsePlanet(world.planet);
+	if (planet === null) {
+		throw new RangeError(
+			"A planet's settings must each be a number within their limits",
+		);
+	}
+	const ageYears = normaliseAgeYears(world.ageYears);
 	// Numbers and the fixed words of this module only, so every character
 	// is ASCII and takes one byte.
 	const header = JSON.stringify({
 		resolution,
 		seaLevel,
 		origin: originRecord(world.origin),
+		planet,
+		ageYears,
 	});
 	const dataOffset = WORLD_FILE_PREFIX_BYTES + header.length;
 	const bytes = new Uint8Array(dataOffset + cellCount * BYTES_PER_ELEVATION);
@@ -324,7 +402,11 @@ export const serializeWorld = (world: World): Uint8Array<ArrayBuffer> => {
  * elevation limits and to single precision by {@link normaliseSeaLevel}.
  * The origin must be of a known kind: blank, generated or the Earth. A
  * generated one needs a seed that is an integer from 0 to 4,294,967,295 and
- * a land fraction from 0 to 1.
+ * a land fraction from 0 to 1. The planet's settings and the date may be
+ * left out, and are then Earth's settings and year zero. Given, the
+ * settings must be an object holding every setting as a number within its
+ * limits, and the date a finite number from zero up: unlike the sea level,
+ * neither is brought within limits.
  * Nothing is converted from another type. Fields this version does not
  * know are ignored, and so is anything the parsed objects inherit rather
  * than hold.

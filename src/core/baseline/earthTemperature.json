@@ -1,0 +1,69 @@
+{
+  "resolution": 64,
+  "annualMean": {
+    "meanDifference": -0.145,
+    "rmsDifference": 3.934
+  },
+  "months": [
+    {
+      "meanDifference": 0.272,
+      "rmsDifference": 4.454
+    },
+    {
+      "meanDifference": -0.419,
+      "rmsDifference": 5.239
+    },
+    {
+      "meanDifference": -0.902,
+      "rmsDifference": 6.144
+    },
+    {
+      "meanDifference": -1.079,
+      "rmsDifference": 6.493
+    },
+    {
+      "meanDifference": -0.901,
+      "rmsDifference": 6.066
+    },
+    {
+      "meanDifference": -0.651,
+      "rmsDifference": 5.337
+    },
+    {
+      "meanDifference": -0.399,
+      "rmsDifference": 4.798
+    },
+    {
+      "meanDifference": -0.255,
+      "rmsDifference": 4.141
+    },
+    {
+      "meanDifference": 0.106,
+      "rmsDifference": 3.623
+    },
+    {
+      "meanDifference": 0.606,
+      "rmsDifference": 3.786
+    },
+    {
+      "meanDifference": 1.002,
+      "rmsDifference": 4.414
+    },
+    {
+      "meanDifference": 0.879,
+      "rmsDifference": 4.439
+    }
+  ],
+  "warmest": {
+    "meanDifference": -0.995,
+    "rmsDifference": 3.908
+  },
+  "coldest": {
+    "meanDifference": 0.123,
+    "rmsDifference": 5.189
+  },
+  "range": {
+    "meanDifference": -1.118,
+    "rmsDifference": 4.798
+  }
+}

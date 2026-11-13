@@ -3,6 +3,12 @@ import { generateWorld } from './generate';
 import { FACE_COUNT, SUPPORTED_RESOLUTIONS } from './grid';
 import { MAX_SEED } from './noise';
 import {
+	DEFAULT_PLANET,
+	PLANET_LIMITS,
+	PLANET_SETTINGS,
+	type PlanetSettings,
+} from './planet';
+import {
 	deserializeWorld,
 	MAX_WORLD_FILE_BYTES,
 	MAX_WORLD_FILE_HEADER_BYTES,
@@ -24,7 +30,13 @@ import {
 
 const VERSION_OFFSET = 8;
 const HEADER_LENGTH_OFFSET = 12;
+/** The header of a blank 64 as written before planets and dates were. */
 const BLANK_HEADER = '{"resolution":64,"seaLevel":0,"origin":{"kind":"blank"}}';
+/** Earth's settings and year zero, as the header holds them. */
+const EARTH_PLANET_FIELDS =
+	'"planet":{"axialTiltDeg":23.44,"starBrightness":1,"starMass":1,"orbitDistanceAu":1,"greenhouseStrength":1},"ageYears":0';
+/** The header written for a blank 64. */
+const WRITTEN_BLANK_HEADER = `{"resolution":64,"seaLevel":0,"origin":{"kind":"blank"},${EARTH_PLANET_FIELDS}}`;
 const CELLS_64 = FACE_COUNT * 64 * 64;
 
 /** The bytes of a text in ASCII. */
@@ -175,6 +187,8 @@ const ALL_ERRORS: readonly WorldFileError[] = [
 	'header-too-long',
 	'bad-header',
 	'bad-resolution',
+	'bad-planet',
+	'bad-age',
 	'bad-length',
 	'not-finite',
 ];
@@ -210,10 +224,10 @@ describe('serializeWorld', () => {
 			1, 0, 0, 0,
 		]);
 		expect(view.getUint32(HEADER_LENGTH_OFFSET, true)).toBe(
-			BLANK_HEADER.length,
+			WRITTEN_BLANK_HEADER.length,
 		);
-		expect(headerText(bytes)).toBe(BLANK_HEADER);
-		expect(bytes).toHaveLength(16 + BLANK_HEADER.length + 4 * CELLS_64);
+		expect(headerText(bytes)).toBe(WRITTEN_BLANK_HEADER);
+		expect(bytes).toHaveLength(16 + WRITTEN_BLANK_HEADER.length + 4 * CELLS_64);
 
 		// -4000 is 0xc57a0000 and 1 is 0x3f800000 as 32-bit floats, written
 		// lowest byte first.
@@ -230,7 +244,40 @@ describe('serializeWorld', () => {
 			resolution: 64,
 			seaLevel: -250,
 			origin: { kind: 'generated', seed: 7, landFraction: 0.25 },
+			planet: DEFAULT_PLANET,
+			ageYears: 0,
 		});
+	});
+
+	it('writes the planet’s settings and the date into the header', () => {
+		const world: World = {
+			...createBlankWorld(64),
+			planet: {
+				axialTiltDeg: 60,
+				starBrightness: 2.5,
+				starMass: 0.8,
+				orbitDistanceAu: 1.5,
+				greenhouseStrength: 0,
+			},
+			ageYears: 12_000,
+		};
+		expect(headerText(serializeWorld(world))).toBe(
+			'{"resolution":64,"seaLevel":0,"origin":{"kind":"blank"},"planet":{"axialTiltDeg":60,"starBrightness":2.5,"starMass":0.8,"orbitDistanceAu":1.5,"greenhouseStrength":0},"ageYears":12000}',
+		);
+	});
+
+	it('writes only the settings a planet has', () => {
+		const planet = {
+			note: 'left over',
+			greenhouseStrength: 1,
+			starMass: 1,
+			orbitDistanceAu: 1,
+			starBrightness: 1,
+			axialTiltDeg: 23.44,
+		} as PlanetSettings;
+		expect(
+			headerText(serializeWorld({ ...createBlankWorld(64), planet })),
+		).toBe(WRITTEN_BLANK_HEADER);
 	});
 
 	it('writes that a world started as the Earth into the header', () => {
@@ -239,7 +286,7 @@ describe('serializeWorld', () => {
 			origin: { kind: 'earth' },
 		};
 		expect(headerText(serializeWorld(world))).toBe(
-			'{"resolution":128,"seaLevel":0,"origin":{"kind":"earth"}}',
+			`{"resolution":128,"seaLevel":0,"origin":{"kind":"earth"},${EARTH_PLANET_FIELDS}}`,
 		);
 	});
 
@@ -250,7 +297,7 @@ describe('serializeWorld', () => {
 			note: 'left over',
 		} as unknown as WorldOrigin;
 		const bytes = serializeWorld({ ...createBlankWorld(64), origin });
-		expect(headerText(bytes)).toBe(BLANK_HEADER);
+		expect(headerText(bytes)).toBe(WRITTEN_BLANK_HEADER);
 
 		const earth = {
 			kind: 'earth',
@@ -259,7 +306,9 @@ describe('serializeWorld', () => {
 		} as unknown as WorldOrigin;
 		expect(
 			headerText(serializeWorld({ ...createBlankWorld(64), origin: earth })),
-		).toBe('{"resolution":64,"seaLevel":0,"origin":{"kind":"earth"}}');
+		).toBe(
+			`{"resolution":64,"seaLevel":0,"origin":{"kind":"earth"},${EARTH_PLANET_FIELDS}}`,
+		);
 	});
 
 	it('keeps the header far below the cap for the longest values there are', () => {
@@ -271,9 +320,17 @@ describe('serializeWorld', () => {
 				seed: MAX_SEED,
 				landFraction: 0.1 + 0.2,
 			},
+			planet: {
+				axialTiltDeg: 0.1 + 0.2,
+				starBrightness: 1 / 3 + 1e-15,
+				starMass: 0.1 + 0.7,
+				orbitDistanceAu: 2 / 3 + 1e-15,
+				greenhouseStrength: 0.1 + 0.2,
+			},
+			ageYears: 1.2345678901234567e300,
 		};
 		const header = headerText(serializeWorld(world));
-		expect(header.length).toBeLessThan(150);
+		expect(header.length).toBeLessThan(400);
 		expect(header.length).toBeLessThan(MAX_WORLD_FILE_HEADER_BYTES);
 	});
 
@@ -311,6 +368,36 @@ describe('serializeWorld', () => {
 		for (const seaLevel of [Number.NaN, Infinity, -Infinity]) {
 			const world: World = { ...createBlankWorld(64), seaLevel };
 			expect(() => serializeWorld(world)).toThrow(RangeError);
+		}
+	});
+
+	it('refuses a world whose planet has a setting that is missing, not a number or out of range', () => {
+		for (const name of PLANET_SETTINGS) {
+			const { min, max } = PLANET_LIMITS[name];
+			for (const value of [
+				undefined,
+				'1',
+				Number.NaN,
+				Infinity,
+				min - 0.001,
+				max + 0.001,
+			]) {
+				const world = {
+					...createBlankWorld(64),
+					planet: { ...DEFAULT_PLANET, [name]: value },
+				} as World;
+				expect(
+					() => serializeWorld(world),
+					`${name}: ${String(value)}`,
+				).toThrow(RangeError);
+			}
+		}
+	});
+
+	it('refuses a world whose date is negative or not finite', () => {
+		for (const ageYears of [-1, -1e-9, Number.NaN, Infinity, -Infinity]) {
+			const world: World = { ...createBlankWorld(64), ageYears };
+			expect(() => serializeWorld(world), String(ageYears)).toThrow(RangeError);
 		}
 	});
 });
@@ -371,6 +458,55 @@ describe('a round trip', () => {
 		world.seaLevel = normaliseSeaLevel(-0);
 		expect(Object.is(world.seaLevel, -0)).toBe(true);
 		expect(Object.is(worldOf(serializeWorld(world)).seaLevel, 0)).toBe(true);
+	});
+
+	it('gives back the planet’s settings and the date exactly', () => {
+		const planets: PlanetSettings[] = [
+			DEFAULT_PLANET,
+			{
+				axialTiltDeg: 0,
+				starBrightness: 0.1,
+				starMass: 0.1,
+				orbitDistanceAu: 0.3,
+				greenhouseStrength: 0,
+			},
+			{
+				axialTiltDeg: 90,
+				starBrightness: 10,
+				starMass: 10,
+				orbitDistanceAu: 3,
+				greenhouseStrength: 3,
+			},
+			{
+				axialTiltDeg: 0.1 + 0.2,
+				starBrightness: 1 / 3,
+				starMass: Math.PI,
+				orbitDistanceAu: Math.SQRT2,
+				greenhouseStrength: 2 / 3,
+			},
+		];
+		const base = sculptedWorld(64);
+		for (const [index, planet] of planets.entries()) {
+			for (const ageYears of [0, 1, 12_000, 2.4e6, 1 / 3, 4.5e9]) {
+				const world: World = { ...base, planet, ageYears };
+				const read = worldOf(serializeWorld(world));
+				expect(read.planet, `planet ${index}`).toEqual(planet);
+				expect(Object.keys(read.planet)).toEqual(PLANET_SETTINGS);
+				expect(read.ageYears).toBe(ageYears);
+			}
+		}
+	});
+
+	it('gives back a setting or a date of negative zero as zero', () => {
+		const world: World = {
+			...createBlankWorld(64),
+			planet: { ...DEFAULT_PLANET, axialTiltDeg: -0, greenhouseStrength: -0 },
+			ageYears: -0,
+		};
+		const read = worldOf(serializeWorld(world));
+		expect(Object.is(read.planet.axialTiltDeg, 0)).toBe(true);
+		expect(Object.is(read.planet.greenhouseStrength, 0)).toBe(true);
+		expect(Object.is(read.ageYears, 0)).toBe(true);
 	});
 
 	it('gives back a seed and a land fraction exactly', () => {
@@ -468,11 +604,63 @@ describe('deserializeWorld', () => {
 			landFraction: 0.5,
 		});
 		expect(Object.keys(read).sort()).toEqual([
+			'ageYears',
 			'elevation',
 			'origin',
+			'planet',
 			'resolution',
 			'seaLevel',
 		]);
+	});
+
+	it('reads a header without a planet or a date as Earth’s settings at year zero', () => {
+		const read = worldOf(fileOf({ header: BLANK_HEADER }));
+		expect(read.planet).toEqual(DEFAULT_PLANET);
+		expect(read.ageYears).toBe(0);
+		expect(read).toEqual(createBlankWorld(64));
+
+		const dated = worldOf(
+			fileOf({ header: `${BLANK_HEADER.slice(0, -1)},"ageYears":250}` }),
+		);
+		expect(dated.planet).toEqual(DEFAULT_PLANET);
+		expect(dated.ageYears).toBe(250);
+
+		const tilted = { ...DEFAULT_PLANET, axialTiltDeg: 45 };
+		const undated = worldOf(
+			fileWithHeader({ ...JSON.parse(BLANK_HEADER), planet: tilted }),
+		);
+		expect(undated.planet).toEqual(tilted);
+		expect(undated.ageYears).toBe(0);
+	});
+
+	it('gives a world read without a planet settings of its own', () => {
+		const first = worldOf(fileOf());
+		const second = worldOf(fileOf());
+		expect(first.planet).not.toBe(second.planet);
+		expect(first.planet).not.toBe(DEFAULT_PLANET);
+	});
+
+	it('reads a planet as its five settings alone, whatever else it holds', () => {
+		const read = worldOf(
+			fileWithHeader({
+				...JSON.parse(BLANK_HEADER),
+				planet: { ...DEFAULT_PLANET, moons: 2, starMass: 2 },
+			}),
+		);
+		expect(read.planet).toEqual({ ...DEFAULT_PLANET, starMass: 2 });
+		expect(Object.keys(read.planet)).toEqual(PLANET_SETTINGS);
+	});
+
+	it('accepts every setting at both of its limits', () => {
+		for (const name of PLANET_SETTINGS) {
+			for (const value of [PLANET_LIMITS[name].min, PLANET_LIMITS[name].max]) {
+				const planet = { ...DEFAULT_PLANET, [name]: value };
+				expect(
+					worldOf(fileWithHeader({ ...JSON.parse(BLANK_HEADER), planet }))
+						.planet,
+				).toEqual(planet);
+			}
+		}
 	});
 
 	it('accepts a header of exactly the longest length allowed', () => {
@@ -769,6 +957,59 @@ describe('a file that is refused', () => {
 		expect(({} as Record<string, unknown>).resolution).toBeUndefined();
 	});
 
+	it('has a bad planet when the planet is not an object of every setting within its limits', () => {
+		const withPlanet = (planet: unknown): Uint8Array =>
+			fileWithHeader({ ...JSON.parse(BLANK_HEADER), planet });
+		for (const planet of [null, 'earth', 1, true, [], [DEFAULT_PLANET], {}]) {
+			expect(errorOf(withPlanet(planet)), JSON.stringify(planet)).toBe(
+				'bad-planet',
+			);
+		}
+		for (const name of PLANET_SETTINGS) {
+			const { min, max } = PLANET_LIMITS[name];
+			const { [name]: _left, ...missing } = DEFAULT_PLANET;
+			expect(errorOf(withPlanet(missing)), `no ${name}`).toBe('bad-planet');
+			for (const value of [
+				null,
+				'1',
+				[1],
+				true,
+				{},
+				min - 0.001,
+				max + 0.001,
+				-1e6,
+				1e6,
+			]) {
+				expect(
+					errorOf(withPlanet({ ...DEFAULT_PLANET, [name]: value })),
+					`${name}: ${JSON.stringify(value)}`,
+				).toBe('bad-planet');
+			}
+			// A number too large for a double parses as infinity.
+			const header = `${BLANK_HEADER.slice(0, -1)},"planet":${JSON.stringify(
+				DEFAULT_PLANET,
+			).replace(`"${name}":${DEFAULT_PLANET[name]}`, `"${name}":1e999`)}}`;
+			expect(errorOf(fileOf({ header })), `${name}: 1e999`).toBe('bad-planet');
+		}
+	});
+
+	it('has a bad age when the date is not a finite number from zero up', () => {
+		for (const ageYears of [
+			'-1',
+			'-0.5',
+			'-1e999',
+			'1e999',
+			'null',
+			'"0"',
+			'[0]',
+			'true',
+			'{}',
+		]) {
+			const header = `${BLANK_HEADER.slice(0, -1)},"ageYears":${ageYears}}`;
+			expect(errorOf(fileOf({ header })), ageYears).toBe('bad-age');
+		}
+	});
+
 	it('has a bad length when bytes are left over after the elevation', () => {
 		const file = serializeWorld(createBlankWorld(64));
 		const longer = new Uint8Array(file.length + 1);
@@ -809,6 +1050,10 @@ describe('a file that is refused', () => {
 			errorOf(fileOf({ header: 'not json' })),
 			errorOf(fileWithElevation(0, Number.NaN)),
 			errorOf(fileOf({ headerLength: 0xffff_ffff })),
+			errorOf(
+				fileWithHeader({ ...JSON.parse(BLANK_HEADER), planet: { tilt: 1 } }),
+			),
+			errorOf(fileWithHeader({ ...JSON.parse(BLANK_HEADER), ageYears: -1 })),
 		];
 		expect(reasons).toEqual([
 			'bad-marker',
@@ -819,6 +1064,8 @@ describe('a file that is refused', () => {
 			'bad-header',
 			'not-finite',
 			'header-too-long',
+			'bad-planet',
+			'bad-age',
 		]);
 		expect(new Set(reasons).size).toBe(ALL_ERRORS.length);
 	});
@@ -832,6 +1079,36 @@ describe('a file that is refused', () => {
 		).toBe('unknown-version');
 		// The resolution comes before the sea level and the origin.
 		expect(errorOf(fileWithHeader({ resolution: 100 }))).toBe('bad-resolution');
+		// The origin comes before the planet, and the planet before the date.
+		expect(
+			errorOf(
+				fileWithHeader({
+					resolution: 64,
+					seaLevel: 0,
+					origin: {},
+					planet: null,
+					ageYears: -1,
+				}),
+			),
+		).toBe('bad-header');
+		expect(
+			errorOf(
+				fileWithHeader({
+					...JSON.parse(BLANK_HEADER),
+					planet: null,
+					ageYears: -1,
+				}),
+			),
+		).toBe('bad-planet');
+		// The date comes before the length of the elevation.
+		expect(
+			errorOf(
+				fileOf({
+					header: `${BLANK_HEADER.slice(0, -1)},"ageYears":-1}`,
+					data: new Uint8Array(3),
+				}),
+			),
+		).toBe('bad-age');
 		// The header comes before the length of the elevation.
 		expect(
 			errorOf(fileOf({ header: 'not json', data: new Uint8Array(3) })),
@@ -857,6 +1134,13 @@ describe('bytes of any kind', () => {
 		);
 		expect(world.seaLevel).toBe(normaliseSeaLevel(world.seaLevel));
 		expect(['blank', 'generated', 'earth']).toContain(world.origin.kind);
+		expect(Object.keys(world.planet)).toEqual(PLANET_SETTINGS);
+		for (const name of PLANET_SETTINGS) {
+			const value = world.planet[name];
+			expect(value).toBeGreaterThanOrEqual(PLANET_LIMITS[name].min);
+			expect(value).toBeLessThanOrEqual(PLANET_LIMITS[name].max);
+		}
+		expect(Number.isFinite(world.ageYears) && world.ageYears >= 0).toBe(true);
 		expect(
 			world.elevation.every(
 				(value) => value >= MIN_ELEVATION_M && value <= MAX_ELEVATION_M,

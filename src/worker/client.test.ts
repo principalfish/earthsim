@@ -6,79 +6,16 @@ import {
 	type SimRequest,
 	type SimResponse,
 	simFailure,
+	type TemperatureProgress,
 	type TerrainStats,
 	type World,
 } from '../core/index';
 import {
-	createSimClient,
-	type LatestOutcome,
-	type WorkerEventLike,
-	type WorkerEventType,
-	type WorkerLike,
-} from './client';
-import { handleRequest } from './handle';
-
-type Listener = (event: WorkerEventLike) => void;
-
-/** A stand-in for a worker whose answers and errors the test sends by hand. */
-type FakeWorker = WorkerLike & {
-	/** A copy of each request posted, in order, as a worker would get it. */
-	readonly posted: SimRequest[];
-	/** Every argument list `postMessage` was called with. */
-	readonly postCalls: unknown[][];
-	/** How many times `terminate` was called. */
-	terminations: number;
-	/** How many listeners the worker has for a type of event. */
-	listenerCount(type: WorkerEventType): number;
-	/** Delivers an event to the listeners for its type. */
-	emit(type: WorkerEventType, event?: WorkerEventLike): void;
-	/** Delivers a response as a `message` event. */
-	respond(response: unknown): void;
-	/** Answers the posted request with that id as the real handler would. */
-	answer(id: number): void;
-};
-
-const createFakeWorker = (): FakeWorker => {
-	const listeners = new Map<WorkerEventType, Set<Listener>>();
-	const of = (type: WorkerEventType): Set<Listener> => {
-		let set = listeners.get(type);
-		if (set === undefined) {
-			set = new Set();
-			listeners.set(type, set);
-		}
-		return set;
-	};
-	const fake: FakeWorker = {
-		posted: [],
-		postCalls: [],
-		terminations: 0,
-		postMessage: (...args: unknown[]) => {
-			fake.postCalls.push(args);
-			fake.posted.push(structuredClone(args[0]) as SimRequest);
-		},
-		addEventListener: (type, listener) => {
-			of(type).add(listener);
-		},
-		removeEventListener: (type, listener) => {
-			of(type).delete(listener);
-		},
-		terminate: () => {
-			fake.terminations++;
-		},
-		listenerCount: (type) => of(type).size,
-		emit: (type, event = {}) => {
-			for (const listener of [...of(type)]) {
-				listener(event);
-			}
-		},
-		respond: (response) => fake.emit('message', { data: response }),
-		answer: (id) => {
-			const request = fake.posted.find((posted) => posted.id === id);
-			fake.respond(structuredClone(handleRequest(request)));
-		},
-	};
-	return fake;
-};
+	progressMessageOf,
+	temperatureOf,
+} from '../core/testing/temperatureFixtures';
+import { createSimClient } from './client';
+import { createFakeWorker } from './testing/fakeWorker';
 
 const statsOf = (landFraction: number): TerrainStats => ({
 	landFraction,
@@ -126,8 +63,8 @@ describe('request', () => {
 		const client = createSimClient(worker);
 		const world = blank();
 
-		void client.request('terrainStats', world);
-		void client.request('terrainStats', world);
+		void client.request('terrainStats', { world });
+		void client.request('terrainStats', { world });
 
 		expect(worker.posted).toHaveLength(2);
 		expect(worker.posted[0]).toEqual({ id: 1, kind: 'terrainStats', world });
@@ -138,7 +75,7 @@ describe('request', () => {
 		const worker = createFakeWorker();
 		const client = createSimClient(worker);
 
-		const result = client.request('terrainStats', blank());
+		const result = client.request('terrainStats', { world: blank() });
 		worker.respond(success(1, 0.25));
 
 		await expect(result).resolves.toEqual(statsOf(0.25));
@@ -148,9 +85,9 @@ describe('request', () => {
 		const worker = createFakeWorker();
 		const client = createSimClient(worker);
 
-		const first = client.request('terrainStats', blank());
-		const second = client.request('terrainStats', blank());
-		const third = client.request('terrainStats', blank());
+		const first = client.request('terrainStats', { world: blank() });
+		const second = client.request('terrainStats', { world: blank() });
+		const third = client.request('terrainStats', { world: blank() });
 		worker.respond(success(3, 0.3));
 		worker.respond(success(1, 0.1));
 
@@ -166,7 +103,7 @@ describe('request', () => {
 		const worker = createFakeWorker();
 		const client = createSimClient(worker);
 
-		const result = client.request('terrainStats', blank());
+		const result = client.request('terrainStats', { world: blank() });
 		worker.respond(simFailure(1, 'terrainStats', 'the world is flat'));
 
 		await expect(result).rejects.toThrow(new Error('the world is flat'));
@@ -176,7 +113,7 @@ describe('request', () => {
 		const worker = createFakeWorker();
 		const client = createSimClient(worker);
 
-		const result = client.request('terrainStats', blank());
+		const result = client.request('terrainStats', { world: blank() });
 		worker.respond(success(99, 0.9));
 		worker.respond(simFailure(null, null, 'A request must be an object'));
 		expect(await stateOf(result)).toBe('pending');
@@ -190,7 +127,7 @@ describe('request', () => {
 		const worker = createFakeWorker();
 		const client = createSimClient(worker);
 
-		const result = client.request('terrainStats', blank());
+		const result = client.request('terrainStats', { world: blank() });
 		for (const data of [undefined, null, 'hello', 1, { id: 1 }]) {
 			worker.respond(data);
 		}
@@ -209,7 +146,7 @@ describe('request', () => {
 		});
 		const before = world.elevation.slice();
 
-		const result = client.request('terrainStats', world);
+		const result = client.request('terrainStats', { world });
 
 		// A second argument would be a transfer list, which empties the
 		// arrays it names.
@@ -238,7 +175,7 @@ describe('request', () => {
 		const world = generateWorld({ resolution: 64, seed: 5, landFraction: 0.4 });
 		world.seaLevel = 300;
 
-		const result = client.request('terrainStats', world);
+		const result = client.request('terrainStats', { world });
 		worker.answer(1);
 
 		await expect(result).resolves.toEqual(computeTerrainStats(world));
@@ -249,7 +186,7 @@ describe('request', () => {
 		const client = createSimClient(worker);
 		const world = { ...blank(), elevation: new Float32Array(4) };
 
-		const result = client.request('terrainStats', world);
+		const result = client.request('terrainStats', { world });
 		worker.answer(1);
 
 		await expect(result).rejects.toThrow(
@@ -265,20 +202,94 @@ describe('request', () => {
 		worker.postMessage = () => {
 			throw new Error('could not be cloned');
 		};
-		await expect(client.request('terrainStats', blank())).rejects.toThrow(
-			new Error('could not be cloned'),
-		);
+		await expect(
+			client.request('terrainStats', { world: blank() }),
+		).rejects.toThrow(new Error('could not be cloned'));
 		worker.postMessage = () => {
 			throw 'not an error';
 		};
-		await expect(client.request('terrainStats', blank())).rejects.toThrow(
-			new Error('not an error'),
-		);
+		await expect(
+			client.request('terrainStats', { world: blank() }),
+		).rejects.toThrow(new Error('not an error'));
 
 		worker.postMessage = post;
-		const result = client.request('terrainStats', blank());
+		const result = client.request('terrainStats', { world: blank() });
 		worker.respond(success(3, 0.7));
 		await expect(result).resolves.toEqual(statsOf(0.7));
+	});
+});
+
+describe('request for temperature', () => {
+	it('sends a copy of the start with the world, leaving the caller both', async () => {
+		const worker = createFakeWorker();
+		const client = createSimClient(worker);
+		const world = blank();
+		const start = temperatureOf(3, 4);
+
+		void client.request('temperature', { world, start });
+
+		expect(worker.postCalls).toEqual([
+			[{ id: 1, kind: 'temperature', world, start }],
+		]);
+		const posted = worker.posted[0] as SimRequest<'temperature'>;
+		expect(posted.start?.state?.temperatureK).not.toBe(
+			start.state.temperatureK,
+		);
+		expect(start.state.temperatureK.byteLength).toBe(4 * 8);
+		expect(start.months[0]?.byteLength).toBe(4 * 4);
+	});
+
+	it('tells of progress for its own id, in order, and settles only on the response', async () => {
+		const worker = createFakeWorker();
+		const client = createSimClient(worker);
+		const heard: TemperatureProgress[] = [];
+		const other: TemperatureProgress[] = [];
+
+		const result = client.request(
+			'temperature',
+			{ world: blank() },
+			{ onProgress: (progress) => heard.push(progress) },
+		);
+		void client.request(
+			'temperature',
+			{ world: blank() },
+			{ onProgress: (progress) => other.push(progress) },
+		);
+		worker.respond(progressMessageOf(1, 1));
+		worker.respond(progressMessageOf(1, 2));
+		expect(await stateOf(result)).toBe('pending');
+		expect(heard.map((progress) => progress.yearsDone)).toEqual([1, 2]);
+		expect(other).toEqual([]);
+
+		worker.respond({
+			id: 1,
+			kind: 'temperature',
+			ok: true,
+			result: temperatureOf(2),
+		});
+		await expect(result).resolves.toEqual(temperatureOf(2));
+
+		// Answered: whatever comes for it later is ignored.
+		worker.respond(progressMessageOf(1, 3));
+		expect(heard).toHaveLength(2);
+	});
+
+	it('ignores progress for an id nobody waits on, or with nobody to tell', async () => {
+		const worker = createFakeWorker();
+		const client = createSimClient(worker);
+
+		const quiet = client.request('temperature', { world: blank() });
+		expect(() => worker.respond(progressMessageOf(1, 1))).not.toThrow();
+		expect(() => worker.respond(progressMessageOf(99, 1))).not.toThrow();
+		expect(await stateOf(quiet)).toBe('pending');
+
+		worker.respond({
+			id: 1,
+			kind: 'temperature',
+			ok: true,
+			result: temperatureOf(1),
+		});
+		await expect(quiet).resolves.toEqual(temperatureOf(1));
 	});
 });
 
@@ -287,8 +298,8 @@ describe('a worker error', () => {
 		const worker = createFakeWorker();
 		const client = createSimClient(worker);
 
-		const first = client.request('terrainStats', blank());
-		const second = client.request('terrainStats', blank());
+		const first = client.request('terrainStats', { world: blank() });
+		const second = client.request('terrainStats', { world: blank() });
 		worker.emit('error', { message: 'Uncaught RangeError: out of memory' });
 
 		await expect(first).rejects.toThrow(
@@ -298,7 +309,7 @@ describe('a worker error', () => {
 		);
 		await expect(second).rejects.toThrow('The simulation worker reported');
 
-		const third = client.request('terrainStats', blank());
+		const third = client.request('terrainStats', { world: blank() });
 		expect(worker.posted).toHaveLength(3);
 		worker.respond(success(3, 0.4));
 		await expect(third).resolves.toEqual(statsOf(0.4));
@@ -308,13 +319,13 @@ describe('a worker error', () => {
 		const worker = createFakeWorker();
 		const client = createSimClient(worker);
 
-		const first = client.request('terrainStats', blank());
+		const first = client.request('terrainStats', { world: blank() });
 		worker.emit('error');
 		await expect(first).rejects.toThrow(
 			new Error('The simulation worker reported an error'),
 		);
 
-		const second = client.request('terrainStats', blank());
+		const second = client.request('terrainStats', { world: blank() });
 		worker.respond(success(1, 0.1));
 		expect(await stateOf(second)).toBe('pending');
 	});
@@ -323,13 +334,13 @@ describe('a worker error', () => {
 		const worker = createFakeWorker();
 		const client = createSimClient(worker);
 
-		const empty = client.request('terrainStats', blank());
+		const empty = client.request('terrainStats', { world: blank() });
 		worker.emit('error', { message: '' });
 		await expect(empty).rejects.toThrow(
 			new Error('The simulation worker reported an error'),
 		);
 
-		const odd = client.request('terrainStats', blank());
+		const odd = client.request('terrainStats', { world: blank() });
 		worker.emit('error', { message: 404 });
 		await expect(odd).rejects.toThrow(
 			new Error('The simulation worker reported an error'),
@@ -340,8 +351,8 @@ describe('a worker error', () => {
 		const worker = createFakeWorker();
 		const client = createSimClient(worker);
 
-		const first = client.request('terrainStats', blank());
-		const second = client.latest('terrainStats', blank());
+		const first = client.request('terrainStats', { world: blank() });
+		const second = client.request('terrainStats', { world: blank() });
 		worker.emit('messageerror');
 
 		for (const result of [first, second]) {
@@ -350,7 +361,7 @@ describe('a worker error', () => {
 			);
 		}
 
-		const third = client.request('terrainStats', blank());
+		const third = client.request('terrainStats', { world: blank() });
 		worker.respond(success(3, 0.4));
 		await expect(third).resolves.toEqual(statsOf(0.4));
 	});
@@ -363,129 +374,16 @@ describe('a worker error', () => {
 	});
 });
 
-describe('latest', () => {
-	const result = (landFraction: number): LatestOutcome<TerrainStats> => ({
-		superseded: false,
-		result: statsOf(landFraction),
-	});
-
-	it('resolves with the result when nothing newer is asked', async () => {
-		const worker = createFakeWorker();
-		const client = createSimClient(worker);
-
-		const only = client.latest('terrainStats', blank());
-		worker.respond(success(1, 0.3));
-
-		await expect(only).resolves.toEqual(result(0.3));
-	});
-
-	it('resolves only the newest of several overlapping requests', async () => {
-		const worker = createFakeWorker();
-		const client = createSimClient(worker);
-
-		const first = client.latest('terrainStats', blank());
-		const second = client.latest('terrainStats', blank());
-		const third = client.latest('terrainStats', blank());
-		expect(worker.posted.map((request) => request.id)).toEqual([1, 2, 3]);
-
-		// The older two settle at once, before the worker has answered.
-		await expect(first).resolves.toEqual({ superseded: true });
-		await expect(second).resolves.toEqual({ superseded: true });
-		expect(await stateOf(third)).toBe('pending');
-
-		// Their answers, in any order, change nothing.
-		worker.respond(success(2, 0.2));
-		worker.respond(success(3, 0.3));
-		worker.respond(success(1, 0.1));
-
-		await expect(third).resolves.toEqual(result(0.3));
-		await expect(first).resolves.toEqual({ superseded: true });
-		await expect(second).resolves.toEqual({ superseded: true });
-	});
-
-	it('does not supersede a request that was already answered', async () => {
-		const worker = createFakeWorker();
-		const client = createSimClient(worker);
-
-		const first = client.latest('terrainStats', blank());
-		worker.respond(success(1, 0.1));
-		const second = client.latest('terrainStats', blank());
-		worker.respond(success(2, 0.2));
-
-		await expect(first).resolves.toEqual(result(0.1));
-		await expect(second).resolves.toEqual(result(0.2));
-	});
-
-	it('rejects when the worker answers the newest with a failure', async () => {
-		const worker = createFakeWorker();
-		const client = createSimClient(worker);
-
-		const first = client.latest('terrainStats', blank());
-		const second = client.latest('terrainStats', blank());
-		worker.respond(simFailure(2, 'terrainStats', 'no statistics today'));
-
-		await expect(first).resolves.toEqual({ superseded: true });
-		await expect(second).rejects.toThrow(new Error('no statistics today'));
-	});
-
-	it('rejects the newest on a worker error and serves the next call', async () => {
-		const worker = createFakeWorker();
-		const client = createSimClient(worker);
-
-		const first = client.latest('terrainStats', blank());
-		worker.emit('error', { message: 'boom' });
-		await expect(first).rejects.toThrow('boom');
-
-		const second = client.latest('terrainStats', blank());
-		worker.respond(success(2, 0.2));
-		await expect(second).resolves.toEqual(result(0.2));
-	});
-
-	it('leaves plain requests alone and is left alone by them', async () => {
-		const worker = createFakeWorker();
-		const client = createSimClient(worker);
-
-		const plain = client.request('terrainStats', blank());
-		const first = client.latest('terrainStats', blank());
-		const other = client.request('terrainStats', blank());
-		expect(await stateOf(first)).toBe('pending');
-
-		const second = client.latest('terrainStats', blank());
-		worker.respond(success(1, 0.1));
-		worker.respond(success(3, 0.3));
-		worker.respond(success(4, 0.4));
-
-		await expect(plain).resolves.toEqual(statsOf(0.1));
-		await expect(other).resolves.toEqual(statsOf(0.3));
-		await expect(first).resolves.toEqual({ superseded: true });
-		await expect(second).resolves.toEqual(result(0.4));
-	});
-
-	it('supersedes the one before even when the new one cannot be posted', async () => {
-		const worker = createFakeWorker();
-		const client = createSimClient(worker);
-
-		const first = client.latest('terrainStats', blank());
-		worker.postMessage = () => {
-			throw new Error('could not be cloned');
-		};
-		const second = client.latest('terrainStats', blank());
-
-		await expect(first).resolves.toEqual({ superseded: true });
-		await expect(second).rejects.toThrow('could not be cloned');
-	});
-});
-
 describe('dispose', () => {
 	it('rejects what is pending, stops listening and ends the worker', async () => {
 		const worker = createFakeWorker();
 		const client = createSimClient(worker);
 
-		const plain = client.request('terrainStats', blank());
-		const newest = client.latest('terrainStats', blank());
+		const plain = client.request('terrainStats', { world: blank() });
+		const other = client.request('terrainStats', { world: blank() });
 		client.dispose();
 
-		for (const result of [plain, newest]) {
+		for (const result of [plain, other]) {
 			await expect(result).rejects.toThrow(
 				new Error('The simulation client has been disposed'),
 			);
@@ -501,12 +399,9 @@ describe('dispose', () => {
 		const client = createSimClient(worker);
 		client.dispose();
 
-		await expect(client.request('terrainStats', blank())).rejects.toThrow(
-			new Error('The simulation client has been disposed'),
-		);
-		await expect(client.latest('terrainStats', blank())).rejects.toThrow(
-			'disposed',
-		);
+		await expect(
+			client.request('terrainStats', { world: blank() }),
+		).rejects.toThrow(new Error('The simulation client has been disposed'));
 		expect(worker.posted).toHaveLength(0);
 	});
 

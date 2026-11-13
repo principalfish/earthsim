@@ -9,6 +9,8 @@
   --color-accent-strong: #8cc4f0;
   --color-danger: #f28b82;
   --color-backdrop: rgb(0 0 0 / 60%);
+  /* The page's background, see-through enough to show what is under it. */
+  --color-overlay-bg: color-mix(in srgb, var(--color-bg) 80%, transparent);
   --space-xs: 0.25rem;
   --space-sm: 0.5rem;
   --space-md: 1rem;
@@ -17,6 +19,9 @@
   --radius-sm: 0.375rem;
   --opacity-disabled: 0.55;
   --panel-width: 20rem;
+  /* About the width of the browsers' own slider thumb, 16px, which a mark
+     on a slider's track is placed by. */
+  --range-thumb-size: 1rem;
   --dialog-width: 28rem;
 
   color-scheme: dark;
@@ -41,9 +46,14 @@ body {
 }
 
 /* Layout */
+/* One cell, the globe's area, which the globe fills and the overlays are
+   laid over; neither can stretch it. */
 .viewport {
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
+  overflow: hidden;
 }
 
 .viewport__message {
@@ -56,6 +66,7 @@ body {
 }
 
 .globe {
+  grid-area: 1 / 1;
   display: block;
   width: 100%;
   height: 100%;
@@ -102,6 +113,61 @@ body {
   letter-spacing: 0.06em;
 }
 
+/* The button that opens and closes a section, drawn as the heading it
+   fills, across the panel, with a marker before the name that points to
+   the name while the section is closed and down while it is open. */
+.panel__toggle {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  inline-size: 100%;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: start;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.panel__toggle::before {
+  flex: none;
+  inline-size: 0.5em;
+  block-size: 0.5em;
+  content: "";
+  background: currentcolor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.panel__toggle[aria-expanded="true"]::before {
+  rotate: 90deg;
+}
+
+.panel__toggle:hover {
+  color: var(--color-text);
+}
+
+.panel__toggle:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+/* What a section holds, spaced as the section's own rows are. */
+.panel__body {
+  display: grid;
+  gap: var(--space-md);
+}
+
+/* Hidden while the section is closed, which the display set on it would
+   otherwise undo. */
+.panel__body[hidden] {
+  display: none;
+}
+
 /* Components */
 .field {
   display: grid;
@@ -130,6 +196,25 @@ body {
   width: 100%;
   margin: 0;
   accent-color: var(--color-accent);
+}
+
+/* A slider with a value marked: the mark hangs under the track, where the
+   middle of the thumb stands at that value. */
+.field__track {
+  --field-mark-height: 0.375rem;
+
+  position: relative;
+  display: grid;
+  padding-block-end: var(--field-mark-height);
+}
+
+.field__mark {
+  position: absolute;
+  inset-block-end: 0;
+  width: 2px;
+  height: var(--field-mark-height);
+  background: var(--color-text-muted);
+  translate: -50% 0;
 }
 
 .field__checkbox {
@@ -180,6 +265,22 @@ body {
 
 .text-input:disabled {
   opacity: var(--opacity-disabled);
+}
+
+.field__select {
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-sm);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.field__select:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
 }
 
 .choice {
@@ -237,6 +338,19 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* Drawn close under the world's line, half the section's gap from it, as
+   one more line about the world. Room for its one line is kept while it is
+   empty. */
+.world-date {
+  min-height: 1.4em;
+  margin: 0;
+  margin-block-start: calc(-1 * var(--space-sm));
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
 .world-status {
   --world-status-line-height: 1.4;
 
@@ -260,55 +374,56 @@ body {
   color: var(--color-text-muted);
 }
 
-.tool-picker {
+.segmented {
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.tool-picker__options {
+.segmented__options {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   overflow: hidden;
   font-size: var(--font-size-sm);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
 
-.tool-picker__option {
+.segmented__option {
   position: relative;
   display: grid;
   cursor: pointer;
 }
 
-.tool-picker__option + .tool-picker__option {
+.segmented__option + .segmented__option {
   border-inline-start: 1px solid var(--color-border);
 }
 
 /* Kept in the page, unseen, so that it still takes focus and the keys. */
-.tool-picker__input {
+.segmented__input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
-.tool-picker__label {
+.segmented__label {
   padding: var(--space-sm) var(--space-xs);
   text-align: center;
 }
 
-.tool-picker__label:hover {
+.segmented__label:hover {
   background: var(--color-border);
 }
 
-.tool-picker__input:checked + .tool-picker__label {
+.segmented__input:checked + .segmented__label {
   font-weight: 600;
   color: var(--color-bg);
   background: var(--color-accent);
 }
 
-.tool-picker__input:focus-visible + .tool-picker__label {
+.segmented__input:focus-visible + .segmented__label {
   outline: 2px solid var(--color-text);
   outline-offset: -2px;
 }
@@ -368,6 +483,19 @@ body {
 
 .button--primary:disabled {
   color: var(--color-bg);
+}
+
+/* A toggle that is on, such as the play button while the year plays. */
+.button[aria-pressed="true"] {
+  font-weight: 600;
+  color: var(--color-bg);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.button[aria-pressed="true"]:enabled:hover {
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
 }
 
 .dialog {
@@ -437,6 +565,41 @@ body {
   gap: var(--space-sm);
 }
 
+.planet-readout {
+  font-size: var(--font-size-sm);
+}
+
+.planet-readout__lines {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.planet-readout__row {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: space-between;
+}
+
+.planet-readout__value {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  text-align: end;
+}
+
+/* The note carries its own margin, so its region takes no room while empty. */
+.planet-readout__note {
+  margin: 0;
+  margin-block-start: var(--space-sm);
+  line-height: 1.4;
+}
+
+/* Sized by its label rather than stretched across the section. */
+.planet-reset {
+  justify-self: start;
+}
+
 .stats {
   display: grid;
   gap: var(--space-sm);
@@ -471,6 +634,242 @@ body {
 .stats__note {
   font-size: var(--font-size-sm);
   line-height: 1.4;
+}
+
+.temperature-view {
+  display: grid;
+  gap: var(--space-md);
+}
+
+/* The slider takes the row, with the play button at its end, level with
+   the slider rather than its label. */
+.month-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-sm);
+  align-items: end;
+}
+
+/* The choice of where the temperature comes from, with a line under it for
+   what the page has to say of it. */
+.comparison {
+  display: grid;
+}
+
+/* Left empty rather than hidden when there is nothing to say, so that a
+   screen reader announces what is written into it; empty, it takes no
+   room. */
+.comparison__message {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.comparison__message:not(:empty) {
+  margin-top: var(--space-xs);
+}
+
+/* Hidden by the page, which the display set on them would otherwise undo. */
+.temperature-view[hidden],
+.temperature-view__show[hidden],
+.month-controls[hidden],
+.comparison[hidden] {
+  display: none;
+}
+
+/* Laid over the globe's bottom-right corner, on the backing the cursor
+   readout has. It is as wide as the panel and has the panel's inline
+   padding, room for the values marked at the ends of the scale, which
+   stand out past the ramp by half their width. In a window narrower than
+   that it is as wide as the globe's area allows. The pointer passes
+   through it to the globe, so turning and sculpting work under it. */
+.legend {
+  display: grid;
+  flex: none;
+  gap: var(--space-sm);
+  inline-size: var(--panel-width);
+  max-inline-size: 100%;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  background: var(--color-overlay-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+}
+
+/* A part of the legend with nothing to show is hidden, which the display
+   set on it would otherwise undo. */
+.legend[hidden],
+.legend [hidden] {
+  display: none;
+}
+
+.legend__scale {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.legend__caption,
+.legend__status {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* The status line is left empty rather than hidden when there is nothing
+   to say, so that a screen reader announces what is written into it; its
+   one line is kept either way, so the legend does not shift as it fills. */
+.legend__status {
+  min-height: 1.4em;
+  color: var(--color-text-muted);
+}
+
+.legend__ramp {
+  height: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* Each value sits under its mark, centred on it; room is kept for one line
+   of them. */
+.legend__ticks {
+  position: relative;
+  height: 1.4em;
+}
+
+.legend__tick {
+  position: absolute;
+  top: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  transform: translateX(-50%);
+}
+
+/* The mark itself: a short line up to the ramp. */
+.legend__tick::before {
+  position: absolute;
+  top: calc(-1 * var(--space-xs) - 0.25rem);
+  left: 50%;
+  width: 1px;
+  height: 0.5rem;
+  content: "";
+  background: var(--color-text);
+}
+
+/* What the end colours stand for, on a line of its own under the values
+   marked so that the two never meet: the low end's words at the left, the
+   high end's at the right, even when the low end's are hidden. */
+.legend__ends {
+  display: flex;
+  gap: var(--space-sm);
+  margin: 0;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.legend__end {
+  font-variant-numeric: tabular-nums;
+}
+
+.legend__end--high {
+  margin-left: auto;
+  text-align: right;
+}
+
+/* The error figures against the observed temperature, directly under the
+   words for the ends. */
+.legend__figures {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.legend__bar {
+  width: 100%;
+  height: 0.25rem;
+  accent-color: var(--color-accent);
+}
+
+/* The row along the bottom of the globe's area that the legend and the
+   cursor readout sit in, a small margin in from its edges. The legend comes
+   first and the row runs from right to left, so the legend takes the
+   bottom-right corner and the strip, pushed along by its margin, the left
+   edge. The lines stack upwards, so when the two do not fit side by side the
+   legend keeps the bottom and the strip's line sits directly above it; on
+   one line both stand on the bottom edge. The pointer passes through the
+   row and all it holds to the globe. */
+.globe-overlays {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: wrap-reverse;
+  /* With the lines stacked upwards, the start is the bottom. */
+  align-items: flex-start;
+  align-self: end;
+  gap: var(--space-sm);
+  min-width: 0;
+  margin: var(--space-sm);
+  pointer-events: none;
+}
+
+/* A place that draws no box, so what it holds is laid out by the row. */
+.globe-overlays__place {
+  display: contents;
+}
+
+/* What lies under the pointer, against the left edge of the globe's area.
+   The pointer passes through it to the globe, so it never stops a stroke or
+   a drag. Its width is fixed, with room in a wide font for the longest
+   usual line, `Annual average −12 °C difference · out of date`, so it keeps
+   its size as the values change; in a window narrower than that it is as
+   wide as the area allows. Each part has a line of its own and a part with
+   nothing to say takes none, so the strip is two lines high in Terrain view
+   and three in Temperature view: its height changes only with what is
+   shown, not with the values. */
+.cursor-readout {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  inline-size: min(26em, 100%);
+  margin-inline-end: auto;
+  padding: var(--space-xs) var(--space-sm);
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  color: var(--color-text);
+  background: var(--color-overlay-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+}
+
+/* Hidden by the page, which the display set on it would otherwise undo. */
+.cursor-readout[hidden] {
+  display: none;
+}
+
+/* One line each, never wrapped: a line longer than the strip is cut short
+   with an ellipsis, so a narrow window neither makes the strip taller nor
+   scrolls. */
+.cursor-readout__position,
+.cursor-readout__elevation,
+.cursor-readout__temperature {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The end of the temperature's line, after a middle dot that is hidden
+   with it. */
+.cursor-readout__status {
+  color: var(--color-text-muted);
+}
+
+.cursor-readout__status::before {
+  content: " · ";
 }
 
 /* Utilities */

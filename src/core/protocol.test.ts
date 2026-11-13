@@ -1,17 +1,53 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_PLANET, PLANET_SETTINGS } from './planet';
 import {
 	isSimKind,
+	isSimProgress,
 	isSimResponse,
 	isWorldShaped,
 	parseSimRequest,
 	type SimFailure,
+	type SimProgress,
 	type SimRequest,
 	simFailure,
 } from './protocol';
 import { computeTerrainStats } from './stats';
+import type {
+	TemperatureConditions,
+	TemperatureProgress,
+	TemperatureState,
+} from './temperature';
 import { createBlankWorld } from './world';
 
 const world = createBlankWorld(64);
+
+/** A state of the right form; its lengths and values are for the solver. */
+const state = (): TemperatureState => ({
+	temperatureK: new Float64Array(3),
+	previousK: new Float64Array(3),
+	referenceCoolingK: new Float64Array(3),
+	stepSeconds: 1,
+});
+
+/** A record of the right form; its values are for the solver. */
+const solvedFor = (): TemperatureConditions => ({
+	seaLevel: 0,
+	planet: { ...DEFAULT_PLANET },
+});
+
+const months = (): Float32Array[] =>
+	Array.from({ length: 12 }, () => new Float32Array(3));
+
+const BAD_START =
+	"A temperature request's start must be an object whose solvedFor has a finite seaLevel and a planet of finite settings and whose state has temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number";
+
+const PROGRESS: TemperatureProgress = {
+	yearsDone: 2,
+	maxYears: 60,
+	changeK: 0.3,
+	toleranceK: 0.05,
+	estimatedYearsLeft: 3,
+};
 
 /** The failure a message is refused with; fails the test if it is accepted. */
 const refusal = (message: unknown): SimFailure => {
@@ -25,6 +61,7 @@ const refusal = (message: unknown): SimFailure => {
 describe('isSimKind', () => {
 	it('accepts the kinds of request', () => {
 		expect(isSimKind('terrainStats')).toBe(true);
+		expect(isSimKind('temperature')).toBe(true);
 	});
 
 	it('refuses other strings', () => {
@@ -58,6 +95,14 @@ describe('isWorldShaped', () => {
 				resolution: 7,
 				seaLevel: Number.NaN,
 				origin: {},
+				planet: {
+					axialTiltDeg: -400,
+					starBrightness: Number.NaN,
+					starMass: 0,
+					orbitDistanceAu: Infinity,
+					greenhouseStrength: 99,
+				},
+				ageYears: -5,
 				elevation: new Float32Array(3),
 			}),
 		).toBe(true);
@@ -80,6 +125,32 @@ describe('isWorldShaped', () => {
 		).toBe(false);
 		const { elevation: _elevation, ...rest } = world;
 		expect(isWorldShaped(rest)).toBe(false);
+	});
+
+	it('refuses a world whose planet or date is missing or of the wrong type', () => {
+		const { planet: _planet, ...noPlanet } = world;
+		expect(isWorldShaped(noPlanet)).toBe(false);
+		const { ageYears: _ageYears, ...noAge } = world;
+		expect(isWorldShaped(noAge)).toBe(false);
+		for (const planet of [null, 'earth', 1, []]) {
+			expect(isWorldShaped({ ...world, planet }), String(planet)).toBe(false);
+		}
+		for (const name of PLANET_SETTINGS) {
+			for (const setting of [undefined, null, '1', [1], true]) {
+				expect(
+					isWorldShaped({
+						...world,
+						planet: { ...world.planet, [name]: setting },
+					}),
+					`${name}: ${String(setting)}`,
+				).toBe(false);
+			}
+		}
+		for (const ageYears of [undefined, null, '0', [0]]) {
+			expect(isWorldShaped({ ...world, ageYears }), String(ageYears)).toBe(
+				false,
+			);
+		}
 	});
 });
 
@@ -187,15 +258,236 @@ describe('parseSimRequest', () => {
 			null,
 			'world',
 			{ ...world, elevation: Array.from({ length: 6 }, () => 0) },
+			{ ...world, planet: { ...world.planet, starMass: '1' } },
+			{ ...world, planet: undefined },
 		]) {
 			expect(refusal({ id: 9, kind: 'terrainStats', world: payload })).toEqual({
 				id: 9,
 				kind: 'terrainStats',
 				ok: false,
 				error:
-					'A terrainStats request needs a world with a resolution, a sea level, an origin and an elevation array',
+					'A terrainStats request needs a world with a resolution, a sea level, an origin, planet settings, a date and an elevation array',
 			});
 		}
+	});
+});
+
+describe('parseSimRequest for temperature', () => {
+	it('reads a request with no start', () => {
+		expect(parseSimRequest({ id: 2, kind: 'temperature', world })).toEqual({
+			id: 2,
+			kind: 'temperature',
+			world,
+		});
+	});
+
+	it('keeps the very state of a start and a copy of its record, and nothing else of it, a whole result’s months included', () => {
+		const record = solvedFor();
+		const start = {
+			months: months(),
+			state: state(),
+			solvedFor: {
+				...record,
+				planet: { ...record.planet, name: 'Earth' },
+				date: 3,
+			},
+			yearsRun: 4,
+			converged: true,
+		};
+		const parsed = parseSimRequest({
+			id: 3,
+			kind: 'temperature',
+			world,
+			start,
+		});
+		expect(parsed).toEqual({
+			id: 3,
+			kind: 'temperature',
+			world,
+			start: { state: start.state, solvedFor: record },
+		});
+		const { start: kept } = parsed as SimRequest<'temperature'>;
+		expect(kept).not.toHaveProperty('months');
+		expect(kept?.state).toBe(start.state);
+		expect(kept?.state?.referenceCoolingK).toBe(start.state.referenceCoolingK);
+		expect(kept).not.toHaveProperty('yearsRun');
+		expect(kept?.solvedFor).toEqual(record);
+		expect(Object.keys(kept?.solvedFor.planet ?? {})).toEqual(PLANET_SETTINGS);
+	});
+
+	it('keeps a record whose sea level and settings lie beyond their limits, for the solver to bring within them', () => {
+		const record = {
+			seaLevel: 1e9,
+			planet: { ...DEFAULT_PLANET, axialTiltDeg: 400, starMass: -1 },
+		};
+		const parsed = parseSimRequest({
+			id: 3,
+			kind: 'temperature',
+			world,
+			start: { state: state(), solvedFor: record },
+		});
+		expect((parsed as SimRequest<'temperature'>).start?.solvedFor).toEqual(
+			record,
+		);
+	});
+
+	it('takes no cap, tolerance, constants, grid or callback from the message', () => {
+		const parsed = parseSimRequest({
+			id: 4,
+			kind: 'temperature',
+			world,
+			maxYears: 1,
+			tolerance: 100,
+			model: { stepsPerMonth: 1 },
+			fullResolution: true,
+			onYear: 'call me',
+		});
+		expect(parsed).toEqual({ id: 4, kind: 'temperature', world });
+		expect(Object.keys(parsed)).toEqual(['id', 'kind', 'world']);
+		const started = parseSimRequest({
+			id: 4,
+			kind: 'temperature',
+			world,
+			start: { state: state(), solvedFor: solvedFor(), fullResolution: true },
+		}) as SimRequest<'temperature'>;
+		expect(Object.keys(started.start ?? {})).toEqual(['state', 'solvedFor']);
+	});
+
+	it('leaves the lengths of the fields and the values of a start for the solver to judge', () => {
+		for (const start of [
+			Object.assign([], { state: state(), solvedFor: solvedFor() }),
+			{
+				state: {
+					...state(),
+					temperatureK: new Float64Array(6 * 128 * 128),
+					previousK: new Float64Array(6 * 128 * 128),
+				},
+				solvedFor: solvedFor(),
+			},
+			{
+				state: { ...state(), stepSeconds: Number.NaN },
+				solvedFor: solvedFor(),
+			},
+			{
+				state: { ...state(), referenceCoolingK: new Float64Array(1) },
+				solvedFor: solvedFor(),
+			},
+		]) {
+			expect(
+				parseSimRequest({ id: 5, kind: 'temperature', world, start }),
+			).toMatchObject({ id: 5, kind: 'temperature' });
+		}
+	});
+
+	it('refuses a start of the wrong form, keeping the id and kind', () => {
+		const record = solvedFor();
+		for (const start of [
+			null,
+			'last time',
+			5,
+			{},
+			{ months: months() },
+			{ state: null },
+			{ state: [] },
+			{ state: { ...state(), temperatureK: new Float32Array(3) } },
+			{ state: { ...state(), previousK: [0, 0, 0] } },
+			{ state: { ...state(), previousK: undefined } },
+			{ state: { ...state(), referenceCoolingK: undefined } },
+			{ state: { ...state(), referenceCoolingK: new Float32Array(3) } },
+			{ state: { ...state(), referenceCoolingK: [0, 0, 0] } },
+			{ state: { ...state(), stepSeconds: '1' } },
+			{ months: months(), state: 'state' },
+		].map((start) =>
+			start !== null && typeof start === 'object'
+				? { ...start, solvedFor: record }
+				: start,
+		)) {
+			expect(
+				refusal({ id: 6, kind: 'temperature', world, start }),
+				JSON.stringify(start),
+			).toEqual({ id: 6, kind: 'temperature', ok: false, error: BAD_START });
+		}
+	});
+
+	it('refuses a start without a record, or with a malformed one, keeping the id and kind', () => {
+		const record = solvedFor();
+		const { starMass: _, ...missing } = record.planet;
+		for (const solved of [
+			undefined,
+			null,
+			'Earth',
+			[],
+			{ planet: record.planet },
+			{ ...record, seaLevel: '0' },
+			{ ...record, seaLevel: Number.NaN },
+			{ ...record, seaLevel: Number.POSITIVE_INFINITY },
+			{ seaLevel: 0 },
+			{ ...record, planet: null },
+			{ ...record, planet: missing },
+			{ ...record, planet: { ...record.planet, axialTiltDeg: '23.44' } },
+			{
+				...record,
+				planet: { ...record.planet, starBrightness: Number.NEGATIVE_INFINITY },
+			},
+			{ ...record, planet: { ...record.planet, orbitDistanceAu: Number.NaN } },
+		]) {
+			const start = { state: state(), solvedFor: solved };
+			expect(
+				refusal({ id: 6, kind: 'temperature', world, start }),
+				JSON.stringify(solved),
+			).toEqual({ id: 6, kind: 'temperature', ok: false, error: BAD_START });
+		}
+		expect(
+			refusal({
+				id: 6,
+				kind: 'temperature',
+				world,
+				start: { months: months(), state: state() },
+			}),
+		).toEqual({ id: 6, kind: 'temperature', ok: false, error: BAD_START });
+	});
+
+	it('takes no start for the statistics, whatever it holds', () => {
+		expect(
+			parseSimRequest({
+				id: 7,
+				kind: 'terrainStats',
+				world,
+				start: 'nonsense',
+			}),
+		).toEqual({ id: 7, kind: 'terrainStats', world });
+	});
+});
+
+describe('isSimProgress', () => {
+	const progress: SimProgress = {
+		id: 1,
+		kind: 'temperature',
+		progress: PROGRESS,
+	};
+
+	it('accepts a message about progress', () => {
+		expect(isSimProgress(progress)).toBe(true);
+	});
+
+	it('refuses one with a bad id, kind or progress', () => {
+		expect(isSimProgress({ ...progress, id: '1' })).toBe(false);
+		expect(isSimProgress({ ...progress, id: null })).toBe(false);
+		expect(isSimProgress({ ...progress, kind: 'erosion' })).toBe(false);
+		expect(isSimProgress({ ...progress, progress: 3 })).toBe(false);
+		expect(isSimProgress({ id: 1, kind: 'temperature' })).toBe(false);
+	});
+
+	it('refuses responses and values that are not objects', () => {
+		expect(isSimProgress({ ...progress, ok: true, result: {} })).toBe(false);
+		expect(isSimProgress(simFailure(1, 'temperature', 'no'))).toBe(false);
+		for (const value of [undefined, null, 1, 'progress']) {
+			expect(isSimProgress(value)).toBe(false);
+		}
+	});
+
+	it('is never taken for a response', () => {
+		expect(isSimResponse(progress)).toBe(false);
 	});
 });
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	createBlankWorld,
 	generateWorld,
@@ -11,8 +11,14 @@ import {
 } from '../../core/index';
 import { importWorldFile } from '../storage';
 import {
+	createFakeDocument,
+	type FakeDocument,
+	oneByClass,
+} from '../testing/fakeDocument';
+import {
 	AUTOSAVE_UNAVAILABLE_LABEL,
 	autosaveLabel,
+	createWorldPanel,
 	DAMAGED_FILE_MESSAGE,
 	describeWorld,
 	EXPORT_FAILED_MESSAGE,
@@ -146,6 +152,8 @@ describe('importErrorMessage', () => {
 			'header-too-long',
 			'bad-header',
 			'bad-resolution',
+			'bad-planet',
+			'bad-age',
 			'bad-length',
 			'not-finite',
 		];
@@ -246,5 +254,47 @@ describe('runImport', () => {
 		await expect(runImport(new Blob([]), stage.steps)).resolves.toBeUndefined();
 		expect(stage.messages).toEqual([]);
 		expect(stage.errors).toEqual([failure]);
+	});
+});
+
+describe('createWorldPanel', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const make = () => {
+		const section = fake.createElement('div');
+		const controls = createWorldPanel(section as unknown as HTMLElement, {
+			description: 'Blank ocean · 64',
+			onNewWorld: () => {},
+			onExport: () => {},
+			onImportOpen: () => {},
+			onImport: () => {},
+		});
+		return { controls, section };
+	};
+
+	it("puts the date line, empty, straight under the world's description", () => {
+		const { section } = make();
+		const summary = oneByClass(section, 'world-summary');
+		const date = oneByClass(section, 'world-date');
+		expect(summary.textContent).toBe('Blank ocean · 64');
+		expect(section.children.indexOf(date)).toBe(
+			section.children.indexOf(summary) + 1,
+		);
+		expect(date.textContent).toBe('');
+		// Not announced: it changes every second while the year plays.
+		expect(date.getAttribute('aria-live')).toBeNull();
+	});
+
+	it('shows the date line it is given', () => {
+		const { controls, section } = make();
+		controls.setDate('Year 0 · July');
+		expect(oneByClass(section, 'world-date').textContent).toBe('Year 0 · July');
 	});
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	compareWithGdal,
 	gdalLocationInput,
+	isNotFound,
 	type Pixel,
 	type SampledImage,
 	samplePixels,
@@ -155,5 +156,22 @@ describe('compareWithGdal', () => {
 		expect(() => compareWithGdal(Float32Array.of(1), '1\n2\n')).toThrow(
 			'GDAL printed 2 values for 1 pixels',
 		);
+	});
+});
+
+describe('isNotFound', () => {
+	it('is true for an error that says the program does not exist', () => {
+		expect(isNotFound(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBe(
+			true,
+		);
+	});
+
+	it('is false for another failure and for anything that is not such an error', () => {
+		expect(isNotFound(Object.assign(new Error('x'), { code: 'EACCES' }))).toBe(
+			false,
+		);
+		expect(isNotFound(null)).toBe(false);
+		expect(isNotFound('ENOENT')).toBe(false);
+		expect(isNotFound(new Error('ENOENT'))).toBe(false);
 	});
 });

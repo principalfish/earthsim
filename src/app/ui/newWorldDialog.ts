@@ -315,8 +315,9 @@ export type WorldSources = {
  * options.
  * @param sources - Where the Earth's data comes from. It is asked only for
  * an Earth world.
- * @returns A promise of a new world with the default sea level. It rejects
- * if the Earth's data cannot be had.
+ * @returns A promise of a new world with the default sea level, Earth's
+ * planet settings and the date at year zero. It rejects if the Earth's data
+ * cannot be had.
  */
 export const worldFromChoice = async (
 	choice: NewWorldChoice,

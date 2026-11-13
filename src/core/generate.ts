@@ -27,6 +27,7 @@ import {
 	MAX_SEED,
 	ridgedNoise3,
 } from './noise';
+import { DEFAULT_AGE_YEARS, DEFAULT_PLANET } from './planet';
 import {
 	DEFAULT_SEA_LEVEL_M,
 	MAX_ELEVATION_M,
@@ -326,7 +327,8 @@ export const randomSeed = (random: () => number = Math.random): number =>
  *
  * @param options - The resolution, the seed and the land fraction.
  * @returns A world with an elevation array of its own, whose origin records
- * the seed and the land fraction.
+ * the seed and the land fraction, with Earth's planet settings and a date
+ * of year zero.
  * @throws RangeError if the resolution is not a supported resolution, if
  * the seed is not an integer from 0 to {@link MAX_SEED}, or if the land
  * fraction is not a number from 0 to 1.
@@ -458,6 +460,8 @@ export const generateWorld = (options: GenerateWorldOptions): World => {
 		resolution,
 		seaLevel: DEFAULT_SEA_LEVEL_M,
 		origin: { kind: 'generated', seed, landFraction },
+		planet: { ...DEFAULT_PLANET },
+		ageYears: DEFAULT_AGE_YEARS,
 		elevation,
 	};
 };

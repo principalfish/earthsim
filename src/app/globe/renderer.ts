@@ -1,6 +1,6 @@
 /**
- * The globe on the page: a Three.js scene holding one mesh, drawn only when
- * something has changed.
+ * The globe on the page: a Three.js scene holding the globe's mesh and the
+ * sun's, drawn only when something has changed.
  *
  * The mesh's own coordinates are core coordinates. Its model matrix is the
  * rotation into the Three.js frame, so the shaders look elevation up with
@@ -10,18 +10,24 @@
 import {
 	BufferAttribute,
 	BufferGeometry,
-	CubeTexture,
-	DataTexture,
-	FloatType,
 	Mesh,
-	NearestFilter,
 	PerspectiveCamera,
-	RedFormat,
+	PlaneGeometry,
 	Scene,
 	Vector3,
 	WebGLRenderer,
 } from 'three';
-import { FACE_COUNT, type Vec3, type World } from '../../core/index';
+import {
+	DEFAULT_PLANET,
+	FACE_COUNT,
+	latLonToDirection,
+	type Rgb,
+	SUN_LONGITUDE_DEG,
+	sunColour,
+	sunDrawnSize,
+	type Vec3,
+	type World,
+} from '../../core/index';
 import {
 	CAMERA_NEAR,
 	type CameraState,
@@ -37,12 +43,23 @@ import {
 import { coreToThree } from './coords';
 import { buildSphereMesh, meshSegments } from './geometry';
 import {
+	aimSunlight,
+	type CellTexture,
+	createCellTexture,
 	createGlobeMaterial,
 	drawnSeaLevel,
 	MAX_EXAGGERATION,
 	MIN_EXAGGERATION,
+	type PreparedLayer,
+	replaceLayer,
+	type SunlightStyle,
+	showLayer,
+	showSunlight,
+	unitSunDirection,
 } from './material';
 import { clientToNdc, raySphere } from './picking';
+import type { ColourRamp, ValueRange } from './ramp';
+import { createSunMaterial, shapeSun, sunPosition } from './sun';
 
 /** The most device pixels drawn per CSS pixel, to bound the cost per frame. */
 const MAX_PIXEL_RATIO = 2;
@@ -67,7 +84,9 @@ export type Globe = {
 	 * The globe keeps hold of the world's elevation array without copying
 	 * it and takes the sea level from the world, drawing it as
 	 * {@link Globe.setSeaLevel} would. After editing the array in place,
-	 * call {@link Globe.updateElevation}.
+	 * call {@link Globe.updateElevation}. A data layer shown for the world
+	 * before is dropped, so the height colours show until one is set for
+	 * this world.
 	 */
 	setWorld(world: World): void;
 	/**
@@ -104,6 +123,66 @@ export type Globe = {
 	setExaggeration(factor: number): void;
 	/** Shows or hides the outlines of the grid's cells. */
 	setGridVisible(visible: boolean): void;
+	/**
+	 * Colours the globe by a per-cell data field in place of the height, or
+	 * goes back to the height colours.
+	 *
+	 * @remarks
+	 * The relief is still raised and shaded, and the coastline is drawn as a
+	 * thin line. With no field, the globe is drawn exactly as it is when no
+	 * layer has ever been set. The globe keeps hold of the field without
+	 * copying it, so it must not be changed while shown; to show other
+	 * values, set the layer again.
+	 *
+	 * @param field - One value per cell of the world on show, in cell order,
+	 * or null to show the height colours.
+	 * @param range - The values the ramp is stretched over: below `min` is
+	 * drawn as its first colour and above `max` as its last. Needed with a
+	 * field.
+	 * @param ramp - The colours to draw the field with. Needed with a field.
+	 * @throws RangeError if a field is given without a range and a ramp, with
+	 * a range whose ends are not finite or not in order, with a ramp the
+	 * globe cannot draw, or with a length other than the world's number of
+	 * cells, or before any world is shown. The layer on show is then left as
+	 * it was.
+	 */
+	setLayer(
+		field: Float32Array | null,
+		range?: ValueRange,
+		ramp?: ColourRamp,
+	): void;
+	/**
+	 * Sets where the sun stands, how large it is drawn and its colour.
+	 *
+	 * @remarks
+	 * The sun is always drawn, hidden only by the planet in front of it. It
+	 * stays in its direction as the camera moves, as a body infinitely far
+	 * away would. The direction is also the one the globe is lit from while
+	 * sunlight is on.
+	 *
+	 * @param direction - The sun's direction in core coordinates; a finite,
+	 * non-zero vector, normalised here.
+	 * @param sizeDeg - The diameter it is drawn at, in degrees; more than 0
+	 * and less than 12.
+	 * @param colour - Its tint, each channel from 0 to 1.
+	 * @throws RangeError for a direction, size or colour outside those; the
+	 * sun is then drawn as before.
+	 */
+	setSun(direction: Vec3, sizeDeg: number, colour: Rgb): void;
+	/**
+	 * Lights the globe by the sun, or as it is lit without. It starts lit as
+	 * without the sun.
+	 *
+	 * @remarks
+	 * Lit with the night side darkened, the side facing the sun is lit and
+	 * the far side dimmed. Lit with the line, the colours are shaded as they
+	 * are without the sun and the line between day and night is drawn over
+	 * them. Either holds whatever the globe is coloured by, the height or a
+	 * data layer.
+	 *
+	 * @param style - How the globe is lit.
+	 */
+	setSunlight(style: SunlightStyle): void;
 	/**
 	 * The point of the globe under a point of the window.
 	 *
@@ -170,39 +249,7 @@ export type Globe = {
 	dispose(): void;
 };
 
-/** The elevation texture of one world and the views it uploads from. */
-type ElevationTexture = {
-	readonly texture: CubeTexture;
-	readonly resolution: number;
-	/** Each face's cells: a view into the world's array, not a copy. */
-	readonly faces: readonly Float32Array[];
-};
-
 const toVector3 = (v: Vec3): Vector3 => new Vector3(v[0], v[1], v[2]);
-
-const createElevationTexture = (world: World): ElevationTexture => {
-	const n = world.resolution;
-	const faces: Float32Array[] = [];
-	for (let face = 0; face < FACE_COUNT; face++) {
-		faces.push(world.elevation.subarray(face * n * n, (face + 1) * n * n));
-	}
-	// The grid lays its faces out as a cube map in core coordinates, so the
-	// faces go in as they are, in order and unflipped: cell (face, i, j) is
-	// texel (i, j) of that face.
-	const texture = new CubeTexture(
-		faces.map((data) => new DataTexture(data, n, n, RedFormat, FloatType)),
-	);
-	texture.format = RedFormat;
-	texture.type = FloatType;
-	// Linear filtering of float textures is an optional extension, and its
-	// blend weights are too coarse for a cell magnified over many pixels.
-	texture.magFilter = NearestFilter;
-	texture.minFilter = NearestFilter;
-	texture.generateMipmaps = false;
-	texture.flipY = false;
-	texture.needsUpdate = true;
-	return { texture, resolution: n, faces };
-};
 
 /**
  * Starts drawing a globe on a canvas.
@@ -224,6 +271,9 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 			canvas,
 			antialias: true,
 			alpha: true,
+			// The sun's glow is blended in premultiplied colour, as the page
+			// composites the canvas.
+			premultipliedAlpha: true,
 			powerPreference: 'high-performance',
 		});
 	} catch (cause) {
@@ -252,8 +302,24 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 	mesh.visible = false;
 	scene.add(mesh);
 
+	// Until the page says otherwise, the Sun of Earth's settings, over the
+	// equator.
+	let sunDirection: Vec3 = latLonToDirection(0, SUN_LONGITUDE_DEG);
+	const sun = createSunMaterial(
+		sunDrawnSize(DEFAULT_PLANET),
+		sunColour(DEFAULT_PLANET),
+	);
+	const sunMesh = new Mesh(new PlaneGeometry(2, 2), sun.material);
+	// Moved with the camera at every frame and sized in its vertex shader,
+	// so its bounds say nothing and it is never culled. It is drawn after
+	// the globe, as transparent objects are.
+	sunMesh.frustumCulled = false;
+	sunMesh.renderOrder = 1;
+	scene.add(sunMesh);
+
 	let cameraState = createCameraState();
-	let elevation: ElevationTexture | null = null;
+	let elevation: CellTexture | null = null;
+	let layer: PreparedLayer | null = null;
 	let segments = 0;
 	let fullUploadPending = false;
 	let brushCursor: WindowPoint | null = null;
@@ -281,7 +347,11 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		if (disposed) {
 			return;
 		}
-		camera.position.copy(toVector3(coreToThree(cameraPosition(cameraState))));
+		const eye = cameraPosition(cameraState);
+		camera.position.copy(toVector3(coreToThree(eye)));
+		sunMesh.position.copy(
+			toVector3(coreToThree(sunPosition(eye, sunDirection))),
+		);
 		camera.up.copy(toVector3(coreToThree([0, 0, 1])));
 		camera.lookAt(0, 0, 0);
 		const brushCentre =
@@ -355,8 +425,11 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 
 	const setWorld = (world: World): void => {
 		elevation?.texture.dispose();
-		elevation = createElevationTexture(world);
+		elevation = createCellTexture(world.elevation, world.resolution);
 		fullUploadPending = true;
+		layer?.texture.dispose();
+		layer = null;
+		showLayer(uniforms, null);
 		uniforms.uElevation.value = elevation.texture;
 		uniforms.uResolution.value = world.resolution;
 		uniforms.uSeaLevel.value = drawnSeaLevel(world.seaLevel);
@@ -448,6 +521,36 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		invalidate();
 	};
 
+	const setLayer = (
+		field: Float32Array | null,
+		range?: ValueRange,
+		ramp?: ColourRamp,
+	): void => {
+		layer = replaceLayer(
+			uniforms,
+			layer,
+			elevation?.resolution ?? null,
+			field,
+			range,
+			ramp,
+		);
+		invalidate();
+	};
+
+	const setSun = (direction: Vec3, sizeDeg: number, colour: Rgb): void => {
+		// Everything is checked before anything changes.
+		const unit = unitSunDirection(direction);
+		shapeSun(sun.uniforms, sizeDeg, colour);
+		aimSunlight(uniforms, unit);
+		sunDirection = unit;
+		invalidate();
+	};
+
+	const setSunlight = (style: SunlightStyle): void => {
+		showSunlight(uniforms, style);
+		invalidate();
+	};
+
 	const setBrush = (cursor: WindowPoint | null, radius = 0): void => {
 		if (cursor === null) {
 			if (brushCursor !== null) {
@@ -502,8 +605,11 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		pixelRatioQuery.removeEventListener('change', onPixelRatioChange);
 		canvas.removeEventListener('webglcontextrestored', invalidate);
 		elevation?.texture.dispose();
+		layer?.texture.dispose();
 		mesh.geometry.dispose();
 		material.dispose();
+		sunMesh.geometry.dispose();
+		sun.material.dispose();
 		renderer.dispose();
 	};
 
@@ -513,6 +619,9 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		setSeaLevel,
 		setExaggeration,
 		setGridVisible,
+		setLayer,
+		setSun,
+		setSunlight,
 		pick,
 		setBrush,
 		rotateBy,

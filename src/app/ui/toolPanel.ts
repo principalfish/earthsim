@@ -22,8 +22,10 @@ import {
 	createButton,
 	createElement,
 	createRangeField,
+	createSegmentedPicker,
 	type RangeScale,
 } from './fields';
+import type { Section } from './section';
 
 /** The step between brush radii the slider can be set to, in kilometres. */
 export const BRUSH_RADIUS_SLIDER_STEP_KM = 50;
@@ -95,8 +97,6 @@ export type ToolPanelOptions = {
 
 /** The tool controls on the page. */
 export type ToolPanel = {
-	/** The section that holds the controls. */
-	readonly element: HTMLElement;
 	/**
 	 * Greys out the undo and redo buttons that have nothing to do, and
 	 * brings back those that have.
@@ -211,71 +211,32 @@ export const historyFocusAfter = (
 	return null;
 };
 
-/** What a group of radio buttons choosing the tool is built from. */
-type ToolPickerOptions = {
-	readonly tool: Tool;
-	readonly onTool: (tool: Tool) => void;
-};
-
 /**
- * The tools as radio buttons drawn as one row of segments. Being radio
- * buttons, they are one tab stop and the arrow keys move between them.
- */
-const createToolPicker = (options: ToolPickerOptions): HTMLElement => {
-	const picker = createElement('fieldset', 'tool-picker');
-	const legend = createElement('legend', 'u-visually-hidden');
-	legend.textContent = 'Tool';
-	const row = createElement('div', 'tool-picker__options');
-
-	for (const tool of TOOLS) {
-		const option = createElement('label', 'tool-picker__option');
-
-		const input = createElement('input', 'tool-picker__input');
-		input.type = 'radio';
-		input.name = 'tool';
-		input.value = tool;
-		input.checked = tool === options.tool;
-		input.addEventListener('change', () => {
-			if (input.checked) {
-				options.onTool(tool);
-			}
-		});
-
-		const label = createElement('span', 'tool-picker__label');
-		label.textContent = TOOL_LABELS[tool];
-
-		option.append(input, label);
-		row.append(option);
-	}
-
-	picker.append(legend, row);
-	return picker;
-};
-
-/**
- * Adds the tool controls to the side panel.
+ * Adds the tool controls to the Tools section of the side panel.
  *
  * @remarks
  * The undo and redo buttons come first, side by side. A button with nothing
- * to do is disabled, which takes it out of the tab order.
+ * to do is disabled, which takes it out of the tab order. The tools follow
+ * as one row of segments.
  *
  * The two sliders belong to the brushes: with the move tool chosen they are
  * greyed out. The strength slider sets the strength of raising and lowering
  * or, with the smooth tool chosen, the smoothing setting; each keeps its
  * value while the slider shows the other.
  *
- * @param panel - The panel to add the controls to, after what it holds.
+ * The section's summary is the chosen tool's name, from {@link TOOL_LABELS},
+ * kept in step with each choice, so that the heading names the tool while
+ * the section is closed.
+ *
+ * @param section - The Tools section: its body, to add the controls to after
+ * what it holds, and its summary.
  * @param options - The starting values and the callbacks for changes.
  * @returns The controls that were added.
  */
 export const createToolPanel = (
-	panel: HTMLElement,
+	section: Pick<Section, 'body' | 'setSummary'>,
 	options: ToolPanelOptions,
 ): ToolPanel => {
-	const section = createElement('section', 'panel__section');
-	const heading = createElement('h2', 'panel__heading');
-	heading.textContent = 'Tools';
-
 	const historyButton = (action: HistoryAction): HTMLButtonElement =>
 		createButton({
 			label: HISTORY_LABELS[action],
@@ -334,15 +295,18 @@ export const createToolPanel = (
 		radius.setDisabled(next === 'move');
 		strengthField.setDisabled(next === 'move');
 		strengthField.setScale(strengthScale(next, { strength, smoothSetting }));
+		section.setSummary(TOOL_LABELS[next]);
 	};
 	showTool(tool);
 
-	section.append(
-		heading,
+	section.body.append(
 		historyRow,
-		createToolPicker({
-			tool,
-			onTool: (next) => {
+		createSegmentedPicker({
+			name: 'tool',
+			legend: 'Tool',
+			choices: TOOLS.map((value) => ({ value, label: TOOL_LABELS[value] })),
+			value: tool,
+			onChange: (next) => {
 				showTool(next);
 				options.onTool(next);
 			},
@@ -350,6 +314,5 @@ export const createToolPanel = (
 		radius.element,
 		strengthField.element,
 	);
-	panel.append(section);
-	return { element: section, setHistoryState };
+	return { setHistoryState };
 };

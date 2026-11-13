@@ -44,7 +44,7 @@ export type StartupPlan = {
 
 /** What a start-up plan is carried out with. */
 export type StartupSteps = {
-	/** Makes the world the one being edited, keeping its own sea level. */
+	/** Makes the world the one being edited, keeping its own sea level, planet settings and date. */
 	readonly replaceWorld: (world: World) => void;
 	/** Shows how saving stands. */
 	readonly setAutosaveState: (state: AutosaveState) => void;
@@ -121,8 +121,9 @@ export const applyStartup = (plan: StartupPlan, steps: StartupSteps): void => {
 		} catch (error) {
 			// Replacing the world makes the new one current and tells every
 			// part of the page before it passes on what one of them threw.
-			// It refuses a world outright only for a sea level that is not
-			// a number, which a world read from storage never has. The page
+			// It refuses a world outright only for a sea level or planet
+			// setting that is not a number, or a date that is negative or
+			// not finite, which a world read from storage never has. The page
 			// and the storage therefore hold the same world, and nothing is
 			// lost by going on to save what is changed in it.
 			steps.logError(error);

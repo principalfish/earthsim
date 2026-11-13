@@ -2,9 +2,10 @@
  * Checking this project's TIFF reader against GDAL: which pixels to compare,
  * and the comparison of what the two read there.
  *
- * Running GDAL is left to the caller. Its `gdallocationinfo -valonly` takes
- * a column and a row on each line of its input and answers with the pixel's
- * value on a line of its own.
+ * Running GDAL is left to the caller, which tells by {@link isNotFound}
+ * whether GDAL is installed. Its `gdallocationinfo -valonly` takes a column
+ * and a row on each line of its input and answers with the pixel's value on
+ * a line of its own.
  */
 
 /** A pixel of an image, by column and row from its top-left corner. */
@@ -110,6 +111,18 @@ export const samplePixels = (
 	}
 	return [...chosen.values()];
 };
+
+/**
+ * Whether an error from running a program says the program was not found,
+ * as Node's `ENOENT` does: for GDAL, that it is not installed.
+ *
+ * @param error - What running the program threw.
+ */
+export const isNotFound = (error: unknown): boolean =>
+	typeof error === 'object' &&
+	error !== null &&
+	'code' in error &&
+	error.code === 'ENOENT';
 
 /**
  * The input that asks `gdallocationinfo` for the values of pixels.
