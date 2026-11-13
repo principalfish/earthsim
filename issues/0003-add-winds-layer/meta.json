@@ -1,0 +1,14 @@
+{
+  "id": 3,
+  "slug": "add-winds-layer",
+  "title": "Add winds layer",
+  "mode": "build",
+  "state": "investigating",
+  "branch": "add-winds-layer",
+  "base": "main",
+  "gh_issue": null,
+  "build_model": null,
+  "created": "2026-11-13 07:43",
+  "updated": "2026-11-13 07:43",
+  "done": null
+}
