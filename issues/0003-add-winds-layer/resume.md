@@ -27,3 +27,7 @@ Five low and nit findings from the same round are being fixed meanwhile.
 - Don't commit before the planner relays the user's approval in the user's words. Don't start piece 3 without the go-ahead.
 - Don't start piece 7 until the planner says the plan has been revised after the user's choice of wind model.
 - No attribution lines in commits. Push only this issue's branch, never forced. No other GitHub writes.
+
+## Planner note (2026-11-13)
+
+The user asked to be pointed to the code that implements the Laplacian once piece 2 is done: in piece 2's review briefing, link `laplacian` in `src/core/vector.ts` (worktree path, with line numbers) and its tests, and say how it works in a few lines.
