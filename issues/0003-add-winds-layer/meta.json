@@ -7,8 +7,8 @@
   "branch": "add-winds-layer",
   "base": "main",
   "gh_issue": 5,
-  "build_model": null,
+  "build_model": "claude-opus-5-5",
   "created": "2026-11-13 07:43",
-  "updated": "2026-11-13 09:09",
+  "updated": "2026-11-13 09:10",
   "done": null
 }
