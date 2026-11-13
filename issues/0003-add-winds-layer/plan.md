@@ -1,0 +1,246 @@
+# Plan: add-winds-layer
+
+**Build model:** claude-opus-5-5 (every piece is either numerical modelling on the sphere or page work that threads through the layer, legend and renderer code; none is mechanical)
+
+## Context
+
+earth_sim is a browser planet simulator for worldbuilding: believable results and a fast simulation matter more than physical fidelity. It runs as static files with no server. Step 1 built the globe, the cubed-sphere grid and sculpting; step 2 built the seasonal temperature layer and the planet settings. This issue is step 3 of the roadmap: the winds, with the air pressure behind them, and the planet's day length as the setting that shapes them. Rain (step 4) follows the winds and ocean currents (step 5) are driven by them, so the output here is shaped for both.
+
+### What exists (as of `main` at `abbf20d`)
+
+- **Grid** (`src/core/grid.ts`): cells indexed `(face*n+j)*n+i`; `getGrid(n)` (`:482`) holds `centres` (Float64 unit vectors), `areas` (steradians) and `neighbours` (Int32, four per cell in the order −i, +i, −j, +j, crossing cube faces, where the axes turn). `edgeGeometry(grid)` (`:761`) gives edge lengths, centre distances and weights. `directionToLatLon` (`:333`). Resolutions 64, 128, 256 only (`Resolution`, `:118`): 24,576 / 98,304 / 393,216 cells of about 156 / 78 / 39 km. The planet's radius is fixed at 6,371 km (`src/core/world.ts:28`). **There are no gradient, divergence, Laplacian or tangent-vector helpers**; the only operator is the diffusion solve in `src/core/exchange.ts`.
+- **Latitude** per cell: `cellLatitudes` (`src/core/insolation.ts:314`, degrees, cached). No longitude array; `src/core/observed.ts:299` uses `atan2(y, x)`.
+- **Temperature** (`src/core/temperature.ts`): `TemperatureResult` (`:397`) has `months`, twelve `Float32Array` of near-surface air temperature in °C on the world's grid, plus `state`, `solvedFor`, `yearsRun`, `converged`, `finalChangeK`. The land mask, albedo, ice and the sea-level monthly temperatures are internal (`Setup`, `:557`; `seaLevelMonths`, `:1749`); sea-level temperature can be rebuilt as months + 273.15 + `lapseCooling` (`:1522`) except where the cooling is capped. A world finer than 64 is solved on the grid one step coarser: `solveResolution` (`:1674`), `coarsenWorld` (`src/core/coarsen.ts:99`), `refineField` (`:392`, one value per cell only). Solves take about 0.88 / 3.5 / 16.7 s at 64 / 128 / 256 on the world's own grid in Node (`:1662`), and 0.85 / 3.4 s for 128 / 256 as the page does them.
+- **Planet settings** (`src/core/planet.ts:17-71`): `axialTiltDeg` 23.44 (0–90), `starBrightness` 1 (0.1–10), `starMass` 1 (0.1–10), `orbitDistanceAu` 1 (0.3–3), `greenhouseStrength` 1 (0–3). `normalisePlanet` (`:94`) and the protocol checks loop over `PLANET_SETTINGS`. `trustNote` (`:209`) is the temperature's "results are rough" test. **There is no rotation or day-length setting.**
+- **World files** (`src/core/serialize.ts`): `parsePlanet` (`:234`) requires every setting to be present and in range, or the file is refused; a header with no planet at all gets Earth's. `WORLD_FILE_VERSION` is 1.
+- **Measured Earth**: `isMeasuredEarth` (`src/core/earth.ts:225`) compares every planet setting, the sea level and every elevation; it gates the Earth comparison (`src/app/wiring.ts:329`).
+- **Worker** (`src/core/protocol.ts`, `src/worker/handle.ts`, `client.ts`, `sim.worker.ts`): messages `{id, kind, world, ...extras}`; kinds listed in `SimResults` (`protocol.ts:40`) with `SimExtras`, `KINDS`, `PAYLOADS`, and `COMPUTE` / `BUFFERS` in `handle.ts:51,65`. Progress is typed `TemperatureProgress`. The worker keeps nothing between requests; results are transferred, requests cloned. There is no cancel message: the page ends and restarts the worker when a request is overtaken (`src/app/workerService.ts:113,325`). Each service has its own worker (`src/app/main.ts:70`).
+- **Refresh** (`src/app/refresh.ts`): `createRefreshScheduler` (`:156`) is a generic debounce; the temperature wraps it with a 400 ms wait, runs only while showing (`setShowing`) and warm-starts (`:340`). A temperature start is reused only when `solvedFor` matches the planet exactly (`temperature.ts:1941`).
+- **Layers and view** (`src/app/view.ts`, `layers.ts`, `ui/layerPanel.ts`): `LAYERS = ['terrain','temperature']` (`view.ts:11`), one exclusive `PageView.layer` chosen by a segmented picker (`layerPanel.ts:998`). The view state (`temperatureView`, `source`, `month`, `sunlight`) lives as locals in `createLayerPanel` (`:450-453`). `layers.ts` holds only `temperature: TemperatureLayer` (`:60`). `layer === 'temperature'` checks at `layerPanel.ts:659, 710, 813, 987`; `offersMonth` (`view.ts:132`).
+- **Sunlight** is not a layer: a checkbox in the View section (`src/app/ui/viewPanel.ts:117`) that goes to `lightGlobe` and `sunlightStyleFor` (`wiring.ts:232`).
+- **Globe** (`src/app/globe/material.ts`, `renderer.ts`, `ramp.ts`): per-cell data is a `CubeTexture` of six `DataTexture`s, RedFormat / FloatType, n×n, one value per cell, nearest filtering, blended by hand in the shader (`material.ts:837-864`). One slot: `uLayerShown`, `uLayer`, `uLayerRange`, a ramp of at most eight stops (`material.ts:488-493`, `ramp.ts:39`). Relief, coastline, grid, day/night line and brush ring are all drawn in the fragment shader (`:657-714`). WebGL 2 is required. **Nothing draws lines, arrows, points or particles**; the scene is the globe mesh and the sun's quad (`renderer.ts:292-318`). **Rendering is on demand**: `invalidate()` asks for one frame (`renderer.ts:371`); there is no frame loop.
+- **Legend, readout, comparison**: the legend takes a `LegendSource` (`src/app/ui/legend.ts:479`) but `legendContent` takes a `TemperatureLayer` (`:535`) and its status texts and figures are in °C. The pointer readout (`ui/cursorReadout.ts`) uses `ShownTemperature` and `formatTemperature`. `ui/comparison.ts` and `src/app/observedData.ts` are temperature-only.
+- **Panel**: sections from the static `PANEL_SECTIONS` (`src/app/ui/panelSections.ts:10`), filled in `main.ts:109-156`; Planet sliders from `PLANET_SLIDERS` (`ui/planetPanel.ts:218`); which sections are open is remembered in local storage by `src/app/panelMemory.ts`.
+- **Observed data** (`src/core/observed.ts`, `scripts/build-observed-temperature.ts`, `scripts/earth/observedSource.ts`, `netcdf.ts`, `pinnedFile.ts`, `scripts/download.ts`): a one-byte-per-value file, 12 × 181 × 360, from NOAA's 20th Century Reanalysis v3 `air.2m.mon.ltm.nc` with a pinned length and SHA-256; `observedTemperature` samples it at cell centres bilinearly (`observed.ts:284`); `compareField(s)` (`src/core/compare.ts:106,140`) give area-weighted mean and RMS differences; the baseline lives in `src/core/baseline/` with a test that fails when a figure worsens by more than 0.05 K.
+- **Documentation** is `README.md` (short) and `docs/user-guide.md`, `docs/temperature.md`, `docs/development.md`, `docs/data.md`. Biome does not format Markdown; tables use the minimum separator `|-|-|`.
+- **Type-checking**: `src/core` compiles without the DOM library and the scripts against `scripts/node.d.ts` only; nothing under `src/` may use a Node API.
+
+### Decisions (all from `decisions.md`, with the user's words)
+
+- The wind model is **chosen after a prototype of both candidates**: rules plus a pressure map, and a simulated atmosphere. "Prototype both first".
+- The prototypes are **judged from a report**: a script runs both and writes pictures of the January and July winds beside the real Earth's, with error figures and solve times; the user picks. Nothing in the page changes until a model is chosen. "A report with maps and figures".
+- **Report cases** besides the real Earth in January and July: an 8-hour and a 4-day day; 0° and 60° tilt; a generated world with 30% land; an ocean world and a one-continent world. The user chose all four.
+- **No time limit** for a wind solve is set in advance; the report shows each model's time beside its quality. "Decide from the report".
+- **Day length** becomes a planet setting: a slider in hours, Earth 24, from 3 hours to 30 days (720 hours), with a "results are rough" warning outside about 6 to 96 hours. That trusted range is the planner's estimate; the prototype report should confirm or move it, and a different range goes back to the user. "Day length, wide range"; "3 hours to 30 days".
+- **Winds are drawn by a Winds switch**, like Sunlight: arrows over whichever colours are showing (Terrain, Temperature or Pressure), sized by speed. **Moving streaks** come as the last piece. "Arrows first, streaks later".
+- **Winds only read the temperature**; they carry no heat and the temperature is unchanged by this issue. "No, winds only read it".
+- **The page shows observed Earth winds**: on an untouched Earth the winds can be simulated or observed, with error figures and a committed baseline guarded by a test. "Yes, in the page".
+- **Pressure is a third colour layer** beside Terrain and Temperature, with its own colours, legend and pointer readout. "Yes, a Pressure layer". It **gets the Earth comparison too**: simulated, observed and difference with error figures. "Yes".
+- **Wind speed unit**: an option for m/s, km/h or mph, default m/s. "option to use any of these somewhere in settings. default to m/s".
+- **One issue**, not two. "Keep one issue".
+
+### Assumptions the user has seen and not corrected
+
+- The unit option sits in the View section and is remembered by the browser (as the open sections are), not saved with the world.
+- Pressure is shown in hectopascals, with no unit option.
+- A change of Day length recalculates the winds and pressure only; the temperature does not depend on it and is not solved again.
+- Winds and pressure are calculated only while the Winds switch is on or the Pressure layer is chosen; they need a current temperature, so switching them on works the temperature out first.
+- On Annual average the arrows show the year's mean wind; on the other temperature summaries they stay on the month last on screen, as the sun does. While Winds is on in Terrain view, the month controls show there, as they do for Sunlight.
+- Surface winds only (about 10 m above the ground) and pressure at sea level. No upper-level winds.
+- The output is each month's wind as eastward and northward speeds per cell in m/s, and the sea-level pressure in hPa.
+- Out of scope: rain, ocean currents, storms; heat carried by winds; tidally locked planets; backwards spin.
+- **Not verified:** that NOAA's 20th Century Reanalysis v3 has long-term monthly means of the 10 m winds and the mean sea-level pressure beside the temperature file already used. Its download server did not answer on 2026-11-13. Piece 1 checks this first.
+
+## Approach
+
+**Prototype, then choose, then build.** Pieces 1 to 3 lay the ground both models need: the observed winds and pressure to judge against, vector maths on the grid, and day length on the world. Pieces 4 to 6 build a report and the two rough models. **After piece 6 the builder stops**: the planner puts the report to the user, who chooses a model. The planner then revises pieces 7 onward for the chosen model before the builder carries on. Pieces 7 to 15 are written here for the rules model, the expected choice, in enough detail to build from; if the simulated atmosphere is chosen, pieces 7 and 8 change (longer solves, progress, warm starts) and the rest largely stand.
+
+**The two candidates.**
+
+- **Rules plus a pressure map.** For each month, a sea-level pressure field is built from (a) the zonal bands: a low along the latitude where the planet is hottest, subtropical highs at the edge of the overturning cell, subpolar lows and polar highs, with the cell's width and the number of bands set by the rotation rate and the equator-to-pole temperature contrast, and (b) thermal highs and lows from each place's temperature against the mean of its latitude, smoothed, so that cold winter continents carry highs and hot summer continents lows. Surface winds follow from the pressure by a balance of the pressure gradient, the planet's turning and friction: along the isobars and across them toward low pressure away from the equator, down the gradient near it. Mountains block and deflect by a simple rule. Expected cost: milliseconds per month.
+- **A simulated atmosphere.** A simplified fluid layer on the grid, pushed toward the state the temperature implies and slowed by friction, stepped forward until its statistics settle, then averaged over many simulated days to give a monthly mean (such a model produces weather, not a steady pattern). The scheme is the builder's choice within these limits: explicit and stable on the cubed sphere at 64, no new dependencies, deterministic.
+
+**Rejected or deferred.**
+
+- *Choosing the rules model without a prototype* (the planner's first recommendation): the user chose to see both.
+- *Both models live in the page behind a switch*: more work before the choice and the loser's page code thrown away; the user chose a report.
+- *A time limit set up front*: the user will weigh time against quality in the report.
+- *Winds carrying heat back into the temperature*: deferred to a later step; it couples the two solves and moves the temperature baseline.
+- *A two-layer or full primitive-equation atmosphere*: beyond what a rough prototype can deliver; if the single-layer simulation shows promise, a fuller one is a later issue.
+- *Splitting the issue in two*: offered; the user kept one issue.
+- *Arrows drawn inside the globe's fragment shader*: possible, but the shader already carries relief, coast, grid, day/night line and brush; separate scene objects keep the wind drawing apart and are what the moving streaks need anyway. The builder may revisit this in piece 9 with a reason.
+
+**Reuse.** Observed data follows the temperature's pattern exactly (pinned source, own netCDF reader, GDAL check, compact file in `public/data/`, lazy fetch, sampling onto cells). The worker kind, service and refresh follow the temperature's. The Pressure layer reuses the temperature's legend, scale fitting, readout and comparison once those are generalised (piece 12). The baseline follows `src/core/baseline/earthTemperature.ts`.
+
+**Documentation** is updated in every piece that changes behaviour: `docs/user-guide.md` for controls, a new `docs/winds.md` for the model (as `docs/temperature.md` is for temperature), `docs/data.md` for data files, `docs/development.md` for commands and source layout, and the README's "What works today" at the end. Tables use the `|-|-|` separator.
+
+## Pieces
+
+1. Observed winds and pressure data
+   - Files: `scripts/build-observed-winds.ts` (new), `scripts/earth/observedSource.ts`, `scripts/earth/netcdf.ts` (only if a variable needs something it lacks), `scripts/earth/dataFile.mjs` and `dataFile.d.mts`, `src/core/observedWind.ts` (new), `src/core/index.ts`, `public/data/earth-wind-1deg.bin` and `public/data/earth-pressure-1deg.bin` (new), `package.json` (`build:observed-winds`), `docs/data.md`, `docs/development.md`.
+   - What: **First, confirm the source.** Check that NOAA's 20th Century Reanalysis v3 offers long-term monthly means (1981–2010, as `air.2m.mon.ltm.nc` is) of the 10 m eastward wind, the 10 m northward wind and the mean sea-level pressure, and note the exact folders, file names, lengths and SHA-256s. **If any is missing, or the server cannot be reached, stop and report to the planner with alternatives; do not build on another source unasked.** Then build two compact files on the source's one-degree grid (181 × 360, north first, as the temperature file): the winds as two signed values per point per month (eastward, northward), and the pressure as one value per point per month. Choose encodings so that storing moves a wind by at most 0.15 m/s and a pressure by at most 0.3 hPa, and so that the build stops rather than write a value out of range. In the core, decode both, and sample them onto a world's cells: pressure bilinearly as temperature is; winds bilinearly **as vectors**, which near the poles means interpolating in three dimensions (or an equivalent that does not average eastward components across the pole), giving each cell an eastward and a northward speed.
+   - Functions: `encodeObservedWind`, `decodeObservedWind`, `observedWind(file, resolution)` returning monthly `{ east, north }`; `encodeObservedPressure`, `decodeObservedPressure`, `observedPressure(file, resolution)`; pinned-file entries; `readObservedWindFile`, `readObservedPressureFile` in `dataFile.mjs`; the build script's `main`.
+   - Depends on: none.
+   - Acceptance: `npm run build:observed-winds` writes both files byte-for-byte reproducibly from the pinned downloads; `-- --verify-with-gdal` agrees with GDAL where GDAL is installed; the files are committed; `docs/data.md` gives format, source, licence and citation for each as it does for temperature.
+   - Tests: encode then decode returns each value within the stated step; a value out of range stops the build; a file of the wrong length is refused; sampling a uniform eastward wind gives eastward wind at every cell including beside both poles; sampling a wind blowing straight over the pole keeps its speed there (no cancelling); pressure sampling matches the temperature sampler on the same numbers; the real files decode to plausible Earth values (trade winds easterly at 15° N and S in the Atlantic and Pacific, westerlies at 45° S, pressure between 950 and 1,060 hPa everywhere).
+
+2. Vector maths on the grid
+   - Files: `src/core/vector.ts` (new), `src/core/coarsen.ts`, `src/core/index.ts`, `docs/development.md`.
+   - What: The operators both wind models and the later steps need, on the cubed-sphere grid: each cell's local east and north unit vectors (with a defined convention at the poles); the gradient of a per-cell field as a tangent vector; the divergence and the curl of a tangent vector field; conversion between a tangent vector in three dimensions and eastward and northward components; smoothing a field by a given distance; and refining a vector field from the grid a step coarser (as `refineField` does for one value per cell, done on the three-dimensional components, then projected back onto the surface). All area- and distance-aware through `edgeGeometry`, and correct across cube-face edges and corners.
+   - Functions: `cellFrames(grid)`, `gradient(grid, field)`, `divergence(grid, vectors)`, `curl(grid, vectors)`, `toEastNorth`, `fromEastNorth`, `smoothField(grid, field, km)`, `refineVectors` in `coarsen.ts`.
+   - Depends on: none.
+   - Acceptance: the operators agree with known answers to within the grid's truncation error at all three resolutions, with no visible seam at face edges.
+   - Tests: the gradient of sin(latitude) points north with the analytic size, within a few percent, at 64 and better at 128; the gradient of a constant is zero; the divergence of solid-body rotation is zero and its curl is twice the rotation rate times sin(latitude); the divergence of a gradient matches the analytic Laplacian of a low-order spherical harmonic; the area-weighted sum of a divergence over the sphere is zero; east and north frames are unit length, perpendicular and tangent; a round trip between three dimensions and east/north returns the input; error at face edges and corners is no worse than several cells into a face (within a stated factor); refining a coarse uniform flow returns it.
+
+3. Day length on the world
+   - Files: `src/core/planet.ts`, `src/core/serialize.ts`, `src/core/protocol.ts`, `src/core/earth.ts`, `src/core/temperature.ts`, `src/app/refresh.ts` (only if the start test lives there), their tests, `docs/development.md`.
+   - What: A sixth planet setting, `dayLengthHours`: Earth 24, limits 3 to 720. A world file or saved world **without** it loads with 24 (today `parsePlanet` refuses a header missing any setting, so files saved since step 2 would otherwise be refused); a value out of range is still refused as damaged. Functions for what follows from it: the rotation rate in radians per second, and `windTrustNote(planet)` saying whether the winds are rough and on which side (`'fast' | 'slow' | null`) outside 6 to 96 hours. The measured Earth needs 24 hours. **The temperature does not depend on day length**: a temperature solved for one day length must be reused, warm start included, for another, so the test that a start was solved for the same planet must ignore this setting, and nothing may re-solve the temperature when only day length changes. No control on the page yet (piece 10).
+   - Functions: `PlanetSettings.dayLengthHours`, `DEFAULT_PLANET`, `PLANET_LIMITS`, `PLANET_SETTINGS`, `rotationRate(planet)`, `TRUSTED_DAY_MIN_HOURS`, `TRUSTED_DAY_MAX_HOURS`, `windTrustNote`, `parsePlanet`, `isMeasuredEarth`, the `solvedFor` comparison in `temperature.ts`.
+   - Depends on: none.
+   - Acceptance: every existing test passes with the new setting; a `world.earthsim` exported from `main` before this piece imports with a 24-hour day; the Earth temperature baseline is unchanged (`npm run baseline:temperature` prints "The baseline is unchanged.").
+   - Tests: a header with five settings and no day length reads as 24 hours; one with a day length of 2 or 721 is refused; a round trip keeps a day length of 10; `normalisePlanet` clamps it; `windTrustNote` is null at 6, 24 and 96, `'fast'` at 5.9 and `'slow'` at 96.1; a world with a 10-hour day is not the measured Earth; a temperature result solved at 24 hours is accepted as a start, and as current, for the same world at 10 hours; the worker protocol accepts and checks the new setting.
+
+4. Wind report with the observed Earth
+   - Files: `scripts/wind-report.ts` (new), `scripts/report/` (new: map drawing and page assembly that touch no file, so they can be tested), `src/core/wind/model.ts` (new: the shape both models share), `package.json` (`report:winds`), `.gitignore` (`reports/`), `docs/development.md`.
+   - What: `npm run report:winds` writes one self-contained HTML file, `reports/winds/index.html` (not committed), that the user opens in a browser. Maps are flat (longitude across, latitude up) and drawn as inline SVG with no new dependency: pressure as colours, the coast as a line, winds as arrows on a regular spacing sized by speed, with a key. In this piece the report shows **the observed Earth** in January and July, and defines the cases and the plug-in shape for the models to come: a wind model is a function from a world, its twelve monthly temperatures and its planet settings to twelve months of eastward wind, northward wind and sea-level pressure per cell. For each model the report will show, per case, January and July maps; on the Earth, the observed beside it and error figures (the area-weighted RMS of the vector difference, the mean speed difference, the share of the surface where the direction is within 45° of observed, and the pressure's mean and RMS difference); zonal-mean eastward wind by latitude as a small line chart, simulated against observed; and solve times at 64, 128 and 256. The cases: the Earth; the Earth with an 8-hour day and with a 4-day day; the Earth with 0° and 60° tilt; a generated world with 30% land (a fixed seed); an ocean world; a one-continent world (built in the script). Temperatures come from `solveTemperature`.
+   - Functions: `WindModel`, `WindResult` (`east`, `north`, `pressure`: twelve `Float32Array` each), `windErrorFigures(simulated, observed, grid)`, `zonalMean(grid, field)`, the report's `cases`, `drawMap`, `buildReport`, `main`.
+   - Depends on: 1, 2, 3.
+   - Acceptance: the command writes the file in under five minutes with no models registered; the observed Earth's trade winds, westerlies, the Asian monsoon's reversal between January and July and the subtropical highs are plain to see.
+   - Tests: the error figures are zero for a field against itself and match hand-worked numbers on a small case; the direction share ignores cells whose observed wind is under a small speed; a zonal mean of a field that depends only on latitude returns it; `drawMap` output is well-formed SVG with one arrow per sample point and none where the wind is zero; the report assembles with zero, one and two models; the one-continent world has the land share intended.
+   - Manual review: open `reports/winds/index.html` (run `npm run report:winds` in the builder's worktree; the planner sends the file) and check the observed Earth maps read clearly: arrows legible, key present, January and July side by side.
+
+5. Prototype: rules plus a pressure map
+   - Files: `src/core/wind/rules.ts` (new), its test, `scripts/wind-report.ts` (register the model).
+   - What: A rough version of the rules model described under Approach, as a `WindModel`: the zonal pressure bands placed from the month's temperature (the low where the zonal-mean temperature peaks, the subtropical highs at the overturning cell's edge, whose latitude and the number of bands follow the rotation rate and the equator-to-pole contrast), thermal highs and lows from each cell's temperature against its latitude's mean, smoothed; then winds from the pressure by the balance of pressure gradient, turning and friction, blending to down-gradient flow near the equator; a simple slowing over land and blocking by high ground. Constants tuned by hand against the observed Earth in the report, each named and commented with where it starts from. Rough means: correct in kind on every report case, not polished; note in the plan's Notes what it gets wrong.
+   - Functions: `rulesWinds: WindModel`, with its parts exported for testing (`zonalBands`, `thermalPressure`, `windsFromPressure`).
+   - Depends on: 4.
+   - Acceptance: the report shows the rules model on every case, with error figures on the Earth and solve times; on the Earth it has easterly trades, mid-latitude westerlies and a monsoon reversal over South Asia.
+   - Tests: on an ocean world with Earth's settings the winds are symmetric east–west and have easterlies in the tropics and westerlies in mid-latitudes in both hemispheres; with no tilt January equals July; a shorter day gives more bands and a narrower tropical cell, a longer day fewer and wider, with one cell reaching the poles at the slow end; winds are finite everywhere at every report setting, including at the poles and the equator; a cold continent in winter carries higher pressure than the sea at its latitude; deterministic.
+   - Manual review: the report's rules-model section (the planner sends the regenerated file).
+
+6. Prototype: a simulated atmosphere, and the choice
+   - Files: `src/core/wind/simulated.ts` (new), its test, `scripts/wind-report.ts` (register the model; add a summary table of both models).
+   - What: A rough version of the simulated atmosphere described under Approach, as a `WindModel`, run at 64 (and at the coarser solve grid for finer worlds), with its settling and averaging lengths chosen so the monthly means are steady to a stated tolerance. **If it cannot be made stable or steady on the Earth at 64 within this piece, that is a valid result**: keep what runs, and report what happened, what was tried and what a working version would take. The report gains a summary: both models side by side with error figures, times and a short list of what each gets right and wrong on each case, **written as observations, without a recommendation dressed as fact**; the builder's own recommendation goes in a separate, labelled paragraph.
+   - Functions: `simulatedWinds: WindModel`, with its stepping parts exported for testing.
+   - Depends on: 4 (5 for the summary).
+   - Acceptance: the report shows both models on every case, or says plainly where the simulated one could not run. **The builder stops after this piece is committed: the next piece does not start until the planner has relayed the user's choice of model and revised pieces 7 onward.**
+   - Tests: the stepping conserves mass to rounding on a closed sphere with no forcing; a state at rest with uniform temperature stays at rest; a balanced zonal flow stays balanced for a stated time; the result is finite and deterministic on the Earth at 64; the monthly mean changes by less than the stated tolerance when the averaging is doubled (or the test records that it does not, with the figure, if the model is not steady).
+   - Manual review: the whole report: the user reads it and chooses the model.
+
+7. The chosen wind model in the core
+   - Files: `src/core/wind.ts` (new; the chosen prototype moved here and finished), `src/core/wind/` (the other prototype deleted; `model.ts` folded in), `src/core/index.ts`, `scripts/wind-report.ts` (kept, for the one model), `scripts/time-temperature.ts` or a new `scripts/time-winds.ts`, `package.json`, `docs/winds.md` (new), `docs/development.md`.
+   - What: The chosen model made the real thing: `solveWinds(world, temperatureMonths, planet)` returning `WindResult`; inputs checked as `solveTemperature` checks its own; a world finer than 64 solved on the grid a step coarser and refined (`coarsenWorld`, `refineField`, `refineVectors`), if the model's cost calls for it; the annual mean wind as a summary; tuned against the observed Earth with the tuning recorded. `docs/winds.md` explains the model, how far to trust it and what it leaves out, in the manner of `docs/temperature.md`. *Written for the rules model; revised after the choice.*
+   - Functions: `solveWinds`, `WindResult`, `summariseWinds` (annual mean), the model's parts.
+   - Depends on: 6 and the user's choice.
+   - Acceptance: the report and the timing script run from `solveWinds`; the Earth's error figures are no worse than the prototype's; the solve time is within what the user accepted from the report.
+   - Tests: the prototype's behaviour tests carried over; inputs of the wrong length, a world and temperatures on different grids, and non-finite temperatures are refused; results at 128 and 256 agree with a solve on the world's own grid within a stated tolerance; the annual mean is the mean of the twelve months as vectors.
+
+8. Winds in the worker and the page's store
+   - Files: `src/core/protocol.ts`, `src/worker/handle.ts`, `src/worker/client.ts`, `src/app/workerService.ts`, `src/app/refresh.ts`, `src/app/layers.ts`, `src/app/wiring.ts`, `src/app/main.ts`, their tests, `docs/development.md`.
+   - What: A `winds` request kind that takes the world and the twelve temperature months and answers with the winds and pressure, on a worker of its own. A winds service and scheduler on the temperature's pattern: asked for only while something shows winds or pressure (nothing does until piece 9, so this piece adds the hook and a test-only way to switch it on); asked again whenever a new temperature result arrives or the day length changes; a request overtaken is dropped as the temperature's is. The layer store gains `winds` with the same current / out of date / calculating / unavailable states. Switching winds on with no current temperature asks for the temperature first.
+   - Functions: `SimResults.winds`, `SimExtras`, `KINDS`, `PAYLOADS`, `COMPUTE`, `BUFFERS`; `createWindsService`; the winds scheduler; `LayerStore.winds`.
+   - Depends on: 7.
+   - Acceptance: with winds switched on in a test, a stroke leads to one temperature request and then one winds request, and the store ends holding winds for the edited world; with winds off, no winds request is ever made.
+   - Tests: the handler answers a winds request and transfers its arrays; a malformed request is refused; winds are requested after each new temperature result while showing and not while hidden; a change of day length requests winds and no temperature; an overtaken request's answer is ignored; the store's states follow the temperature's through calculating, current and out of date; with no worker the state is unavailable and the rest of the page works.
+
+9. The Winds switch and arrows on the globe
+   - Files: `src/app/globe/wind.ts` (new), `src/app/globe/renderer.ts`, `src/app/ui/viewPanel.ts`, `src/app/ui/layerPanel.ts`, `src/app/view.ts`, `src/app/wiring.ts`, `src/app/ui/legend.ts` or a small new `ui/windKey.ts`, `src/app/styles.css`, their tests, `docs/user-guide.md`.
+   - What: A **Winds** checkbox in the View section, off to start with and not saved, as Sunlight is. On, the globe carries arrows over whichever colours are showing: placed evenly over the sphere at a spacing that follows the zoom (more arrows closer in, never a clutter), pointing with the wind, with length and weight growing with speed up to a cap, sitting clear of the raised relief at every exaggeration, hidden on the far side, readable on both the terrain and the temperature colours. A small key shows what an arrow of a given length means. Arrows follow the month on screen and the year as it plays; on Annual average they show the mean wind; on the other summaries they keep the month last shown. While Winds is on in Terrain view the month controls show there. While the winds are being worked out the last arrows stay, marked as the legend marks an out-of-date temperature; until the first result there are none. Ticking Winds opens the Layers section if it is closed, as Sunlight does.
+   - Functions: `createWindArrows(scene…)` with `setWinds`, `setMonth`, `setVisible`, `setZoom`; `arrowSamples(spacing)`; the View panel's checkbox; `offersMonth`.
+   - Depends on: 8.
+   - Acceptance: on the Earth preset the trade winds, the westerlies and the monsoon's reversal between January and July are plain on the globe; turning Winds off leaves the globe exactly as before.
+   - Tests: sample points are evenly spread (no two closer than a stated share of the spacing, none missing near poles or face edges); an arrow's direction on the sphere matches its cell's eastward and northward wind; length is capped; calm cells draw nothing; a new month or result updates the arrows; Winds off removes them and asks for no winds; the month controls show in Terrain view only while Sunlight or Winds is on; ticking Winds opens Layers.
+   - Manual review: `npm run dev` in the builder's worktree. On the Earth: Winds on over Terrain and over Temperature; step and play the months; zoom in and out; change the relief exaggeration; sculpt a mountain range and a new continent and watch the winds change; a generated world.
+
+10. Day length in the Planet section
+    - Files: `src/app/ui/planetPanel.ts`, `src/app/wiring.ts`, `src/app/ui/dateLine.ts` (only if the day shows there), their tests, `docs/user-guide.md`, `docs/winds.md`.
+    - What: A **Day length** slider in the Planet section, on a scale of equal ratios like the star's, with Earth's 24 hours marked and a step exactly on it, written as hours under two days (`24 hours (Earth)`, `10 hours`) and days above (`16 days`). A second note under the Planet lines says when the winds are rough and why (a very fast or very slow spin), separate from the temperature's note. Moving it recalculates the winds and pressure only. **Reset to Earth** resets it too. On an Earth world, any day length but 24 hours removes the Earth comparison, and 24 brings it back.
+    - Functions: the `PLANET_SLIDERS` entry; `formatDayLength`; the note.
+    - Depends on: 9 (so the effect can be seen), 3.
+    - Acceptance: dragging Day length on the Earth with Winds on changes the number and width of the wind bands and never starts a temperature solve.
+    - Tests: the slider's ends are 3 hours and 30 days and one step is exactly 24; the value's wording at 10, 24, 47 and 48 hours and 16 days; the note shows below 6 and above 96 hours and not between; moving the slider asks for winds and not temperature; Reset to Earth returns it to 24; the setting is saved and restored with the world.
+    - Manual review: `npm run dev`; the Earth with Winds on; drag Day length across its range and watch the bands; check the note at both ends; Reset to Earth.
+
+11. Wind under the pointer, and the unit option
+    - Files: `src/app/ui/cursorReadout.ts`, `src/app/ui/viewPanel.ts`, `src/app/panelMemory.ts` or a new `src/app/preferences.ts`, the wind key from piece 9, `src/app/wiring.ts`, their tests, `docs/user-guide.md`.
+    - What: While Winds is on, the strip under the pointer adds the wind there: its speed and the direction it blows from, such as `7 m/s from the north-east`, with "out of date" as the temperature has. A **Wind speed** option in the View section chooses m/s, km/h or mph, m/s to start with; it is remembered by the browser as the open sections are, is not saved with the world, and changes the strip and the key at once.
+    - Functions: `formatWind(speedMs, fromDeg, unit)`, `compassPoint(deg)` (eight points), `WIND_UNITS`, the stored preference.
+    - Depends on: 9.
+    - Acceptance: the strip names the wind under the pointer in the chosen unit, and the choice survives a reload.
+    - Tests: conversions (10 m/s is 36 km/h and 22 mph, to the unit's rounding); the eight compass points at their boundaries; a calm cell reads `calm`; the unit changes the strip and the key; the preference is restored on load and falls back to m/s when storage is blocked or holds something else; the strip shows no wind with Winds off.
+    - Manual review: `npm run dev`; Winds on; move the pointer over trade winds and westerlies; switch the unit; reload.
+
+12. Scalar layers made general
+    - Files: `src/app/view.ts`, `src/app/layers.ts`, `src/app/ui/layerPanel.ts`, `src/app/ui/legend.ts`, `src/app/ui/cursorReadout.ts`, `src/app/ui/comparison.ts`, `src/app/observedData.ts`, `src/app/globe/ramp.ts`, their tests, `docs/development.md`.
+    - What: A refactor with **no change in behaviour**: what the layer panel, the legend, the pointer strip, the scale fitting, the comparison controls and the observed-data fetch know about temperature (its name, unit, wording, ramp, how a value is formatted, which file holds the observed one) moves into a description of a layer that each takes as data, so that a second one-value-per-cell layer can be added by describing it. The temperature becomes the first such description.
+    - Functions: a `ScalarLayerSpec` (name, unit, value format, ramps, legend wording, observed-file loader, difference scale); `legendContent`, the readout and the comparison taking a spec.
+    - Depends on: none (kept after the wind pieces so they are not held up; it touches `layerPanel.ts` and `legend.ts`, as pieces 9 and 11 do, so it must not run alongside them).
+    - Acceptance: every existing test passes unchanged except where a test names a moved function; the page looks and behaves exactly as before.
+    - Tests: the existing legend, readout, comparison and layer-panel tests, run through the spec; a test with a made-up second spec shows the legend, readout and comparison use its unit, wording and ramp.
+    - Manual review: `npm run dev`; Temperature view on the Earth: legend, pointer strip, months, summaries, Observed and Difference all as before.
+
+13. The Pressure layer
+    - Files: `src/app/view.ts`, `src/app/layers.ts`, `src/app/ui/layerPanel.ts`, `src/app/globe/ramp.ts`, `src/app/wiring.ts`, `src/app/refresh.ts`, their tests, `docs/user-guide.md`, `docs/winds.md`.
+    - What: **Pressure** as a third choice beside Terrain and Temperature: the sea-level pressure of the month on screen in hectopascals, in colours of its own that cannot be mistaken for the temperature's (a diverging pair around the planet's mean pressure), with relief and coast as in Temperature view, the legend, and the value in the pointer strip (`1,018 hPa`). Its summaries are Month and Annual average only. Choosing it works the winds and pressure out as the Winds switch does. Winds can be on over it.
+    - Functions: `LAYERS` gains `'pressure'`; the pressure `ScalarLayerSpec`; `PRESSURE_RAMP`; the scheduler's "showing" test.
+    - Depends on: 12, 8.
+    - Acceptance: on the Earth the subtropical highs, the low along the equator and the winter high over Siberia show, with the arrows running along and across them as they should.
+    - Tests: the layer picker offers three layers; choosing Pressure asks for winds; the legend and strip use hPa; the scale is centred on the mean; only Month and Annual average are offered; Terrain and Temperature are untouched by it.
+    - Manual review: `npm run dev`; Pressure on the Earth in January and July with Winds on; a generated world; the legend and pointer strip.
+
+14. Earth comparison and baseline for winds and pressure
+    - Files: `src/app/observedData.ts`, `src/app/ui/comparison.ts`, `src/app/ui/layerPanel.ts`, `src/app/ui/viewPanel.ts`, `src/app/globe/wind.ts`, `src/app/wiring.ts`, `src/core/baseline/earthWinds.ts` and `earthWinds.json` (new), `scripts/update-earth-winds-baseline.ts` (new), `package.json` (`baseline:winds`), their tests, `docs/user-guide.md`, `docs/winds.md`, `docs/development.md`.
+    - What: On the measured Earth (which now also needs a 24-hour day): the Pressure layer offers Simulated, Observed and Difference with mean and RMS error figures, through the general comparison of piece 12; the Winds switch gains a choice of Simulated or Observed arrows, and the wind key shows the error figures for the month on screen (the RMS of the vector difference and the share of the surface within 45° of the observed direction). The observed files are fetched the first time they are asked for, with the temperature's loading and failure behaviour. A committed baseline of the Earth's wind and pressure error figures at 64, a test that fails when a figure worsens by more than a stated tolerance, and `npm run baseline:winds` to rewrite it.
+    - Functions: the pressure spec's observed loader; the wind source choice; `earthWindFigures`, `windBaselineRegressions`; the script's `main`.
+    - Depends on: 13, 11, 1.
+    - Acceptance: on an untouched Earth, observed and simulated winds can be flipped between and the figures read; any edit removes the choice and undoing returns it; the baseline test passes and fails when a constant of the model is spoiled.
+    - Tests: the choices appear only on the measured Earth; a failed fetch returns to Simulated and the next try fetches again; the figures match `windErrorFigures`; a non-finite figure counts as a regression; a worse figure fails and a better one passes; the baseline script reports "unchanged" on the committed file.
+    - Manual review: `npm run dev`; the Earth preset; Pressure: Simulated, Observed, Difference; Winds: Simulated and Observed in January and July; make a stroke and undo it.
+
+15. Moving streaks
+    - Files: `src/app/globe/streaks.ts` (new), `src/app/globe/renderer.ts`, `src/app/ui/viewPanel.ts`, `src/app/wiring.ts`, `src/app/styles.css`, their tests, `docs/user-guide.md`, `README.md` ("What works today").
+    - What: A choice beside the Winds switch of **Arrows** or **Streaks**. Streaks are many short trails carried along by the wind, fading behind them, faster where the wind is stronger, as on weather maps. They need the globe to redraw continuously, so a frame loop runs **only while streaks are showing and the page is visible**, and stops when Winds is off, Arrows is chosen, or the tab is hidden; the rest of the page keeps drawing on demand. The streak count follows the zoom and has a cap. Sculpting and turning the globe stay smooth with streaks on at 256.
+    - Functions: `createWindStreaks(scene…)`; the renderer's `setAnimating`; the View panel's choice.
+    - Depends on: 9 (and 14 for the observed source).
+    - Acceptance: streaks flow with the trade winds and westerlies on the Earth; switching back to Arrows or turning Winds off stops the frame loop (checked by a counter in a test and by the browser's performance panel by hand).
+    - Tests: a trail's step follows the wind at its position and is longer in stronger wind; a trail that leaves the sphere's near side or ages out is replaced; the loop starts only for streaks and stops for arrows, for Winds off and for a hidden page; the count is capped; with a made-up frame clock the trails are deterministic.
+    - Manual review: `npm run dev`; the Earth; Streaks over Terrain, Temperature and Pressure; play the months; zoom; sculpt while streaks run; on the finest grid; watch that the fan or battery load stops when Streaks is off.
+
+## Checkpoints
+
+- [ ] 1. Observed winds and pressure data
+- [ ] 2. Vector maths on the grid
+- [ ] 3. Day length on the world
+- [ ] 4. Wind report with the observed Earth
+- [ ] 5. Prototype: rules plus a pressure map
+- [ ] 6. Prototype: a simulated atmosphere, and the choice (**stop here for the user's choice of model; the planner revises pieces 7 onward**)
+- [ ] 7. The chosen wind model in the core
+- [ ] 8. Winds in the worker and the page's store
+- [ ] 9. The Winds switch and arrows on the globe
+- [ ] 10. Day length in the Planet section
+- [ ] 11. Wind under the pointer, and the unit option
+- [ ] 12. Scalar layers made general
+- [ ] 13. The Pressure layer
+- [ ] 14. Earth comparison and baseline for winds and pressure
+- [ ] 15. Moving streaks
+
+## Verification
+
+After every piece, from the builder's worktree:
+
+- `npm run check` (Biome lint and format; Markdown is linted but not formatted)
+- `npm run typecheck` (fails if `src/core` touches browser types or `src/` touches Node)
+- `npm test`
+- `npm run build`
+- `npm run baseline:temperature` must print "The baseline is unchanged." in every piece: this issue does not change the temperature.
+- Coverage of changed lines: `"$(python3 ~/.claude/lib/planner.py tools)/coverage-changed.sh" main`.
+- From piece 4: `npm run report:winds`, and the report sent to the planner for the pieces that have it as a manual review.
+- From piece 14: `npm run baseline:winds` must print that the baseline is unchanged unless the piece is meant to move it.
+
+Scripted browser checks keep their browser profiles in the session's scratch folder, never the Windows temp folder. The user's own dev server, if one is running, is left alone; a builder that needs one starts its own on another port.
+
+## Notes
+
+- 2026-11-13: The user reaches a dev server from their Mac by an SSH tunnel to the port the server is on; say which port a manual review's server is on.
+- 2026-11-13: The trusted day-length range (6 to 96 hours) is the planner's estimate. If the prototype report shows the rules hold over a different range, say so in the piece 6 report; changing it is the user's decision.
+- 2026-11-13: Pieces 7 onward are written for the rules model. After the user's choice they are revised by the planner; re-run `planner.py path` before starting piece 7.

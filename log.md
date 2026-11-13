@@ -71,3 +71,4 @@
 - 2026-11-13 07:43 · add-winds-layer (0003) · created (build): Add winds layer
 - 2026-11-13 09:05 · add-winds-layer (0003) · title = Add winds, air pressure and day length
 - 2026-11-13 09:05 · add-winds-layer (0003) · GitHub issue #5
+- 2026-11-13 09:09 · add-winds-layer (0003) · investigating → planned

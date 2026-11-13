@@ -3,12 +3,12 @@
   "slug": "add-winds-layer",
   "title": "Add winds, air pressure and day length",
   "mode": "build",
-  "state": "investigating",
+  "state": "planned",
   "branch": "add-winds-layer",
   "base": "main",
   "gh_issue": 5,
   "build_model": null,
   "created": "2026-11-13 07:43",
-  "updated": "2026-11-13 09:05",
+  "updated": "2026-11-13 09:09",
   "done": null
 }
