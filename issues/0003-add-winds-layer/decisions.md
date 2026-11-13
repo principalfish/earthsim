@@ -33,6 +33,8 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - The builder's analysis loop stops once a round finds nothing above low severity, for the rest of this issue. The user: "Yes, stop at low only" (2026-11-13)
 - The flaky observed-temperature test gets a timeout in piece 2. The user: "Yes, fold it in" (2026-11-13)
 
+- Piece 2 adds a direct Laplacian operator, accurate at the cube's seams. The user: "A: add it now" (2026-11-13)
+
 ## Open
 - None.
 
