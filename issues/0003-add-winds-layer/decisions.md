@@ -17,12 +17,13 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - No time limit is set for a wind solve in advance; the report shows each model's time beside its quality and the user weighs them. The user: "Decide from the report" (2026-11-13)
 - Pressure is shown too, as a third colour layer beside Terrain and Temperature, with its own colours, legend and pointer readout. The user: "Yes, a Pressure layer" (2026-11-13)
 
+- The Day length slider runs from 3 hours to 30 days, with the "results are rough" warning outside about 6 to 96 hours (the planner's estimate of where the wind rules hold, to be checked by the prototype). The user: "3 hours to 30 days" (2026-11-13)
+- Wind speed can be shown in m/s, km/h or mph, chosen by an option in the page's settings; the default is m/s. The user: "option to use any of these somewhere in settings. default to m/s" (2026-11-13)
+- The Pressure layer gets the Earth comparison too: on an untouched Earth it offers simulated, observed and difference with error figures. The user: "Yes" (2026-11-13)
+- The prototype report shows, for both models, the real Earth in January and July and four further cases: fast and slow spin (an 8-hour and a 4-day day), tilt extremes (0° and 60°), a generated world with 30% land, and an ocean world and a one-continent world. The user chose all four (2026-11-13)
+
 ## Open
-- The Day length slider's exact range and the trusted range (the planner's estimate: 3 hours to 30 days, trusted from about 6 to 96 hours).
-- The wind's unit in the legend and readout (m/s, km/h or mph).
-- Whether the Pressure layer also gets the Earth comparison (observed and difference), as temperature has and winds will.
-- Which cases the prototype report shows besides the real Earth (spin, tilt, generated and extreme worlds).
-- Whether the issue is split in two, now that it holds a prototype, a new planet setting, observed data, arrows, a Pressure layer and moving streaks.
+- Whether the issue is split in two, now that it holds a prototype, a new planet setting, observed data, arrows, a Pressure layer, a unit option and moving streaks. The planner's suggestion: this issue ends with winds as arrows and their Earth comparison; a second issue adds the Pressure layer, the unit option and the moving streaks.
 
 ## Assumed
 - Winds and pressure are worked out from the twelve monthly temperature fields and the planet settings, month by month, and shown for the month on screen. On Annual average the arrows show the year's mean wind; on the other temperature summaries they stay on the month last on screen, as the sun does.
@@ -32,3 +33,5 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - The output is shaped for the later steps: each month's wind as eastward and northward speeds per cell, and the pressure, from which rain (step 4) can take convergence and uplift and currents (step 5) the wind's push on the sea.
 - While Winds is on in Terrain view, the month controls show there, as they do for Sunlight.
 - Out of scope here: rain, ocean currents, storms (steps 4, 5 and 7); heat carried by winds; tidally locked planets; retrograde rotation.
+- The wind unit option sits in the View section and is remembered by the browser, like which panel sections are open; it is not saved with the world.
+- Pressure is shown in hectopascals (the same as millibars), with no unit option.

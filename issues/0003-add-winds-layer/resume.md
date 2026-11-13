@@ -8,16 +8,14 @@
 
 ## Pending with the user
 
-Answered on 2026-11-13 (all in `decisions.md`): model by prototype of both; day length with a wide range; arrows first then streaks; winds only read the temperature; judged from a report with maps and figures; observed winds in the page; no time limit set in advance; a Pressure layer.
+All three rounds of questions are answered (2026-11-13) and in `decisions.md`.
 
-Third round, asked 2026-11-13, each with the planner's recommendation:
+Asked 2026-11-13, waiting on the user:
 
-1. **Day length range:** 3 hours to 30 days, warning outside 6 to 96 hours (recommended), or narrower, or wider.
-2. **Wind unit:** m/s (recommended), km/h or mph.
-3. **Earth comparison for pressure too:** yes (recommended, it is a single value per cell like temperature), or winds and temperature only.
-4. **Cases in the prototype report besides the Earth:** fast and slow spin; tilt extremes; a generated world; an ocean world and a one-continent world (recommended: all four).
+1. **Whether to split the issue in two.** The planner's suggestion: this issue ends with winds as arrows and their Earth comparison (observed data, prototype and choice of model, day length, the model in the worker, arrows, comparison and baseline); a second issue adds the Pressure layer, the wind unit option and the moving streaks.
+2. **Whether anything in the ledger is missing or wrong.** The full ledger was shown, with the planner's assumptions to correct (the unit option in the View section and remembered by the browser; pressure in hectopascals; Day length changes not re-solving temperature; arrows on Annual average showing the year's mean wind).
 
-Then: raise whether to split the issue in two, present the full ledger, and ask whether anything is missing before drafting `issue.md`.
+Next, on an explicit "that's everything": draft `issue.md` and present it; on approval create the GitHub issue, write `plan.md` (the prototype piece ends in a decision gate: the user picks the model from the report, and the model pieces are finalised after it), propose manual reviews, and offer to start the builder.
 
 ## Groundwork (from the code on `main`, 2026-11-13)
 
