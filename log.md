@@ -63,3 +63,4 @@
 - 2026-11-12 22:28 · add-seasonal-temperature-layer-and-planet-controls (0002) · self review 01: all 9 findings and N1 chosen; sent to the builder
 - 2026-11-13 07:20 · add-seasonal-temperature-layer-and-planet-controls (0002) · builder: review fixes built, uncommitted (HEAD d0f873a); review request written to the builder worktree's .planner-outbox/review-request-review-fixes.md because sends to the planner chat failed (host unreachable); the user's dev server on 5176 is no longer running, not stopped by the builder
 - 2026-11-13 07:27 · add-seasonal-temperature-layer-and-planet-controls (0002) · builder: review fixes committed and pushed as 7896afc after the user's approval ("Approve, commit"); state stays review
+- 2026-11-13 07:32 · add-seasonal-temperature-layer-and-planet-controls (0002) · review → ready
