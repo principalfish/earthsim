@@ -208,7 +208,7 @@ earth_sim is a browser planet simulator for worldbuilding: believable results an
 
 ## Checkpoints
 
-- [ ] 1. Observed winds and pressure data
+- [x] 1. Observed winds and pressure data
 - [ ] 2. Vector maths on the grid
 - [ ] 3. Day length on the world
 - [ ] 4. Wind report with the observed Earth
@@ -249,6 +249,7 @@ Scripted browser checks keep their browser profiles in the session's scratch fol
 - 2026-11-13, piece 1, deviations from the Files line: new internal `src/core/observedGrid.ts` (the grid, byte codec, checks and sampling shared by temperature, pressure and wind; `src/core/observed.ts` changed to use it, results and messages unchanged); `scripts/observedBuild.ts`, `scripts/observedGdalRun.ts`, `scripts/earth/observedGdal.ts`, `scripts/earth/storedValues.ts` (build steps and the GDAL comparison shared by both observed builds; `scripts/build-observed-temperature.ts` changed to use them, its output and printed lines unchanged); `.gitattributes` (`public/data/*.bin binary`); `README.md` data credit line; `src/core/index.test.ts`. `scripts/earth/netcdf.ts` needed no change.
 - 2026-11-13, piece 1, coverage: 100% of 238 changed lines in `src/` (scripts are not measured). Accepted by the coverage check as not worth a test: `main` in `scripts/build-observed-winds.ts`, `readObservedSource` / `writeDataFile` in `scripts/observedBuild.ts` and `verifyObservedWithGdal` in `scripts/observedGdalRun.ts` (download, file and GDAL-process wiring over tested helpers).
 - 2026-11-13, piece 1: no supported grid lets a test tell vector interpolation from per-component interpolation at the poles on this data (the pole rows hold a value per longitude and neighbours are 1° apart); the over-the-pole test passes either way. The blend test pins the weights and frames instead.
+- 2026-11-13, piece 1: committed as `69d3619` and pushed. The three optional round-5 findings are left unfixed by the user's choice ("Approve, A: as is"): (a) `encodeBytes` / `decodeBytes` in `src/core/observedGrid.ts` say "unsigned codec only" in their docs but do not assert it; (b) `observedWind` writes the bilinear weights out again beside `interpolate`; (c) `observedPressure` and `observedTemperature` share a four-line body. `/review self` may raise them again.
 - 2026-11-13, follow-up, not this piece's: under coverage with every worker busy, the existing test "fails at those places if turned north for south or moved round" in `src/core/observed.test.ts` once took 5.08 s against Vitest's 5 s default (2.6 s under coverage alone, about 1 s plainly; it passed in five other coverage runs). A timeout on it, as `earth.test.ts` has, would stop the flake.
 - 2026-11-13, for piece 2: `observedWind.ts` has a small private east/north frame helper; `cellFrames` in piece 2 can replace it. For piece 14: `observedWind` at 256 takes about 0.5 s in Node.
 - 2026-11-13: Pieces 7 onward are written for the rules model. After the user's choice they are revised by the planner; re-run `planner.py path` before starting piece 7.
