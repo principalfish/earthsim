@@ -113,10 +113,14 @@ Requires Node.js and npm. Run `npm install` once, then:
   - `src/core/serialize.ts`: the world file format, and the checks a file must pass to be read as a world.
   - `src/core/earth.ts`: reading the Earth data file, and the Earth as a world at each resolution.
   - `src/core/observed.ts`: reading the observed temperature file, and taking it onto a world's cells.
+  - `src/core/planet.ts`: the planet settings (axial tilt, the star's brightness and mass, the orbit's radius and the greenhouse strength) with their limits and Earth's values, what follows from them (the sunlight against Earth's, the length of the year, and whether the temperature model is trusted for them), and a world's date.
+  - `src/core/star.ts`: the star as the planet sees it: its radius from its mass, its surface temperature and colour, its size in the sky and its direction in each month.
+  - `src/core/insolation.ts`: sunlight at the top of the atmosphere by latitude and time of year, the twelve months and their names, and the latitude of each cell.
   - `src/core/temperature.ts`: the temperature model, a seasonal energy balance on the world's grid, or the grid a step coarser above the coarsest, stepped through the year until the year repeats.
   - `src/core/coarsen.ts`: a world averaged onto the grid a step coarser, and a field carried back from it.
   - `src/core/exchange.ts`: heat passed between neighbouring cells, and the multigrid-preconditioned solver for the implicit steps it needs.
   - `src/core/compare.ts`: one field less another, and area-weighted error figures between two fields or two sets of monthly fields.
+  - `src/core/quantile.ts`: weighted quantiles of values on the grid, each counting for its cell's area: the lowest and highest values and the cuts a share in from either end.
   - `src/core/baseline/`: the Earth temperature baseline, and the figures and the check it is kept with.
   - `src/core/testing/`: temperature results and progress of the right form, which only the tests use.
 - `src/app/`: the page, which imports the core.

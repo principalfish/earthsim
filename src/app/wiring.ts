@@ -298,8 +298,8 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * for the statistics and the temperature again, tell the layer panel
  * whether the world is still, or is again, the measured Earth, and mark
  * the world changed for the autosave. A change of the planet settings,
- * told through {@link AppState.notifyPlanetChange}, asks for the
- * temperature again, tells the layer panel the same and marks the world
+ * which {@link AppState.setPlanet} tells the planet listeners of, asks for
+ * the temperature again, tells the layer panel the same and marks the world
  * changed; the statistics do not depend on it. Whether the world is the
  * measured Earth is worked out once for each of these, and once for each
  * new world, never during a stroke. The planet

@@ -190,6 +190,47 @@ describe('baselineRegressions', () => {
 		).toEqual([{ figure: 'seasonal range mean', baseline: -0.5, now: 0.56 }]);
 	});
 
+	it('names a figure that is not a number', () => {
+		expect(
+			baselineRegressions(withPart(baseline, 3, Number.NaN, 4), baseline),
+		).toEqual([{ figure: 'April mean', baseline: -0.5, now: Number.NaN }]);
+		expect(
+			baselineRegressions(
+				withPart(baseline, 'coldest', -0.5, Number.NaN),
+				baseline,
+			),
+		).toEqual([{ figure: 'coldest month RMS', baseline: 4, now: Number.NaN }]);
+	});
+
+	it('names a figure that is infinite, of either sign', () => {
+		expect(
+			baselineRegressions(
+				withPart(baseline, 'warmest', -0.5, Infinity),
+				baseline,
+			),
+		).toEqual([{ figure: 'warmest month RMS', baseline: 4, now: Infinity }]);
+		expect(
+			baselineRegressions(
+				withPart(baseline, 'annualMean', -Infinity, 4),
+				baseline,
+			),
+		).toEqual([
+			{ figure: 'annual average mean', baseline: -0.5, now: -Infinity },
+		]);
+	});
+
+	it('names a figure whose baseline is not finite', () => {
+		expect(
+			baselineRegressions(
+				baseline,
+				withPart(baseline, 'range', -0.5, Infinity),
+			),
+		).toEqual([{ figure: 'seasonal range RMS', baseline: Infinity, now: 4 }]);
+		expect(
+			baselineRegressions(baseline, withPart(baseline, 0, Number.NaN, 4)),
+		).toEqual([{ figure: 'January mean', baseline: Number.NaN, now: -0.5 }]);
+	});
+
 	it('names every figure that is worse, in order', () => {
 		const worse = withPart(
 			withPart(withPart(baseline, 0, -0.5, 5), 'warmest', -0.7, 4.2),

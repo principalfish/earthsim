@@ -26,15 +26,12 @@ import {
 	observedTemperature,
 	solveTemperature,
 } from '../src/core/index';
+import {
+	readEarthDataFile,
+	readObservedTemperatureFile,
+} from './earth/dataFile.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const EARTH_FILE = join(ROOT, 'public', 'data', 'earth-256.bin');
-const OBSERVED_FILE = join(
-	ROOT,
-	'public',
-	'data',
-	'earth-temperature-1deg.bin',
-);
 const BASELINE_FILE = join(
 	ROOT,
 	'src',
@@ -43,8 +40,15 @@ const BASELINE_FILE = join(
 	'earthTemperature.json',
 );
 
-/** The figures of a baseline text as name and value, in the file's order. */
-const flatten = (text: string): Map<string, number> => {
+/**
+ * The figures of a baseline text as name and value, in the file's order.
+ *
+ * @param text - The baseline, as JSON.
+ * @returns Each number in it, under its path: the keys that lead to it
+ * joined by dots, an array's elements keyed by their index. Anything that
+ * is not a number, an object or an array is left out.
+ */
+export const flatten = (text: string): Map<string, number> => {
 	const figures = new Map<string, number>();
 	const walk = (value: unknown, path: string): void => {
 		if (typeof value === 'number') {
@@ -78,11 +82,11 @@ export const main = (args: readonly string[]): void => {
 		throw new Error(`Unknown option ${args.join(' ')}: there are no options`);
 	}
 	const world = earthWorld(
-		decodeEarth(new Uint8Array(readFileSync(EARTH_FILE))),
+		decodeEarth(readEarthDataFile()),
 		BASELINE_RESOLUTION,
 	);
 	const observed = observedTemperature(
-		decodeObservedTemperature(new Uint8Array(readFileSync(OBSERVED_FILE))),
+		decodeObservedTemperature(readObservedTemperatureFile()),
 		BASELINE_RESOLUTION,
 	);
 	const figures: EarthTemperatureFigures = earthTemperatureFigures(

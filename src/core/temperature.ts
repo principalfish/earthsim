@@ -1894,11 +1894,12 @@ const solveOnGrid = (
  * {@link normalisePlanet} first, so a setting beyond its limits is brought
  * to the limit and one that is not a number is refused.
  *
- * A world of 64 cells per face edge is solved on its own grid. One of more
- * is solved on the grid a step coarser, {@link solveResolution} of its own:
- * the world is averaged onto that grid by {@link coarsenWorld}, where a
- * coarse cell is land by the mean elevation of the four cells it covers,
- * and solved there as a world of its own; its monthly mean sea-level
+ * A world of 64 cells per face edge is solved on its own grid. A world of
+ * more than 64 cells per face edge is solved on the grid a step coarser,
+ * {@link solveResolution} of its own: the world is averaged onto that grid
+ * by {@link coarsenWorld}, where a coarse cell is land by the mean
+ * elevation of the four cells it covers, and solved there as a world of
+ * its own; its monthly mean sea-level
  * temperatures are then carried back to the world's grid and each cell
  * cooled by its own height, by {@link refineMonths}. Land and sea differ
  * smoothly across a coast, over about one coarse cell (156 km on a world

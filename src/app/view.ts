@@ -85,20 +85,7 @@ export const TEMPERATURE_SOURCE_LABELS: Readonly<
 };
 
 /** The months of the year, January first, as the page names them. */
-export const MONTH_NAMES = [
-	'January',
-	'February',
-	'March',
-	'April',
-	'May',
-	'June',
-	'July',
-	'August',
-	'September',
-	'October',
-	'November',
-	'December',
-] as const;
+export { MONTH_NAMES } from '../core/index';
 
 /**
  * The month on screen when the page opens and when a new world arrives, as

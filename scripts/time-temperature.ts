@@ -34,10 +34,7 @@
  * only in its times.
  */
 
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 import { stdout } from 'node:process';
-import { fileURLToPath } from 'node:url';
 import {
 	cellLatitudes,
 	cellsWithin,
@@ -50,6 +47,7 @@ import {
 	generateWorld,
 	getGrid,
 	latLonToDirection,
+	MONTH_NAMES,
 	MONTHS_PER_YEAR,
 	normaliseSeaLevel,
 	observedTemperature,
@@ -60,15 +58,10 @@ import {
 	type TemperatureResult,
 	type World,
 } from '../src/core/index';
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const EARTH_FILE = join(ROOT, 'public', 'data', 'earth-256.bin');
-const OBSERVED_FILE = join(
-	ROOT,
-	'public',
-	'data',
-	'earth-temperature-1deg.bin',
-);
+import {
+	readEarthDataFile,
+	readObservedTemperatureFile,
+} from './earth/dataFile.mjs';
 
 /** The generated world timed beside the Earth. */
 const GENERATED_SEED = 20_261_111;
@@ -103,21 +96,6 @@ const LARGEST_ERRORS = 5;
  * from the full one are listed.
  */
 const WORST_CELLS = 10;
-
-const MONTH_NAMES = [
-	'January',
-	'February',
-	'March',
-	'April',
-	'May',
-	'June',
-	'July',
-	'August',
-	'September',
-	'October',
-	'November',
-	'December',
-];
 
 const JANUARY = 0;
 const JULY = 6;
@@ -198,15 +176,12 @@ const highestPoint = (
 			highest = cell;
 		}
 	}
-	const [x, y, z] = [
+	const { latitudeDeg, longitudeDeg } = directionToLatLon([
 		grid.centres[3 * highest] as number,
 		grid.centres[3 * highest + 1] as number,
 		grid.centres[3 * highest + 2] as number,
-	];
-	return {
-		latitude: (Math.atan2(z, Math.hypot(x, y)) * 180) / Math.PI,
-		longitude: (Math.atan2(y, x) * 180) / Math.PI,
-	};
+	]);
+	return { latitude: latitudeDeg, longitude: longitudeDeg };
 };
 
 type Timing = {
@@ -716,10 +691,8 @@ export const main = (args: readonly string[]): void => {
 	if (args.length > 0) {
 		throw new Error(`Unknown option ${args.join(' ')}: there are no options`);
 	}
-	const earth = decodeEarth(new Uint8Array(readFileSync(EARTH_FILE)));
-	const observedData = decodeObservedTemperature(
-		new Uint8Array(readFileSync(OBSERVED_FILE)),
-	);
+	const earth = decodeEarth(readEarthDataFile());
+	const observedData = decodeObservedTemperature(readObservedTemperatureFile());
 
 	// Warm-up, not timed.
 	solveTemperature(earthWorld(earth, SUPPORTED_RESOLUTIONS[0]));

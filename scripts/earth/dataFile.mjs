@@ -1,6 +1,6 @@
 /**
- * Reads the Earth data files from `public/data/` for the tests that need the
- * real thing.
+ * Reads the Earth data files from `public/data/`, for the tests that need
+ * the real thing and for the scripts that run on the Earth.
  *
  * Plain JavaScript with its types declared beside it, so that the core's
  * tests can import it while the core is still type-checked without any of

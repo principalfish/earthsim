@@ -14,6 +14,7 @@ export type BuiltAttribute =
 			readonly value: readonly number[];
 	  };
 
+/** A variable to write: its name, type, dimensions, attributes and values. */
 export type BuiltVariable = {
 	readonly name: string;
 	readonly type: NetcdfType;
@@ -24,6 +25,7 @@ export type BuiltVariable = {
 	readonly values: readonly number[];
 };
 
+/** A whole netCDF-3 file to write: its dimensions, attributes and variables. */
 export type BuiltFile = {
 	/** 1 for the classic format, 2 for 64-bit offsets; 1 if not given. */
 	readonly version?: 1 | 2;

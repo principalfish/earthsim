@@ -15,7 +15,7 @@
 
 import { compareField, type FieldDifference } from '../compare';
 import type { Grid, Resolution } from '../grid';
-import { MONTHS_PER_YEAR } from '../insolation';
+import { MONTH_NAMES, MONTHS_PER_YEAR } from '../insolation';
 import type { MonthlyTemperature } from '../observed';
 import { summariseTemperature } from '../temperature';
 
@@ -158,22 +158,6 @@ const PART_NAMES: Readonly<Record<BaselineSummary, string>> = {
 	range: 'seasonal range',
 };
 
-/** The months, as a regression names them. */
-const MONTH_NAMES = [
-	'January',
-	'February',
-	'March',
-	'April',
-	'May',
-	'June',
-	'July',
-	'August',
-	'September',
-	'October',
-	'November',
-	'December',
-] as const;
-
 /**
  * The figures that are worse than the baseline's by more than a tolerance.
  *
@@ -183,7 +167,9 @@ const MONTH_NAMES = [
  * is more than the tolerance above the size of the baseline's, whichever
  * its sign: a mean that crosses zero is no worse for that if its size is
  * within the tolerance. A figure that is better, or no worse than the
- * tolerance allows, passes.
+ * tolerance allows, passes. A figure that is not a finite number, NaN
+ * included, is worse whatever its value, as is any figure whose baseline is
+ * not finite: a solve that went wrong never passes.
  *
  * @param now - The figures as they are now.
  * @param baseline - The committed figures.
@@ -212,22 +198,26 @@ export const baselineRegressions = (
 		throw new RangeError(`The figures need ${MONTHS_PER_YEAR} months`);
 	}
 	const regressions: BaselineRegression[] = [];
+	/** Whether a figure is worse than its baseline by more than the tolerance. */
+	const worse = (figure: number, base: number): boolean =>
+		!(
+			Number.isFinite(figure) &&
+			Number.isFinite(base) &&
+			figure <= base + toleranceK
+		);
 	const check = (
 		name: string,
 		ours: FieldDifference,
 		theirs: FieldDifference,
 	): void => {
-		if (
-			Math.abs(ours.meanDifference) >
-			Math.abs(theirs.meanDifference) + toleranceK
-		) {
+		if (worse(Math.abs(ours.meanDifference), Math.abs(theirs.meanDifference))) {
 			regressions.push({
 				figure: `${name} mean`,
 				baseline: theirs.meanDifference,
 				now: ours.meanDifference,
 			});
 		}
-		if (ours.rmsDifference > theirs.rmsDifference + toleranceK) {
+		if (worse(ours.rmsDifference, theirs.rmsDifference)) {
 			regressions.push({
 				figure: `${name} RMS`,
 				baseline: theirs.rmsDifference,

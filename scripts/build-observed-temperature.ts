@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import {
 	decodeObservedTemperature,
 	encodeObservedTemperature,
+	MONTH_NAMES,
 	OBSERVED_BASE_C,
 	OBSERVED_COLUMNS,
 	OBSERVED_MAX_C,
@@ -35,6 +36,7 @@ import { ensurePinnedFile } from './download';
 import {
 	compareWithGdal,
 	gdalLocationInput,
+	isNotFound,
 	type Pixel,
 	samplePixels,
 } from './earth/gdalCheck';
@@ -70,31 +72,9 @@ const CACHE_DIRECTORY = join(ROOT, '.cache', 'observed');
 const OUTPUT_DIRECTORY = join(ROOT, 'public', 'data');
 const OUTPUT_NAME = 'earth-temperature-1deg.bin';
 
-const MONTH_NAMES = [
-	'January',
-	'February',
-	'March',
-	'April',
-	'May',
-	'June',
-	'July',
-	'August',
-	'September',
-	'October',
-	'November',
-	'December',
-];
-
 const say = (text: string): void => {
 	stdout.write(`${text}\n`);
 };
-
-/** Whether an error says the program to run was not found. */
-const isNotFound = (error: unknown): boolean =>
-	typeof error === 'object' &&
-	error !== null &&
-	'code' in error &&
-	error.code === 'ENOENT';
 
 /**
  * What `gdallocationinfo` prints for points of the source file: a value

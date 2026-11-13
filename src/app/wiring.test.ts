@@ -894,8 +894,7 @@ describe('what changes the terrain or the sea level', () => {
 describe('a change of the planet settings', () => {
 	it('reaches the temperature and the autosave, once each, and not the statistics', async () => {
 		const stage = await createStartedStage();
-		stage.state.world.planet = { ...stage.state.world.planet, axialTiltDeg: 0 };
-		stage.state.notifyPlanetChange();
+		stage.state.setPlanet({ ...stage.state.world.planet, axialTiltDeg: 0 });
 		expect(stage.log).toEqual([
 			'globe.setSun',
 			'temperature.refresh',
@@ -1292,7 +1291,11 @@ describe('the temperature, on its worker', () => {
 		[
 			'a change of the planet',
 			nothing,
-			(stage: Stage) => stage.state.notifyPlanetChange(),
+			(stage: Stage) =>
+				stage.state.setPlanet({
+					...stage.state.world.planet,
+					axialTiltDeg: 0,
+				}),
 		],
 		[
 			'a drag of a planet slider',
@@ -1460,7 +1463,8 @@ describe('the cursor readout', () => {
 
 	it('does not look again for a change of the planet alone, which changes nothing on screen', async () => {
 		const stage = await createStartedStage();
-		stage.state.notifyPlanetChange();
+		stage.state.setPlanet({ ...stage.state.world.planet, axialTiltDeg: 0 });
+		expect(stage.log).toContain('temperature.refresh');
 		expect(stage.readoutCalls).toEqual([]);
 	});
 

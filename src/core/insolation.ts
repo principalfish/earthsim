@@ -24,6 +24,22 @@ export const SOLAR_CONSTANT_W_M2 = 1361;
 /** The number of months in every year. */
 export const MONTHS_PER_YEAR = 12;
 
+/** The names of the months of the year, January first. */
+export const MONTH_NAMES = [
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December',
+] as const;
+
 /**
  * The fraction of the year at which the star stands overhead farthest
  * north: the northern summer solstice, about 21 June.

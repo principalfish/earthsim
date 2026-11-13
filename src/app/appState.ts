@@ -127,25 +127,17 @@ export type AppState = {
 	 */
 	addPlanetListener(listener: WorldListener): void;
 	/**
-	 * Tells the planet listeners that the planet settings of the world
-	 * being edited have been changed in place. Whatever changes them calls
-	 * this once afterwards, as {@link AppState.setPlanet} does; the
-	 * listeners of a replacement are not told.
-	 *
-	 * @remarks
-	 * As for a replacement, a listener that throws does not stop the
-	 * others: all are called, and then its error, or an `AggregateError`
-	 * of several, is thrown from here.
-	 */
-	notifyPlanetChange(): void;
-	/**
 	 * Gives the world being edited other planet settings, and tells the
-	 * planet listeners once, through {@link AppState.notifyPlanetChange}.
+	 * planet listeners once; the listeners of a replacement are not told.
 	 *
 	 * @remarks
 	 * The settings are put through {@link normalisePlanet} first. If that
 	 * leaves every setting as the world has it, nothing is changed and no
 	 * listener is told.
+	 *
+	 * As for a replacement, a listener that throws does not stop the
+	 * others: all are called, and then its error, or an `AggregateError`
+	 * of several, is thrown from here. The world keeps the new settings.
 	 *
 	 * @param settings - The new settings. They are not kept: the world gets
 	 * a copy.
@@ -220,6 +212,7 @@ export const createAppState = (options: AppStateOptions): AppState => {
 		}
 	};
 
+	/** Tells the planet listeners that the world's planet settings changed. */
 	const notifyPlanetChange = (): void =>
 		announce(
 			planetListeners,
@@ -271,7 +264,6 @@ export const createAppState = (options: AppStateOptions): AppState => {
 		addPlanetListener: (listener) => {
 			planetListeners.push(listener);
 		},
-		notifyPlanetChange,
 		setPlanet: (settings) => {
 			const planet = normalisePlanet(settings);
 			const before = current.planet;

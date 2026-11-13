@@ -49,6 +49,7 @@ import { assertEtopoLayout, ETOPO_FILE, ETOPO_NO_DATA } from './earth/etopo';
 import {
 	compareWithGdal,
 	gdalLocationInput,
+	isNotFound,
 	type Pixel,
 	samplePixels,
 } from './earth/gdalCheck';
@@ -130,13 +131,6 @@ const openSource = (path: string): TileReader => {
 		close: () => closeSync(file),
 	};
 };
-
-/** Whether an error says the program to run was not found. */
-const isNotFound = (error: unknown): boolean =>
-	typeof error === 'object' &&
-	error !== null &&
-	'code' in error &&
-	error.code === 'ENOENT';
 
 /**
  * Compares what this script reads from the source file with what GDAL
