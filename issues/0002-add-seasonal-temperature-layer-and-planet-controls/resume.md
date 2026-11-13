@@ -1,9 +1,10 @@
 # Resume: add-seasonal-temperature-layer-and-planet-controls
 
-_Updated 2026-11-12, with all 14 pieces committed and the issue in review._
+_Updated 2026-11-13, with all 14 pieces and the review fixes committed and the issue in review._
 
 ## Where it stands
 
+- The review fixes are committed and pushed as `7896afc` (2026-11-13, "review fixes: apply self-review findings", 19 files, +269 −210) after the user's approval ("Approve, commit"). The branch head is `7896afc`, on origin too; the state stays review.
 - All 14 pieces are committed and pushed: `8390675`, `0c19852`, `4a1e290`, `1445e44`, `ff500c7`, `533ef95`, `fd8e21f`, `63364cf`, `140a260`, `90889e2`, `a85c004`, `fa10b57`, `a698c5a`, `d0f873a`. Branch `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa`, draft PR #4, GitHub issue #3.
 - Piece 14 was committed on 2026-11-12 after the user's manual review ("Tried it, approve"). The state is review. The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped; its worktree and dev dependencies are kept for the review's fixes. Next: the all-pieces recap, `/review self`, `/publish`.
 - Piece 13 was committed on 2026-11-12 after the user's manual review on their Mac ("Approve as it is"; "looks good on mac too"). The builder (session `local_f46a8d01-2bba-49f0-b178-13cfe0924c9e`) has stopped with its look-ahead for piece 14 and starts it only on the user's go-ahead.
@@ -16,6 +17,8 @@ _Updated 2026-11-12, with all 14 pieces committed and the issue in review._
 - Pieces 8 to 13 each have a manual review: relay an approval only when the user's words say they tried it.
 
 ## Pending with the user
+
+Nothing. The review fixes are committed and pushed as `7896afc` on the user's approval ("Approve, commit", 2026-11-13); the builder has stopped and keeps its worktree. Next, in the planner chat: re-run the checks that raised the findings on the new diff (correctness on Opus; coverage, style, common-mistakes on Sonnet; fresh subagents) with a fresh Opus verifier; update `reviews/01-2026-11-12.md`, the `review.md` index and the issue's plan checklist ("Review fixes (round 1)"); then suggest `/publish add-seasonal-temperature-layer-and-planet-controls`. Merging is the user's. The user's dev server on port 5176 is still down; the user knows, and nobody restarted it.
 
 **The review fixes are built and waiting on the user's approval to commit** (2026-11-13). All ten chosen items (C1, C2, D1, D2, D3, Y1, Y2, Y3, V1, N1) are applied in the builder's worktree, uncommitted at `d0f873a`: 19 files, +269 −210. The builder's review request is in its worktree at `.planner-outbox/review-request-review-fixes.md` (its sends to this chat failed while the desktop app was unreachable). The planner re-ran lint, typecheck, the tests (73 files, 2,429 passed) and `npm run baseline:temperature` ("The baseline is unchanged.") on the fixed tree and read the source hunks against the findings. Told to the user: nothing changes in the page; C1 also counts a non-finite baseline figure as a regression; D3's latitude and longitude can differ in their last bits with the timing script's output unchanged; `npm run build:earth` was not run (its source needs a download); the builder's own loop over the fix diff confirmed and fixed three more low items (a wiring test that could not fail, the `dataFile.mjs` header, tests for the shared `isNotFound`); the user's dev server on port 5176 is no longer running and nobody restarted it. Next: relay the user's approval in their words; the builder commits one "review fixes: apply self-review findings" commit and pushes; then re-run the checks that raised the findings on the new diff (correctness on Opus; coverage, style, common-mistakes on Sonnet; fresh subagents) with a fresh Opus verifier; update `reviews/01-2026-11-12.md`, the `review.md` index and the issue's plan checklist ("Review fixes (round 1)"); then suggest `/publish add-seasonal-temperature-layer-and-planet-controls`. Merging is the user's.
 
