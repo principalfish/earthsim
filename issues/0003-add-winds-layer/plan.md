@@ -110,7 +110,7 @@ earth_sim is a browser planet simulator for worldbuilding: believable results an
    - Manual review: open `reports/winds/index.html` (run `npm run report:winds` in the builder's worktree; the planner sends the file) and check the observed Earth maps read clearly: arrows legible, key present, January and July side by side.
 
 5. Prototype: rules plus a pressure map
-   - Files: `src/core/wind/rules.ts` (new), its test, `scripts/wind-report.ts` (register the model).
+   - Files: `src/core/wind/rules.ts` (new), its test, `scripts/wind-report.ts` (register the model), `scripts/report/run.ts` and `scripts/report/page.ts` (a model's non-number values shown as a note for that case, with a warning, the run carrying on), their tests.
    - What: A rough version of the rules model described under Approach, as a `WindModel`: the zonal pressure bands placed from the month's temperature (the low where the zonal-mean temperature peaks, the subtropical highs at the overturning cell's edge, whose latitude and the number of bands follow the rotation rate and the equator-to-pole contrast), thermal highs and lows from each cell's temperature against its latitude's mean, smoothed; then winds from the pressure by the balance of pressure gradient, turning and friction, blending to down-gradient flow near the equator; a simple slowing over land and blocking by high ground. Constants tuned by hand against the observed Earth in the report, each named and commented with where it starts from. Rough means: correct in kind on every report case, not polished; note in the plan's Notes what it gets wrong.
    - Functions: `rulesWinds: WindModel`, with its parts exported for testing (`zonalBands`, `thermalPressure`, `windsFromPressure`).
    - Depends on: 4.

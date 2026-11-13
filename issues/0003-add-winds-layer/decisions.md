@@ -36,6 +36,8 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - The wind report works out every case on the 64 grid; solve times at 64, 128 and 256 are measured on the Earth only. The user: "64 for all cases (Recommended)" (2026-11-13)
 - The report draws pressure colours as a small image embedded in each SVG map (Node's built-in zlib, no new package), with coast, arrows and key as SVG on top. The user: "Small embedded image (Recommended)" (2026-11-13)
 - The report's one-continent world has one continent of about 20% of the surface from about 15°S to 55°N. The user: "15°S to 55°N (Recommended)" (2026-11-13)
+- When a wind model gives a value that is not a number, the report replaces that case's maps for that model with a note naming the month and field, prints a warning and carries on with the other cases (piece 5 may touch `scripts/report/run.ts` and `page.ts` for this). The user: "Note it, carry on (Recommended)" (2026-11-13)
+- Each prototype is tuned only until it is right in kind: on the Earth easterly trades, westerlies and the South Asian monsoon reversal, and every other case right in kind; error figures reported without a target; what it gets wrong listed; how much tuning each had stated, so the comparison is fair. The user: "Right in kind (Recommended)" (2026-11-13)
 - The flaky observed-temperature test gets a timeout in piece 2. The user: "Yes, fold it in" (2026-11-13)
 
 - Piece 2 adds a direct Laplacian operator, accurate at the cube's seams. The user: "A: add it now" (2026-11-13)
