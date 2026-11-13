@@ -11,11 +11,12 @@ If anything differs, stop and tell the user.
 1. 2026-11-13 — Piece 1 → "Approve, A: as is", committed `69d3619`, pushed.
 2. 2026-11-13 — Piece 2 go-ahead "Start it"; "Yes, replace it" (frame helper); "Yes, fold it in" (test timeout); "Yes, stop at low only" (analysis loop).
 3. 2026-11-13 — Laplacian at cube edges → "A: add it now": a direct `laplacian(grid, field)`.
+4. 2026-11-13 — First review request for piece 2 → changes requested, "Yes, add that test": a near-edge accuracy group in `src/core/vector.test.ts`. Added; every bound holds.
 
 ## The pending decision (exact)
 
-1. Approve piece 2 for commit and push, or ask for changes. The review request sent to the planner chat has the summary, figures, checks and the proposed commit message.
-2. Two optional items left unfixed for the user's choice: (a) one shared "make tangent" helper for a projection written twice (`refineVectors` and the end of `gradient`); (b) a guard in `smoothField` for a `km` below about 1e-155. The builder recommends leaving both.
+1. Approve piece 2 for commit and push, or ask for changes. The second review request sent to the planner chat has the summary, figures, checks and the proposed commit message.
+2. Five optional nits left unfixed for the user's choice: (a) one shared "make tangent" helper for a projection written twice; (b) a guard in `smoothField` for a `km` below about 1e-155; (c) `faceDerivatives` recomputing a point `faceToDirection` gives; (d) three differently worded "output is the input" errors; (e) a varying-flow test for `refineVectors`. The builder recommends leaving all five.
 
 ## What the next session does
 
