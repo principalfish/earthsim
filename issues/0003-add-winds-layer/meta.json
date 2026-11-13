@@ -9,7 +9,7 @@
   "gh_issue": 5,
   "build_model": "claude-opus-5-5",
   "created": "2026-11-13 07:43",
-  "updated": "2026-11-13 09:28",
+  "updated": "2026-11-13 10:56",
   "done": null,
   "local": [
     {
@@ -28,5 +28,6 @@
       "name": "claude/add-winds-layer-991a60",
       "added": "2026-11-13 09:28"
     }
-  ]
+  ],
+  "pr": 6
 }

@@ -76,3 +76,4 @@
 - 2026-11-13 09:17 · add-winds-layer (0003) · tracking session local_861b5031-c368-4a88-b7a4-71e71ea962f6
 - 2026-11-13 09:28 · add-winds-layer (0003) · branch = claude/add-winds-layer-991a60
 - 2026-11-13 09:28 · add-winds-layer (0003) · planned → building
+- 2026-11-13 10:56 · add-winds-layer (0003) · PR #6
