@@ -8,16 +8,16 @@
 
 ## Pending with the user
 
-Answered on 2026-11-13 (in `decisions.md`): "Prototype both first"; "Day length, wide range"; "Arrows first, streaks later"; "No, winds only read it".
+Answered on 2026-11-13 (all in `decisions.md`): model by prototype of both; day length with a wide range; arrows first then streaks; winds only read the temperature; judged from a report with maps and figures; observed winds in the page; no time limit set in advance; a Pressure layer.
 
-Second round, asked 2026-11-13, each with the planner's recommendation:
+Third round, asked 2026-11-13, each with the planner's recommendation:
 
-1. **How the prototypes are judged:** a report with maps and error figures against observed Earth winds, which the user chooses from (recommended), or both models live in the page behind a temporary switch.
-2. **Observed Earth winds in the page:** yes, as temperature has, with an error baseline (recommended), or only in scripts and tests.
-3. **How long a wind solve may take:** no longer than the temperature solve (recommended), or longer allowed.
-4. **Pressure as a colour layer:** not in this step (recommended), or yes.
+1. **Day length range:** 3 hours to 30 days, warning outside 6 to 96 hours (recommended), or narrower, or wider.
+2. **Wind unit:** m/s (recommended), km/h or mph.
+3. **Earth comparison for pressure too:** yes (recommended, it is a single value per cell like temperature), or winds and temperature only.
+4. **Cases in the prototype report besides the Earth:** fast and slow spin; tilt extremes; a generated world; an ocean world and a one-continent world (recommended: all four).
 
-Still to settle after those: the Day length range, the wind unit, and what rain and currents need from the output.
+Then: raise whether to split the issue in two, present the full ledger, and ask whether anything is missing before drafting `issue.md`.
 
 ## Groundwork (from the code on `main`, 2026-11-13)
 
