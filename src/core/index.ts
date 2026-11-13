@@ -20,4 +20,5 @@ export * from './serialize';
 export * from './star';
 export * from './stats';
 export * from './temperature';
+export * from './vector';
 export * from './world';

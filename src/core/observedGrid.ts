@@ -283,17 +283,9 @@ export type Location = {
 
 /**
  * Where the centre of each cell of a world falls among the points of the
- * data, one entry per cell for each field of {@link Location}, and the
- * centre's latitude and longitude.
+ * data, one entry per cell for each field of {@link Location}.
  */
 export type CellLocations = {
-	/**
-	 * The latitude of each cell's centre, in degrees, -90 to 90: the grid's
-	 * own array, which must be treated as read-only.
-	 */
-	readonly latitudes: Float64Array;
-	/** The longitude of each cell's centre, in degrees east, -180 to 180. */
-	readonly longitudes: Float64Array;
 	readonly northWest: Int32Array;
 	readonly northEast: Int32Array;
 	readonly south: Float64Array;
@@ -357,13 +349,11 @@ export const interpolate = (values: Float32Array, at: Location): number => {
  * data, worked out once so that it can be used for every month.
  *
  * @param grid - The world's grid.
- * @returns One entry per cell in cell order, in new arrays but for the
- * latitudes, which are the grid's own.
+ * @returns One entry per cell in cell order, in new arrays.
  */
 export const locateCells = (grid: Grid): CellLocations => {
 	const { centres, cellCount } = grid;
 	const latitudes = cellLatitudes(grid);
-	const longitudes = new Float64Array(cellCount);
 	const northWest = new Int32Array(cellCount);
 	const northEast = new Int32Array(cellCount);
 	const south = new Float64Array(cellCount);
@@ -374,14 +364,13 @@ export const locateCells = (grid: Grid): CellLocations => {
 		const longitudeDeg =
 			Math.atan2(centres[3 * cell + 1] as number, centres[3 * cell] as number) *
 			DEGREES_PER_RADIAN;
-		longitudes[cell] = longitudeDeg;
 		locate(latitudes[cell] as number, longitudeDeg, at);
 		northWest[cell] = at.northWest;
 		northEast[cell] = at.northEast;
 		south[cell] = at.south;
 		east[cell] = at.east;
 	}
-	return { latitudes, longitudes, northWest, northEast, south, east };
+	return { northWest, northEast, south, east };
 };
 
 /**

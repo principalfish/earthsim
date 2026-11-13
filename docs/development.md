@@ -49,13 +49,14 @@ A pure library with no DOM, Three.js or worker globals.
 | `serialize.ts` | The world file format and the checks a file must pass |
 | `earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
 | `observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
-| `observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector |
+| `observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `vector.ts`'s directions east and north |
 | `observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
 | `planet.ts` | The planet settings, their limits and Earth's values; the sunlight, year length and trust warning that follow from them; a world's date |
 | `star.ts` | The star as the planet sees it: radius, surface temperature, colour, size in the sky and direction in each month |
 | `insolation.ts` | Sunlight by latitude and time of year, the twelve months, and each cell's latitude |
 | `temperature.ts` | The temperature model |
-| `coarsen.ts` | A world averaged onto the grid a step coarser, and a field carried back from it |
+| `coarsen.ts` | A world averaged onto the grid a step coarser, and a field or a vector field carried back from it |
+| `vector.ts` | Vector fields on the grid, east and north at every cell, and the gradient, divergence, curl, Laplacian and smoothing of fields |
 | `exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
 | `compare.ts` | One field less another, and area-weighted error figures |
 | `quantile.ts` | Area-weighted quantiles of values on the grid |

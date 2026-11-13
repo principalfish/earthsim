@@ -50,6 +50,12 @@ import {
 	SIGNED_BYTE,
 	UNSIGNED_BYTE,
 } from './observedGrid';
+import {
+	cellFrames,
+	createEastNorthFrame,
+	type EastNorthFrame,
+	writeEastNorthFrame,
+} from './vector';
 
 /** The exact length of the wind file, in bytes: two components a month. */
 export const OBSERVED_WIND_BYTES =
@@ -287,51 +293,6 @@ export const decodeObservedPressure = (
 });
 
 /**
- * The directions east and north at a place, as unit vectors in the frame
- * of the grid's cell centres: z towards the North Pole, x towards latitude
- * 0°, longitude 0°. East has no z component.
- */
-type Frame = {
-	eastX: number;
-	eastY: number;
-	northX: number;
-	northY: number;
-	northZ: number;
-};
-
-/**
- * Writes the directions east and north at a latitude φ and longitude λ,
- * given by their sines and cosines.
- *
- * @remarks
- * East is (−sin λ, cos λ, 0) and north (−sin φ cos λ, −sin φ sin λ, cos φ).
- * At a pole these are the limits approached along the meridian of λ, and
- * nothing is divided, so a pole is no special case.
- */
-const writeFrame = (
-	sinLatitude: number,
-	cosLatitude: number,
-	sinLongitude: number,
-	cosLongitude: number,
-	out: Frame,
-): void => {
-	out.eastX = -sinLongitude;
-	out.eastY = cosLongitude;
-	out.northX = -sinLatitude * cosLongitude;
-	out.northY = -sinLatitude * sinLongitude;
-	out.northZ = cosLatitude;
-};
-
-/** A frame to be written by {@link writeFrame}. */
-const emptyFrame = (): Frame => ({
-	eastX: 0,
-	eastY: 0,
-	northX: 0,
-	northY: 0,
-	northZ: 0,
-});
-
-/**
  * The observed wind of every month on the cells of a world.
  *
  * @remarks
@@ -345,7 +306,8 @@ const emptyFrame = (): Frame => ({
  * eastward and northward wind along the cell centre's own directions. A
  * wind blowing across a pole therefore keeps its strength there, where
  * averaging the eastward winds of points on either side of the pole would
- * cancel them.
+ * cancel them. Both sets of directions are those of
+ * {@link writeEastNorthFrame}, the centres' from {@link cellFrames}.
  *
  * A cell centre at a pole, which no supported grid has, would take the
  * directions east and north of longitude 0°.
@@ -382,13 +344,13 @@ export const observedWind = (
 		columnCos[column] = Math.cos(column * RADIANS_PER_DEGREE);
 	}
 
-	const centre = emptyFrame();
+	const centres = cellFrames(grid);
 	// The four points around a cell, north-west, north-east, south-west and
 	// south-east: their indices in a month, their weights, and the
 	// directions east and north at each.
 	const corners = new Int32Array(4);
 	const weights = new Float64Array(4);
-	const frames = Array.from({ length: 4 }, emptyFrame);
+	const frames = Array.from({ length: 4 }, createEastNorthFrame);
 	const east = Array.from(
 		{ length: MONTHS_PER_YEAR },
 		() => new Float32Array(cellCount),
@@ -398,16 +360,11 @@ export const observedWind = (
 		() => new Float32Array(cellCount),
 	);
 	for (let cell = 0; cell < cellCount; cell++) {
-		const latitude = (cells.latitudes[cell] as number) * RADIANS_PER_DEGREE;
-		// A centre at a pole has longitude 0, so takes that meridian's frame.
-		const longitude = (cells.longitudes[cell] as number) * RADIANS_PER_DEGREE;
-		writeFrame(
-			Math.sin(latitude),
-			Math.cos(latitude),
-			Math.sin(longitude),
-			Math.cos(longitude),
-			centre,
-		);
+		const eastX = centres.east.x[cell] as number;
+		const eastY = centres.east.y[cell] as number;
+		const northX = centres.north.x[cell] as number;
+		const northY = centres.north.y[cell] as number;
+		const northZ = centres.north.z[cell] as number;
 		const northWest = cells.northWest[cell] as number;
 		const northEast = cells.northEast[cell] as number;
 		const southward = cells.south[cell] as number;
@@ -424,12 +381,12 @@ export const observedWind = (
 			const index = corners[corner] as number;
 			const row = Math.floor(index / OBSERVED_COLUMNS);
 			const column = index - row * OBSERVED_COLUMNS;
-			writeFrame(
+			writeEastNorthFrame(
 				rowSin[row] as number,
 				rowCos[row] as number,
 				columnSin[column] as number,
 				columnCos[column] as number,
-				frames[corner] as Frame,
+				frames[corner] as EastNorthFrame,
 			);
 		}
 
@@ -441,7 +398,7 @@ export const observedWind = (
 			let z = 0;
 			for (let corner = 0; corner < 4; corner++) {
 				const index = corners[corner] as number;
-				const frame = frames[corner] as Frame;
+				const frame = frames[corner] as EastNorthFrame;
 				const weight = weights[corner] as number;
 				const u = weight * (eastGrid[index] as number);
 				const v = weight * (northGrid[index] as number);
@@ -449,9 +406,9 @@ export const observedWind = (
 				y += u * frame.eastY + v * frame.northY;
 				z += v * frame.northZ;
 			}
-			(east[month] as Float32Array)[cell] = x * centre.eastX + y * centre.eastY;
+			(east[month] as Float32Array)[cell] = x * eastX + y * eastY;
 			(north[month] as Float32Array)[cell] =
-				x * centre.northX + y * centre.northY + z * centre.northZ;
+				x * northX + y * northY + z * northZ;
 		}
 	}
 	return { east, north };
