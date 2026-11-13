@@ -211,7 +211,7 @@ earth_sim is a browser planet simulator for worldbuilding: believable results an
 - [x] 1. Observed winds and pressure data
 - [x] 2. Vector maths on the grid
 - [x] 3. Day length on the world
-- [ ] 4. Wind report with the observed Earth
+- [x] 4. Wind report with the observed Earth
 - [ ] 5. Prototype: rules plus a pressure map
 - [ ] 6. Prototype: a simulated atmosphere, and the choice (**stop here for the user's choice of model; the planner revises pieces 7 onward**)
 - [ ] 7. The chosen wind model in the core
@@ -280,3 +280,4 @@ Scripted browser checks keep their browser profiles in the session's scratch fol
 
 - 2026-11-13, piece 4, deviations from the Files line: `src/core/index.ts` and `src/core/index.test.ts` (the new module's exports); `scripts/report/testing/` (an XML well-formedness checker and a PNG decoder for the tests). `scripts/node.d.ts` needed no change: `node:zlib`'s `deflateSync` was already declared there. The coverage tool measures `src/` only, so `scripts/report/` is judged from its tests; `scripts/wind-report.ts`'s `main` is untested (it reads, takes the clock, writes and prints), as the other scripts' are. `scripts/report/run.test.ts`'s model test solves the Earth at 64 and 128 and has a 60 s timeout (it ran over 5 s under coverage).
 
+- 2026-11-13, piece 4, manual review: the user opened the report page and approved ("Tried it, approve"); the arrow spacing stays at 5 degrees and the pressure colours as they are.
