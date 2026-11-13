@@ -72,7 +72,7 @@ Keep this section current when a step is merged.
 - **Planet settings on the world:** axial tilt, the star's brightness and mass, the orbit's distance and the greenhouse strength, saved with the world. A note in the Planet panel warns when they are outside the range the temperature model is trusted for.
 - **Monthly temperature fields** for the twelve months, solved in a Web Worker only while the Temperature layer shows. A world finer than 64 cells per face edge is solved on the grid one step coarser and carried back, so coasts are smoothed over about one coarse cell.
 - **Earth comparison:** on an untouched Earth preset the layer shows simulated, observed or difference. It was built so each later step can add its own observed layer.
-- **Earth error baseline:** annual mean −0.15 °C and RMS 3.93 °C at 64, committed in `src/core/baseline/earthTemperature.json`, with a test that fails if the figures get worse. Nothing was tuned to the Earth. Winds (step 3) and above all ocean currents (step 5) are expected to improve it; re-run `npm run baseline:temperature` when a step changes the temperature.
+- **Earth error baseline:** annual mean −0.15 °C and RMS 3.93 °C at 64, committed in `src/core/baseline/earthTemperature.json`, with a test that fails if the figures get worse. The model's constants were tuned against the observed Earth when the solver was built (step 2, piece 4); they were not tuned again when the comparison was added. Winds (step 3) and above all ocean currents (step 5) are expected to improve it; re-run `npm run baseline:temperature` when a step changes the temperature.
 
 ### Left out of step 2, to pick up in a later step
 - **Rotation rate** is not yet a planet setting. Step 3 needs it: it sets the width and number of the wind bands.
