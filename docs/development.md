@@ -16,6 +16,7 @@ Requires Node.js and npm. Run `npm install` once.
 | `npm run build:observed-winds` | Rebuild the Earth's observed winds and sea-level pressure data; see [Data](data.md) |
 | `npm run baseline:temperature` | Write the Earth temperature baseline afresh; see below |
 | `npm run time:temperature` | Time the temperature solver at every resolution and print the simulated Earth's error figures, as Markdown tables. Takes a few minutes |
+| `npm run report:winds` | Write the wind report, `reports/winds/index.html`, to open in a browser: the observed Earth's winds and sea-level pressure in January and July, the worlds the wind models are run on, and each registered model's maps, error figures and solve times. The file is not committed |
 
 ## The Earth temperature baseline
 
@@ -49,6 +50,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `serialize.ts` | The world file format and the checks a file must pass |
 | `earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
 | `observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
+| `wind/model.ts` | The shape every wind model shares, its error figures against the observed winds and pressure, and the mean of a field by bands of latitude |
 | `observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `vector.ts`'s directions east and north |
 | `observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
 | `planet.ts` | The six planet settings, their limits and Earth's values, and the five of them the temperature reads (all but the day length); the sunlight, year length, rotation rate and trust warnings that follow from them; a world's date |
@@ -97,7 +99,7 @@ It computes from a copy of the world and keeps nothing between requests. The pag
 | `client.ts` | The page's side of the channel |
 | `testing/` | A stand-in worker for the tests |
 
-### `scripts/`: building the data
+### `scripts/`: building the data and the reports
 
 Run with Node, not in the browser.
 
@@ -112,6 +114,8 @@ Run with Node, not in the browser.
 | `earth/` | The parts of the build that touch no file: reading TIFF and netCDF, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data files |
 | `time-temperature.ts` | The solver's timings and the simulated Earth's error figures |
 | `update-earth-temperature-baseline.ts` | Writes the Earth temperature baseline afresh |
+| `wind-report.ts` | Writes the wind report, and lists the wind models it runs |
+| `report/` | The parts of the wind report that touch no file: the cases (`cases.ts`), the maps (`map.ts`), the zonal-mean chart (`chart.ts`), the PNG writer (`png.ts`), the page (`page.ts`), running the models on the cases (`run.ts`), and in `testing/` the XML and PNG readers only its tests use |
 | `run-with-vite.mjs` | Runs a TypeScript script through Vite, so it can import the core |
 
 ### `public/data/`

@@ -98,6 +98,20 @@ describe('core', () => {
 		}
 	});
 
+	it("exports the wind models' error figures and zonal means", () => {
+		for (const name of [
+			'DIRECTION_MIN_SPEED_M_PER_S',
+			'DIRECTION_TOLERANCE_DEG',
+			'ZONAL_BANDS',
+			'windMonth',
+			'windMonthErrorFigures',
+			'windErrorFigures',
+			'zonalMean',
+		]) {
+			expect(core, name).toHaveProperty(name);
+		}
+	});
+
 	it('exports weighted quantiles', () => {
 		expect(core).toHaveProperty('weightedQuantiles');
 	});
