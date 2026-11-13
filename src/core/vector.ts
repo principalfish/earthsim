@@ -42,7 +42,11 @@
  * `PLANET_RADIUS_KM * 1000` for per metre.
  */
 
-import { createExchangeSolver, uniformCoupling } from './exchange';
+import {
+	createExchangeSolver,
+	type ExchangeSolver,
+	uniformCoupling,
+} from './exchange';
 import {
 	directionToFace,
 	edgeGeometry,
@@ -227,13 +231,45 @@ const HALF_PI = Math.PI / 2;
 export const SMOOTHING_STEPS = 4;
 
 /**
- * How closely {@link smoothField} solves each step, as a fraction of the
- * root-mean-square departure of the field from its mean, weighted by area.
+ * How closely {@link smoothField} solves each step on the grid of 64 cells
+ * per face edge, as a fraction of the root-mean-square departure of the
+ * field from its mean, weighted by area; on a finer grid, this times 64
+ * over its cells per face edge.
+ *
+ * @remarks
+ * A spike's departure grows as the cells shrink, while what it is smoothed
+ * to does not, so a tolerance taken against the departure is made tighter
+ * on the finer grids to hold the error against the smoothed field. Solved
+ * to a tenth of it, a spike's spread moves by under 0.3%, over 500 and
+ * 1,000 km on every grid.
  */
-const SMOOTHING_TOLERANCE = 1e-6;
+const SMOOTHING_TOLERANCE = 1e-5;
+
+/**
+ * The exchange solver {@link smoothField} steps with on one grid, and its
+ * working memory, kept between calls.
+ */
+type Smoother = {
+	readonly solver: ExchangeSolver;
+	/** The masses last set, for a step of {@link Smoother.step}. */
+	readonly mass: Float64Array;
+	/**
+	 * The step the masses were last set for; 0 before the first, and not a
+	 * number while they are being set, so that a set that fails part-way
+	 * leaves them marked as unset.
+	 */
+	step: number;
+	/** The right-hand side of a step. */
+	readonly rhs: Float64Array;
+	/** A first answer to a step, the correction is taken from. */
+	readonly guess: Float64Array;
+	/** The Laplacian of the guess. */
+	readonly curvature: Float64Array;
+};
 
 const CELL_FRAMES = new WeakMap<Grid, CellFrames>();
 const OPERATORS = new WeakMap<Grid, Operators>();
+const SMOOTHERS = new WeakMap<Grid, Smoother>();
 
 /**
  * Writes the directions east and north at a latitude φ and longitude λ,
@@ -1401,38 +1437,108 @@ export const laplacian = (
 };
 
 /**
+ * The exchange solver and working memory {@link smoothField} uses on a grid,
+ * made on first use and then shared.
+ */
+const smoother = (grid: Grid): Smoother => {
+	let built = SMOOTHERS.get(grid);
+	if (built === undefined) {
+		const { cellCount } = grid;
+		built = {
+			solver: createExchangeSolver(grid, uniformCoupling(grid, 1)),
+			mass: new Float64Array(cellCount),
+			step: 0,
+			rhs: new Float64Array(cellCount),
+			guess: new Float64Array(cellCount),
+			curvature: new Float64Array(cellCount),
+		};
+		SMOOTHERS.set(grid, built);
+	}
+	return built;
+};
+
+/**
+ * Adds to `rhs` what the exchange between neighbours misses of the
+ * Laplacian of `x`: the cell's area times {@link laplacian}'s value, less
+ * the exchange's own sum over the four edges, `Σ w (x_k − x_i)`.
+ */
+const addSkewCorrection = (
+	grid: Grid,
+	x: Float64Array,
+	curvature: Float64Array,
+	rhs: Float64Array,
+): void => {
+	const { cellCount, areas, neighbours } = grid;
+	const { weights } = edgeGeometry(grid);
+	laplacian(grid, x, 1, curvature);
+	for (let cell = 0; cell < cellCount; cell++) {
+		const first = SIDES * cell;
+		const value = x[cell] as number;
+		const exchange =
+			(weights[first] as number) *
+				((x[neighbours[first] as number] as number) - value) +
+			(weights[first + 1] as number) *
+				((x[neighbours[first + 1] as number] as number) - value) +
+			(weights[first + 2] as number) *
+				((x[neighbours[first + 2] as number] as number) - value) +
+			(weights[first + 3] as number) *
+				((x[neighbours[first + 3] as number] as number) - value);
+		rhs[cell] =
+			(rhs[cell] as number) +
+			(areas[cell] as number) * (curvature[cell] as number) -
+			exchange;
+	}
+};
+
+/**
  * A field smoothed over a distance on the planet: roughly the field blurred
  * by a Gaussian whose standard deviation along any one direction is `km`.
  *
  * @remarks
- * The field is diffused, as heat is by {@link createExchangeSolver}'s
- * exchange between neighbouring cells, for as long as spreads a spike to a
- * variance of `km²` along each direction across the surface, so that its
+ * The field is diffused for as long as spreads a spike to a variance of
+ * `km²` along each direction across the surface, so that its
  * root-mean-square distance from where it started is `√2 · km`. That is
- * taken in {@link SMOOTHING_STEPS} implicit steps, each solved by the
- * exchange solver, which is stable however far the smoothing reaches and
- * whose cost grows only slowly with the distance: explicit steps would need
- * one for every fraction of a cell the field spreads, thousands for a
- * thousand kilometres on the finest grid. A spherical harmonic of
- * degree l, of wavenumber `k = √(l(l + 1))` per planet's radius, is damped
- * by `(1 + (k · km)² / 8)⁻⁴` with `km` in planet's radii, against a
- * Gaussian's `exp(−(k · km)² / 2)`.
+ * taken in {@link SMOOTHING_STEPS} implicit steps, each solved by
+ * {@link createExchangeSolver}'s solver, which is stable however far the
+ * smoothing reaches and whose cost grows only slowly with the distance:
+ * explicit steps would need one for every fraction of a cell the field
+ * spreads, thousands for a thousand kilometres on the finest grid. A
+ * spherical harmonic of degree l, of wavenumber `k = √(l(l + 1))` per
+ * planet's radius, is damped by `(1 + (k · km)² / 8)⁻⁴` with `km` in
+ * planet's radii, against a Gaussian's `exp(−(k · km)² / 2)`.
  *
- * A call costs roughly 40 to 50 ms at 64 cells per face edge whatever the
- * distance; at 128 about 0.13 s over 100 km, 0.17 s over 1,000 km and
- * 0.26 s over 3,000 km; at 256 about 0.6 s over 100 km, 1 s over 1,000 km
- * and 1.3 s over 3,000 km. On the finer grids it roughly doubles from 100
- * to 3,000 km, as the solver takes more iterations.
+ * The solver's exchange between neighbours, across each edge in proportion
+ * to the difference between the two cells, is not by itself a Laplacian
+ * where the cells are skewed, as they are towards the cube's corners, where
+ * three faces meet and the grid lines cross at 60° and 120°: it leaves out
+ * the part of the slope along the edge. Near a corner that makes the spread
+ * lopsided, faster along the face's diagonal than across it, and a spike on
+ * the corner itself spreads to only 0.9 of the distance it would elsewhere,
+ * at every grid size. Each step therefore solves the exchange's system with
+ * the rest of {@link laplacian}, which is right at the corners too, added
+ * to its right-hand side: what the Laplacian of the field gives less what
+ * the exchange gives, taken from the field the step starts from. On the
+ * first step, where the field may still change from cell to cell, it is
+ * taken instead from a first answer to the step, solved without it. A spike
+ * then spreads to within 2% of `√2 · km` wherever it starts, on a corner
+ * too, and at a corner to within 2% of the distance it does in the middle
+ * of a face, measured over 500 and 1,000 km at 64, 128 and 256 cells per
+ * face edge; and nearly evenly every way: its spread along the direction
+ * it reaches furthest is at most 1.06 times the spread across it, against
+ * 1.24 from the exchange alone. Taking the correction from the field
+ * before the step rather than solving for it leaves a small mark at the
+ * corners, which `docs/winds.md` gives for the wind model; solving for it
+ * would take two more rounds of every step. Since the correction is not
+ * part of the implicit solve, a smoothed value can stray a little outside
+ * the field's range, most when smoothing over a cell or two.
+ *
+ * A call costs some tens of milliseconds at 64 cells per face edge, and
+ * about five times as much at 128 and thirty times at 256. The solver and
+ * its working memory are kept for each grid between calls.
  *
  * Each step moves value between cells without making or losing any, so the
  * area-weighted mean is kept to rounding, and a constant field is given
  * back as it is. Distances are on a planet of {@link PLANET_RADIUS_KM}.
- *
- * The exchange between neighbours takes no account of how skewed the cells
- * are, which matters only near the eight cube corners, where three faces
- * meet at 120°: a spike there spreads to about 0.9 of the distance it
- * would elsewhere, 0.91 at 64 cells per face edge and 0.90 at 128 and at
- * 256 over 500 km, so a finer grid does not cure it.
  *
  * @param grid - The grid.
  * @param field - One finite value per cell. It is not changed, unless it is
@@ -1443,7 +1549,9 @@ export const laplacian = (
  * out. It may be `field` itself.
  * @returns `into`, or the new array.
  * @throws RangeError if `field` or `into` has the wrong length, `field` has
- * a value that is not finite, or `km` is negative or not finite.
+ * a value that is not finite, or `km` is negative, not finite, or so short
+ * or so long that a step of it is not a positive, finite length with a
+ * finite inverse; nothing is written then.
  * @throws Error if a step could not be solved to its tolerance; `into`, or
  * `field` if it is `into`, may then be left partly smoothed.
  */
@@ -1457,6 +1565,18 @@ export const smoothField = (
 	if (!(km >= 0 && Number.isFinite(km))) {
 		throw new RangeError(
 			`A smoothing distance must be zero or more kilometres; got ${km}`,
+		);
+	}
+	const sigma = km / PLANET_RADIUS_KM;
+	// Diffusing for a time t at unit diffusivity spreads a spike to a variance
+	// of 2t along each direction.
+	const step = (sigma * sigma) / (2 * SMOOTHING_STEPS);
+	if (
+		km > 0 &&
+		!(step > 0 && Number.isFinite(step) && Number.isFinite(1 / step))
+	) {
+		throw new RangeError(
+			`A smoothing distance of ${km} km is too short or too long to smooth over`,
 		);
 	}
 	const { cellCount, areas } = grid;
@@ -1491,28 +1611,41 @@ export const smoothField = (
 		const departure = (result[cell] as number) - mean;
 		spread += (areas[cell] as number) * departure * departure;
 	}
-	const sigma = km / PLANET_RADIUS_KM;
-	// Diffusing for a time t at unit diffusivity spreads a spike to a variance
-	// of 2t along each direction.
-	const step = (sigma * sigma) / (2 * SMOOTHING_STEPS);
-	const solver = createExchangeSolver(grid, uniformCoupling(grid, 1));
-	const mass = new Float64Array(cellCount);
-	for (let cell = 0; cell < cellCount; cell++) {
-		mass[cell] = (areas[cell] as number) / step;
-	}
-	solver.setMass(mass);
-	const rhs = new Float64Array(cellCount);
-	const tolerance = SMOOTHING_TOLERANCE * Math.sqrt(spread / area);
-	for (let taken = 0; taken < SMOOTHING_STEPS; taken++) {
+	const working = smoother(grid);
+	const { solver, mass, rhs, guess, curvature } = working;
+	if (working.step !== step) {
+		// Marked unset until the masses are, so that a failure leaves none
+		// taken for set.
+		working.step = Number.NaN;
 		for (let cell = 0; cell < cellCount; cell++) {
-			rhs[cell] = (mass[cell] as number) * (result[cell] as number);
+			mass[cell] = (areas[cell] as number) / step;
 		}
-		const { iterations, converged } = solver.solve(rhs, result, tolerance);
+		solver.setMass(mass);
+		working.step = step;
+	}
+	const tolerance =
+		((SMOOTHING_TOLERANCE * 64) / grid.n) * Math.sqrt(spread / area);
+	const solve = (x: Float64Array): void => {
+		const { iterations, converged } = solver.solve(rhs, x, tolerance);
 		if (!converged) {
 			throw new Error(
 				`Smoothing over ${km} km was not solved in ${iterations} iterations`,
 			);
 		}
+	};
+	for (let taken = 0; taken < SMOOTHING_STEPS; taken++) {
+		for (let cell = 0; cell < cellCount; cell++) {
+			rhs[cell] = (mass[cell] as number) * (result[cell] as number);
+		}
+		if (taken === 0) {
+			guess.set(result);
+			solve(guess);
+			addSkewCorrection(grid, guess, curvature, rhs);
+			result.set(guess);
+		} else {
+			addSkewCorrection(grid, result, curvature, rhs);
+		}
+		solve(result);
 	}
 	return result;
 };

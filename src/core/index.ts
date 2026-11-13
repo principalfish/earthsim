@@ -22,4 +22,5 @@ export * from './stats';
 export * from './temperature';
 export * from './vector';
 export * from './wind/model';
+export * from './wind/solve';
 export * from './world';

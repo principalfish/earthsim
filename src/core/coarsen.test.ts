@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readEarthDataFile } from '../../scripts/earth/dataFile.mjs';
 import {
+	coarsenField,
 	coarsenWorld,
 	refineField,
 	refinementStencil,
@@ -103,6 +104,77 @@ const besideEdge = (grid: Grid, cell: number): boolean => {
 
 const latitudeOf = (x: number, y: number, z: number): number =>
 	(Math.atan2(z, Math.hypot(x, y)) * 180) / Math.PI;
+
+describe('coarsenField', () => {
+	it('takes each coarse cell as the area-weighted mean of the four it covers, in double precision', () => {
+		const fine = getGrid(256);
+		const field = fieldOf(
+			fine,
+			(x, y, z) => Math.sin(7 * x) + y * z + 1e-9 * x,
+		);
+		const coarse = coarsenField(field, 256);
+		const coarseGrid = getGrid(128);
+		expect(coarse).toHaveLength(coarseGrid.cellCount);
+		for (const [face, i, j] of [
+			[0, 0, 0],
+			[1, 63, 64],
+			[3, 127, 5],
+			[5, 40, 127],
+		] as const) {
+			let total = 0;
+			let area = 0;
+			for (const [di, dj] of [
+				[0, 0],
+				[1, 0],
+				[0, 1],
+				[1, 1],
+			] as const) {
+				const cell = cellIndex(fine, face, 2 * i + di, 2 * j + dj);
+				total += (fine.areas[cell] as number) * (field[cell] as number);
+				area += fine.areas[cell] as number;
+			}
+			expect(coarse[cellIndex(coarseGrid, face, i, j)]).toBe(total / area);
+		}
+	});
+
+	it.each(FINE)(
+		'keeps the area-weighted mean and a constant field at %d',
+		(resolution) => {
+			const fine = getGrid(resolution);
+			const coarseGrid = getGrid(resolution / 2);
+			const field = fieldOf(fine, linear);
+			expect(
+				Math.abs(
+					areaMean(coarseGrid, coarsenField(field, resolution)) -
+						areaMean(fine, field),
+				),
+			).toBeLessThan(1e-12);
+			const constant = new Float64Array(fine.cellCount).fill(287.5);
+			expect(
+				largestDifference(coarsenField(constant, resolution), constant),
+			).toBeLessThan(1e-12);
+		},
+	);
+
+	it('writes into the array given', () => {
+		const into = new Float64Array(getGrid(64).cellCount);
+		const field = fieldOf(getGrid(128), linear);
+		expect(coarsenField(field, 128, into)).toBe(into);
+		expect(into).toEqual(coarsenField(field, 128));
+	});
+
+	it('refuses the coarsest grid, an unsupported one, and a field or an output of the wrong length', () => {
+		const field = new Float64Array(getGrid(128).cellCount);
+		expect(() =>
+			coarsenField(new Float64Array(getGrid(64).cellCount), 64),
+		).toThrow('it has none a step coarser');
+		expect(() => coarsenField(field, 96)).toThrow(RangeError);
+		expect(() => coarsenField(field.subarray(1), 128)).toThrow(RangeError);
+		expect(() => coarsenField(field, 128, new Float64Array(5))).toThrow(
+			RangeError,
+		);
+	});
+});
 
 describe('coarsenWorld', () => {
 	it('gives the Earth at 128 from the Earth at 256 exactly', () => {

@@ -87,8 +87,11 @@ describe('core', () => {
 			'coarsenWorld',
 			'refinementStencil',
 			'refineField',
+			'coarsenField',
+			'refineVectors',
 			'temperatureConditions',
 			'lapseCooling',
+			'assertSolvableWorld',
 			'coolingDrift',
 			'estimateYearsLeft',
 			'summariseTemperature',
@@ -107,6 +110,16 @@ describe('core', () => {
 			'windMonthErrorFigures',
 			'windErrorFigures',
 			'zonalMean',
+		]) {
+			expect(core, name).toHaveProperty(name);
+		}
+	});
+
+	it('exports the wind model and its annual mean', () => {
+		for (const name of [
+			'WIND_SOLVE_RESOLUTION',
+			'solveWinds',
+			'summariseWinds',
 		]) {
 			expect(core, name).toHaveProperty(name);
 		}

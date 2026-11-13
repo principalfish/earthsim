@@ -33,6 +33,13 @@
  * then tuned by hand against the observed Earth, or against the invented
  * cases, so that the winds are right in kind; they are not physical
  * truth.
+ *
+ * The way in is `solveWinds`, in `solve.ts`, which checks its input and
+ * works the pressure out on the 64 grid. Here are the model's parts:
+ * {@link rulesPressureMonth} and {@link rulesPressure} for the pressure,
+ * {@link windsFromPressure} and {@link windsFromPressures} for the wind
+ * that follows, and {@link rulesWindsOnGrid}, the two together on the
+ * world's own grid.
  */
 
 import { type Grid, getGrid } from '../grid';
@@ -47,12 +54,7 @@ import {
 	toEastNorth,
 } from '../vector';
 import { PLANET_RADIUS_KM, type World } from '../world';
-import {
-	type WindModel,
-	type WindResult,
-	type ZonalMean,
-	zonalMean,
-} from './model';
+import { type WindResult, type ZonalMean, zonalMean } from './model';
 
 const RADIANS_PER_DEGREE = Math.PI / 180;
 
@@ -790,7 +792,7 @@ export const zonalBands = (
  * Over the sea the response is {@link SEA_THERMAL_SHARE} of the land's, and
  * over land it falls by a factor of e every {@link THERMAL_HEIGHT_M} of
  * height above the sea level. Smoothing keeps the area-weighted mean,
- * which is not zero; {@link rulesWinds} takes it away with the rest.
+ * which is not zero; {@link rulesPressure} takes it away with the rest.
  *
  * @param world - The world: its grid, terrain and sea level. Not changed.
  * @param seaLevelTemperature - The month's air temperature brought down to
@@ -998,71 +1000,160 @@ export const windsFromPressure = (
 };
 
 /**
- * The rules wind model: each month's sea-level pressure from its zonal
- * bands and its thermal highs and lows, shifted to a mean of
- * {@link REFERENCE_PRESSURE_HPA}, and the wind from that pressure.
+ * The winds of a run of months from their sea-level pressure, on the
+ * world's own grid: {@link windsFromPressure} for each, with the part that
+ * depends on the terrain and the day length worked out once for them all.
+ *
+ * @param world - The world: its grid, terrain, sea level and day length.
+ * Not changed.
+ * @param pressures - Fields of sea-level pressure in hectopascals, one
+ * finite value per cell in each, such as twelve months. Not changed.
+ * @returns The eastward and northward wind at each cell's centre, in
+ * metres a second, in new arrays, one of each per field given.
+ * @throws RangeError if a field does not hold one value per cell.
+ */
+export const windsFromPressures = (
+	world: World,
+	pressures: readonly ArrayLike<number>[],
+): { east: Float32Array[]; north: Float32Array[] } => {
+	const surface = surfaceOf(world);
+	const { cellCount } = surface.grid;
+	for (const field of pressures) {
+		if (field.length !== cellCount) {
+			throw new RangeError(
+				`A pressure field must hold ${cellCount} values, one per cell; got ${field.length}`,
+			);
+		}
+	}
+	const scratch = scratchOf(surface.grid);
+	const east: Float32Array[] = [];
+	const north: Float32Array[] = [];
+	for (const field of pressures) {
+		const winds = windsOn(surface, field, scratch);
+		east.push(winds.east);
+		north.push(winds.north);
+	}
+	return { east, north };
+};
+
+/**
+ * One month of the rules model's sea-level pressure on the world's own
+ * grid: the month's zonal bands and its thermal highs and lows, shifted to
+ * a mean of {@link REFERENCE_PRESSURE_HPA}.
  *
  * @remarks
- * Each month's air temperature is brought down to sea level by adding back
- * the temperature model's own lapse-rate cooling of each cell
- * ({@link lapseCooling}); its zonal mean in {@link PROFILE_BANDS} bands
- * places the bands ({@link zonalBands}) and gives the mean the thermal part
- * is taken against ({@link thermalPressure}); the wind follows by
- * {@link windsFromPressure}. Nothing but the temperatures, the terrain, the
- * sea level and the day length is read, so a month's winds depend on its
- * temperature alone.
+ * The month's air temperature is brought down to sea level by adding back
+ * the temperature model's own lapse-rate cooling of each cell, as
+ * {@link lapseCooling} gives it; its zonal mean in {@link PROFILE_BANDS}
+ * bands places the bands ({@link zonalBands}) and gives the mean the
+ * thermal part is taken against ({@link thermalPressure}). Nothing but the
+ * temperature, the terrain, the sea level and the day length is read, so
+ * the pressure depends on the month's temperature alone. It is nearly all
+ * the model's time, most of that {@link smoothField}'s.
  *
- * @throws RangeError if there are not twelve temperature fields of one
- * value per cell; and, from {@link thermalPressure}, if a field holds a
- * value that is not finite.
+ * @param world - The world. It is not changed.
+ * @param temperature - The month's mean near-surface air temperature in
+ * degrees Celsius, one value per cell of the world's grid. Not changed.
+ * @param cooling - The world's lapse-rate cooling, in kelvin, one value per
+ * cell, as {@link lapseCooling} gives it. Not changed.
+ * @returns A new field of hectopascals, in double precision.
+ * @throws RangeError if the temperature or the cooling does not hold one
+ * value per cell; and, from {@link zonalMean}, if the temperature or the
+ * cooling holds a value that is not finite.
  */
-export const rulesWinds: WindModel = (world, temperatures): WindResult => {
+export const rulesPressureMonth = (
+	world: World,
+	temperature: ArrayLike<number>,
+	cooling: ArrayLike<number>,
+): Float64Array => {
+	const grid = getGrid(world.resolution);
+	const { cellCount, areas } = grid;
+	for (const [name, field] of [
+		['temperature', temperature],
+		['cooling', cooling],
+	] as const) {
+		if (field.length !== cellCount) {
+			throw new RangeError(
+				`A ${name} field must hold ${cellCount} values, one per cell; got ${field.length}`,
+			);
+		}
+	}
+	const latitudes = cellLatitudes(grid);
+	const seaLevel = new Float64Array(cellCount);
+	for (let cell = 0; cell < cellCount; cell++) {
+		seaLevel[cell] = (temperature[cell] as number) + (cooling[cell] as number);
+	}
+	const profile = zonalMean(grid, seaLevel, PROFILE_BANDS);
+	const bands = zonalBands(profile, world.planet);
+	const field = thermalPressure(world, seaLevel, profile);
+	let total = 0;
+	let totalArea = 0;
+	for (let cell = 0; cell < cellCount; cell++) {
+		const value =
+			(field[cell] as number) + bands.offset(latitudes[cell] as number);
+		field[cell] = value;
+		total += (areas[cell] as number) * value;
+		totalArea += areas[cell] as number;
+	}
+	const shift = REFERENCE_PRESSURE_HPA - total / totalArea;
+	for (let cell = 0; cell < cellCount; cell++) {
+		field[cell] = (field[cell] as number) + shift;
+	}
+	return field;
+};
+
+/**
+ * The rules model's sea-level pressure on the world's own grid for a year:
+ * {@link rulesPressureMonth} of each month, with the world's cooling
+ * worked out once.
+ *
+ * @param world - The world. It is not changed.
+ * @param temperatures - Twelve fields, January to December, of the mean
+ * near-surface air temperature in degrees Celsius, one value per cell of the
+ * world's grid. They are not changed.
+ * @returns Twelve new fields of hectopascals, in double precision.
+ * @throws RangeError if there are not twelve temperature fields of one
+ * value per cell, or the world is not valid (from {@link lapseCooling});
+ * and, from {@link zonalMean}, if a field holds a value that is not
+ * finite.
+ */
+export const rulesPressure = (
+	world: World,
+	temperatures: readonly ArrayLike<number>[],
+): Float64Array[] => {
 	if (temperatures.length !== MONTHS_PER_YEAR) {
 		throw new RangeError(
 			`The rules model needs ${MONTHS_PER_YEAR} months of temperature; got ${temperatures.length}`,
 		);
 	}
-	const surface = surfaceOf(world);
-	const { grid } = surface;
-	const { cellCount, areas } = grid;
-	const latitudes = cellLatitudes(grid);
 	const cooling = lapseCooling(world);
-	const scratch = scratchOf(grid);
-	const seaLevel = new Float64Array(cellCount);
-	let totalArea = 0;
-	for (let cell = 0; cell < cellCount; cell++) {
-		totalArea += areas[cell] as number;
-	}
-	const east: Float32Array[] = [];
-	const north: Float32Array[] = [];
-	const pressure: Float32Array[] = [];
-	for (const month of temperatures) {
-		if (month.length !== cellCount) {
-			throw new RangeError(
-				`A temperature field must hold ${cellCount} values, one per cell; got ${month.length}`,
-			);
-		}
-		for (let cell = 0; cell < cellCount; cell++) {
-			seaLevel[cell] = (month[cell] as number) + (cooling[cell] as number);
-		}
-		const profile = zonalMean(grid, seaLevel, PROFILE_BANDS);
-		const bands = zonalBands(profile, world.planet);
-		const field = thermalPressure(world, seaLevel, profile);
-		let total = 0;
-		for (let cell = 0; cell < cellCount; cell++) {
-			const value =
-				(field[cell] as number) + bands.offset(latitudes[cell] as number);
-			field[cell] = value;
-			total += (areas[cell] as number) * value;
-		}
-		const shift = REFERENCE_PRESSURE_HPA - total / totalArea;
-		for (let cell = 0; cell < cellCount; cell++) {
-			field[cell] = (field[cell] as number) + shift;
-		}
-		const winds = windsOn(surface, field, scratch);
-		east.push(winds.east);
-		north.push(winds.north);
-		pressure.push(Float32Array.from(field));
-	}
-	return { east, north, pressure };
+	return temperatures.map((month) => rulesPressureMonth(world, month, cooling));
+};
+
+/**
+ * The rules wind model on the world's own grid: each month's sea-level
+ * pressure by {@link rulesPressure}, and the wind from it by
+ * {@link windsFromPressures}. `solveWinds` checks its input, and on a
+ * world finer than 64 cells per face edge works the pressure out on the 64
+ * grid instead.
+ *
+ * @remarks
+ * Its time grows with the grid's cells, most of it {@link smoothField}'s;
+ * `docs/winds.md` gives it.
+ *
+ * @param world - The world. It is not changed.
+ * @param temperatures - Twelve fields, as {@link rulesPressure} takes them.
+ * They are not changed.
+ * @returns New arrays, one value per cell of the world's grid in each.
+ * @throws RangeError as {@link rulesPressure} does.
+ */
+export const rulesWindsOnGrid = (
+	world: World,
+	temperatures: readonly ArrayLike<number>[],
+): WindResult => {
+	const pressure = rulesPressure(world, temperatures);
+	return {
+		...windsFromPressures(world, pressure),
+		pressure: pressure.map((field) => Float32Array.from(field)),
+	};
 };

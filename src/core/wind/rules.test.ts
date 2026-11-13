@@ -14,13 +14,16 @@ import {
 	POLE_LOW_TO_DEG,
 	PROFILE_BANDS,
 	REFERENCE_PRESSURE_HPA,
-	rulesWinds,
+	rulesPressureMonth,
+	rulesWindsOnGrid,
 	SEA_FRICTION_PER_S,
 	SIDE_CONTRAST_K,
 	thermalPressure,
 	windsFromPressure,
+	windsFromPressures,
 	zonalBands,
 } from './rules';
+import { solveWinds } from './solve';
 
 const grid = getGrid(64);
 const { cellCount, areas } = grid;
@@ -556,7 +559,7 @@ describe('thermalPressure', () => {
 		expect(meanOver(thermal, cellsIn(45, 60, 160, 180))).toBeLessThan(0);
 	});
 
-	it('makes a cold patch on a cube corner a stronger high than the same patch elsewhere at its latitude, by the smoothing’s shorter reach there', () => {
+	it('makes a cold patch on a cube corner much the same high as the same patch elsewhere at its latitude', () => {
 		// A patch 10 K colder, a Gaussian 500 km across, on an ocean world
 		// whose temperature otherwise depends on the latitude alone, centred
 		// on the corner at 35.26°N, 45°E, and at the same latitude on 0°,
@@ -599,16 +602,15 @@ describe('thermalPressure', () => {
 		};
 		const corner = patchAt(45);
 		const face = patchAt(0);
-		// Smoothing reaches about 0.9 as far at a corner, so the high there
-		// is about 16% higher (2.64 against 2.27 hPa) and its strongest wind
-		// about 29% stronger (2.23 against 1.73 m/s). That is a mark, not an
-		// invisible difference; the bounds hold it where it is, so that it
-		// cannot grow unnoticed.
+		// The smoothing reaches as far at a corner as elsewhere; what is left
+		// of a mark there comes from the correction it makes for the skewed
+		// cells being taken from the field before each step: the high is
+		// 3.4% weaker (2.18 against 2.26 hPa) and its strongest wind 6.1%
+		// weaker (1.63 against 1.73 m/s). The smoothing alone, without the
+		// correction, made them 16% and 29% stronger.
 		expect(face.peak).toBeGreaterThan(2);
-		expect(corner.peak / face.peak).toBeGreaterThan(1.1);
-		expect(corner.peak / face.peak).toBeLessThan(1.2);
-		expect(corner.wind / face.wind).toBeGreaterThan(1.2);
-		expect(corner.wind / face.wind).toBeLessThan(1.35);
+		expect(Math.abs(corner.peak / face.peak - 1)).toBeLessThan(0.05);
+		expect(Math.abs(corner.wind / face.wind - 1)).toBeLessThan(0.08);
 	});
 
 	it('refuses a field of the wrong length, or one with a value that is not finite', () => {
@@ -727,13 +729,35 @@ describe('windsFromPressure', () => {
 	});
 });
 
-describe('rulesWinds', () => {
+describe('windsFromPressures', () => {
+	it('gives each field’s winds as windsFromPressure does, and refuses a field of the wrong length', () => {
+		const world = continentWorld();
+		const fields = [0, 20].map((hottest) =>
+			zonalField(hottest).map((value) => REFERENCE_PRESSURE_HPA - value),
+		);
+		const winds = windsFromPressures(world, fields);
+		expect(winds.east).toHaveLength(2);
+		fields.forEach((field, index) => {
+			const one = windsFromPressure(world, field);
+			expect(winds.east[index]).toEqual(one.east);
+			expect(winds.north[index]).toEqual(one.north);
+		});
+		expect(() =>
+			windsFromPressures(world, [
+				fields[0] as Float32Array,
+				new Float32Array(cellCount - 1),
+			]),
+		).toThrow(RangeError);
+	});
+});
+
+describe('the rules model through solveWinds', () => {
 	// One run of a year, about half a second at 64 cells per face edge,
 	// more under coverage, hence the longer time allowed.
 	it('on an ocean world with Earth’s settings is symmetric east–west, with easterlies in the tropics and westerlies in mid-latitudes in both hemispheres', () => {
 		const world = oceanWorld();
 		const field = zonalField(0);
-		const result = rulesWinds(
+		const result = solveWinds(
 			world,
 			yearOf(() => field),
 		);
@@ -807,12 +831,12 @@ describe('rulesWinds', () => {
 		upright.planet = normalisePlanet({ ...DEFAULT_PLANET, axialTiltDeg: 0 });
 		const tilted = oceanWorld();
 		tilted.planet = normalisePlanet({ ...DEFAULT_PLANET, axialTiltDeg: 60 });
-		const a = rulesWinds(upright, months);
-		const b = rulesWinds(tilted, months);
+		const a = solveWinds(upright, months);
+		const b = solveWinds(tilted, months);
 		expect(b).toEqual(a);
 		// The months given in the other order give the year in the other
 		// order: a month's winds are those of its temperature.
-		const reversed = rulesWinds(upright, [...months].reverse());
+		const reversed = solveWinds(upright, [...months].reverse());
 		for (let month = 0; month < MONTHS_PER_YEAR; month++) {
 			expect(reversed.east[month]).toEqual(a.east[MONTHS_PER_YEAR - 1 - month]);
 			expect(reversed.pressure[month]).toEqual(
@@ -823,7 +847,7 @@ describe('rulesWinds', () => {
 		// January equals July. The checks above would still pass for a model
 		// that read the month's number the same from either end of the year
 		// (January as December, June as July); this one would not.
-		const steady = rulesWinds(
+		const steady = solveWinds(
 			upright,
 			yearOf(() => zonalField(0)),
 		);
@@ -840,7 +864,7 @@ describe('rulesWinds', () => {
 		for (const cell of CONTINENT) {
 			winter[cell] = (winter[cell] as number) - 20;
 		}
-		const pressure = rulesWinds(
+		const pressure = solveWinds(
 			world,
 			yearOf(() => winter),
 		).pressure[0] as Float32Array;
@@ -871,7 +895,7 @@ describe('rulesWinds', () => {
 		const equator = cellAt(grid, latLonToDirection(0, 0));
 		for (const dayLengthHours of [3, 8, 24, 96, 720]) {
 			world.planet = normalisePlanet({ ...DEFAULT_PLANET, dayLengthHours });
-			const result = rulesWinds(world, months);
+			const result = solveWinds(world, months);
 			expect(allFinite(result.east), `${dayLengthHours} h`).toBe(true);
 			expect(allFinite(result.north), `${dayLengthHours} h`).toBe(true);
 			expect(allFinite(result.pressure), `${dayLengthHours} h`).toBe(true);
@@ -892,17 +916,20 @@ describe('rulesWinds', () => {
 	it('is deterministic', () => {
 		const world = continentWorld();
 		const months = yearOf((month) => zonalField(month - 6));
-		expect(rulesWinds(world, months)).toEqual(rulesWinds(world, months));
+		expect(solveWinds(world, months)).toEqual(solveWinds(world, months));
 	}, 60_000);
 
-	it('refuses other than twelve months, or a month of the wrong length', () => {
+	it('refuses other than twelve months, or a month of the wrong length, on its own grid too', () => {
 		const field = zonalField(0);
-		expect(() => rulesWinds(oceanWorld(), [field])).toThrow(RangeError);
+		expect(() => rulesWindsOnGrid(oceanWorld(), [field])).toThrow(RangeError);
 		expect(() =>
-			rulesWinds(
+			rulesWindsOnGrid(
 				oceanWorld(),
 				yearOf((month) => (month === 3 ? field.subarray(2) : field)),
 			),
+		).toThrow(RangeError);
+		expect(() =>
+			rulesPressureMonth(oceanWorld(), field, new Float64Array(cellCount - 1)),
 		).toThrow(RangeError);
 	});
 });

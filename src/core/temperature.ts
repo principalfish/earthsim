@@ -589,7 +589,15 @@ type Setup = {
 	readonly model: TemperatureModel;
 };
 
-const assertWorld = (world: World): void => {
+/**
+ * Throws unless a world is one the temperature can be solved for: a
+ * supported resolution, one finite elevation per cell, and a sea level
+ * from {@link MIN_ELEVATION_M} to {@link MAX_ELEVATION_M}.
+ *
+ * @param world - The world. It is not changed.
+ * @throws RangeError naming the first thing found wrong.
+ */
+export const assertSolvableWorld = (world: World): void => {
 	if (!isSupportedResolution(world.resolution)) {
 		throw new RangeError(
 			`Unsupported world resolution ${world.resolution}: expected one of ${SUPPORTED_RESOLUTIONS.join(', ')}`,
@@ -995,7 +1003,7 @@ export const annualBalance = (
 	model: TemperatureModel = TEMPERATURE_MODEL,
 ): Float64Array => {
 	assertModel(model);
-	assertWorld(world);
+	assertSolvableWorld(world);
 	return balanceOnGrid(world, model);
 };
 
@@ -1534,7 +1542,7 @@ export const lapseCooling = (
 	model: TemperatureModel = TEMPERATURE_MODEL,
 ): Float64Array => {
 	assertModel(model);
-	assertWorld(world);
+	assertSolvableWorld(world);
 	const cooling = new Float64Array(getGrid(world.resolution).cellCount);
 	coolingInto(world, model.lapseRate, cooling);
 	return cooling;
@@ -2031,7 +2039,7 @@ export const solveTemperature = (
 	} = options;
 	assertOptions(maxYears, tolerance);
 	assertModel(model);
-	assertWorld(world);
+	assertSolvableWorld(world);
 	const coarse =
 		fullResolution || solveResolution(world.resolution) === world.resolution
 			? null

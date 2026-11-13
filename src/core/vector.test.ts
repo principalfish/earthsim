@@ -882,6 +882,25 @@ describe('smoothField', () => {
 		expect(smoothField(grid, constant, 1500)).toEqual(constant);
 	});
 
+	it('refuses a distance too short or too long for a step, before anything is set', () => {
+		const fine = getGrid(128);
+		const field = Float64Array.from({ length: fine.cellCount }, (_, cell) =>
+			Math.sin(cell / 1000),
+		);
+		const copy = Float64Array.from(field);
+		const into = new Float64Array(fine.cellCount).fill(7);
+		for (const km of [1e-160, 1e160]) {
+			expect(() => smoothField(fine, field, km, into), `${km}`).toThrow(
+				RangeError,
+			);
+			expect(into.every((value) => value === 7)).toBe(true);
+		}
+		const first = smoothField(fine, field, 100);
+		expect(() => smoothField(fine, field, 1e-160)).toThrow(RangeError);
+		expect(smoothField(fine, field, 100)).toEqual(first);
+		expect(field).toEqual(copy);
+	}, 60_000);
+
 	/**
 	 * The root-mean-square distance on the surface a spike is spread to,
 	 * over √2 times the distance smoothed over.
@@ -926,13 +945,76 @@ describe('smoothField', () => {
 		60_000,
 	);
 
-	it('spreads a spike at a cube corner less far, by under a sixth', () => {
-		// The exchange between neighbours misses the skew of the cells at a
-		// corner, where three faces meet at 120°: over 500 km a spike there
-		// spreads to 0.91 of the distance at 64 cells per face edge, and 0.90
-		// at 128 and at 256.
-		const corner = (Math.atan(Math.SQRT1_2) * 180) / Math.PI;
-		expect(spikeSpread(64, corner, -45, 500)).toBeGreaterThan(0.85);
+	it('spreads a spike at 256 over 1,000 km to within 1% of √2 times that, in the middle of a face', () => {
+		// The finest grid over the longest distance is where a tolerance
+		// taken against the spike's own departure would be loosest. Measured:
+		// 0.994 at the North Pole.
+		const spread = spikeSpread(256, 90, 0, 1000);
+		expect(Math.abs(spread - 1)).toBeLessThan(0.01);
+	}, 60_000);
+
+	it.each([
+		[64, 500],
+		[64, 900],
+		[128, 500],
+		[256, 1000],
+	])(
+		'spreads a spike at a cube corner at %d over %d km as far as one in the middle of a face, within 2%',
+		(resolution, km) => {
+			// The exchange between neighbours alone, which misses the skew of
+			// the cells where three faces meet, spread one to 0.91 of the
+			// distance at a corner. Measured: 1.005, 1.013, 1.012 and 1.015
+			// times the face's middle's. Each spread checks that the spike's
+			// total, its area-weighted mean, is kept.
+			const corner = (Math.atan(Math.SQRT1_2) * 180) / Math.PI;
+			const ratio =
+				spikeSpread(resolution, corner, -45, km) /
+				spikeSpread(resolution, 0, 0, km);
+			expect(Math.abs(ratio - 1)).toBeLessThan(0.02);
+		},
+		60_000,
+	);
+
+	it('spreads a spike near a cube corner nearly evenly every way', () => {
+		// Its spread along the way it reaches furthest over its spread across
+		// that, at 32°N, 40°E, some 600 km from the corner: 1.05 over 500 km,
+		// against 1.24 from the exchange between neighbours alone.
+		const on = getGrid(64);
+		const direction = latLonToDirection(32, 40);
+		const spike = new Float64Array(on.cellCount);
+		const start = cellAt(on, direction);
+		spike[start] = 1 / (on.areas[start] as number);
+		const smoothed = smoothField(on, spike, 500);
+		const frame = createEastNorthFrame();
+		const latitude = (32 * Math.PI) / 180;
+		const longitude = (40 * Math.PI) / 180;
+		writeEastNorthFrame(
+			Math.sin(latitude),
+			Math.cos(latitude),
+			Math.sin(longitude),
+			Math.cos(longitude),
+			frame,
+		);
+		let ee = 0;
+		let nn = 0;
+		let en = 0;
+		for (let cell = 0; cell < on.cellCount; cell++) {
+			const x = on.centres[3 * cell] as number;
+			const y = on.centres[3 * cell + 1] as number;
+			const z = on.centres[3 * cell + 2] as number;
+			if (x * direction[0] + y * direction[1] + z * direction[2] < 0.5) {
+				continue;
+			}
+			const weight = (on.areas[cell] as number) * (smoothed[cell] as number);
+			const along = x * frame.eastX + y * frame.eastY;
+			const up = x * frame.northX + y * frame.northY + z * frame.northZ;
+			ee += weight * along * along;
+			nn += weight * up * up;
+			en += weight * along * up;
+		}
+		const half = (ee + nn) / 2;
+		const offset = Math.sqrt(((ee - nn) / 2) ** 2 + en * en);
+		expect(Math.sqrt((half + offset) / (half - offset))).toBeLessThan(1.1);
 	});
 
 	it('damps a short wave more than a long one, each as the steps do', () => {
@@ -970,6 +1052,26 @@ describe('smoothField', () => {
 				(1 + (6 * sigma * sigma) / (2 * SMOOTHING_STEPS)) ** -SMOOTHING_STEPS,
 		);
 	});
+
+	it('gives the same result for a grid and distance whatever was smoothed before', () => {
+		const coarse = getGrid(64);
+		const fine = getGrid(128);
+		const fineNoisy = Float64Array.from(
+			{ length: fine.cellCount },
+			() => 1000 + 40 * random(),
+		);
+		const copy = Float64Array.from(noisy);
+		const fineCopy = Float64Array.from(fineNoisy);
+		const at500 = smoothField(coarse, noisy, 500);
+		const at900 = smoothField(coarse, noisy, 900);
+		expect(smoothField(coarse, noisy, 500)).toEqual(at500);
+		const onFine = smoothField(fine, fineNoisy, 500);
+		expect(smoothField(coarse, noisy, 900)).toEqual(at900);
+		expect(smoothField(coarse, noisy, 500)).toEqual(at500);
+		expect(smoothField(fine, fineNoisy, 500)).toEqual(onFine);
+		expect(noisy).toEqual(copy);
+		expect(fineNoisy).toEqual(fineCopy);
+	}, 60_000);
 
 	it('gives the field back over no distance, and writes into the array given, which may be the field', () => {
 		const back = smoothField(grid, noisy, 0);

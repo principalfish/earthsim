@@ -16,6 +16,7 @@ Requires Node.js and npm. Run `npm install` once.
 | `npm run build:observed-winds` | Rebuild the Earth's observed winds and sea-level pressure data; see [Data](data.md) |
 | `npm run baseline:temperature` | Write the Earth temperature baseline afresh; see below |
 | `npm run time:temperature` | Time the temperature solver at every resolution and print the simulated Earth's error figures, as Markdown tables. Takes a few minutes |
+| `npm run time:winds` | Time a year of the Earth's winds at every resolution, as `solveWinds` solves them by default (the pressure on the 64 grid) and wholly on the world's own grid beside it, and print how far the two lie apart, as Markdown tables. Takes about half a minute; see [Winds](winds.md#the-pressure-of-finer-worlds-is-worked-out-on-the-64-grid) |
 | `npm run report:winds` | Write the wind report, `reports/winds/index.html`, to open in a browser: the observed Earth's winds and sea-level pressure in January and July, the worlds the wind models are run on, and each registered model's maps, error figures and solve times. The file is not committed |
 
 ## The Earth temperature baseline
@@ -51,14 +52,15 @@ A pure library with no DOM, Three.js or worker globals.
 | `earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
 | `observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
 | `wind/model.ts` | The shape every wind model shares, its error figures against the observed winds and pressure, and the mean of a field by bands of latitude |
-| `wind/rules.ts` | A prototype wind model, not exported from the core: sea-level pressure from zonal bands placed by the temperature and the day length plus thermal highs and lows, and the wind from it by a balance of pressure gradient, turning and friction |
+| `wind/rules.ts` | The rules wind model on a world's own grid, and its parts: sea-level pressure from zonal bands placed by the temperature and the day length plus thermal highs and lows, and the wind from it by a balance of pressure gradient, turning and friction; see [Winds](winds.md) |
+| `wind/solve.ts` | The winds of a world: its input checked, the rules model's pressure worked out on the 64 grid and carried back to the world's grid, the winds from it there, and the annual mean of a year of winds |
 | `observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `vector.ts`'s directions east and north |
 | `observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
 | `planet.ts` | The six planet settings, their limits and Earth's values, and the five of them the temperature reads (all but the day length); the sunlight, year length, rotation rate and trust warnings that follow from them; a world's date |
 | `star.ts` | The star as the planet sees it: radius, surface temperature, colour, size in the sky and direction in each month |
 | `insolation.ts` | Sunlight by latitude and time of year, the twelve months, and each cell's latitude |
 | `temperature.ts` | The temperature model |
-| `coarsen.ts` | A world averaged onto the grid a step coarser, and a field or a vector field carried back from it |
+| `coarsen.ts` | A world or a field averaged onto the grid a step coarser, and a field or a vector field carried back from it |
 | `vector.ts` | Vector fields on the grid, east and north at every cell, and the gradient, divergence, curl, Laplacian and smoothing of fields |
 | `exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
 | `compare.ts` | One field less another, and area-weighted error figures |
@@ -114,6 +116,7 @@ Run with Node, not in the browser.
 | `download.ts` | Downloads a source file into `.cache/` once, checked against its pinned length and SHA-256 |
 | `earth/` | The parts of the build that touch no file: reading TIFF and netCDF, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data files |
 | `time-temperature.ts` | The solver's timings and the simulated Earth's error figures |
+| `time-winds.ts` | The wind model's timings, and how far its solve with the pressure on the 64 grid lies from one wholly on the world's own grid |
 | `update-earth-temperature-baseline.ts` | Writes the Earth temperature baseline afresh |
 | `wind-report.ts` | Writes the wind report, and lists the wind models it runs |
 | `report/` | The parts of the wind report that touch no file: the cases (`cases.ts`), the maps (`map.ts`), the zonal-mean chart (`chart.ts`), the PNG writer (`png.ts`), the page (`page.ts`), running the models on the cases (`run.ts`), and in `testing/` the XML and PNG readers only its tests use |

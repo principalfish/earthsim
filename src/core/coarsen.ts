@@ -76,6 +76,69 @@ const assertRefinable = (resolution: number): Resolution => {
 };
 
 /**
+ * A field on the grid a step coarser: each coarse cell's value the mean of
+ * the four fine cells it covers, weighted by their areas.
+ *
+ * @remarks
+ * The mean of each block is taken in double precision, summed row by row,
+ * so the area-weighted mean of the whole field is kept to rounding, and a
+ * constant field is given back as it is, to rounding. The field is
+ * averaged without regard to what it stands for: land and sea alike.
+ *
+ * @param fine - One value per cell of the grid of `resolution`. It is not
+ * changed.
+ * @param resolution - The fine grid's cells along a face edge: 128 or 256.
+ * @param into - Where to write the coarse values, one per cell of the grid
+ * a step coarser; a new array when left out.
+ * @returns `into`, or the new array.
+ * @throws RangeError if the resolution is not supported or is the
+ * coarsest, or if `fine` or `into` has the wrong length.
+ */
+export const coarsenField = (
+	fine: ArrayLike<number>,
+	resolution: number,
+	into?: Float64Array,
+): Float64Array => {
+	const coarse = assertRefinable(resolution);
+	const fineGrid = getGrid(resolution);
+	if (fine.length !== fineGrid.cellCount) {
+		throw new RangeError(
+			`A field on ${resolution} cells per face edge has ${fineGrid.cellCount} values; got ${fine.length}`,
+		);
+	}
+	const coarseCount = FACE_COUNT * coarse * coarse;
+	const result = into ?? new Float64Array(coarseCount);
+	if (result.length !== coarseCount) {
+		throw new RangeError(
+			`A field a step coarser than ${resolution} cells per face edge has ${coarseCount} values; got ${result.length}`,
+		);
+	}
+	const { areas } = fineGrid;
+	const n = resolution;
+	let cell = 0;
+	for (let face = 0; face < FACE_COUNT; face++) {
+		for (let j = 0; j < coarse; j++) {
+			for (let i = 0; i < coarse; i++) {
+				let total = 0;
+				let area = 0;
+				for (let dj = 0; dj < 2; dj++) {
+					const row = (face * n + 2 * j + dj) * n;
+					for (let di = 0; di < 2; di++) {
+						const fineCell = row + 2 * i + di;
+						const fineArea = areas[fineCell] as number;
+						total += fineArea * (fine[fineCell] as number);
+						area += fineArea;
+					}
+				}
+				result[cell] = total / area;
+				cell++;
+			}
+		}
+	}
+	return result;
+};
+
+/**
  * The world on the grid a step coarser: half the cells along each face
  * edge, each coarse cell's elevation the mean of the four cells it covers,
  * weighted by their areas.
@@ -84,10 +147,10 @@ const assertRefinable = (resolution: number): Resolution => {
  * Everything else is the world's: its sea level, planet, date and origin.
  * A coarse cell is land when its mean elevation is above the sea level, so
  * land narrower than a coarse cell, an island or a strait, can vanish from
- * the coarse world or close up. The mean of each block is taken in double
- * precision, summed row by row as the Earth's data is summed when a coarser
- * Earth is made, and stored in single precision; so the Earth at 256 cells
- * per face edge, coarsened, is exactly the Earth at 128.
+ * the coarse world or close up. The means are {@link coarsenField}'s,
+ * stored in single precision, summed as the Earth's data is summed when a
+ * coarser Earth is made; so the Earth at 256 cells per face edge,
+ * coarsened, is exactly the Earth at 128.
  *
  * @param world - A world of more than 64 cells per face edge. It is not
  * changed.
@@ -105,36 +168,15 @@ export const coarsenWorld = (world: World): World => {
 			`A world of resolution ${world.resolution} has ${fine.cellCount} cells; its elevation holds ${world.elevation.length}`,
 		);
 	}
-	const { areas } = fine;
-	const n = world.resolution;
-	const elevation = new Float32Array(FACE_COUNT * resolution * resolution);
-	let cell = 0;
-	for (let face = 0; face < FACE_COUNT; face++) {
-		for (let j = 0; j < resolution; j++) {
-			for (let i = 0; i < resolution; i++) {
-				let total = 0;
-				let area = 0;
-				for (let dj = 0; dj < 2; dj++) {
-					const row = (face * n + 2 * j + dj) * n;
-					for (let di = 0; di < 2; di++) {
-						const fineCell = row + 2 * i + di;
-						const fineArea = areas[fineCell] as number;
-						total += fineArea * (world.elevation[fineCell] as number);
-						area += fineArea;
-					}
-				}
-				elevation[cell] = total / area;
-				cell++;
-			}
-		}
-	}
 	return {
 		resolution,
 		seaLevel: world.seaLevel,
 		origin: world.origin,
 		planet: { ...world.planet },
 		ageYears: world.ageYears,
-		elevation,
+		elevation: Float32Array.from(
+			coarsenField(world.elevation, world.resolution),
+		),
 	};
 };
 

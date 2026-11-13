@@ -11,6 +11,7 @@
     "build:observed-winds": "node scripts/run-with-vite.mjs scripts/build-observed-winds.ts",
     "baseline:temperature": "node scripts/run-with-vite.mjs scripts/update-earth-temperature-baseline.ts",
     "time:temperature": "node scripts/run-with-vite.mjs scripts/time-temperature.ts",
+    "time:winds": "node scripts/run-with-vite.mjs scripts/time-winds.ts",
     "report:winds": "node scripts/run-with-vite.mjs scripts/wind-report.ts",
     "preview": "vite preview",
     "test": "vitest run",
