@@ -69,3 +69,4 @@
 - 2026-11-13 07:37 · add-seasonal-temperature-layer-and-planet-controls (0002) · session local_f46a8d01-2bba-49f0-b178-13cfe0924c9e removed
 - 2026-11-13 07:37 · add-seasonal-temperature-layer-and-planet-controls (0002) · cleanup: removed worktree /home/philiph/workspace/earth_sim/.claude/worktrees/add-seasonal-temperature-layer-and-planet-controls-f645fa, branch claude/add-seasonal-temperature-layer-and-planet-controls-f645fa
 - 2026-11-13 07:43 · add-winds-layer (0003) · created (build): Add winds layer
+- 2026-11-13 09:05 · add-winds-layer (0003) · title = Add winds, air pressure and day length
