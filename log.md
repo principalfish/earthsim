@@ -61,3 +61,4 @@
 - 2026-11-12 22:10 · add-seasonal-temperature-layer-and-planet-controls (0002) · whole-branch self review started (13 check subagents on Opus and Sonnet)
 - 2026-11-12 22:19 · add-seasonal-temperature-layer-and-planet-controls (0002) · self review 01: 9 verified findings, all low; user choosing
 - 2026-11-12 22:28 · add-seasonal-temperature-layer-and-planet-controls (0002) · self review 01: all 9 findings and N1 chosen; sent to the builder
+- 2026-11-13 07:20 · add-seasonal-temperature-layer-and-planet-controls (0002) · builder: review fixes built, uncommitted (HEAD d0f873a); review request written to the builder worktree's .planner-outbox/review-request-review-fixes.md because sends to the planner chat failed (host unreachable); the user's dev server on 5176 is no longer running, not stopped by the builder
