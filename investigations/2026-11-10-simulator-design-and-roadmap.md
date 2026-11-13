@@ -53,6 +53,42 @@ Each step adds a viewable map layer and gets its own issue.
 7. Tropical storm zones
 8. Plate tectonics and time stepping
 
+## Status and carried-over items (as of 2026-11-13)
+
+Keep this section current when a step is merged.
+
+| Step | Status | Issue |
+|-|-|-|
+| 1 Globe, grid and sculpting | Done, merged 2026-11-11 | 0001, GitHub #1, PR #2 |
+| 2 Sunlight and seasonal temperature | Done, merged 2026-11-13 | 0002, GitHub #3, PR #4 |
+| 3 Winds | Next | |
+| 4 Moisture, rainfall and Köppen zones | Not started | |
+| 5 Ocean currents | Not started | |
+| 6 Ice sheets and sea ice | Not started | |
+| 7 Tropical storm zones | Not started | |
+| 8 Plate tectonics and time stepping | Not started | |
+
+### What step 2 built that later steps rely on
+- **Planet settings on the world:** axial tilt, the star's brightness and mass, the orbit's distance and the greenhouse strength, saved with the world. A note in the Planet panel warns when they are outside the range the temperature model is trusted for.
+- **Monthly temperature fields** for the twelve months, solved in a Web Worker only while the Temperature layer shows. A world finer than 64 cells per face edge is solved on the grid one step coarser and carried back, so coasts are smoothed over about one coarse cell.
+- **Earth comparison:** on an untouched Earth preset the layer shows simulated, observed or difference. It was built so each later step can add its own observed layer.
+- **Earth error baseline:** annual mean −0.15 °C and RMS 3.93 °C at 64, committed in `src/core/baseline/earthTemperature.json`, with a test that fails if the figures get worse. Nothing was tuned to the Earth. Winds (step 3) and above all ocean currents (step 5) are expected to improve it; re-run `npm run baseline:temperature` when a step changes the temperature.
+
+### Left out of step 2, to pick up in a later step
+- **Rotation rate** is not yet a planet setting. Step 3 needs it: it sets the width and number of the wind bands.
+- **Orbit eccentricity.**
+- **A flat map view.**
+- **Real ice sheets:** step 2 only brightens cold surfaces; step 6 replaces that.
+
+### Open follow-ups, nothing decided
+- A fixed temperature scale option: the scale is fitted to each world, so a frozen planet is drawn in much the same colours as a warm one.
+- With Sunlight on, the sun can be hard to find in the scene (accepted as it is for now).
+- Terrain speckle on a world wholly at sea level (predates step 2).
+- The build's 500 kB chunk warning (predates step 2).
+- Whether the changed-lines coverage tool should also measure `scripts/`.
+- Two small code notes from the step 2 review: a doc comment above the `MONTH_NAMES` re-export in `src/app/view.ts` that attaches to nothing; `cellLatitudes` in `src/core/insolation.ts` and a longitude in `src/core/observed.ts` repeating the `directionToLatLon` arithmetic with no test tying them together.
+- Never tried by hand: Firefox, screen readers, touch and high-density screens, the production build since the solver speed-ups, and opening a world file saved before step 2 in the page.
+
 ## Prior art
 
 Listed from memory, not searched, so possibly incomplete or out of date: ExoPlaSim (a real climate model used by worldbuilders; offline, no ocean currents); ROCKE-3D, MITgcm, cGENIE (research models, hard to set up); Tectonics.js (browser tectonics with crude climate); Songs of the Eons and Undiscovered Worlds (rule-based climate); GPlates (real-Earth plate reconstruction, not a forward simulator). None is known to do the whole thing interactively.
