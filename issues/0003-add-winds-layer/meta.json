@@ -6,7 +6,7 @@
   "state": "investigating",
   "branch": "add-winds-layer",
   "base": "main",
-  "gh_issue": null,
+  "gh_issue": 5,
   "build_model": null,
   "created": "2026-11-13 07:43",
   "updated": "2026-11-13 09:05",
