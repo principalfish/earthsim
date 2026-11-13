@@ -9,6 +9,14 @@
   "gh_issue": 5,
   "build_model": "claude-opus-5-5",
   "created": "2026-11-13 07:43",
-  "updated": "2026-11-13 09:10",
-  "done": null
+  "updated": "2026-11-13 09:17",
+  "done": null,
+  "local": [
+    {
+      "kind": "session",
+      "name": "local_861b5031-c368-4a88-b7a4-71e71ea962f6",
+      "added": "2026-11-13 09:17",
+      "note": "builder: add-winds-layer"
+    }
+  ]
 }

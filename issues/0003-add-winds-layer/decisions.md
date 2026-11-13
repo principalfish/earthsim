@@ -26,8 +26,11 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 
 - The ledger is complete and the issue text approved. The user: "Approve, plan it" (2026-11-13)
 
+- All ten proposed manual reviews are kept: pieces 4, 5, 6, 9, 10, 11, 12, 13, 14 and 15. The user: "Keep all ten" (2026-11-13)
+- The builder runs as issue 0002's did: the builder session on the planner chat's model, implementation subagents on Opus, not on Sonnet as the models guide's experiment says. The user: "Same as last time" (2026-11-13)
+
 ## Open
-- Which of the proposed manual reviews to keep (pieces 4, 5, 6, 9, 10, 11, 12, 13, 14, 15).
+- None.
 
 ## Assumed
 - Winds and pressure are worked out from the twelve monthly temperature fields and the planet settings, month by month, and shown for the month on screen. On Annual average the arrows show the year's mean wind; on the other temperature summaries they stay on the month last on screen, as the sun does.
