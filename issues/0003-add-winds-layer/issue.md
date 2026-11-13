@@ -12,11 +12,11 @@ Not included: winds carrying heat (temperature is unchanged by this step), upper
 
 ## Plan
 
-_2026-11-13 · 1 of 15 pieces done · now: waiting on a decision (start piece 2)_
+_2026-11-13 · 1 of 15 pieces done · now: piece 2 in progress_
 
 - [x] **1/15 Observed winds and pressure data** · `69d3619`
   The real Earth's monthly winds and sea-level pressure as two small data files, with readers that take them onto a world's cells.
-- [ ] **2/15 Vector maths on the grid** · not started
+- [ ] **2/15 Vector maths on the grid** · in progress
   Gradient, divergence, curl, smoothing and east/north directions on the cubed-sphere grid.
 - [ ] **3/15 Day length on the world** · not started
   A sixth planet setting, 3 hours to 30 days, saved with the world; older files load with 24 hours.

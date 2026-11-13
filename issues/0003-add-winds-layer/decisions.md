@@ -29,6 +29,10 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - All ten proposed manual reviews are kept: pieces 4, 5, 6, 9, 10, 11, 12, 13, 14 and 15. The user: "Keep all ten" (2026-11-13)
 - The builder runs as issue 0002's did: the builder session on the planner chat's model, implementation subagents on Opus, not on Sonnet as the models guide's experiment says. The user: "Same as last time" (2026-11-13)
 
+- Piece 2 replaces piece 1's private east/north helper with the shared one. The user: "Yes, replace it" (2026-11-13)
+- The builder's analysis loop stops once a round finds nothing above low severity, for the rest of this issue. The user: "Yes, stop at low only" (2026-11-13)
+- The flaky observed-temperature test gets a timeout in piece 2. The user: "Yes, fold it in" (2026-11-13)
+
 ## Open
 - None.
 
