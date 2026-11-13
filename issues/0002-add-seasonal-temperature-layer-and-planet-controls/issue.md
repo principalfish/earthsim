@@ -14,7 +14,7 @@ Not included: orbit eccentricity, rotation rate, a flat map view, winds, current
 
 ## Plan
 
-_2026-11-13 · 14 of 14 pieces done · now: all done, in review (review fixes waiting on review)_
+_2026-11-13 · 14 of 14 pieces done · now: all done, reviewed; the PR description is next_
 
 - [x] **1/14 Planet settings and date on the world** · `8390675`
   Worlds carry axial tilt, star brightness, star mass, orbit distance, greenhouse strength and a date, saved and loaded, with old files still loading.
@@ -44,3 +44,5 @@ _2026-11-13 · 14 of 14 pieces done · now: all done, in review (review fixes wa
   The star drawn in the scene, following the star settings and the months, with a Sunlight toggle that lights the globe from it.
 - [x] **14/14 Collapsible panel sections and the legend over the globe** · `d0f873a` · added 2026-11-12: the user asked for the side panel's sections to be expandable
   Every side-panel section opens and closes, with only World open on a first visit and the state remembered; the sections run World, Layers, View, Planet, Tools, Statistics; the temperature legend moves to the bottom right of the globe.
+- [x] **Review fixes (round 1)** · `7896afc`
+  Ten low findings from the self review fixed: two guards, shared code in place of four copies, documentation and tests.
