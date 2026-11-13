@@ -40,6 +40,7 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - Each prototype is tuned only until it is right in kind: on the Earth easterly trades, westerlies and the South Asian monsoon reversal, and every other case right in kind; error figures reported without a target; what it gets wrong listed; how much tuning each had stated, so the comparison is fair. The user: "Right in kind (Recommended)" (2026-11-13)
 - The piece 6 summary checks both models on the 60° tilt case against published high-tilt runs: do the westerlies and trades survive (Ferreira et al. 2014), and does the tropical belt swing far into the summer hemisphere as one broad cell (Lobo and Bordoni 2020). The user: "yes add those checks" (2026-11-13)
 - The piece 6 summary also checks both models on the 8-hour and 4-day cases against published rotation-rate studies: more, narrower bands and the tropical edge near 0.6 of Earth's latitude at three times Earth's spin; a tropical cell about twice as wide at a quarter of it. The user: "yes" (2026-11-13)
+- Piece 5: the "with no tilt January equals July" assertion is restored (it undoes a round 1 fix), and the smoothing's shorter reach at cube corners stays as a known limit pinned by a test, to be fixed when the wind model is chosen. The user: "Tried it, approve both" (2026-11-13)
 - The flaky observed-temperature test gets a timeout in piece 2. The user: "Yes, fold it in" (2026-11-13)
 
 - Piece 2 adds a direct Laplacian operator, accurate at the cube's seams. The user: "A: add it now" (2026-11-13)
