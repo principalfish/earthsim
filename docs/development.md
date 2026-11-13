@@ -51,6 +51,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
 | `observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
 | `wind/model.ts` | The shape every wind model shares, its error figures against the observed winds and pressure, and the mean of a field by bands of latitude |
+| `wind/rules.ts` | A prototype wind model, not exported from the core: sea-level pressure from zonal bands placed by the temperature and the day length plus thermal highs and lows, and the wind from it by a balance of pressure gradient, turning and friction |
 | `observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `vector.ts`'s directions east and north |
 | `observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
 | `planet.ts` | The six planet settings, their limits and Earth's values, and the five of them the temperature reads (all but the day length); the sunlight, year length, rotation rate and trust warnings that follow from them; a world's date |

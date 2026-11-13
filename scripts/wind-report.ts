@@ -13,6 +13,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { stdout } from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { rulesWinds } from '../src/core/wind/rules';
 import {
 	readEarthDataFile,
 	readObservedPressureFile,
@@ -25,9 +26,12 @@ const REPORT_DIRECTORY = join(ROOT, 'reports', 'winds');
 const REPORT_FILE = join(REPORT_DIRECTORY, 'index.html');
 
 declare const performance: { now(): number };
+declare const console: { warn(message: string): void };
 
 /** The wind models the report runs, in the order it shows them. */
-export const WIND_MODELS: readonly RegisteredModel[] = [];
+export const WIND_MODELS: readonly RegisteredModel[] = [
+	{ name: 'Rules plus a pressure map', model: rulesWinds },
+];
 
 /**
  * Works out the report and writes it.
@@ -47,6 +51,7 @@ export const main = (args: readonly string[]): void => {
 		},
 		models: WIND_MODELS,
 		now: () => performance.now(),
+		warn: (message) => console.warn(message),
 	});
 	const bytes = new TextEncoder().encode(page);
 	mkdirSync(REPORT_DIRECTORY, { recursive: true });

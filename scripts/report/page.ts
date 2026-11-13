@@ -56,12 +56,39 @@ export type ModelTiming = {
 	readonly seconds: number;
 };
 
+/** The three fields of a model's result. */
+export type WindField = 'east' | 'north' | 'pressure';
+
+/** The names of the fields, as the page and the warnings give them. */
+export const WIND_FIELD_NAMES: { readonly [K in WindField]: string } = {
+	east: 'eastward wind',
+	north: 'northward wind',
+	pressure: 'sea-level pressure',
+};
+
+/**
+ * Where a model's result first holds a value that is not a finite number:
+ * the earliest month that holds one, and in it the first field that does,
+ * in the order eastward wind, northward wind, pressure.
+ */
+export type ModelFault = {
+	/** The month, from 0 for January. */
+	readonly month: number;
+	readonly field: WindField;
+};
+
 /** One model's winds on every case, and its times. */
 export type ModelRun = {
 	/** The model's name, for headings. */
 	readonly name: string;
 	/** Its winds and pressure on each case, under the case's id. */
 	readonly results: ReadonlyMap<string, WindResult>;
+	/**
+	 * The cases whose result holds a value that is not a finite number,
+	 * under the case's id, with where the first such value is. Their maps,
+	 * figures and chart are not drawn. None when left out.
+	 */
+	readonly faults?: ReadonlyMap<string, ModelFault>;
 	/** Its times on the Earth, from the coarsest grid. */
 	readonly timings: readonly ModelTiming[];
 };
@@ -91,6 +118,7 @@ h2 { font-size: 1.35rem; margin: 2.5rem 0 .5rem; border-bottom: 1px solid var(--
 h3 { font-size: 1.1rem; margin: 1.75rem 0 .5rem; }
 p, ul { max-width: 60rem; }
 .muted { color: var(--muted); }
+.note { border-left: 4px solid #d9730d; padding: .25rem .75rem; }
 .pair { display: grid; grid-template-columns: 1fr; gap: 1rem 1.5rem; }
 @media (min-width: 1260px) { .pair { grid-template-columns: 1fr 1fr; } }
 figure { margin: 0; }
@@ -137,6 +165,13 @@ const table = (
 };
 
 const monthName = (month: number): string => MONTH_NAMES[month] as string;
+
+/**
+ * What a fault is, as a sentence ending in a full stop: the field and the
+ * month of the first value that is not a finite number.
+ */
+export const faultText = (fault: ModelFault): string =>
+	`The ${WIND_FIELD_NAMES[fault.field]} in ${monthName(fault.month)} is the first value that is not a finite number.`;
 
 /** What the maps show and how to read them. */
 const legend = (): string => {
@@ -192,16 +227,23 @@ const modelSection = (
 		),
 	);
 	for (const { case: shown, world } of cases) {
+		parts.push(
+			`<h3>${name}: ${escapeText(shown.title)}</h3>`,
+			`<p class="muted">${escapeText(shown.description)}</p>`,
+		);
+		const fault = model.faults?.get(shown.id);
+		if (fault !== undefined) {
+			parts.push(
+				`<p class="note"><strong>Not drawn:</strong> the model gave a value that is not a finite number on this case. ${escapeText(faultText(fault))} Its maps${shown.id === EARTH_CASE_ID ? ', its figures against the observed Earth and its chart' : ''} for this case are left out.</p>`,
+			);
+			continue;
+		}
 		const result = model.results.get(shown.id);
 		if (result === undefined) {
 			throw new RangeError(
 				`The model ${model.name} has no result for the case ${shown.id}`,
 			);
 		}
-		parts.push(
-			`<h3>${name}: ${escapeText(shown.title)}</h3>`,
-			`<p class="muted">${escapeText(shown.description)}</p>`,
-		);
 		if (shown.id !== EARTH_CASE_ID) {
 			parts.push(
 				`<div class="pair">${SHOWN_MONTHS.map((month) =>
@@ -287,13 +329,16 @@ const modelSection = (
  * Earth; for each case its January and July maps; and on the Earth the
  * observed beside the simulated, the error figures for January, July and
  * the whole year, and the mean eastward wind by latitude against the
- * observed. Every text put into the page is escaped.
+ * observed. A case among a model's faults has in their place a note of
+ * where its first value that is not a finite number is; the model's other
+ * cases and its times are shown as ever. Every text put into the page is
+ * escaped.
  *
  * @param input - The cases, the observed Earth and the models' results.
  * Not changed.
  * @returns The page, from its doctype to its closing tag.
  * @throws RangeError if no case is the Earth, or a model has no result for
- * a case.
+ * a case that is not among its faults.
  */
 export const buildReport = (input: ReportInput): string => {
 	const { cases, observed, models } = input;

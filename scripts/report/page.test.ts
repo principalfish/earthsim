@@ -177,6 +177,40 @@ describe('buildReport', () => {
 		}
 	});
 
+	it('shows a note in place of each case a model gave a value that is not a finite number on, and the rest as ever', () => {
+		const faulty: ModelRun = {
+			...run(ECHO, observed),
+			// No result is needed for a case among the faults.
+			results: new Map([['one-continent', observed]]),
+			faults: new Map([
+				['earth', { month: 6, field: 'east' }],
+				['ocean', { month: 0, field: 'pressure' }],
+			]),
+		};
+		const page = buildReport({ cases: shownCases, observed, models: [faulty] });
+		expect(count(page, '<strong>Not drawn:</strong>')).toBe(2);
+		expect(page).toContain(
+			'The eastward wind in July is the first value that is not a finite number. Its maps, its figures against the observed Earth and its chart for this case are left out.',
+		);
+		expect(page).toContain(
+			'The sea-level pressure in January is the first value that is not a finite number. Its maps for this case are left out.',
+		);
+		// The times and the one good case are shown; nothing of the Earth's.
+		expect(page).toContain('<td class="number">0.156</td>');
+		expect(page).toContain(
+			'<figcaption>Echo, July: A one-continent world</figcaption>',
+		);
+		expect(page).not.toContain('<figcaption>Echo, January: The Earth');
+		expect(page).not.toContain('<td>The whole year</td>');
+		expect(page).not.toContain('against observed</figcaption>');
+		// Observed twice at the top, and the chart; the one good case twice.
+		const drawings = drawingsOf(page);
+		expect(drawings).toHaveLength(2 + 1 + 2);
+		for (const drawing of drawings) {
+			parseXml(drawing);
+		}
+	});
+
 	it('refuses cases without the Earth, or a model missing a case', () => {
 		expect(() =>
 			buildReport({
