@@ -1,14 +1,15 @@
 /**
  * The settings of a planet and its star, and what follows from them.
  *
- * A planet is set by five numbers, each a control with its own limits: the
- * tilt of its axis, the brightness and mass of its star, the radius of its
- * orbit, and the strength of its greenhouse effect. The orbit is a circle.
- * Brightness and mass are separate settings, so any brightness can go with
- * any mass.
+ * A planet is set by six numbers, each with its own limits: the tilt of its
+ * axis, the brightness and mass of its star, the radius of its orbit, the
+ * strength of its greenhouse effect, and the length of its day. The orbit is
+ * a circle. Brightness and mass are separate settings, so any brightness can
+ * go with any mass. The temperature depends on every setting but the day
+ * length.
  *
- * Two values follow from the settings alone: the sunlight the planet
- * receives compared with Earth, and the length of its year.
+ * Values follow from the settings alone: the sunlight the planet receives
+ * compared with Earth, the length of its year, and how fast it turns.
  *
  * A world also has a date, counted in years since it began.
  */
@@ -31,10 +32,24 @@ export type PlanetSettings = {
 	 * 0 is no greenhouse effect at all.
 	 */
 	readonly greenhouseStrength: number;
+	/** The time of one full turn of the planet, in hours. */
+	readonly dayLengthHours: number;
 };
 
 /** The name of one of a planet's settings. */
 export type PlanetSetting = keyof PlanetSettings;
+
+/**
+ * The name of one of the settings the temperature reads: every setting but
+ * the day length, which the temperature does not depend on.
+ */
+export type TemperatureSetting = Exclude<PlanetSetting, 'dayLengthHours'>;
+
+/**
+ * The settings of a planet that the temperature reads. A planet's whole
+ * {@link PlanetSettings} are also these.
+ */
+export type TemperaturePlanet = Pick<PlanetSettings, TemperatureSetting>;
 
 /** The lowest and highest value a setting can take, both allowed. */
 export type PlanetLimit = {
@@ -49,6 +64,7 @@ export const DEFAULT_PLANET: PlanetSettings = Object.freeze({
 	starMass: 1,
 	orbitDistanceAu: 1,
 	greenhouseStrength: 1,
+	dayLengthHours: 24,
 });
 
 /** The values each setting can take. */
@@ -59,6 +75,7 @@ export const PLANET_LIMITS: { readonly [K in PlanetSetting]: PlanetLimit } =
 		starMass: Object.freeze({ min: 0.1, max: 10 }),
 		orbitDistanceAu: Object.freeze({ min: 0.3, max: 3 }),
 		greenhouseStrength: Object.freeze({ min: 0, max: 3 }),
+		dayLengthHours: Object.freeze({ min: 3, max: 720 }),
 	});
 
 /** Every setting's name, in the order the settings are listed and written. */
@@ -68,13 +85,59 @@ export const PLANET_SETTINGS: readonly PlanetSetting[] = Object.freeze([
 	'starMass',
 	'orbitDistanceAu',
 	'greenhouseStrength',
+	'dayLengthHours',
 ]);
+
+/**
+ * The names of the settings the temperature reads, in the order of
+ * {@link PLANET_SETTINGS}: every setting but the day length, which the
+ * temperature does not depend on.
+ */
+export const TEMPERATURE_SETTINGS: readonly TemperatureSetting[] =
+	Object.freeze([
+		'axialTiltDeg',
+		'starBrightness',
+		'starMass',
+		'orbitDistanceAu',
+		'greenhouseStrength',
+	]);
 
 /** The date of a new world, in years since it began. */
 export const DEFAULT_AGE_YEARS = 0;
 
 /** The length of Earth's year in days: the Julian year. */
 export const EARTH_YEAR_DAYS = 365.25;
+
+/**
+ * A setting's value brought within its limits: a value beyond a limit,
+ * infinity included, is brought to that limit, and a negative zero becomes
+ * zero.
+ *
+ * @param name - The setting.
+ * @param value - The value, a number that is not NaN.
+ */
+export const clampSetting = (name: PlanetSetting, value: number): number => {
+	const { min, max } = PLANET_LIMITS[name];
+	return Math.min(max, Math.max(min, value));
+};
+
+/**
+ * The settings of a planet that the temperature reads, and nothing else.
+ *
+ * @param planet - The settings, whole or only those the temperature reads.
+ * They are not changed.
+ * @returns New settings, holding only {@link TEMPERATURE_SETTINGS}, in
+ * their order.
+ */
+export const temperaturePlanet = (
+	planet: TemperaturePlanet,
+): TemperaturePlanet => ({
+	axialTiltDeg: planet.axialTiltDeg,
+	starBrightness: planet.starBrightness,
+	starMass: planet.starMass,
+	orbitDistanceAu: planet.orbitDistanceAu,
+	greenhouseStrength: planet.greenhouseStrength,
+});
 
 /**
  * Settings in the form a world stores: every one a number within its
@@ -87,7 +150,7 @@ export const EARTH_YEAR_DAYS = 365.25;
  * limit, infinity included, is brought to that limit.
  *
  * @param settings - The settings to normalise. They are not changed.
- * @returns New settings, holding only the five settings, in the order of
+ * @returns New settings, holding only the six settings, in the order of
  * {@link PLANET_SETTINGS}.
  * @throws RangeError if any setting is not a number, NaN included.
  */
@@ -100,8 +163,7 @@ export const normalisePlanet = (settings: PlanetSettings): PlanetSettings => {
 				`A planet's ${name} must be a number; got ${typeof value}`,
 			);
 		}
-		const { min, max } = PLANET_LIMITS[name];
-		clamped[name] = Math.min(max, Math.max(min, value));
+		clamped[name] = clampSetting(name, value);
 	}
 	return clamped;
 };
@@ -132,6 +194,58 @@ export const sunlightRelativeToEarth = (planet: PlanetSettings): number =>
  */
 export const yearLengthDays = (planet: PlanetSettings): number =>
 	EARTH_YEAR_DAYS * Math.sqrt(planet.orbitDistanceAu ** 3 / planet.starMass);
+
+/** The number of seconds in an hour. */
+const SECONDS_PER_HOUR = 3600;
+
+/**
+ * How fast a planet turns, in radians per second.
+ *
+ * @remarks
+ * One full turn, 2π, over the day length in seconds. The day length is
+ * taken as the time of one full turn, not corrected for the planet's
+ * motion along its orbit through the year, so Earth's 24 hours give a rate
+ * about 0.3% below its true one.
+ *
+ * @param planet - The planet's settings.
+ */
+export const rotationRate = (planet: PlanetSettings): number =>
+	(2 * Math.PI) / (planet.dayLengthHours * SECONDS_PER_HOUR);
+
+/**
+ * The shortest day, in hours, that the winds are trusted for. This day
+ * itself is trusted.
+ */
+export const TRUSTED_DAY_MIN_HOURS = 6;
+
+/**
+ * The longest day, in hours, that the winds are trusted for. This day
+ * itself is trusted.
+ */
+export const TRUSTED_DAY_MAX_HOURS = 96;
+
+/** Which way a planet's day lies outside the band the winds are trusted for. */
+export type WindRoughSide = 'fast' | 'slow';
+
+/**
+ * Whether the winds for a planet are rough because of the length of its
+ * day, and on which side.
+ *
+ * @param planet - The planet's settings.
+ * @returns `'fast'` for a planet that turns too fast, its day shorter than
+ * {@link TRUSTED_DAY_MIN_HOURS}; `'slow'` for one that turns too slowly, its
+ * day longer than {@link TRUSTED_DAY_MAX_HOURS}; and null within the band,
+ * both ends included.
+ */
+export const windTrustNote = (planet: PlanetSettings): WindRoughSide | null => {
+	if (planet.dayLengthHours < TRUSTED_DAY_MIN_HOURS) {
+		return 'fast';
+	}
+	if (planet.dayLengthHours > TRUSTED_DAY_MAX_HOURS) {
+		return 'slow';
+	}
+	return null;
+};
 
 /**
  * How fast the temperature model's emissivity falls as the greenhouse

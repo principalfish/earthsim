@@ -51,7 +51,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
 | `observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `vector.ts`'s directions east and north |
 | `observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
-| `planet.ts` | The planet settings, their limits and Earth's values; the sunlight, year length and trust warning that follow from them; a world's date |
+| `planet.ts` | The six planet settings, their limits and Earth's values, and the five of them the temperature reads (all but the day length); the sunlight, year length, rotation rate and trust warnings that follow from them; a world's date |
 | `star.ts` | The star as the planet sees it: radius, surface temperature, colour, size in the sky and direction in each month |
 | `insolation.ts` | Sunlight by latitude and time of year, the twelve months, and each cell's latitude |
 | `temperature.ts` | The temperature model |

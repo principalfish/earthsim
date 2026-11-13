@@ -473,6 +473,7 @@ describe('replaceWorld and the planet and date', () => {
 		starMass: 0.8,
 		orbitDistanceAu: 1.5,
 		greenhouseStrength: 0.5,
+		dayLengthHours: 10,
 	};
 
 	/** A world as if read from a file: with settings and a date of its own. */
@@ -698,6 +699,7 @@ describe('setPlanet', () => {
 		starMass: 2,
 		orbitDistanceAu: 1.5,
 		greenhouseStrength: 0.25,
+		dayLengthHours: 30,
 	};
 
 	it('gives the world being edited a copy of the settings, then tells the planet listeners once', () => {

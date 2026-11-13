@@ -11,7 +11,10 @@
  *    date, such as `{"resolution":64,"seaLevel":0,"origin":{"kind":"blank"},
  *    "planet":{"axialTiltDeg":23.44,...},"ageYears":0}`. The planet and the
  *    date may be left out, as files written before they were added leave
- *    them out; such a file reads as Earth's settings at year zero.
+ *    them out; such a file reads as Earth's settings at year zero. So may
+ *    the planet's day length, which files written before it was added
+ *    leave out of the planet's settings; such a file reads as a day of 24
+ *    hours, Earth's.
  * 5. The elevation of every cell in metres, in the grid's cell order: `6 *
  *    n * n` 32-bit floats for a resolution of `n`.
  *
@@ -111,7 +114,9 @@ export const MAX_WORLD_FILE_BYTES =
  * - `bad-resolution`: the header's resolution is missing or is not a
  *   supported resolution.
  * - `bad-planet`: the header holds planet settings, and they are not an
- *   object holding every setting as a number within its limits.
+ *   object holding every setting, the day length aside, as a number within
+ *   its limits, or they hold a day length that is not a number within its
+ *   limits.
  * - `bad-age`: the header holds a date that is not a finite number of years
  *   from zero up.
  * - `bad-length`: bytes are left over after the elevation of the header's
@@ -225,19 +230,37 @@ const parseOrigin = (value: unknown): WorldOrigin | null => {
 };
 
 /**
- * Reads planet settings as a header holds them.
- *
- * @returns New settings holding only the five settings, or null if the
- * value is not an object holding every one of them as a number within its
- * limits.
+ * The settings a header's planet may leave out, each then Earth's: those
+ * added after files with planets were first written.
  */
-const parsePlanet = (value: unknown): PlanetSettings | null => {
+const SETTINGS_FILES_MAY_LEAVE_OUT: readonly PlanetSetting[] = Object.freeze([
+	'dayLengthHours',
+]);
+
+/**
+ * Reads planet settings as a header holds them, or checks a world's
+ * before they are written.
+ *
+ * @param value - The settings, of any type at all.
+ * @param mayLeaveOut - The settings that may be missing, each then
+ * Earth's.
+ * @returns New settings holding only the six settings, or null if the
+ * value is not an object, if it is missing a setting that may not be left
+ * out, or if a setting it holds is not a number within its limits.
+ */
+const parsePlanet = (
+	value: unknown,
+	mayLeaveOut: readonly PlanetSetting[],
+): PlanetSettings | null => {
 	if (!isPlainObject(value)) {
 		return null;
 	}
 	const planet: Record<PlanetSetting, number> = { ...DEFAULT_PLANET };
 	for (const name of PLANET_SETTINGS) {
 		const setting = ownField(value, name);
+		if (setting === undefined && mayLeaveOut.includes(name)) {
+			continue;
+		}
 		const { min, max } = PLANET_LIMITS[name];
 		if (typeof setting !== 'number' || !(setting >= min && setting <= max)) {
 			return null;
@@ -291,7 +314,7 @@ const parseHeader = (bytes: Uint8Array): Header | WorldFileFailure => {
 	const planet =
 		planetField === undefined
 			? { ...DEFAULT_PLANET }
-			: parsePlanet(planetField);
+			: parsePlanet(planetField, SETTINGS_FILES_MAY_LEAVE_OUT);
 	if (planet === null) {
 		return failure('bad-planet');
 	}
@@ -350,7 +373,8 @@ export const serializeWorld = (world: World): Uint8Array<ArrayBuffer> => {
 			`A sea level must be a finite number of metres; got ${seaLevel}`,
 		);
 	}
-	const planet = parsePlanet(world.planet);
+	// A file may leave some settings out, but a world must hold them all.
+	const planet = parsePlanet(world.planet, []);
 	if (planet === null) {
 		throw new RangeError(
 			"A planet's settings must each be a number within their limits",
@@ -405,8 +429,9 @@ export const serializeWorld = (world: World): Uint8Array<ArrayBuffer> => {
  * a land fraction from 0 to 1. The planet's settings and the date may be
  * left out, and are then Earth's settings and year zero. Given, the
  * settings must be an object holding every setting as a number within its
- * limits, and the date a finite number from zero up: unlike the sea level,
- * neither is brought within limits.
+ * limits, but for the day length, which may be left out and is then 24
+ * hours; and the date must be a finite number from zero up: unlike the sea
+ * level, neither is brought within limits.
  * Nothing is converted from another type. Fields this version does not
  * know are ignored, and so is anything the parsed objects inherit rather
  * than hold.

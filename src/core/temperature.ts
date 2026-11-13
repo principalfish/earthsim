@@ -61,12 +61,15 @@ import {
 } from './insolation';
 import type { MonthlyTemperature } from './observed';
 import {
+	clampSetting,
 	DEFAULT_PLANET,
 	GREENHOUSE_FACTOR,
 	normalisePlanet,
 	PLANET_LIMITS,
-	PLANET_SETTINGS,
 	type PlanetSettings,
+	TEMPERATURE_SETTINGS,
+	type TemperaturePlanet,
+	temperaturePlanet,
 	yearLengthDays,
 } from './planet';
 import { MAX_ELEVATION_M, MIN_ELEVATION_M, type World } from './world';
@@ -254,8 +257,12 @@ export const TEMPERATURE_MODEL: TemperatureModel = Object.freeze({
 export type TemperatureConditions = {
 	/** The sea level, in metres, as the single-precision number nearest it. */
 	readonly seaLevel: number;
-	/** The planet's settings, as {@link normalisePlanet} gives them. */
-	readonly planet: PlanetSettings;
+	/**
+	 * The planet's settings that the temperature reads, as
+	 * {@link normalisePlanet} gives them. The day length is not one of
+	 * them: the temperature does not depend on it.
+	 */
+	readonly planet: TemperaturePlanet;
 };
 
 /**
@@ -304,7 +311,8 @@ export type TemperatureState = {
  * @remarks
  * A {@link TemperatureResult} is one. The state is used only for the sea
  * level and planet in `solvedFor`; for any other the start is set aside.
- * It is also set aside once its terrain has drifted to
+ * The planet's day length is not part of this: the temperature does not
+ * depend on it. It is also set aside once its terrain has drifted to
  * {@link TemperatureModel.terrainDriftLimitK} or past it. A start set aside
  * leaves the solve starting from nothing: see {@link solveTemperature} for
  * the rules and their order.
@@ -1485,9 +1493,11 @@ const assertOptions = (maxYears: number, tolerance: number): void => {
 /**
  * The sea level and planet a solve of a world is for, in the forms the
  * solver uses them: the sea level as the single-precision number nearest
- * it, as elevations are stored, and the planet as {@link normalisePlanet}
- * gives it. A result's {@link TemperatureResult.solvedFor} is this for the
- * world it was solved for.
+ * it, as elevations are stored, and the planet's settings that the
+ * temperature reads, {@link TEMPERATURE_SETTINGS}, as
+ * {@link normalisePlanet} gives them. A result's
+ * {@link TemperatureResult.solvedFor} is this for the world it was solved
+ * for.
  *
  * @param world - The world. It is not changed.
  * @returns A new object.
@@ -1495,7 +1505,7 @@ const assertOptions = (maxYears: number, tolerance: number): void => {
  */
 export const temperatureConditions = (world: World): TemperatureConditions => ({
 	seaLevel: Math.fround(world.seaLevel),
-	planet: normalisePlanet(world.planet),
+	planet: temperaturePlanet(normalisePlanet(world.planet)),
 });
 
 /**
@@ -1577,7 +1587,9 @@ export const coolingDrift = (
 
 /**
  * Throws unless a start's record is an object of a finite sea level and a
- * planet whose five settings are each a finite number.
+ * planet whose settings the temperature reads, {@link TEMPERATURE_SETTINGS},
+ * are each a finite number. Anything else it holds, such as a day length,
+ * is not read.
  */
 const assertConditions = (value: unknown): void => {
 	if (typeof value !== 'object' || value === null) {
@@ -1594,7 +1606,7 @@ const assertConditions = (value: unknown): void => {
 	if (typeof planet !== 'object' || planet === null) {
 		throw new RangeError("A start's record must hold the planet's settings");
 	}
-	for (const name of PLANET_SETTINGS) {
+	for (const name of TEMPERATURE_SETTINGS) {
 		const setting: unknown = (planet as Record<string, unknown>)[name];
 		if (typeof setting !== 'number' || !Number.isFinite(setting)) {
 			throw new RangeError(
@@ -1607,7 +1619,10 @@ const assertConditions = (value: unknown): void => {
 /**
  * Whether a start's record, already checked, names the sea level and
  * planet of the world being solved, both brought to the forms the solver
- * uses and compared exactly.
+ * uses and compared exactly. Only the settings the temperature reads,
+ * {@link TEMPERATURE_SETTINGS}, are compared, each brought within its
+ * limits by {@link clampSetting}, so a record of another day length, or of
+ * none, names the same planet.
  */
 const sameConditions = (
 	setup: Setup,
@@ -1616,8 +1631,12 @@ const sameConditions = (
 	if (Math.fround(conditions.seaLevel) !== setup.seaLevel) {
 		return false;
 	}
-	const planet = normalisePlanet(conditions.planet);
-	return PLANET_SETTINGS.every((name) => planet[name] === setup.planet[name]);
+	// Setting by setting rather than through normalisePlanet, which refuses
+	// settings without a day length, as a record's may be.
+	return TEMPERATURE_SETTINGS.every(
+		(name) =>
+			clampSetting(name, conditions.planet[name]) === setup.planet[name],
+	);
 };
 
 /**
@@ -1940,8 +1959,10 @@ const solveOnGrid = (
  *
  * 1. Its record, `solvedFor`, must name the world's sea level and planet,
  *    each brought to the forms of {@link temperatureConditions} and
- *    compared exactly. A start set aside here costs only the comparison:
- *    its state is not read.
+ *    compared exactly. Of the planet, only the settings the temperature
+ *    reads, {@link TEMPERATURE_SETTINGS}, are compared: a start solved for
+ *    another day length suits the world. A start set aside here costs only
+ *    the comparison: its state is not read.
  * 2. Its state's terrain must have drifted from its reference, as
  *    {@link coolingDrift} measures it against
  *    {@link TemperatureState.referenceCoolingK} for the world on the grid
@@ -1991,9 +2012,10 @@ const solveOnGrid = (
  * setting is not a number, if `maxYears` is not a whole number from 1 to
  * {@link MAX_YEARS_LIMIT}, if `tolerance` is not finite and above zero, if
  * a model constant is missing or out of range, if `start` is not an object
- * with a state and a record of a finite sea level and five finite planet
- * settings, or if a start that passes the first test has a state that is
- * not valid (see {@link TemperatureState}), on another grid included.
+ * with a state and a record of a finite sea level and a finite number for
+ * each of the planet's {@link TEMPERATURE_SETTINGS}, or if a start that
+ * passes the first test has a state that is not valid (see
+ * {@link TemperatureState}), on another grid included.
  * @throws Whatever `onYear` throws, as it is.
  */
 export const solveTemperature = (
@@ -2044,7 +2066,10 @@ export const solveTemperature = (
 	return {
 		months,
 		state,
-		solvedFor: { seaLevel: setup.seaLevel, planet: setup.planet },
+		solvedFor: {
+			seaLevel: setup.seaLevel,
+			planet: temperaturePlanet(setup.planet),
+		},
 		yearsRun,
 		converged,
 		finalChangeK,

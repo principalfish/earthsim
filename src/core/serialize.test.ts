@@ -7,6 +7,7 @@ import {
 	PLANET_LIMITS,
 	PLANET_SETTINGS,
 	type PlanetSettings,
+	TEMPERATURE_SETTINGS,
 } from './planet';
 import {
 	deserializeWorld,
@@ -34,7 +35,15 @@ const HEADER_LENGTH_OFFSET = 12;
 const BLANK_HEADER = '{"resolution":64,"seaLevel":0,"origin":{"kind":"blank"}}';
 /** Earth's settings and year zero, as the header holds them. */
 const EARTH_PLANET_FIELDS =
-	'"planet":{"axialTiltDeg":23.44,"starBrightness":1,"starMass":1,"orbitDistanceAu":1,"greenhouseStrength":1},"ageYears":0';
+	'"planet":{"axialTiltDeg":23.44,"starBrightness":1,"starMass":1,"orbitDistanceAu":1,"greenhouseStrength":1,"dayLengthHours":24},"ageYears":0';
+/** Earth's settings as written before the day length was. */
+const FIVE_SETTINGS = {
+	axialTiltDeg: 23.44,
+	starBrightness: 1,
+	starMass: 1,
+	orbitDistanceAu: 1,
+	greenhouseStrength: 1,
+};
 /** The header written for a blank 64. */
 const WRITTEN_BLANK_HEADER = `{"resolution":64,"seaLevel":0,"origin":{"kind":"blank"},${EARTH_PLANET_FIELDS}}`;
 const CELLS_64 = FACE_COUNT * 64 * 64;
@@ -258,11 +267,12 @@ describe('serializeWorld', () => {
 				starMass: 0.8,
 				orbitDistanceAu: 1.5,
 				greenhouseStrength: 0,
+				dayLengthHours: 10,
 			},
 			ageYears: 12_000,
 		};
 		expect(headerText(serializeWorld(world))).toBe(
-			'{"resolution":64,"seaLevel":0,"origin":{"kind":"blank"},"planet":{"axialTiltDeg":60,"starBrightness":2.5,"starMass":0.8,"orbitDistanceAu":1.5,"greenhouseStrength":0},"ageYears":12000}',
+			'{"resolution":64,"seaLevel":0,"origin":{"kind":"blank"},"planet":{"axialTiltDeg":60,"starBrightness":2.5,"starMass":0.8,"orbitDistanceAu":1.5,"greenhouseStrength":0,"dayLengthHours":10},"ageYears":12000}',
 		);
 	});
 
@@ -273,6 +283,7 @@ describe('serializeWorld', () => {
 			starMass: 1,
 			orbitDistanceAu: 1,
 			starBrightness: 1,
+			dayLengthHours: 24,
 			axialTiltDeg: 23.44,
 		} as PlanetSettings;
 		expect(
@@ -326,6 +337,7 @@ describe('serializeWorld', () => {
 				starMass: 0.1 + 0.7,
 				orbitDistanceAu: 2 / 3 + 1e-15,
 				greenhouseStrength: 0.1 + 0.2,
+				dayLengthHours: 2 / 3 + 3,
 			},
 			ageYears: 1.2345678901234567e300,
 		};
@@ -392,6 +404,12 @@ describe('serializeWorld', () => {
 				).toThrow(RangeError);
 			}
 		}
+	});
+
+	it('refuses a world whose planet has no day length, which a file may leave out but a world may not', () => {
+		const { dayLengthHours: _, ...planet } = DEFAULT_PLANET;
+		const world = { ...createBlankWorld(64), planet } as World;
+		expect(() => serializeWorld(world)).toThrow(RangeError);
 	});
 
 	it('refuses a world whose date is negative or not finite', () => {
@@ -469,6 +487,7 @@ describe('a round trip', () => {
 				starMass: 0.1,
 				orbitDistanceAu: 0.3,
 				greenhouseStrength: 0,
+				dayLengthHours: 3,
 			},
 			{
 				axialTiltDeg: 90,
@@ -476,6 +495,7 @@ describe('a round trip', () => {
 				starMass: 10,
 				orbitDistanceAu: 3,
 				greenhouseStrength: 3,
+				dayLengthHours: 720,
 			},
 			{
 				axialTiltDeg: 0.1 + 0.2,
@@ -483,6 +503,7 @@ describe('a round trip', () => {
 				starMass: Math.PI,
 				orbitDistanceAu: Math.SQRT2,
 				greenhouseStrength: 2 / 3,
+				dayLengthHours: 10,
 			},
 		];
 		const base = sculptedWorld(64);
@@ -633,6 +654,33 @@ describe('deserializeWorld', () => {
 		expect(undated.ageYears).toBe(0);
 	});
 
+	it('reads a planet of five settings and no day length, as written before the day length was, as a day of 24 hours', () => {
+		const read = worldOf(
+			fileWithHeader({
+				...JSON.parse(BLANK_HEADER),
+				planet: { ...FIVE_SETTINGS, axialTiltDeg: 45 },
+				ageYears: 3,
+			}),
+		);
+		expect(read.planet).toEqual({
+			...DEFAULT_PLANET,
+			axialTiltDeg: 45,
+			dayLengthHours: 24,
+		});
+		expect(Object.keys(read.planet)).toEqual(PLANET_SETTINGS);
+		expect(read.ageYears).toBe(3);
+	});
+
+	it('keeps a day length of 10 hours through a round trip', () => {
+		const world: World = {
+			...createBlankWorld(64),
+			planet: { ...DEFAULT_PLANET, dayLengthHours: 10 },
+		};
+		const bytes = serializeWorld(world);
+		expect(headerText(bytes)).toContain('"dayLengthHours":10}');
+		expect(worldOf(bytes).planet.dayLengthHours).toBe(10);
+	});
+
 	it('gives a world read without a planet settings of its own', () => {
 		const first = worldOf(fileOf());
 		const second = worldOf(fileOf());
@@ -640,7 +688,7 @@ describe('deserializeWorld', () => {
 		expect(first.planet).not.toBe(DEFAULT_PLANET);
 	});
 
-	it('reads a planet as its five settings alone, whatever else it holds', () => {
+	it('reads a planet as its six settings alone, whatever else it holds', () => {
 		const read = worldOf(
 			fileWithHeader({
 				...JSON.parse(BLANK_HEADER),
@@ -965,10 +1013,12 @@ describe('a file that is refused', () => {
 				'bad-planet',
 			);
 		}
-		for (const name of PLANET_SETTINGS) {
-			const { min, max } = PLANET_LIMITS[name];
+		for (const name of TEMPERATURE_SETTINGS) {
 			const { [name]: _left, ...missing } = DEFAULT_PLANET;
 			expect(errorOf(withPlanet(missing)), `no ${name}`).toBe('bad-planet');
+		}
+		for (const name of PLANET_SETTINGS) {
+			const { min, max } = PLANET_LIMITS[name];
 			for (const value of [
 				null,
 				'1',
@@ -991,6 +1041,19 @@ describe('a file that is refused', () => {
 			).replace(`"${name}":${DEFAULT_PLANET[name]}`, `"${name}":1e999`)}}`;
 			expect(errorOf(fileOf({ header })), `${name}: 1e999`).toBe('bad-planet');
 		}
+	});
+
+	it('has a bad planet when its day length is there but is not a number from 3 to 720', () => {
+		const withDay = (dayLengthHours: unknown): Uint8Array =>
+			fileWithHeader({
+				...JSON.parse(BLANK_HEADER),
+				planet: { ...FIVE_SETTINGS, dayLengthHours },
+			});
+		for (const value of [2, 721, 2.999, 720.001, 0, -24, '24', null, true]) {
+			expect(errorOf(withDay(value)), JSON.stringify(value)).toBe('bad-planet');
+		}
+		expect(worldOf(withDay(3)).planet.dayLengthHours).toBe(3);
+		expect(worldOf(withDay(720)).planet.dayLengthHours).toBe(720);
 	});
 
 	it('has a bad age when the date is not a finite number from zero up', () => {
