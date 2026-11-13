@@ -12,7 +12,7 @@ Not included: winds carrying heat (temperature is unchanged by this step), upper
 
 ## Plan
 
-_2026-11-13 · 3 of 15 pieces done · now: waiting on a decision_
+_2026-11-13 · 3 of 15 pieces done · now: piece 4 in progress_
 
 - [x] **1/15 Observed winds and pressure data** · `69d3619`
   The real Earth's monthly winds and sea-level pressure as two small data files, with readers that take them onto a world's cells.
@@ -20,7 +20,7 @@ _2026-11-13 · 3 of 15 pieces done · now: waiting on a decision_
   Gradient, divergence, curl, smoothing and east/north directions on the cubed-sphere grid.
 - [x] **3/15 Day length on the world** · `0bdca21`
   A sixth planet setting, 3 hours to 30 days, saved with the world; older files load with 24 hours.
-- [ ] **4/15 Wind report with the observed Earth** · waiting on you
+- [ ] **4/15 Wind report with the observed Earth** · in progress
   A script that writes a page of wind and pressure maps, starting with the real Earth in January and July.
 - [ ] **5/15 Prototype: rules plus a pressure map** · not started
   A rough wind model from pressure bands and thermal highs and lows, shown in the report on every case.
