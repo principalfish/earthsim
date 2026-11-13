@@ -49,6 +49,8 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - The model's improvements are judged right in kind and time-boxed (stop when the listed faults are better in kind or after about ten tuning rounds; keep a change only if no case gets worse in kind). Each Earth figure may worsen by up to 2% of its value from non-tuning changes; any trade between figures comes to the user with the numbers before it is kept. The user: "Right in kind, small margin (Recommended)" (2026-11-13)
 - Piece 7c adds a soft cap on cold highs, set well above the warm cap so the Earth is unchanged, to stop runaway pressure on extreme worlds; checked on the 60° cases and a cold, distant-orbit world. The user: "yes" (2026-11-13)
 - Piece 7c builds a tuning script (`npm run tune:winds`) that sweeps and searches the model's settings and prints the Earth's error figures; it proposes values and does not judge: a value is kept only if the other cases stay right in kind and the literature checks hold, to guard against overfitting to the Earth. The user: "yes definitely construct a script for 7c" (2026-11-13)
+- The page side of "day length alone never re-solves the temperature" is done in piece 8, not piece 10 (this replaces the earlier "With the slider, piece 10"): a day-length change alone goes to the winds only. The user: "Do it in piece 8 (Recommended)" (2026-11-13)
+- An overtaken wind solve is left to finish and its answer ignored, keeping the worker and its grid tables. The user: "Let it finish, ignore it (Recommended)" (2026-11-13)
 - The flaky observed-temperature test gets a timeout in piece 2. The user: "Yes, fold it in" (2026-11-13)
 
 - Piece 2 adds a direct Laplacian operator, accurate at the cube's seams. The user: "A: add it now" (2026-11-13)
