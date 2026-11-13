@@ -249,10 +249,15 @@ export const isSupportedResolution = (n: number): n is Resolution =>
 /**
  * The direction of a point given in continuous face coordinates.
  *
+ * @remarks
+ * Coordinates a little outside 0 to 1, by less than a half, are allowed:
+ * they continue the face's equiangular coordinates past its edge and give
+ * points beyond it, on the faces next to it.
+ *
  * @param face - Face index, 0 to 5.
- * @param s - Position along the face's `u` axis, 0 to 1.
- * @param t - Position along the face's `v` axis, 0 to 1.
- * @returns The unit vector through that point of the face.
+ * @param s - Position along the face's `u` axis, 0 to 1 on the face.
+ * @param t - Position along the face's `v` axis, 0 to 1 on the face.
+ * @returns The unit vector through that point.
  * @throws RangeError if `face` is not a face index.
  */
 export const faceToDirection = (face: number, s: number, t: number): Vec3 => {
@@ -655,8 +660,18 @@ const arcBetween = (
 /**
  * The directions of the corners of one face's cells: corner `(i, j)`, for
  * `i` and `j` from 0 to n, at `3 * (j * (n + 1) + i)`.
+ *
+ * @remarks
+ * A corner on a cube edge is placed exactly on it, so it is the same point
+ * seen from either face, to rounding. Each call builds a new array of
+ * `3 (n + 1)²` values; it is meant for building per-grid geometry once.
+ *
+ * @param n - Cells along a face edge.
+ * @param face - Face index, 0 to 5.
+ * @returns A new array, owned by the caller.
+ * @throws RangeError if `face` is not a face index.
  */
-const faceCorners = (n: number, face: number): Float64Array => {
+export const faceCorners = (n: number, face: number): Float64Array => {
 	const { normal, u, v } = faceAxes(face);
 	const stride = n + 1;
 	const tangents = new Float64Array(stride);
@@ -683,6 +698,32 @@ const faceCorners = (n: number, face: number): Float64Array => {
 	return corners;
 };
 
+/**
+ * The corners at the two ends of each side of a cell, as offsets into the
+ * layout of {@link faceCorners} from the cell's own corner `(i, j)`.
+ *
+ * @remarks
+ * Side `k`, in neighbour order `-i`, `+i`, `-j`, `+j`, runs from corner
+ * `first[k]` to corner `second[k]`: the `-i` side from `(i, j)` to
+ * `(i, j + 1)`, the `+i` side from `(i + 1, j)` to `(i + 1, j + 1)`, the
+ * `-j` side from `(i, j)` to `(i + 1, j)` and the `+j` side from
+ * `(i, j + 1)` to `(i + 1, j + 1)`.
+ *
+ * @param n - Cells along a face edge.
+ */
+export const sideCorners = (
+	n: number,
+): {
+	readonly first: readonly number[];
+	readonly second: readonly number[];
+} => {
+	const stride = n + 1;
+	return {
+		first: [0, 1, 0, stride],
+		second: [stride, stride + 1, 1, stride + 1],
+	};
+};
+
 const buildEdgeGeometry = (grid: Grid): EdgeGeometry => {
 	const { n, cellCount, centres, neighbours: all } = grid;
 	const size = NEIGHBOUR_COUNT * cellCount;
@@ -690,10 +731,7 @@ const buildEdgeGeometry = (grid: Grid): EdgeGeometry => {
 	const distances = new Float64Array(size);
 	const weights = new Float64Array(size);
 	const stride = n + 1;
-	// The corners at the two ends of each side of a cell, in neighbour
-	// order (-i, +i, -j, +j), as offsets from the cell's corner (i, j).
-	const firstEnd = [0, 1, 0, stride];
-	const secondEnd = [stride, stride + 1, 1, stride + 1];
+	const { first: firstEnd, second: secondEnd } = sideCorners(n);
 	let cell = 0;
 	for (let face = 0; face < FACE_COUNT; face++) {
 		const corners = faceCorners(n, face);

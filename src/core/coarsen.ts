@@ -1,7 +1,7 @@
 /**
  * Moving between a grid and the one a step coarser: a world averaged onto
- * the coarser grid, and a field on the coarser grid carried back onto the
- * finer.
+ * the coarser grid, and a field or a vector field on the coarser grid
+ * carried back onto the finer.
  *
  * The grids nest exactly: coarse cell `(face, i, j)` covers the four cells
  * `(face, 2i … 2i + 1, 2j … 2j + 1)` of the grid with twice as many cells
@@ -19,6 +19,7 @@ import {
 	SUPPORTED_RESOLUTIONS,
 	type Vec3,
 } from './grid';
+import type { VectorField } from './vector';
 import type { World } from './world';
 
 /** The four coarse cells, and their weights, that make up each fine cell. */
@@ -422,6 +423,77 @@ export const refineField = (
 				((coarse[cells[first + 2] as number] as number) - base) +
 			(weights[first + 3] as number) *
 				((coarse[cells[first + 3] as number] as number) - base);
+	}
+	return result;
+};
+
+/**
+ * A vector field on the grid a step coarser carried onto a fine grid: each
+ * of its three components by {@link refineField}, and the result made
+ * tangent to the sphere at each fine cell's centre by dropping its part
+ * along the centre's direction.
+ *
+ * @remarks
+ * Interpolating the components in three dimensions, rather than eastward
+ * and northward ones, treats every direction alike, the poles included.
+ * The fine vectors are not rescaled after the projection: where the coarse
+ * vectors around a fine cell turn, its vector comes out a little shorter
+ * than theirs, as any average of them would.
+ *
+ * @param coarse - One tangent vector per cell of the grid a step coarser
+ * than `resolution`. It is not changed.
+ * @param resolution - The fine grid's cells along a face edge: 128 or 256.
+ * @param into - Where to write the fine vectors, one per fine cell; new
+ * arrays when left out.
+ * @returns `into`, or the new arrays.
+ * @throws RangeError if the resolution is not supported or is the
+ * coarsest, or if any array of `coarse` or `into` has the wrong length.
+ */
+export const refineVectors = (
+	coarse: VectorField,
+	resolution: number,
+	into?: VectorField,
+): VectorField => {
+	assertRefinable(resolution);
+	const fine = getGrid(resolution);
+	const result = into ?? {
+		x: new Float64Array(fine.cellCount),
+		y: new Float64Array(fine.cellCount),
+		z: new Float64Array(fine.cellCount),
+	};
+	// Every length is checked before any array is written.
+	const coarseCount = fine.cellCount / 4;
+	for (const name of ['x', 'y', 'z'] as const) {
+		const length = coarse[name]?.length;
+		if (length !== coarseCount) {
+			throw new RangeError(
+				`A field a step coarser than ${resolution} cells per face edge has ${coarseCount} values; its ${name} components have ${length}`,
+			);
+		}
+	}
+	for (const name of ['x', 'y', 'z'] as const) {
+		const length = result[name]?.length;
+		if (length !== fine.cellCount) {
+			throw new RangeError(
+				`A field on ${resolution} cells per face edge has ${fine.cellCount} values; the output's ${name} components have ${length}`,
+			);
+		}
+	}
+	const x = refineField(coarse.x, resolution, result.x);
+	const y = refineField(coarse.y, resolution, result.y);
+	const z = refineField(coarse.z, resolution, result.z);
+	const { centres, cellCount } = fine;
+	for (let cell = 0; cell < cellCount; cell++) {
+		const cx = centres[3 * cell] as number;
+		const cy = centres[3 * cell + 1] as number;
+		const cz = centres[3 * cell + 2] as number;
+		const vx = x[cell] as number;
+		const vy = y[cell] as number;
+		const vz = z[cell] as number;
+		const outward = vx * cx + vy * cy + vz * cz;
+		x[cell] = vx - outward * cx;
+		y[cell] = vy - outward * cy;
+		z[cell] = vz - outward * cz;
 	}
 	return result;
 };

@@ -16,8 +16,8 @@
 
 import {
 	PLANET_SETTINGS,
-	type PlanetSetting,
-	type PlanetSettings,
+	TEMPERATURE_SETTINGS,
+	temperaturePlanet,
 } from './planet';
 import type { TerrainStats } from './stats';
 import type {
@@ -168,14 +168,15 @@ const isFiniteNumber = (value: unknown): value is number =>
 
 /**
  * Whether a value is a record of what a temperature result was solved
- * for: a finite sea level and a planet whose every setting is a finite
- * number.
+ * for: a finite sea level and a planet whose every setting the temperature
+ * reads, {@link TEMPERATURE_SETTINGS}, is a finite number. Anything else
+ * the planet holds, such as a day length, is not checked.
  */
 const isConditionsShaped = (value: unknown): value is TemperatureConditions =>
 	isRecord(value) &&
 	isFiniteNumber(value.seaLevel) &&
 	isRecord(value.planet) &&
-	PLANET_SETTINGS.every((name) =>
+	TEMPERATURE_SETTINGS.every((name) =>
 		isFiniteNumber((value.planet as Record<string, unknown>)[name]),
 	);
 
@@ -194,16 +195,16 @@ const isTemperatureStartShaped = (value: unknown): value is TemperatureStart =>
 	isConditionsShaped(value.solvedFor) &&
 	isStateShaped(value.state);
 
-/** A copy of a checked record, holding only the sea level and planet. */
+/**
+ * A copy of a checked record, holding only the sea level and the planet's
+ * settings that the temperature reads.
+ */
 const copyConditions = (
 	conditions: TemperatureConditions,
-): TemperatureConditions => {
-	const planet = {} as Record<PlanetSetting, number>;
-	for (const name of PLANET_SETTINGS) {
-		planet[name] = conditions.planet[name];
-	}
-	return { seaLevel: conditions.seaLevel, planet: planet as PlanetSettings };
-};
+): TemperatureConditions => ({
+	seaLevel: conditions.seaLevel,
+	planet: temperaturePlanet(conditions.planet),
+});
 
 /**
  * Reads what a message of each kind carries besides the world it has
@@ -224,7 +225,7 @@ const PAYLOADS: {
 			return { world };
 		}
 		if (!isTemperatureStartShaped(start)) {
-			return "A temperature request's start must be an object whose solvedFor has a finite seaLevel and a planet of finite settings and whose state has temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number";
+			return "A temperature request's start must be an object whose solvedFor has a finite seaLevel and a planet whose settings, the day length aside, are finite, and whose state has temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number";
 		}
 		// Only what a solve starts from is taken, whatever else came with it.
 		return {

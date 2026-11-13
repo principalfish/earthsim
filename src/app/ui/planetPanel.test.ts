@@ -50,9 +50,10 @@ const planetWith = (changes: Partial<PlanetSettings>): PlanetSettings => ({
 });
 
 describe('the planet sliders', () => {
-	it('set each of the settings once, in the order of the settings', () => {
+	it('set each of the settings but the day length once, in the order of the settings', () => {
+		// The day length has no slider: it stays as the world holds it.
 		expect(PLANET_SLIDERS.map((slider) => slider.setting)).toEqual(
-			PLANET_SETTINGS,
+			PLANET_SETTINGS.filter((name) => name !== 'dayLengthHours'),
 		);
 	});
 
@@ -654,6 +655,7 @@ describe('createPlanetPanel', () => {
 			starMass: 10,
 			orbitDistanceAu: 0.3,
 			greenhouseStrength: 0,
+			dayLengthHours: 24,
 		};
 		const { inputs, changes, sunlight, year, region } = make(planet);
 		expect(inputs.map((input) => input.value)).toEqual([

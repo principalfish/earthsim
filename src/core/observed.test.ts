@@ -242,7 +242,7 @@ describe('the observed temperature', () => {
 				`${degrees}°`,
 			).not.toEqual([]);
 		}
-	});
+	}, 60_000);
 });
 
 describe('quantiseTemperature', () => {

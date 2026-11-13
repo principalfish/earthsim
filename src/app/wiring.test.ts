@@ -631,7 +631,7 @@ describe('the start of the page', () => {
 			'toolPanel.setHistoryState false false',
 			`globe.setWorld ${describeWorld(world)}`,
 			'viewPanel.setSeaLevel 250',
-			'planetPanel.setPlanet 45 1 2 1 1',
+			'planetPanel.setPlanet 45 1 2 1 1 24',
 			`worldPanel.setDescription ${describeWorld(world)}`,
 			'statistics.reset',
 			'statistics.refresh',
@@ -965,7 +965,7 @@ describe('the planet controls', () => {
 		stage.worldPanelOptions.onImport(new Blob());
 		await settle();
 
-		expect(stage.log).toContain('planetPanel.setPlanet 23.44 1 0.5 2 1');
+		expect(stage.log).toContain('planetPanel.setPlanet 23.44 1 0.5 2 1 24');
 		expect(
 			stage.log.filter((entry) => entry === 'autosave.markChanged'),
 		).toHaveLength(1);

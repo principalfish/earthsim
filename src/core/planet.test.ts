@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	clampSetting,
 	DEFAULT_AGE_YEARS,
 	DEFAULT_PLANET,
 	EARTH_YEAR_DAYS,
@@ -9,11 +10,17 @@ import {
 	PLANET_LIMITS,
 	PLANET_SETTINGS,
 	type PlanetSettings,
+	rotationRate,
 	sunlightRelativeToEarth,
+	TEMPERATURE_SETTINGS,
+	TRUSTED_DAY_MAX_HOURS,
+	TRUSTED_DAY_MIN_HOURS,
 	TRUSTED_WARMTH_MAX,
 	TRUSTED_WARMTH_MIN,
+	temperaturePlanet,
 	trustNote,
 	warmthRelativeToEarth,
+	windTrustNote,
 	yearLengthDays,
 } from './planet';
 import { TEMPERATURE_MODEL } from './temperature';
@@ -38,6 +45,7 @@ describe('the settings', () => {
 			starMass: 1,
 			orbitDistanceAu: 1,
 			greenhouseStrength: 1,
+			dayLengthHours: 24,
 		});
 		expect(DEFAULT_AGE_YEARS).toBe(0);
 	});
@@ -49,12 +57,23 @@ describe('the settings', () => {
 			starMass: { min: 0.1, max: 10 },
 			orbitDistanceAu: { min: 0.3, max: 3 },
 			greenhouseStrength: { min: 0, max: 3 },
+			dayLengthHours: { min: 3, max: 720 },
 		});
 	});
 
 	it('are listed once each, in the order Earth’s are', () => {
 		expect(PLANET_SETTINGS).toEqual(Object.keys(DEFAULT_PLANET));
 		expect(Object.keys(PLANET_LIMITS)).toEqual(PLANET_SETTINGS);
+	});
+
+	it('that the temperature reads are every one but the day length, in order', () => {
+		expect(TEMPERATURE_SETTINGS).toEqual([
+			'axialTiltDeg',
+			'starBrightness',
+			'starMass',
+			'orbitDistanceAu',
+			'greenhouseStrength',
+		]);
 	});
 
 	it('start within their limits', () => {
@@ -71,6 +90,7 @@ describe('the settings', () => {
 		expect(Object.isFrozen(PLANET_LIMITS)).toBe(true);
 		expect(Object.isFrozen(PLANET_LIMITS.starMass)).toBe(true);
 		expect(Object.isFrozen(PLANET_SETTINGS)).toBe(true);
+		expect(Object.isFrozen(TEMPERATURE_SETTINGS)).toBe(true);
 	});
 
 	it('are plain data that survive a structured clone', () => {
@@ -88,6 +108,7 @@ describe('normalisePlanet', () => {
 			starMass: 2,
 			orbitDistanceAu: 1.5,
 			greenhouseStrength: 0,
+			dayLengthHours: 10,
 		};
 		expect(normalisePlanet(planet)).toEqual(planet);
 		expect(normalisePlanet(DEFAULT_PLANET)).toEqual(DEFAULT_PLANET);
@@ -127,6 +148,19 @@ describe('normalisePlanet', () => {
 		},
 	);
 
+	it('brings the day length within 3 to 720 hours, and rejects one that is not a number', () => {
+		const day = (hours: unknown): number =>
+			normalisePlanet({ ...DEFAULT_PLANET, dayLengthHours: hours as number })
+				.dayLengthHours;
+		expect(day(2)).toBe(3);
+		expect(day(721)).toBe(720);
+		expect(day(10)).toBe(10);
+		expect(() => day('24')).toThrow(RangeError);
+		expect(() => day(Number.NaN)).toThrow(RangeError);
+		const { dayLengthHours: _, ...noDay } = DEFAULT_PLANET;
+		expect(() => normalisePlanet(noDay as PlanetSettings)).toThrow(RangeError);
+	});
+
 	it('turns a negative zero into zero', () => {
 		const normalised = normalisePlanet(
 			planetWith({ axialTiltDeg: -0, greenhouseStrength: -0 }),
@@ -135,7 +169,7 @@ describe('normalisePlanet', () => {
 		expect(Object.is(normalised.greenhouseStrength, 0)).toBe(true);
 	});
 
-	it('keeps only the five settings, in their order', () => {
+	it('keeps only the six settings, in their order', () => {
 		const planet = {
 			moons: 3,
 			...planetWith({ greenhouseStrength: 2 }),
@@ -324,6 +358,70 @@ describe('trustNote', () => {
 		expect(trustNote(lit(1, 0))).toBe('cold');
 		expect(trustNote(lit(1, 3))).toBe('hot');
 		expect(trustNote(lit(0.6, 3))).toBeNull();
+	});
+});
+
+describe('clampSetting', () => {
+	it('brings a value within its setting’s limits, and leaves one within them', () => {
+		expect(clampSetting('dayLengthHours', 2)).toBe(3);
+		expect(clampSetting('dayLengthHours', Number.POSITIVE_INFINITY)).toBe(720);
+		expect(clampSetting('starMass', 2)).toBe(2);
+		expect(Object.is(clampSetting('axialTiltDeg', -0), 0)).toBe(true);
+	});
+});
+
+describe('temperaturePlanet', () => {
+	it('gives a new copy of the settings the temperature reads, and nothing else', () => {
+		const planet = planetWith({ starMass: 2, dayLengthHours: 10 });
+		const read = temperaturePlanet(planet);
+		expect(read).toEqual({
+			axialTiltDeg: 23.44,
+			starBrightness: 1,
+			starMass: 2,
+			orbitDistanceAu: 1,
+			greenhouseStrength: 1,
+		});
+		expect(Object.keys(read)).toEqual(TEMPERATURE_SETTINGS);
+		expect(temperaturePlanet(read)).not.toBe(read);
+	});
+});
+
+describe('rotationRate', () => {
+	it('is one full turn a day: 2π over 86,400 seconds for Earth', () => {
+		expect(rotationRate(DEFAULT_PLANET)).toBe((2 * Math.PI) / 86_400);
+	});
+
+	it('is about 0.3% below Earth’s true rate for Earth’s 24 hours', () => {
+		const sidereal = (2 * Math.PI) / 86_164.1;
+		expect(1 - rotationRate(DEFAULT_PLANET) / sidereal).toBeCloseTo(0.0027, 4);
+	});
+
+	it('halves when the day doubles', () => {
+		const day = (hours: number): number =>
+			rotationRate(planetWith({ dayLengthHours: hours }));
+		expect(day(48)).toBe(day(24) / 2);
+		expect(day(10)).toBe(day(20) * 2);
+	});
+});
+
+describe('windTrustNote', () => {
+	const day = (hours: number): PlanetSettings =>
+		planetWith({ dayLengthHours: hours });
+
+	it('trusts the band from 6 to 96 hours, both ends included', () => {
+		expect(TRUSTED_DAY_MIN_HOURS).toBe(6);
+		expect(TRUSTED_DAY_MAX_HOURS).toBe(96);
+		expect(windTrustNote(day(6))).toBeNull();
+		expect(windTrustNote(day(24))).toBeNull();
+		expect(windTrustNote(day(96))).toBeNull();
+		expect(windTrustNote(DEFAULT_PLANET)).toBeNull();
+	});
+
+	it('is rough on the fast side below the band, and the slow above', () => {
+		expect(windTrustNote(day(5.9))).toBe('fast');
+		expect(windTrustNote(day(3))).toBe('fast');
+		expect(windTrustNote(day(96.1))).toBe('slow');
+		expect(windTrustNote(day(720))).toBe('slow');
 	});
 });
 

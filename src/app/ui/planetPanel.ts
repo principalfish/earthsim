@@ -349,7 +349,7 @@ export type PlanetPanelOptions = {
 	/** The settings shown at first. */
 	readonly planet: PlanetSettings;
 	/**
-	 * Called with the new settings, all five, whenever a slider moves and
+	 * Called with the new settings, every one, whenever a slider moves and
 	 * when Earth's are put back.
 	 */
 	readonly onChange: (planet: PlanetSettings) => void;

@@ -649,6 +649,14 @@ describe('isMeasuredEarth', () => {
 		expect(isMeasuredEarth(world)).toBe(true);
 	});
 
+	it('does not hold with a day of 10 hours, and holds again at 24', () => {
+		const world = freshEarth(64);
+		world.planet = { ...DEFAULT_PLANET, dayLengthHours: 10 };
+		expect(isMeasuredEarth(world)).toBe(false);
+		world.planet = { ...DEFAULT_PLANET, dayLengthHours: 24 };
+		expect(isMeasuredEarth(world)).toBe(true);
+	});
+
 	it('does not hold for a generated or a blank world, even with the Earth’s terrain', () => {
 		expect(
 			isMeasuredEarth(

@@ -52,6 +52,6 @@ The data and timing scripts are listed in [Development](docs/development.md).
 ## Data credits
 
 - **Elevation:** NOAA's ETOPO 2022 global relief model (CC0-1.0).
-- **Observed temperature:** NOAA/CIRES/DOE 20th Century Reanalysis V3, provided by the NOAA PSL, Boulder, Colorado, USA (CC0-1.0).
+- **Observed temperature, winds and pressure:** NOAA/CIRES/DOE 20th Century Reanalysis V3, provided by the NOAA PSL, Boulder, Colorado, USA (CC0-1.0).
 
 Full citations, licences and caveats are in [Data](docs/data.md).

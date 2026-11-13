@@ -1,13 +1,15 @@
 # Data
 
-The two Earth data files in `public/data/`: what they hold, where they come from, their licences, and how to rebuild them.
+The four Earth data files in `public/data/`: what they hold, where they come from, their licences, and how to rebuild them.
 
 | File | What it holds | Size |
 |-|-|-|
 | `earth-256.bin` | The Earth's elevation on the finest grid | 786,432 bytes |
 | `earth-temperature-1deg.bin` | The Earth's observed monthly air temperature | 781,920 bytes |
+| `earth-wind-1deg.bin` | The Earth's observed monthly surface winds | 1,563,840 bytes |
+| `earth-pressure-1deg.bin` | The Earth's observed monthly sea-level pressure | 781,920 bytes |
 
-Both builds download their source into `.cache/`, which is not committed, and reuse it afterwards. The download is checked against a pinned length and SHA-256 at every run, and a file whose SHA-256 differs is deleted. Both builds give the same bytes every time.
+Every build downloads its sources into `.cache/`, which is not committed, and reuses them afterwards. Each download is checked against a pinned length and SHA-256 at every run, and a file whose SHA-256 differs is deleted. Every build gives the same bytes every time.
 
 ## Elevation
 
@@ -90,3 +92,51 @@ npm run build:observed-temperature -- --verify-with-gdal
 This compares about 2,200 points, every month at each, with GDAL's `gdallocationinfo`, both with the file's rows as they are and turned north side up, and stops if any differs.
 
 When the committed file was built, on 2026-11-11 with GDAL 3.12.2, those values matched bit for bit, as did all 781,920 values in a separate comparison with the whole variable as `gdal_translate` decodes it.
+
+## Observed winds and pressure
+
+The mean wind 10 m above the ground or the sea and the mean air pressure reduced to sea level, for each month, averaged over 1981 to 2010. One build writes both files.
+
+### Format
+
+- **Grid:** the same as the observed temperature's: 181 latitudes from 90° N to 90° S and 360 longitudes eastward from 0°. The core interpolates it onto a world's cells when needed: the pressure exactly as the temperature, the wind as a vector, so that a wind blowing across a pole is not cancelled by averaging eastward winds from either side of it.
+- **Winds:** two components, eastward and northward, each one signed byte `b` standing for `0.25 × b` m/s, so the file can hold −32 to 31.75 m/s in quarter steps. The source's eastward wind runs from −10.49 to 11.16 m/s and its northward from −10.24 to 13.75 m/s. Storing a value moves it by at most 0.125 m/s.
+- **Pressure:** one unsigned byte `b` standing for `940 + 0.5 × b` hPa, so the file can hold 940 to 1,067.5 hPa in half steps. The source runs from 978.42 to 1,036.70 hPa. Storing a value moves it by at most 0.25 hPa.
+- **Order of the wind file:** month by month; within a month the whole eastward grid, then the whole northward grid; each grid row by row from the north, then column by column from 0° E; no header (12 × 2 × 181 × 360 bytes).
+- **Order of the pressure file:** as the temperature's: month by month, then row by row from the north, then column by column from 0° E, with no header (12 × 181 × 360 bytes).
+
+### Source
+
+NOAA's Twentieth Century Reanalysis, the same dataset as the observed temperature.
+
+- **Product:** NOAA/CIRES/DOE 20th Century Reanalysis (V3), the long-term monthly means of the 10 m wind and of the sea-level pressure (the mean of the 80 ensemble members), as three netCDF-3 files laid out as the temperature's is. Their rows run from the South Pole to the North Pole; the build turns them over.
+  - `uwnd.10m.mon.ltm.nc`, the eastward wind (variable `uwnd`, in m/s), from <https://downloads.psl.noaa.gov/Datasets/20thC_ReanV3/Derived/Monthlies/10mSI-MO/>.
+  - `vwnd.10m.mon.ltm.nc`, the northward wind (variable `vwnd`, in m/s), from the same folder.
+  - `prmsl.mon.ltm.nc`, the sea-level pressure (variable `prmsl`, in pascals; the build divides by 100 for hectopascals), from <https://downloads.psl.noaa.gov/Datasets/20thC_ReanV3/Derived/Monthlies/miscSI-MO/>.
+- **Checksums:**
+  - `uwnd.10m.mon.ltm.nc`: 3,135,968 bytes, SHA-256 `4450426e3ca074f78af0126515d3d14e5245789be68b8d1d21e9f84d694b794d`.
+  - `vwnd.10m.mon.ltm.nc`: 3,135,968 bytes, SHA-256 `9a8432467c7c2274cde58144897e699d50d8f92f72c2f162b894d37e9d6002f9`.
+  - `prmsl.mon.ltm.nc`: 4,699,888 bytes, SHA-256 `841c8ac2a878899f1d2bed9560dc004c60f59bf0b6542d4ff70da5b95be56c8c`.
+- **Caveat:** the reanalysis assimilates only surface pressure observations, so its sea-level pressure is the most closely tied to measurements of its fields; its winds are the model's, shaped by those pressures and by the prescribed sea surface temperature and sea ice.
+- **Licence:** the same as the observed temperature's, CC0-1.0, in the words quoted under [Observed temperature](#observed-temperature) from the dataset's record at NOAA PSL, read on 2026-11-11.
+- **Acknowledgement and reference:** as for the observed temperature: data provided by the NOAA PSL, Boulder, Colorado, USA, from their website at <https://psl.noaa.gov>, with the support statement and the reference (Slivinski et al., 2019, https://doi.org/10.1002/qj.3598) given there.
+
+### Rebuilding
+
+```bash
+npm run build:observed-winds
+```
+
+It downloads the three sources, about 11 MB in all, into `.cache/observed/`, and takes about a second once they are there. The build stops rather than write a value outside the range its file can hold, and checks that storing moved no value by more than half a step.
+
+### Verification
+
+The script reads the netCDF files with the project's own small reader. To check it against GDAL:
+
+```bash
+npm run build:observed-winds -- --verify-with-gdal
+```
+
+This compares the same points as the temperature's build, every month at each, for each of the three variables, with GDAL's `gdallocationinfo`, both with the files' rows as they are and turned north side up, and stops if any differs. Without GDAL installed it says so and carries on.
+
+When the committed files were built, on 2026-11-13 with GDAL 3.12.2, all 26,556 values compared (2,213 points, every month) matched bit for bit for each of `uwnd`, `vwnd` and `prmsl`, in both orders. Two builds gave the same bytes: SHA-256 `4b259f809ca26ba5ca92e72e219f3dd7664a76dd22c5dc94045c6e0d2b5c9711` for `earth-wind-1deg.bin` and `f798ccc777433ba21e7bc351547ba8a3e9d54d8a0885a17ca4cee0628387d61c` for `earth-pressure-1deg.bin`.

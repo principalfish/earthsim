@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { readEarthDataFile } from '../../scripts/earth/dataFile.mjs';
-import { coarsenWorld, refineField, refinementStencil } from './coarsen';
+import {
+	coarsenWorld,
+	refineField,
+	refinementStencil,
+	refineVectors,
+} from './coarsen';
 import { decodeEarth, earthWorld } from './earth';
 import { generateWorld } from './generate';
 import {
@@ -14,6 +19,7 @@ import {
 import { cellLatitudes, MONTHS_PER_YEAR } from './insolation';
 import { DEFAULT_PLANET } from './planet';
 import { refineMonths, TEMPERATURE_MODEL, ZERO_CELSIUS_K } from './temperature';
+import { createVectorField, type VectorField } from './vector';
 import { createBlankWorld, type World } from './world';
 
 const EARTH = decodeEarth(readEarthDataFile());
@@ -546,6 +552,116 @@ describe('refineField', () => {
 			),
 		).toThrow(RangeError);
 		expect(() => refineField(new Float64Array(6), 64)).toThrow(RangeError);
+	});
+});
+
+/** A uniform flow in three dimensions, made tangent at each cell's centre. */
+const uniformFlow = (grid: Grid): VectorField => {
+	const flow = createVectorField(grid);
+	const along = [3, -4, 12];
+	for (let cell = 0; cell < grid.cellCount; cell++) {
+		const x = grid.centres[3 * cell] as number;
+		const y = grid.centres[3 * cell + 1] as number;
+		const z = grid.centres[3 * cell + 2] as number;
+		const outward =
+			(along[0] as number) * x +
+			(along[1] as number) * y +
+			(along[2] as number) * z;
+		flow.x[cell] = (along[0] as number) - outward * x;
+		flow.y[cell] = (along[1] as number) - outward * y;
+		flow.z[cell] = (along[2] as number) - outward * z;
+	}
+	return flow;
+};
+
+describe('refineVectors', () => {
+	it.each([
+		[128, 2e-4],
+		[256, 5e-5],
+	])(
+		'carries a uniform flow of speed 13, made tangent, onto %d to within %f',
+		(resolution, bound) => {
+			const fine = getGrid(resolution);
+			const refined = refineVectors(
+				uniformFlow(getGrid(resolution / 2)),
+				resolution,
+			);
+			const exact = uniformFlow(fine);
+			let largest = 0;
+			for (let cell = 0; cell < fine.cellCount; cell++) {
+				largest = Math.max(
+					largest,
+					Math.hypot(
+						(refined.x[cell] as number) - (exact.x[cell] as number),
+						(refined.y[cell] as number) - (exact.y[cell] as number),
+						(refined.z[cell] as number) - (exact.z[cell] as number),
+					),
+				);
+			}
+			expect(largest / 13).toBeLessThan(bound);
+		},
+		60_000,
+	);
+
+	it('gives vectors tangent to the sphere at the fine centres, into the arrays given', () => {
+		const fine = getGrid(128);
+		const into = createVectorField(fine);
+		const refined = refineVectors(uniformFlow(getGrid(64)), 128, into);
+		expect(refined).toBe(into);
+		let outward = 0;
+		for (let cell = 0; cell < fine.cellCount; cell++) {
+			outward = Math.max(
+				outward,
+				Math.abs(
+					(into.x[cell] as number) * (fine.centres[3 * cell] as number) +
+						(into.y[cell] as number) * (fine.centres[3 * cell + 1] as number) +
+						(into.z[cell] as number) * (fine.centres[3 * cell + 2] as number),
+				),
+			);
+		}
+		expect(outward).toBeLessThan(1e-13);
+	});
+
+	it('writes nothing when any one array is of the wrong length or missing', () => {
+		const coarse = uniformFlow(getGrid(64));
+		const filled = (): VectorField => {
+			const into = createVectorField(getGrid(128));
+			into.x.fill(7);
+			into.y.fill(7);
+			into.z.fill(7);
+			return into;
+		};
+		const wrongs: [VectorField, VectorField][] = [
+			[coarse, { ...filled(), z: new Float64Array(5) }],
+			[{ ...coarse, z: new Float64Array(5) }, filled()],
+			[{ x: coarse.x, y: coarse.y } as unknown as VectorField, filled()],
+			[coarse, { x: filled().x, y: filled().y } as unknown as VectorField],
+		];
+		for (const [from, into] of wrongs) {
+			const before = {
+				x: into.x?.slice(),
+				y: into.y?.slice(),
+				z: into.z?.slice(),
+			};
+			expect(() => refineVectors(from, 128, into)).toThrow(RangeError);
+			expect(into.x).toEqual(before.x);
+			expect(into.y).toEqual(before.y);
+			expect(into.z).toEqual(before.z);
+		}
+	});
+
+	it('refuses a field or an output of the wrong length, and the coarsest grid', () => {
+		const coarse = createVectorField(getGrid(64));
+		expect(() =>
+			refineVectors({ ...coarse, y: new Float64Array(5) }, 128),
+		).toThrow(RangeError);
+		expect(() =>
+			refineVectors(coarse, 128, {
+				...createVectorField(getGrid(128)),
+				z: new Float64Array(5),
+			}),
+		).toThrow(RangeError);
+		expect(() => refineVectors(coarse, 64)).toThrow(RangeError);
 	});
 });
 

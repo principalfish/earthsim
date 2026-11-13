@@ -12,7 +12,11 @@ import {
 	latLonToDirection,
 } from './grid';
 import { cellLatitudes, MONTHS_PER_YEAR } from './insolation';
-import { PLANET_LIMITS, PLANET_SETTINGS, type PlanetSettings } from './planet';
+import {
+	PLANET_LIMITS,
+	type PlanetSettings,
+	TEMPERATURE_SETTINGS,
+} from './planet';
 import {
 	coolingDrift,
 	DEFAULT_MAX_YEARS,
@@ -716,13 +720,15 @@ describe('solveTemperature after a change of sea level or planet', {
 	const own = (): TemperatureConditions => blankOneYear().solvedFor;
 	const others: [string, () => TemperatureConditions][] = [
 		['sea level', () => ({ ...own(), seaLevel: 10 })],
-		...PLANET_SETTINGS.map((name): [string, () => TemperatureConditions] => [
-			name,
-			() => ({
-				...own(),
-				planet: { ...own().planet, [name]: own().planet[name] + 0.01 },
-			}),
-		]),
+		...TEMPERATURE_SETTINGS.map(
+			(name): [string, () => TemperatureConditions] => [
+				name,
+				() => ({
+					...own(),
+					planet: { ...own().planet, [name]: own().planet[name] + 0.01 },
+				}),
+			],
+		),
 	];
 
 	it.each(others)('sets aside a start recorded for another %s', (_, other) => {
@@ -733,6 +739,51 @@ describe('solveTemperature after a change of sea level or planet', {
 			start: { ...blankOneYear(), solvedFor: other() },
 		});
 		expect(result).toEqual(blankOneYear());
+	});
+
+	it('carries on a start recorded for another day length, which the temperature does not depend on', () => {
+		// The start is a result of the blank world at its own 24 hours.
+		expect(BLANK.planet.dayLengthHours).toBe(24);
+		const tenHours = withPlanet(BLANK, { dayLengthHours: 10 });
+		const result = solveTemperature(tenHours, {
+			...YEAR,
+			start: blankOneYear(),
+		});
+		expect(result.months).toEqual(blankTwoYears().months);
+		expect(result.state).toEqual(blankTwoYears().state);
+		expect(result.solvedFor).toEqual(temperatureConditions(tenHours));
+	});
+
+	it('carries on a start whose record holds a whole planet’s settings, another day length among them', () => {
+		const whole: PlanetSettings = { ...BLANK.planet, dayLengthHours: 10 };
+		const result = solveTemperature(BLANK, {
+			...YEAR,
+			start: { ...blankOneYear(), solvedFor: { ...own(), planet: whole } },
+		});
+		expect(result.months).toEqual(blankTwoYears().months);
+	});
+
+	it('records only the settings the temperature reads', () => {
+		expect(Object.keys(blankOneYear().solvedFor.planet)).toEqual(
+			TEMPERATURE_SETTINGS,
+		);
+		expect(Object.keys(temperatureConditions(BLANK).planet)).toEqual(
+			TEMPERATURE_SETTINGS,
+		);
+	});
+
+	it('gives the same answer for any day length, so a result for one is current for another', () => {
+		const tenHours = solveTemperature(
+			withPlanet(BLANK, { dayLengthHours: 10 }),
+			{
+				...COARSE,
+				maxYears: 1,
+			},
+		);
+		const { solvedFor, ...answer } = tenHours;
+		const { solvedFor: earthDay, ...earthAnswer } = blankOneYear();
+		expect(answer).toEqual(earthAnswer);
+		expect(solvedFor).toEqual(earthDay);
 	});
 
 	it('takes as many years from a start set aside as from nothing', () => {
@@ -775,8 +826,9 @@ describe('solveTemperature after a change of sea level or planet', {
 	});
 
 	it('carries on a start recorded for the same planet, compared as brought within its limits', () => {
-		// Every setting of the hottest corner is at a limit, so settings
-		// beyond them name the same planet.
+		// Every setting the temperature reads is at a limit at the hottest
+		// corner, so settings beyond them name the same planet. The day
+		// length is not compared.
 		const hot = withPlanet(EARTH, HOTTEST);
 		const beyond: PlanetSettings = {
 			axialTiltDeg: 95,
@@ -784,6 +836,7 @@ describe('solveTemperature after a change of sea level or planet', {
 			starMass: 11,
 			orbitDistanceAu: 0.1,
 			greenhouseStrength: 5,
+			dayLengthHours: 1,
 		};
 		const result = solveTemperature(hot, {
 			...YEAR,
@@ -1470,9 +1523,7 @@ describe('solveTemperature at the extremes', {
 		}
 		return result;
 	};
-	const settings = Object.keys(PLANET_LIMITS) as (keyof PlanetSettings)[];
-
-	it.each(settings)(
+	it.each(TEMPERATURE_SETTINGS)(
 		'keeps every value finite on the Earth with %s at either limit',
 		(name) => {
 			for (const value of [PLANET_LIMITS[name].min, PLANET_LIMITS[name].max]) {

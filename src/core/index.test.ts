@@ -47,6 +47,21 @@ describe('core', () => {
 		}
 	});
 
+	it('exports the observed winds and pressure and their regridding', () => {
+		for (const name of [
+			'OBSERVED_WIND_BYTES',
+			'OBSERVED_PRESSURE_BYTES',
+			'decodeObservedWind',
+			'encodeObservedWind',
+			'decodeObservedPressure',
+			'encodeObservedPressure',
+			'observedWind',
+			'observedPressure',
+		]) {
+			expect(core, name).toHaveProperty(name);
+		}
+	});
+
 	it('exports the temperature solver and its comparison with observed', () => {
 		for (const name of [
 			'edgeGeometry',
@@ -78,6 +93,20 @@ describe('core', () => {
 			'estimateYearsLeft',
 			'summariseTemperature',
 			'compareFields',
+		]) {
+			expect(core, name).toHaveProperty(name);
+		}
+	});
+
+	it("exports the wind models' error figures and zonal means", () => {
+		for (const name of [
+			'DIRECTION_MIN_SPEED_M_PER_S',
+			'DIRECTION_TOLERANCE_DEG',
+			'ZONAL_BANDS',
+			'windMonth',
+			'windMonthErrorFigures',
+			'windErrorFigures',
+			'zonalMean',
 		]) {
 			expect(core, name).toHaveProperty(name);
 		}
