@@ -12,7 +12,7 @@ Not included: winds carrying heat (temperature is unchanged by this step), upper
 
 ## Plan
 
-_2026-11-13 · 5 of 16 pieces done (piece 6 dropped, piece 7 split in three) · now: waiting on a decision_
+_2026-11-13 · 5 of 16 pieces done (piece 6 dropped, piece 7 split in three) · now: piece 7a in progress_
 
 - [x] **1/15 Observed winds and pressure data** · `69d3619`
   The real Earth's monthly winds and sea-level pressure as two small data files, with readers that take them onto a world's cells.
@@ -25,7 +25,7 @@ _2026-11-13 · 5 of 16 pieces done (piece 6 dropped, piece 7 split in three) · 
 - [x] **5/15 Prototype: rules plus a pressure map** · `993fa03`
   A rough wind model from pressure bands and thermal highs and lows, shown in the report on every case.
 - [ ] ~~**6/15 Prototype: a simulated atmosphere, and the choice**~~ · dropped 2026-11-13: the simulated atmosphere is deferred to a later roadmap step (estimated at minutes per world against half a second for the rules model); the rules model is the one built
-- [ ] **7a The wind model made real** (was part of 7; split 2026-11-13) · waiting on you
+- [ ] **7a The wind model made real** (was part of 7; split 2026-11-13) · in progress
   The rules model as `solveWinds`: input checks, every world solved at 64 and refined, the annual mean, a timing script, the cube-corner smoothing fix and `docs/winds.md`.
 - [ ] **8/15 Winds in the worker and the page's store** · not started
   Winds worked out in a worker after each temperature result, only while something shows them.
