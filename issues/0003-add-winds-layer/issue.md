@@ -12,9 +12,9 @@ Not included: winds carrying heat (temperature is unchanged by this step), upper
 
 ## Plan
 
-_2026-11-13 · 0 of 15 pieces done · now: planned, waiting on a decision (which manual reviews to keep; starting the builder)_
+_2026-11-13 · 0 of 15 pieces done · now: piece 1 in progress_
 
-- [ ] **1/15 Observed winds and pressure data** · not started
+- [ ] **1/15 Observed winds and pressure data** · in progress
   The real Earth's monthly winds and sea-level pressure as two small data files, with readers that take them onto a world's cells.
 - [ ] **2/15 Vector maths on the grid** · not started
   Gradient, divergence, curl, smoothing and east/north directions on the cubed-sphere grid.

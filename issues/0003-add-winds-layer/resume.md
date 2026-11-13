@@ -2,18 +2,15 @@
 
 ## Where it stands
 
-- State `planned` (check: `grep '"state"' "$(python3 ~/.claude/lib/planner.py path 3)/meta.json"`). GitHub issue #5. No branch, no builder, no PR yet.
-- `issue.md` is approved and carries the `## Plan` checklist; `plan.md` has 15 pieces, with a stop after piece 6 for the user's choice of wind model (pieces 7 onward are written for the rules model and get revised after the choice).
-- `decisions.md` is complete apart from the one item below.
+- State `planned`, moving to `building` when the builder's first update is ingested (check: `grep '"state"' "$(python3 ~/.claude/lib/planner.py path 3)/meta.json"`). GitHub issue #5. No PR yet: open the draft PR once piece 1 is pushed.
+- The builder was started on 2026-11-13: session `local_861b5031-c368-4a88-b7a4-71e71ea962f6` ("builder: add-winds-layer", name `b-add-winds-layer`), on piece 1 with the user's go-ahead ("Start it"). It runs on the planner chat's model with Opus implementation subagents ("Same as last time"). Find its worktree and branch with `planner.py ingest 3` and `meta.json`'s `local` list.
+- `plan.md` has 15 pieces, ten with a manual review (4, 5, 6, 9, 10, 11, 12, 13, 14, 15; "Keep all ten"), and a stop after piece 6 for the user's choice of wind model: pieces 7 onward are written for the rules model and the planner revises them after the choice.
 
 ## Pending with the user
 
-Asked 2026-11-13:
+Nothing. Next: when the builder reports, `planner.py ingest 3`, check `git log main..<branch>`, and relay as `/planner`'s "Relaying for the builder" says. Piece 1 may stop with a question: NOAA's download server did not answer on 2026-11-13, so the wind and pressure files are unconfirmed.
 
-1. **Which proposed manual reviews to keep.** Proposed for pieces 4, 5, 6 (the wind report), 9 (arrows), 10 (Day length slider), 11 (pointer strip and unit), 12 (the refactor, to see nothing changed), 13 (Pressure), 14 (Earth comparison), 15 (streaks). Pieces 1, 2, 3, 7 and 8 have none. Remove the `Manual review:` line from any piece the user drops.
-2. **Whether to start the builder.** Before starting, give the next-stage briefing for piece 1 (its one decision: none expected; its risk: NOAA's server was unreachable on 2026-11-13, and the wind and pressure files are unconfirmed, so piece 1 may stop with a question). Also raise the builder's model: `models.md` says builder sessions start on `claude-sonnet-5-5` (the "Builder on Sonnet" experiment is on), while issue 0002's builder ran on `claude-fable-5-2` with Opus implementation subagents; ask which the user wants.
-
-Next: on the answers, edit `plan.md` for the kept reviews, save, start the builder as a linked session (`/planner`'s "Starting the builder"), track its session, and update the issue's checklist status line.
+Relay an approval of a manual-review piece only when the user's words say they tried it.
 
 ## Groundwork (from the code on `main`, 2026-11-13)
 
