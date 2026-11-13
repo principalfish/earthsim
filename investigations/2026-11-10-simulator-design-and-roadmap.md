@@ -1,6 +1,6 @@
 # Simulator design and roadmap
 
-The whole-simulator design for earth_sim and the eight-step build order, so each step's issue can draw on it. Only the items under "Decided by the user" are settled; everything else is a proposal to be confirmed when its step is planned.
+The whole-simulator design for earth_sim and the nine-step build order, so each step's issue can draw on it. Only the items under "Decided by the user" are settled; everything else is a proposal to be confirmed when its step is planned.
 
 ## Decided by the user (2026-11-10)
 
@@ -13,6 +13,7 @@ The whole-simulator design for earth_sim and the eight-step build order, so each
 - Architecture: TypeScript; the simulation is a pure library with no browser dependency, run in a Web Worker; Three.js draws the globe; no server, static files only; worlds saved by file export and import.
 - Tooling: npm, Vite, Vitest, Biome, `tsc`.
 - One issue per build step, starting with step 1.
+- A biome map is a step of its own, before plate tectonics (added 2026-11-13). It is what most worldbuilders want from the tool: what grows where, not the climate fields themselves.
 - The simulation must be pauseable, with the user able to edit the map while it is paused; a run continues from the edited state. The main thread holds the editable, authoritative world and the worker computes from copies of it, which is what makes this possible.
 
 ## Proposed, not yet confirmed
@@ -31,6 +32,7 @@ The whole-simulator design for earth_sim and the eight-step build order, so each
 | Ocean currents | Wind-driven gyres solved from the wind field around coastlines; deep circulation skipped at first | Medium |
 | Rainfall | Moisture carried along the winds, raining out on uplift and mountains | Medium |
 | Tropical storms | A diagnostic map from sea temperature, latitude and wind shear, not simulated storms | Easy |
+| Biome map | Each cell's biome (rainforest, savanna, desert, steppe, forest, taiga, tundra, ice) classified from its monthly temperature and rainfall, drawn in natural map colours. Builds on the Köppen zones from step 4 | Easy |
 | Glaciation | Snowfall minus melt, simple ice flow, albedo feedback into temperature | Medium |
 | Continental drift | Rigid plates rotating on the sphere with rules for collision, subduction and rifting. The hardest part to make look right. Reference: "Procedural Tectonic Planets" (Cortial et al., 2019) | Hard |
 
@@ -51,7 +53,8 @@ Each step adds a viewable map layer and gets its own issue.
 5. Ocean currents, feeding heat back into temperature
 6. Ice sheets and sea ice
 7. Tropical storm zones
-8. Plate tectonics and time stepping
+8. Biome map
+9. Plate tectonics and time stepping
 
 ## Status and carried-over items (as of 2026-11-13)
 
@@ -66,7 +69,8 @@ Keep this section current when a step is merged.
 | 5 Ocean currents | Not started | |
 | 6 Ice sheets and sea ice | Not started | |
 | 7 Tropical storm zones | Not started | |
-| 8 Plate tectonics and time stepping | Not started | |
+| 8 Biome map | Not started | |
+| 9 Plate tectonics and time stepping | Not started | |
 
 ### What step 2 built that later steps rely on
 - **Planet settings on the world:** axial tilt, the star's brightness and mass, the orbit's distance and the greenhouse strength, saved with the world. A note in the Planet panel warns when they are outside the range the temperature model is trusted for.
@@ -91,4 +95,4 @@ Keep this section current when a step is merged.
 
 ## Prior art
 
-Listed from memory, not searched, so possibly incomplete or out of date: ExoPlaSim (a real climate model used by worldbuilders; offline, no ocean currents); ROCKE-3D, MITgcm, cGENIE (research models, hard to set up); Tectonics.js (browser tectonics with crude climate); Songs of the Eons and Undiscovered Worlds (rule-based climate); GPlates (real-Earth plate reconstruction, not a forward simulator). None is known to do the whole thing interactively.
+Listed from memory, not searched, so possibly incomplete or out of date: SimEarth (Maxis, 1990; the closest in spirit, with drift, climate and biomes on one planet, but a game with its own rules rather than a tool for drawing a world); ExoPlaSim (a real climate model used by worldbuilders; offline, no ocean currents); ROCKE-3D, MITgcm, cGENIE (research models, hard to set up); Tectonics.js (browser tectonics with crude climate); Songs of the Eons and Undiscovered Worlds (rule-based climate); GPlates (real-Earth plate reconstruction, not a forward simulator). None is known to do the whole thing interactively.
