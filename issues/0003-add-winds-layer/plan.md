@@ -234,7 +234,7 @@ earth_sim is a browser planet simulator for worldbuilding: believable results an
 - [x] 4. Wind report with the observed Earth
 - [x] 5. Prototype: rules plus a pressure map
 - [ ] ~~6. Prototype: a simulated atmosphere, and the choice~~ (dropped 2026-11-13; not to be built)
-- [ ] 7a. The wind model made real
+- [x] 7a. The wind model made real
 - [ ] 8. Winds in the worker and the page's store
 - [ ] 9. The Winds switch and arrows on the globe
 - [ ] 7b. The yardstick: a ninth case and three literature checks
@@ -333,3 +333,5 @@ Scripted browser checks keep their browser profiles in the session's scratch fol
 - 2026-11-13, piece 7a, the smoothing's corner fix (`smoothField`, `src/core/vector.ts`): the cause was that the exchange between neighbouring cells is not a true Laplacian where cells are skewed (60° and 120° corners near the cube's corners); each implicit step now adds what `laplacian` gives less what the exchange gives to its right-hand side. A spike's reach is now 0.99 to 1.02 of √2 × the distance at 64, 128 and 256 over 500 and 1,000 km, a corner within 2% of a face's middle (was 9% short). Known limit, told to the user, who did not object: a cold patch centred exactly on a corner gives a high 3.4% weaker and a wind 6.1% weaker than elsewhere at its latitude (was 16% and 29% stronger); removing it would take two more rounds a step, about 2.5 times the smoothing time. The smoothing also refuses a distance whose step is not positive and finite before anything is written, keeps its solver and working memory for each grid between calls, and can now stray slightly outside the field's range over a cell or two (about 1e-6 at the model's 900 km).
 
 - 2026-11-13, piece 7a, deviations from the Files line: `src/core/coarsen.ts` and its test (`coarsenField`; `coarsenWorld` now uses it and gives exactly what it gave); `src/core/temperature.ts` (the world check renamed `assertSolvableWorld` and exported; its body and callers unchanged, the temperature baseline unchanged); `src/core/index.test.ts`. The README lists the docs pages and does not yet list `docs/winds.md`; left for the README's update at the end, as the plan says. Changed-lines coverage 99%: the only uncovered lines are two "grids do not line up" checks in `vector.ts` accepted in piece 2; the smoothing's "was not solved" error is the same kind and unreached. `scripts/time-winds.ts` is untested, as the temperature's timing script is.
+
+- 2026-11-13, piece 7a, approved and committed: the user approved as it stood ("Approve, commit"); the commit title keeps the plan's numbering ("piece 7a/15"). The README's link to `docs/winds.md` goes with piece 9, when winds appear on the page.
