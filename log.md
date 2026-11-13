@@ -65,3 +65,4 @@
 - 2026-11-13 07:27 · add-seasonal-temperature-layer-and-planet-controls (0002) · builder: review fixes committed and pushed as 7896afc after the user's approval ("Approve, commit"); state stays review
 - 2026-11-13 07:32 · add-seasonal-temperature-layer-and-planet-controls (0002) · review → ready
 - 2026-11-13 07:33 · add-seasonal-temperature-layer-and-planet-controls (0002) · PR #4 description final
+- 2026-11-13 07:35 · add-seasonal-temperature-layer-and-planet-controls (0002) · merged → done
