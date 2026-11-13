@@ -1,22 +1,29 @@
-# Resume: add-winds-layer
+# Resume point — read this first
 
-## Where it stands
+## Where we are
 
-- State `planned`, moving to `building` when the builder's first update is ingested (check: `grep '"state"' "$(python3 ~/.claude/lib/planner.py path 3)/meta.json"`). GitHub issue #5. No PR yet: open the draft PR once piece 1 is pushed.
-- The builder was started on 2026-11-13: session `local_861b5031-c368-4a88-b7a4-71e71ea962f6` ("builder: add-winds-layer", name `b-add-winds-layer`), on piece 1 with the user's go-ahead ("Start it"). It runs on the planner chat's model with Opus implementation subagents ("Same as last time"). Find its worktree and branch with `planner.py ingest 3` and `meta.json`'s `local` list.
-- `plan.md` has 15 pieces, ten with a manual review (4, 5, 6, 9, 10, 11, 12, 13, 14, 15; "Keep all ten"), and a stop after piece 6 for the user's choice of wind model: pieces 7 onward are written for the rules model and the planner revises them after the choice.
+Piece 1 of 15 ("Observed winds and pressure data") is built, checked and reviewed in the builder's worktree, **uncommitted**, and paused for the user's review. Issue state `building`.
+State checks: branch `claude/add-winds-layer-991a60`, HEAD `abbf20d` (`git -C /home/philiph/workspace/earth_sim/.claude/worktrees/add-winds-layer-991a60 log --oneline -1`), tree **not** clean: 26 files changed against `origin/main` (`git diff --stat origin/main`). Data files: `sha256sum public/data/earth-wind-1deg.bin` gives `4b259f80…9711`, `earth-pressure-1deg.bin` gives `f798ccc7…d61c`, `earth-temperature-1deg.bin` is unchanged (`e685f84f…a51e`).
+If anything differs, stop and tell the user.
 
-## Pending with the user
+## How it got here — decisions already answered, in order
 
-Nothing. Next: when the builder reports, `planner.py ingest 3`, check `git log main..<branch>`, and relay as `/planner`'s "Relaying for the builder" says. Piece 1 may stop with a question: NOAA's download server did not answer on 2026-11-13, so the wind and pressure files are unconfirmed.
+1. 2026-11-13 — Which manual reviews to keep, and whether to start the builder → the builder was started for piece 1 only ("Start it").
+2. 2026-11-13 — Builder models → "Same as last time": implementation subagents on Opus, checks on their usual tiers.
+3. 2026-11-13 — Is the NOAA source there? → Yes: `uwnd.10m.mon.ltm.nc`, `vwnd.10m.mon.ltm.nc` and `prmsl.mon.ltm.nc` exist beside the temperature file; details in `plan.md` Notes.
 
-Relay an approval of a manual-review piece only when the user's words say they tried it.
+## The pending decision (exact)
 
-## Groundwork (from the code on `main`, 2026-11-13)
+1. Approve piece 1 for commit and push, or ask for changes. The review request sent to the planner chat has the summary, the checks and the proposed commit message.
+2. Three optional findings from the fifth analysis round stand unfixed (all low or nit, none a defect), because the rounds had stopped converging: (a) `encodeBytes` / `decodeBytes` in `src/core/observedGrid.ts` say "unsigned codec only" in their docs but do not assert it; (b) `observedWind` writes the bilinear weights out again beside `interpolate`; (c) `observedPressure` and `observedTemperature` share a four-line body. Options: commit as it is (the builder's recommendation, with (a) as a one-line assert if the user wants any of them), or fix some or all, which costs another round of checks.
 
-- **Grid:** `getGrid(n)` gives cell centres (unit vectors), areas and four neighbours per cell across cube faces (`src/core/grid.ts:482`); `edgeGeometry` gives edge lengths and centre distances (`grid.ts:761`). There are no gradient, divergence or tangent-vector helpers: winds need them.
-- **Temperature result:** `months`, twelve `Float32Array` of near-surface air in °C on the world's grid (`src/core/temperature.ts:397`). The land mask, ice and sea-level temperatures are internal. `coarsenWorld` and `refineField` (scalar only) can be reused to solve on a coarser grid.
-- **Planet settings:** five, no rotation or day length (`src/core/planet.ts:17-71`). `parsePlanet` requires every key (`src/core/serialize.ts:234`), so a new setting needs a default for files saved without it. `isMeasuredEarth` compares every setting, and a temperature start is reused only on an exact settings match, so a rotation change would force a temperature re-solve unless that is handled.
-- **Worker:** stateless, one worker per service, no cancel message (the page ends and restarts the worker). A winds kind needs entries in `SimResults`, `SimExtras`, `KINDS`, `PAYLOADS`, `COMPUTE`, `BUFFERS` (`src/core/protocol.ts`, `src/worker/handle.ts`), and needs the temperature months sent in or the winds worked out inside the temperature request.
-- **Page:** one exclusive layer (`LAYERS` in `src/app/view.ts:11`), one data texture slot of one value per cell (`src/app/globe/material.ts:837`), legend and cursor readout written for temperature. Nothing draws arrows, lines or particles, and the globe renders only on change (`src/app/globe/renderer.ts:371`), so moving streaks need a render loop.
-- **Observed data:** the temperature file's build, reader and comparison (`scripts/build-observed-temperature.ts`, `src/core/observed.ts`, `src/core/compare.ts`) are scalar; observed winds need a signed two-component encoding.
+## What the next session does
+
+1. On approval quoted from the user: commit with the approved message, push `claude/add-winds-layer-991a60`, tick checkpoint 1, save, and send the look-ahead for piece 2.
+2. On changes requested: make them, re-run the checks and the analysis loop, and send a new review request.
+
+## Don't
+
+- Don't commit before the planner relays the user's approval in the user's words. Don't start piece 2 without the go-ahead.
+- Don't start piece 7 until the planner says the plan has been revised after the user's choice of wind model.
+- No attribution lines in commits. Push only this issue's branch, never forced. No other GitHub writes.
