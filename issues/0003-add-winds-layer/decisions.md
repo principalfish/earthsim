@@ -37,3 +37,4 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - Out of scope here: rain, ocean currents, storms (steps 4, 5 and 7); heat carried by winds; tidally locked planets; retrograde rotation.
 - The wind unit option sits in the View section and is remembered by the browser, like which panel sections are open; it is not saved with the world.
 - Pressure is shown in hectopascals (the same as millibars), with no unit option.
+- The observed winds and pressure come from the same source as the observed temperature, NOAA's 20th Century Reanalysis v3 long-term monthly means: the 10 m eastward and northward winds and the mean sea-level pressure. NOT VERIFIED: NOAA's download server did not answer on 2026-11-13 (even the temperature file timed out), so the file names and folders are unconfirmed. The builder's first check; if the files are not there, come back to the user with alternatives before building on another source.

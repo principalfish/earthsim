@@ -8,14 +8,13 @@
 
 ## Pending with the user
 
-All three rounds of questions are answered (2026-11-13) and in `decisions.md`.
+All questions are answered (2026-11-13) and in `decisions.md`, the last being "Keep one issue". The full ledger was shown to the user, who has not yet said in words that it is complete.
 
-Asked 2026-11-13, waiting on the user:
+Asked 2026-11-13, waiting on the user: **approval of the draft issue text** (shown in the chat, title "Add winds, air pressure and day length"), and with it their word that nothing in the ledger is missing or wrong. The draft is not in `issue.md` yet; if the chat is lost, redraft it from `decisions.md`: what the step is for, the prototype of two models and the report, Day length, the Winds switch with arrows then streaks, the Pressure layer, the unit option, the Earth comparison for both, and what is not included.
 
-1. **Whether to split the issue in two.** The planner's suggestion: this issue ends with winds as arrows and their Earth comparison (observed data, prototype and choice of model, day length, the model in the worker, arrows, comparison and baseline); a second issue adds the Pressure layer, the wind unit option and the moving streaks.
-2. **Whether anything in the ledger is missing or wrong.** The full ledger was shown, with the planner's assumptions to correct (the unit option in the View section and remembered by the browser; pressure in hectopascals; Day length changes not re-solving temperature; arrows on Annual average showing the year's mean wind).
+Next, on approval: write `issue.md`, create the GitHub issue, write `plan.md` (the prototype piece ends in a decision gate: the user picks the model from the report, and the model pieces are finalised after it), propose manual reviews, add the `## Plan` checklist, set the state to planned, and offer to start the builder.
 
-Next, on an explicit "that's everything": draft `issue.md` and present it; on approval create the GitHub issue, write `plan.md` (the prototype piece ends in a decision gate: the user picks the model from the report, and the model pieces are finalised after it), propose manual reviews, and offer to start the builder.
+Unverified: that NOAA's 20th Century Reanalysis v3 has long-term monthly means of 10 m winds and sea-level pressure under the names expected; its server did not answer on 2026-11-13.
 
 ## Groundwork (from the code on `main`, 2026-11-13)
 
