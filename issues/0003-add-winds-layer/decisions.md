@@ -22,8 +22,10 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - The Pressure layer gets the Earth comparison too: on an untouched Earth it offers simulated, observed and difference with error figures. The user: "Yes" (2026-11-13)
 - The prototype report shows, for both models, the real Earth in January and July and four further cases: fast and slow spin (an 8-hour and a 4-day day), tilt extremes (0° and 60°), a generated world with 30% land, and an ocean world and a one-continent world. The user chose all four (2026-11-13)
 
+- The work stays one issue, not two. The user: "Keep one issue" (2026-11-13)
+
 ## Open
-- Whether the issue is split in two, now that it holds a prototype, a new planet setting, observed data, arrows, a Pressure layer, a unit option and moving streaks. The planner's suggestion: this issue ends with winds as arrows and their Earth comparison; a second issue adds the Pressure layer, the unit option and the moving streaks.
+- Nothing, pending the user's word that the ledger is complete.
 
 ## Assumed
 - Winds and pressure are worked out from the twelve monthly temperature fields and the planet settings, month by month, and shown for the month on screen. On Annual average the arrows show the year's mean wind; on the other temperature summaries they stay on the month last on screen, as the sun does.
