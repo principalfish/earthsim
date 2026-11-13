@@ -74,3 +74,5 @@
 - 2026-11-13 09:09 · add-winds-layer (0003) · investigating → planned
 - 2026-11-13 09:10 · add-winds-layer (0003) · build_model = claude-opus-5-5
 - 2026-11-13 09:17 · add-winds-layer (0003) · tracking session local_861b5031-c368-4a88-b7a4-71e71ea962f6
+- 2026-11-13 09:28 · add-winds-layer (0003) · branch = claude/add-winds-layer-991a60
+- 2026-11-13 09:28 · add-winds-layer (0003) · planned → building
