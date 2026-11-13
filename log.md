@@ -67,3 +67,4 @@
 - 2026-11-13 07:33 · add-seasonal-temperature-layer-and-planet-controls (0002) · PR #4 description final
 - 2026-11-13 07:35 · add-seasonal-temperature-layer-and-planet-controls (0002) · merged → done
 - 2026-11-13 07:37 · add-seasonal-temperature-layer-and-planet-controls (0002) · session local_f46a8d01-2bba-49f0-b178-13cfe0924c9e removed
+- 2026-11-13 07:37 · add-seasonal-temperature-layer-and-planet-controls (0002) · cleanup: removed worktree /home/philiph/workspace/earth_sim/.claude/worktrees/add-seasonal-temperature-layer-and-planet-controls-f645fa, branch claude/add-seasonal-temperature-layer-and-planet-controls-f645fa

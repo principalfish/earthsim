@@ -22,12 +22,14 @@
     {
       "kind": "worktree",
       "name": "/home/philiph/workspace/earth_sim/.claude/worktrees/add-seasonal-temperature-layer-and-planet-controls-f645fa",
-      "added": "2026-11-11 16:37"
+      "added": "2026-11-11 16:37",
+      "removed": "2026-11-13 07:37"
     },
     {
       "kind": "branch",
       "name": "claude/add-seasonal-temperature-layer-and-planet-controls-f645fa",
-      "added": "2026-11-11 16:37"
+      "added": "2026-11-11 16:37",
+      "removed": "2026-11-13 07:37"
     }
   ],
   "pr": 4
