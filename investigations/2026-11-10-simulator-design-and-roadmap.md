@@ -64,13 +64,28 @@ Keep this section current when a step is merged.
 |-|-|-|
 | 1 Globe, grid and sculpting | Done, merged 2026-11-11 | 0001, GitHub #1, PR #2 |
 | 2 Sunlight and seasonal temperature | Done, merged 2026-11-13 | 0002, GitHub #3, PR #4 |
-| 3 Winds | Next | |
+| 3 Winds | Building | 0003, GitHub #5, PR #6 |
+| 3a Core folders by component (refactor, no behaviour change) | Not started; after step 3 merges, before step 4 | |
 | 4 Moisture, rainfall and Köppen zones | Not started | |
 | 5 Ocean currents | Not started | |
 | 6 Ice sheets and sea ice | Not started | |
 | 7 Tropical storm zones | Not started | |
 | 8 Biome map | Not started | |
 | 9 Plate tectonics and time stepping | Not started | |
+
+### Step 3a: core folders by component
+`src/core/` is flat today, except `src/core/wind/`, which step 3 started because it holds several models. With five more layers to come, a flat folder would pass 40 files, so the core moves into one folder per component in one refactor, between steps 3 and 4. It is a pure move: no behaviour change, checked by the existing tests and the temperature baseline. It waits for step 3's merge because that branch edits the files that would move.
+- **Small blast radius:** the page, the worker and the scripts import the core only through `src/core/index.ts`, except one script that imports `baseline/earthTemperature`. So the move rewrites the core's own imports and tests, and that one script.
+- **Layout, a proposal to settle when it is planned:**
+  - `grid/`: `grid`, `vector`, `coarsen`, `quantile` (grid maths every layer shares)
+  - `world/`: `world`, `generate`, `noise`, `brush`, `history`, `stats`, `serialize`
+  - `planet/`: `planet`, `star`, `insolation`
+  - `earth/`: `earth`, `observedGrid` (reading the Earth data files)
+  - `temperature/`: `temperature`, `exchange`, `observed`, `baseline/`
+  - `wind/`: as step 3 leaves it, plus `observedWind`
+  - left flat: `index`, `protocol`, `compare`; `testing/` stays
+- Each later step (rain, ocean, ice, storms, tectonics) then starts its own folder.
+- Probably `/quick-build` once the layout is agreed, since it is one mechanical commit; `/planner refactor` if the layout needs discussion.
 
 ### What step 2 built that later steps rely on
 - **Planet settings on the world:** axial tilt, the star's brightness and mass, the orbit's distance and the greenhouse strength, saved with the world. A note in the Planet panel warns when they are outside the range the temperature model is trusted for.
