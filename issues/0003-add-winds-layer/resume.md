@@ -2,19 +2,18 @@
 
 ## Where it stands
 
-- State `investigating` (check: `python3 ~/.claude/lib/planner.py path 3` and `meta.json`). No branch, no builder, no GitHub issue yet.
-- The discussion has started: the brief was played back and the first four questions put to the user on 2026-11-13. `decisions.md` holds the ledger.
-- The README rewrite the user asked for first is committed on `main` as `abbf20d` (quick build, not pushed).
+- State `planned` (check: `grep '"state"' "$(python3 ~/.claude/lib/planner.py path 3)/meta.json"`). GitHub issue #5. No branch, no builder, no PR yet.
+- `issue.md` is approved and carries the `## Plan` checklist; `plan.md` has 15 pieces, with a stop after piece 6 for the user's choice of wind model (pieces 7 onward are written for the rules model and get revised after the choice).
+- `decisions.md` is complete apart from the one item below.
 
 ## Pending with the user
 
-All questions are answered (2026-11-13) and in `decisions.md`, the last being "Keep one issue". The full ledger was shown to the user, who has not yet said in words that it is complete.
+Asked 2026-11-13:
 
-Asked 2026-11-13, waiting on the user: **approval of the draft issue text** (shown in the chat, title "Add winds, air pressure and day length"), and with it their word that nothing in the ledger is missing or wrong. The draft is not in `issue.md` yet; if the chat is lost, redraft it from `decisions.md`: what the step is for, the prototype of two models and the report, Day length, the Winds switch with arrows then streaks, the Pressure layer, the unit option, the Earth comparison for both, and what is not included.
+1. **Which proposed manual reviews to keep.** Proposed for pieces 4, 5, 6 (the wind report), 9 (arrows), 10 (Day length slider), 11 (pointer strip and unit), 12 (the refactor, to see nothing changed), 13 (Pressure), 14 (Earth comparison), 15 (streaks). Pieces 1, 2, 3, 7 and 8 have none. Remove the `Manual review:` line from any piece the user drops.
+2. **Whether to start the builder.** Before starting, give the next-stage briefing for piece 1 (its one decision: none expected; its risk: NOAA's server was unreachable on 2026-11-13, and the wind and pressure files are unconfirmed, so piece 1 may stop with a question). Also raise the builder's model: `models.md` says builder sessions start on `claude-sonnet-5-5` (the "Builder on Sonnet" experiment is on), while issue 0002's builder ran on `claude-fable-5-2` with Opus implementation subagents; ask which the user wants.
 
-Next, on approval: write `issue.md`, create the GitHub issue, write `plan.md` (the prototype piece ends in a decision gate: the user picks the model from the report, and the model pieces are finalised after it), propose manual reviews, add the `## Plan` checklist, set the state to planned, and offer to start the builder.
-
-Unverified: that NOAA's 20th Century Reanalysis v3 has long-term monthly means of 10 m winds and sea-level pressure under the names expected; its server did not answer on 2026-11-13.
+Next: on the answers, edit `plan.md` for the kept reviews, save, start the builder as a linked session (`/planner`'s "Starting the builder"), track its session, and update the issue's checklist status line.
 
 ## Groundwork (from the code on `main`, 2026-11-13)
 

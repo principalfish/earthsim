@@ -24,8 +24,10 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 
 - The work stays one issue, not two. The user: "Keep one issue" (2026-11-13)
 
+- The ledger is complete and the issue text approved. The user: "Approve, plan it" (2026-11-13)
+
 ## Open
-- Nothing, pending the user's word that the ledger is complete.
+- Which of the proposed manual reviews to keep (pieces 4, 5, 6, 9, 10, 11, 12, 13, 14, 15).
 
 ## Assumed
 - Winds and pressure are worked out from the twelve monthly temperature fields and the planet settings, month by month, and shown for the month on screen. On Annual average the arrows show the year's mean wind; on the other temperature summaries they stay on the month last on screen, as the sun does.
