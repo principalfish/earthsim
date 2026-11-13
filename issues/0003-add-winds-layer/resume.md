@@ -8,14 +8,16 @@
 
 ## Pending with the user
 
-Four questions, asked 2026-11-13, each with the planner's recommendation:
+Answered on 2026-11-13 (in `decisions.md`): "Prototype both first"; "Day length, wide range"; "Arrows first, streaks later"; "No, winds only read it".
 
-1. **How the winds are worked out:** rules plus a pressure map (recommended: bands set by rotation and by where the planet is hottest, plus highs and lows over warm and cold land and sea, winds derived from the pressure), a simulated atmosphere, or prototype both first.
-2. **Rotation as a planet setting in this step:** day length in hours with a wide range and a "results are rough" warning (recommended), a narrow trusted range only, or not in this step.
-3. **How winds are drawn:** static arrows over the current colours, moving streaks, or arrows first and streaks as a later piece (recommended).
-4. **Whether winds change the temperature in this step:** no, they only read it (recommended), or yes, winds carry heat.
+Second round, asked 2026-11-13, each with the planner's recommendation:
 
-Still to ask after those: observed Earth winds for a comparison and error baseline; whether pressure is shown as a colour layer; the wind units in the legend and readout.
+1. **How the prototypes are judged:** a report with maps and error figures against observed Earth winds, which the user chooses from (recommended), or both models live in the page behind a temporary switch.
+2. **Observed Earth winds in the page:** yes, as temperature has, with an error baseline (recommended), or only in scripts and tests.
+3. **How long a wind solve may take:** no longer than the temperature solve (recommended), or longer allowed.
+4. **Pressure as a colour layer:** not in this step (recommended), or yes.
+
+Still to settle after those: the Day length range, the wind unit, and what rain and currents need from the output.
 
 ## Groundwork (from the code on `main`, 2026-11-13)
 
