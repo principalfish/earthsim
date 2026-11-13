@@ -12,7 +12,7 @@ Not included: winds carrying heat (temperature is unchanged by this step), upper
 
 ## Plan
 
-_2026-11-13 · 4 of 15 pieces done · now: waiting on review of piece 5_
+_2026-11-13 · 5 of 15 pieces done · now: waiting on a decision_
 
 - [x] **1/15 Observed winds and pressure data** · `69d3619`
   The real Earth's monthly winds and sea-level pressure as two small data files, with readers that take them onto a world's cells.
@@ -22,9 +22,9 @@ _2026-11-13 · 4 of 15 pieces done · now: waiting on review of piece 5_
   A sixth planet setting, 3 hours to 30 days, saved with the world; older files load with 24 hours.
 - [x] **4/15 Wind report with the observed Earth** · `faf7157`
   A script that writes a page of wind and pressure maps, starting with the real Earth in January and July.
-- [ ] **5/15 Prototype: rules plus a pressure map** · waiting on you
+- [x] **5/15 Prototype: rules plus a pressure map** · `993fa03`
   A rough wind model from pressure bands and thermal highs and lows, shown in the report on every case.
-- [ ] **6/15 Prototype: a simulated atmosphere, and the choice** · not started
+- [ ] **6/15 Prototype: a simulated atmosphere, and the choice** · waiting on you
   A rough simulated atmosphere beside it in the report; then the work stops for the choice of model.
 - [ ] **7/15 The chosen wind model in the core** · not started
   The chosen model finished, tuned against the Earth and documented.
