@@ -8,6 +8,7 @@
     "build": "npm run typecheck && vite build",
     "build:earth": "node scripts/run-with-vite.mjs scripts/build-earth-data.ts",
     "build:observed-temperature": "node scripts/run-with-vite.mjs scripts/build-observed-temperature.ts",
+    "build:observed-winds": "node scripts/run-with-vite.mjs scripts/build-observed-winds.ts",
     "baseline:temperature": "node scripts/run-with-vite.mjs scripts/update-earth-temperature-baseline.ts",
     "time:temperature": "node scripts/run-with-vite.mjs scripts/time-temperature.ts",
     "preview": "vite preview",

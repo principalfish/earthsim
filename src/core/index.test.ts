@@ -47,6 +47,21 @@ describe('core', () => {
 		}
 	});
 
+	it('exports the observed winds and pressure and their regridding', () => {
+		for (const name of [
+			'OBSERVED_WIND_BYTES',
+			'OBSERVED_PRESSURE_BYTES',
+			'decodeObservedWind',
+			'encodeObservedWind',
+			'decodeObservedPressure',
+			'encodeObservedPressure',
+			'observedWind',
+			'observedPressure',
+		]) {
+			expect(core, name).toHaveProperty(name);
+		}
+	});
+
 	it('exports the temperature solver and its comparison with observed', () => {
 		for (const name of [
 			'edgeGeometry',

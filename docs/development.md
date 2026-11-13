@@ -13,6 +13,7 @@ Requires Node.js and npm. Run `npm install` once.
 | `npm run typecheck` | Type-check every part of the source |
 | `npm run build:earth` | Rebuild the Earth's elevation data from its source; see [Data](data.md) |
 | `npm run build:observed-temperature` | Rebuild the Earth's observed temperature data; see [Data](data.md) |
+| `npm run build:observed-winds` | Rebuild the Earth's observed winds and sea-level pressure data; see [Data](data.md) |
 | `npm run baseline:temperature` | Write the Earth temperature baseline afresh; see below |
 | `npm run time:temperature` | Time the temperature solver at every resolution and print the simulated Earth's error figures, as Markdown tables. Takes a few minutes |
 
@@ -48,6 +49,8 @@ A pure library with no DOM, Three.js or worker globals.
 | `serialize.ts` | The world file format and the checks a file must pass |
 | `earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
 | `observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
+| `observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector |
+| `observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
 | `planet.ts` | The planet settings, their limits and Earth's values; the sunlight, year length and trust warning that follow from them; a world's date |
 | `star.ts` | The star as the planet sees it: radius, surface temperature, colour, size in the sky and direction in each month |
 | `insolation.ts` | Sunlight by latitude and time of year, the twelve months, and each cell's latitude |
@@ -101,6 +104,9 @@ Run with Node, not in the browser.
 |-|-|
 | `build-earth-data.ts` | Downloads the source and writes `public/data/earth-256.bin` |
 | `build-observed-temperature.ts` | Downloads the source and writes `public/data/earth-temperature-1deg.bin` |
+| `build-observed-winds.ts` | Downloads the three sources and writes `public/data/earth-wind-1deg.bin` and `public/data/earth-pressure-1deg.bin` |
+| `observedGdalRun.ts` | Runs GDAL's `gdallocationinfo` on an observed source and compares it with this project's reader, for both observed builds |
+| `observedBuild.ts` | What both observed builds share: the option, reading a source, and writing the data file; their range and storing-error checks are `earth/storedValues.ts` |
 | `download.ts` | Downloads a source file into `.cache/` once, checked against its pinned length and SHA-256 |
 | `earth/` | The parts of the build that touch no file: reading TIFF and netCDF, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data files |
 | `time-temperature.ts` | The solver's timings and the simulated Earth's error figures |
@@ -109,4 +115,4 @@ Run with Node, not in the browser.
 
 ### `public/data/`
 
-The two Earth data files, served beside the page as they are; see [Data](data.md).
+The four Earth data files, served beside the page as they are; see [Data](data.md).

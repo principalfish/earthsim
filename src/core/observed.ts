@@ -18,17 +18,31 @@
  * {@link OBSERVED_BYTES} bytes in all.
  */
 
-import { getGrid, isSupportedResolution, SUPPORTED_RESOLUTIONS } from './grid';
-import { cellLatitudes, MONTHS_PER_YEAR } from './insolation';
+import { getGrid, type SUPPORTED_RESOLUTIONS } from './grid';
+import { MONTHS_PER_YEAR } from './insolation';
+import {
+	assertResolution,
+	assertTwelveGrids,
+	type ByteCodec,
+	codecMax,
+	decodeBytes,
+	dequantiseByte,
+	encodeBytes,
+	interpolate,
+	interpolateOnCells,
+	type Location,
+	locate,
+	locateCells,
+	OBSERVED_VALUES_PER_MONTH,
+	quantiseByte,
+	UNSIGNED_BYTE,
+} from './observedGrid';
 
-/** Rows of latitude in each month: one a degree, both poles included. */
-export const OBSERVED_ROWS = 181;
-
-/** Columns of longitude in each row: one a degree, from 0° east. */
-export const OBSERVED_COLUMNS = 360;
-
-/** Values in each month of the data. */
-export const OBSERVED_VALUES_PER_MONTH = OBSERVED_ROWS * OBSERVED_COLUMNS;
+export {
+	OBSERVED_COLUMNS,
+	OBSERVED_ROWS,
+	OBSERVED_VALUES_PER_MONTH,
+} from './observedGrid';
 
 /** The exact length of the data file, in bytes. */
 export const OBSERVED_BYTES = MONTHS_PER_YEAR * OBSERVED_VALUES_PER_MONTH;
@@ -39,11 +53,17 @@ export const OBSERVED_BASE_C = -80;
 /** The temperature between one stored value and the next, in degrees. */
 export const OBSERVED_STEP_C = 0.5;
 
-/** The largest value a byte can hold. */
-const MAX_STORED = 255;
+/** How the file stores each temperature. */
+const CODEC: ByteCodec = {
+	...UNSIGNED_BYTE,
+	base: OBSERVED_BASE_C,
+	step: OBSERVED_STEP_C,
+	units: '°C',
+	quantity: 'temperature',
+};
 
 /** The highest temperature the file can hold, in degrees Celsius. */
-export const OBSERVED_MAX_C = OBSERVED_BASE_C + MAX_STORED * OBSERVED_STEP_C;
+export const OBSERVED_MAX_C = codecMax(CODEC);
 
 /** The observed temperature, as the data file gives it. */
 export type ObservedTemperature = {
@@ -62,8 +82,6 @@ export type ObservedTemperature = {
  */
 export type MonthlyTemperature = readonly Float32Array[];
 
-const DEGREES_PER_RADIAN = 180 / Math.PI;
-
 /**
  * The stored value for a temperature: the nearest half-degree step, a
  * value that lies halfway between two going to the higher.
@@ -74,16 +92,8 @@ const DEGREES_PER_RADIAN = 180 / Math.PI;
  * {@link OBSERVED_BASE_C} to {@link OBSERVED_MAX_C} that its nearest step
  * lies outside them too, rather than bringing it within them.
  */
-export const quantiseTemperature = (celsius: number): number => {
-	// Adding 0 makes the -0 that rounding gives just above -80.5 °C a 0.
-	const stored = Math.round((celsius - OBSERVED_BASE_C) / OBSERVED_STEP_C) + 0;
-	if (!(stored >= 0 && stored <= MAX_STORED)) {
-		throw new RangeError(
-			`${celsius} °C is outside the ${OBSERVED_BASE_C} to ${OBSERVED_MAX_C} °C the observed temperature file can hold`,
-		);
-	}
-	return stored;
-};
+export const quantiseTemperature = (celsius: number): number =>
+	quantiseByte(CODEC, celsius);
 
 /**
  * The temperature a stored value stands for, in degrees Celsius.
@@ -91,7 +101,7 @@ export const quantiseTemperature = (celsius: number): number => {
  * @param stored - A whole number from 0 to 255.
  */
 export const dequantiseTemperature = (stored: number): number =>
-	OBSERVED_BASE_C + OBSERVED_STEP_C * stored;
+	dequantiseByte(CODEC, stored);
 
 /**
  * The bytes of the data file for twelve months of temperature.
@@ -105,26 +115,7 @@ export const dequantiseTemperature = (stored: number): number =>
  */
 export const encodeObservedTemperature = (
 	months: readonly ArrayLike<number>[],
-): Uint8Array<ArrayBuffer> => {
-	if (months.length !== MONTHS_PER_YEAR) {
-		throw new RangeError(
-			`Observed temperature has ${MONTHS_PER_YEAR} months; got ${months.length}`,
-		);
-	}
-	const bytes = new Uint8Array(OBSERVED_BYTES);
-	months.forEach((values, month) => {
-		if (values.length !== OBSERVED_VALUES_PER_MONTH) {
-			throw new RangeError(
-				`Each month of observed temperature has ${OBSERVED_VALUES_PER_MONTH} values; month ${month} has ${values.length}`,
-			);
-		}
-		const start = month * OBSERVED_VALUES_PER_MONTH;
-		for (let index = 0; index < OBSERVED_VALUES_PER_MONTH; index++) {
-			bytes[start + index] = quantiseTemperature(values[index] as number);
-		}
-	});
-	return bytes;
-};
+): Uint8Array<ArrayBuffer> => encodeBytes(CODEC, months);
 
 /**
  * Reads the bytes of the observed temperature file.
@@ -139,91 +130,10 @@ export const encodeObservedTemperature = (
  */
 export const decodeObservedTemperature = (
 	bytes: Uint8Array,
-): ObservedTemperature => {
-	if (bytes.length !== OBSERVED_BYTES) {
-		throw new RangeError(
-			`The observed temperature file is ${OBSERVED_BYTES} bytes long; got ${bytes.length}`,
-		);
-	}
-	const months: Float32Array[] = [];
-	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
-		const start = month * OBSERVED_VALUES_PER_MONTH;
-		const values = new Float32Array(OBSERVED_VALUES_PER_MONTH);
-		for (let index = 0; index < OBSERVED_VALUES_PER_MONTH; index++) {
-			values[index] = dequantiseTemperature(bytes[start + index] as number);
-		}
-		months.push(values);
-	}
-	return { months };
-};
+): ObservedTemperature => ({ months: decodeBytes(CODEC, bytes) });
 
-/**
- * Where a place falls among the points of the data: the four around it and
- * how far it lies between them. Written by {@link locate}.
- */
-type Location = {
-	/** Index in a month of the point north-west of the place. */
-	northWest: number;
-	/** Index in a month of the point north-east of it. */
-	northEast: number;
-	/** How far the place lies from the northern row to the southern, 0 to 1. */
-	south: number;
-	/** How far it lies from the western column to the eastern, 0 to 1. */
-	east: number;
-};
-
-/**
- * Finds the four points of the data around a place.
- *
- * @remarks
- * The northern row is never the southern pole row, so the row south of it
- * is always there; a place at the South Pole lies all the way to that row.
- * Longitude wraps, so a place between 359° and 360° east lies between the
- * last column and the first.
- */
-const locate = (
-	latitudeDeg: number,
-	longitudeDeg: number,
-	out: Location,
-): void => {
-	const down = 90 - latitudeDeg;
-	const row = Math.min(Math.floor(down), OBSERVED_ROWS - 2);
-	let across = longitudeDeg % 360;
-	if (across < 0) {
-		across += 360;
-	}
-	// A tiny negative longitude can come to 360 itself once 360 is added.
-	if (across >= 360) {
-		across -= 360;
-	}
-	const column = Math.floor(across);
-	out.northWest = row * OBSERVED_COLUMNS + column;
-	out.northEast = row * OBSERVED_COLUMNS + ((column + 1) % OBSERVED_COLUMNS);
-	out.south = down - row;
-	out.east = across - column;
-};
-
-/** The value at a place, from the four points around it. */
-const interpolate = (values: Float32Array, at: Location): number => {
-	const nw = values[at.northWest] as number;
-	const ne = values[at.northEast] as number;
-	const sw = values[at.northWest + OBSERVED_COLUMNS] as number;
-	const se = values[at.northEast + OBSERVED_COLUMNS] as number;
-	const north = nw + at.east * (ne - nw);
-	const south = sw + at.east * (se - sw);
-	return north + at.south * (south - north);
-};
-
-const assertMonths = (data: ObservedTemperature): void => {
-	if (
-		data.months.length !== MONTHS_PER_YEAR ||
-		data.months.some((values) => values.length !== OBSERVED_VALUES_PER_MONTH)
-	) {
-		throw new RangeError(
-			`Observed temperature holds ${MONTHS_PER_YEAR} months of ${OBSERVED_VALUES_PER_MONTH} values`,
-		);
-	}
-};
+const assertMonths = (data: ObservedTemperature): void =>
+	assertTwelveGrids('temperature', data.months);
 
 /**
  * The observed temperature of one month at a place, interpolated between
@@ -285,39 +195,8 @@ export const observedTemperature = (
 	data: ObservedTemperature,
 	resolution: number,
 ): MonthlyTemperature => {
-	if (!isSupportedResolution(resolution)) {
-		throw new RangeError(
-			`Unsupported world resolution ${resolution}: expected one of ${SUPPORTED_RESOLUTIONS.join(', ')}`,
-		);
-	}
+	assertResolution(resolution);
 	assertMonths(data);
-	const grid = getGrid(resolution);
-	const { centres, cellCount } = grid;
-	const latitudes = cellLatitudes(grid);
-	const northWest = new Int32Array(cellCount);
-	const northEast = new Int32Array(cellCount);
-	const south = new Float64Array(cellCount);
-	const east = new Float64Array(cellCount);
-	const at: Location = { northWest: 0, northEast: 0, south: 0, east: 0 };
-	for (let cell = 0; cell < cellCount; cell++) {
-		const longitudeDeg =
-			Math.atan2(centres[3 * cell + 1] as number, centres[3 * cell] as number) *
-			DEGREES_PER_RADIAN;
-		locate(latitudes[cell] as number, longitudeDeg, at);
-		northWest[cell] = at.northWest;
-		northEast[cell] = at.northEast;
-		south[cell] = at.south;
-		east[cell] = at.east;
-	}
-	return data.months.map((values) => {
-		const field = new Float32Array(cellCount);
-		for (let cell = 0; cell < cellCount; cell++) {
-			at.northWest = northWest[cell] as number;
-			at.northEast = northEast[cell] as number;
-			at.south = south[cell] as number;
-			at.east = east[cell] as number;
-			field[cell] = interpolate(values, at);
-		}
-		return field;
-	});
+	const cells = locateCells(getGrid(resolution));
+	return data.months.map((values) => interpolateOnCells(values, cells));
 };

@@ -12,6 +12,7 @@ export * from './history';
 export * from './insolation';
 export * from './noise';
 export * from './observed';
+export * from './observedWind';
 export * from './planet';
 export * from './protocol';
 export * from './quantile';
