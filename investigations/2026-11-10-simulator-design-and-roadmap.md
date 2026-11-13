@@ -68,7 +68,7 @@ Each step adds a viewable map layer and gets its own issue.
 8. Biome map
 9. Plate tectonics and time stepping
 
-Added since (see the status table): 3a, the core and page folders, and 3b, heat carried by winds and the climate loop, both between steps 3 and 4.
+Added since (see the status table): 3a, the core and page folders, and 3b, heat carried by winds and the climate loop, both between steps 3 and 4. Also 10, an optional simulated atmosphere, after step 9.
 
 ## Status and carried-over items (as of 2026-11-13)
 
@@ -87,6 +87,7 @@ Keep this section current when a step is merged.
 | 7 Tropical storm zones | Not started | |
 | 8 Biome map | Not started | |
 | 9 Plate tectonics and time stepping | Not started | |
+| 10 A simulated atmosphere (optional) | Deferred from step 3 by the user, 2026-11-13 | |
 
 ### Step 3a: core folders by component, page folders by role
 `src/core/` is flat today, except `src/core/wind/`, which step 3 started because it holds several models. With five more layers to come, a flat folder would pass 40 files, so the core moves into one folder per component in one refactor, between steps 3 and 4. It is a pure move: no behaviour change, checked by the existing tests and the temperature baseline. It waits for step 3's merge because that branch edits the files that would move.
@@ -114,6 +115,14 @@ Keep this section current when a step is merged.
 The first feedback into temperature, and the loop that later feedbacks (ocean currents, ice) plug into; design under "How the layers feed back into each other". Today heat spreads evenly between neighbouring cells, so west and east coasts get the same climate; winds carrying heat should give mild west coasts and cold east coasts at mid-latitudes, and set how far inland the sea's influence reaches.
 - **First job when planning it:** look at the Earth difference map region by region, to see how much of the error sits where winds would help (mid-latitude west and east coasts) and how much where they would not (the North Atlantic, sea-ice edges, high ground).
 - **Known costs:** the temperature solver relies on heat exchange being symmetric between neighbours, which carrying heat with the wind is not, so it needs a different method; the temperature starts to depend on day length; the worker's one-request-per-layer design becomes one climate solve.
+
+### Step 10 (optional): a simulated atmosphere
+Step 3 planned to prototype two wind models and choose. After the rules prototype (step 3, piece 5) the user deferred the simulated one to here: "ok lets maybe defer the simulated atmosphere til the end of the roadmap - if you are confident it will take so long to solve then its not worth doing here yet", then "Yes, defer it". Step 3 builds the rules model.
+- **What it would be:** a fluid layer (or two) on the grid, driven by the temperature and stepped forward until its averages settle; a month's winds are an average over many simulated days.
+- **Why deferred:** estimated, not measured, at 10 to 60 s per simulated month on the 64 grid, so minutes per world against half a second for the rules model; and inside the climate loop the winds are solved several times per pass.
+- **What was learnt before deferring:** one thermally driven layer makes trades and monsoons but no mid-latitude westerlies; those need weather systems, so either seeded stirring where the temperature changes fastest with latitude (a published approach, Vallis and colleagues 2004, cited from memory) or two layers. Explicit stepping on the cubed sphere may need extra damping at seams and corners.
+- **What it would buy:** patterns that come from the physics, so pressure bands that differ by longitude and unusual planets need no new rules; weather, which the storm step could use.
+- **What could make it worthwhile:** running it on the graphics card (WebGPU), a coarser grid, or starting each month from the last. The wind report from step 3 (`npm run report:winds`, eight or nine cases, error figures against the observed Earth, three checks against published studies) is the yardstick to judge it by.
 
 ### What step 2 built that later steps rely on
 - **Planet settings on the world:** axial tilt, the star's brightness and mass, the orbit's distance and the greenhouse strength, saved with the world. A note in the Planet panel warns when they are outside the range the temperature model is trusted for.
