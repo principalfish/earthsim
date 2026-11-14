@@ -25,13 +25,13 @@ import type { RotateButton, ViewInput } from './globe/input';
 import type { SunlightStyle } from './globe/material';
 import type { Globe } from './globe/renderer';
 import { createLayerStore, type LayerStore } from './layers';
-import type { ObservedLoader } from './observedData';
 import type { Preferences } from './preferences';
 import type {
 	RefreshScheduler,
 	TemperatureScheduler,
 	WindsScheduler,
 } from './refresh';
+import { type ScalarObservedLoader, scalarLayerOf } from './scalarLayer';
 import {
 	DEFAULT_TOOL,
 	rotateButtonFor,
@@ -42,7 +42,7 @@ import { applyStartup, decideStartup, type StartupRead } from './startup';
 import type { WorldStore } from './storage';
 import type { CursorReadout } from './ui/cursorReadout';
 import { createDateLine } from './ui/dateLine';
-import type { LayerPanel, ShownTemperature, ShownWinds } from './ui/layerPanel';
+import type { LayerPanel, ShownLayer, ShownWinds } from './ui/layerPanel';
 import {
 	FIRST_NEW_WORLD_VALUES,
 	type NewWorldDialogOptions,
@@ -122,16 +122,16 @@ export type PageLayerOptions = {
 	readonly winds: Pick<WindsScheduler, 'setShowing'>;
 	/** Called with the view settings whenever any of them changes. */
 	readonly onView: (view: PageView) => void;
-	/** Gives the observed temperature on a world's grid. */
-	readonly loadObserved: ObservedLoader;
+	/** Gives a layer's observed year on a world's grid. */
+	readonly loadObserved: ScalarObservedLoader;
 	/** The unit the key to the wind arrows writes its speeds in at first. */
 	readonly windUnit: WindUnit;
 };
 
 /** What the cursor readout reads of the page. */
 export type PageReadoutOptions = PageStatisticsOptions & {
-	/** What the globe shows of the temperature, at the time it is asked. */
-	readonly shownTemperature: () => ShownTemperature | null;
+	/** What the globe shows of a computed layer, at the time it is asked. */
+	readonly shownLayer: () => ShownLayer | null;
 	/** What the globe shows of the winds, at the time it is asked. */
 	readonly shownWinds: () => ShownWinds | null;
 	/** The unit wind speeds are written in, at the time it is asked. */
@@ -203,7 +203,7 @@ export type PageParts = {
 	/**
 	 * Adds the layer controls to the panel, which hold the view settings:
 	 * what the globe is coloured by, and so whether the temperature is
-	 * showing, and what of the temperature's year it shows. It starts on
+	 * showing, and what of each computed layer's year it shows. It starts on
 	 * {@link DEFAULT_PAGE_VIEW}.
 	 */
 	readonly createLayerPanel: (
@@ -240,10 +240,10 @@ export type PageParts = {
 	/** Gives the Earth's elevation data, for a world that starts as Earth. */
 	readonly loadEarth: WorldSources['loadEarth'];
 	/**
-	 * Gives the Earth's observed temperature on a world's grid, for the
-	 * comparison on the measured Earth.
+	 * Gives a layer's observed year of the Earth on a world's grid, such as
+	 * the temperature's, for the comparison on the measured Earth.
 	 */
-	readonly loadObserved: ObservedLoader;
+	readonly loadObserved: ScalarObservedLoader;
 	/** Offers a world to the user as a file; may throw. */
 	readonly exportWorld: (world: World) => void;
 	/** Reads a file as a world, trusting nothing about it. */
@@ -268,8 +268,9 @@ export type PageParts = {
 
 /**
  * How the globe is lit for a layer and the Sunlight setting. In Terrain
- * view the night side is darkened. In Temperature view the colours are
- * shaded as without the sun, since a darkened colour would read as another
+ * view the night side is darkened. On a computed layer it is lit as the
+ * layer's description says: in Temperature view the colours are shaded as
+ * without the sun, since a darkened colour would read as another
  * temperature, and the line between day and night is drawn instead.
  *
  * @param layer - What the globe is coloured by.
@@ -279,7 +280,7 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
 	if (!sunlight) {
 		return 'off';
 	}
-	return layer === 'temperature' ? 'line' : 'darkened';
+	return scalarLayerOf(layer)?.sunlightStyle ?? 'darkened';
 };
 
 /**
@@ -634,7 +635,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	const readout = parts.createCursorReadout({
 		currentWorld: () => state.world,
 		isStrokeActive: sculpt.isStrokeActive,
-		shownTemperature: layerPanel.shown,
+		shownLayer: layerPanel.shown,
 		shownWinds: layerPanel.shownWinds,
 		windUnit: () => windUnit,
 	});

@@ -6,9 +6,9 @@ import { loadEarthData } from './earthData';
 import { attachViewInput } from './globe/input';
 import { MAX_DRAWN_SEA_LEVEL_M, MIN_DRAWN_SEA_LEVEL_M } from './globe/material';
 import { createGlobe, type Globe } from './globe/renderer';
-import { loadObservedTemperature } from './observedData';
 import { createPanelMemory, reachStorage } from './panelMemory';
 import { createPreferences } from './preferences';
+import { loadLayerObserved } from './scalarLayer';
 import { createSculptController } from './sculpt';
 import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
 import { createCursorReadout, createReadoutStrip } from './ui/cursorReadout';
@@ -171,7 +171,7 @@ if (globe !== null) {
 		layersSection: sections.layers,
 		openNewWorldDialog,
 		loadEarth: loadEarthData,
-		loadObserved: loadObservedTemperature,
+		loadObserved: loadLayerObserved,
 		exportWorld: (world) => exportWorldFile(world),
 		importWorld: importWorldFile,
 		setInert: (inert) => {

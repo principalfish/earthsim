@@ -12,20 +12,21 @@ import {
 	weightedQuantiles,
 } from '../../core/index';
 import { type ColourRamp, rampGradient, type ValueRange } from '../globe/ramp';
-import type { TemperatureLayer } from '../layers';
+import type { ScalarLayerReading, ScalarLayerSpec } from '../scalarLayer';
 import { createElement } from './fields';
 
 /**
- * The narrowest range a scale is fitted to, in degrees Celsius. A field
- * that varies less than this, or not at all, is shown over at least this
- * much, about its middle, so that the ramp is not stretched over a sliver.
+ * The narrowest range a scale is fitted to unless it is given another: the
+ * temperature's, in degrees Celsius. A field that varies less than this, or
+ * not at all, is shown over at least this much, about its middle, so that
+ * the ramp is not stretched over a sliver.
  */
 export const MIN_FITTED_SPAN_C = 2;
 
 /**
- * The share of a year's weight, by area, a temperature scale leaves out at
- * each end: half a percent, so that the scale spans the middle 99% of the
- * world.
+ * The share of a year's weight, by area, a scale fitted to a year leaves
+ * out at each end: half a percent, so that the scale spans the middle 99%
+ * of the world.
  */
 export const FIT_TAIL_SHARE = 0.005;
 
@@ -82,17 +83,17 @@ export const LEGEND_EMPTY_TEXT = 'Not calculated yet';
  */
 export const LEGEND_OUT_OF_DATE_TEXT = 'Out of date';
 
-/** What the legend says once no result can be calculated. */
-export const LEGEND_UNAVAILABLE_TEXT = 'Temperature unavailable';
+/**
+ * What the legend says of a calculation that tells its years, as the
+ * temperature's does, before its first year is done.
+ */
+export const LEGEND_FIRST_YEAR_TEXT = 'Calculating · first year';
 
 /**
- * What the legend says when the result is current but the globe shows none
- * of it, as when the globe refused its first field.
+ * What the legend says of a calculation under way that tells nothing of how
+ * far it has come.
  */
-export const LEGEND_NOT_SHOWN_TEXT = 'Temperature could not be shown';
-
-/** What the legend says of the calculation before its first year is done. */
-export const LEGEND_FIRST_YEAR_TEXT = 'Calculating · first year';
+export const LEGEND_CALCULATING_TEXT = 'Calculating';
 
 /** Whether a field shown on a scale holds values beyond either of its ends. */
 export type ValuesBeyond = {
@@ -136,9 +137,9 @@ export const cellWeights = (cellCount: number): ArrayLike<number> => {
 };
 
 /**
- * The scale a year of temperatures is fitted to, the same in every month
- * so that a colour means the same in each, and spanning the middle 99% of
- * the world by area.
+ * The scale a year of a layer, such as the temperature, is fitted to from
+ * end to end, the same in every month so that a colour means the same in
+ * each, and spanning the middle 99% of the world by area.
  *
  * @remarks
  * Its ends are the weighted quantiles {@link FIT_TAIL_SHARE} in from either
@@ -146,32 +147,34 @@ export const cellWeights = (cellCount: number): ArrayLike<number> => {
  * weight, as a cell-month by its cell's area: so a peak or a pole that
  * covers little of the world does not stretch the scale and squeeze the
  * rest into a few colours. Values beyond the ends take the end colours.
- * Before they are rounded, the ends are widened about their middle to
- * {@link MIN_FITTED_SPAN_C} if they are closer than that. They are then
- * rounded outward to whole degrees, the low end down and the high end up,
- * so that the legend's words for what lies beyond them are whole numbers.
+ * Before they are rounded, the ends are widened about their middle to the
+ * smallest span if they are closer than that. They are then rounded
+ * outward to whole numbers, the low end down and the high end up, so that
+ * the legend's words for what lies beyond them are whole numbers.
  *
  * @param months - The fields, such as the twelve months of a year, each one
  * value per cell. Values that are not numbers or are infinite are passed
  * over.
  * @param weights - What each cell counts for, one per cell, as from
  * {@link cellWeights}.
- * @returns The range, at least {@link MIN_FITTED_SPAN_C} wide with whole
- * ends, and whether any finite value lies below its low end or above its
- * high end.
+ * @param minSpan - The smallest span of the scale, above zero;
+ * {@link MIN_FITTED_SPAN_C} when left out.
+ * @returns The range, at least `minSpan` wide with whole ends, and whether
+ * any finite value lies below its low end or above its high end.
  * @throws RangeError if no field holds a finite value, or a field or the
  * weights are not as {@link weightedQuantiles} takes them.
  */
 export const fitRange = (
 	months: readonly Float32Array[],
 	weights: ArrayLike<number>,
+	minSpan: number = MIN_FITTED_SPAN_C,
 ): FittedScale => {
 	const cuts = weightedQuantiles(months, weights, FIT_TAIL_SHARE);
 	let { low, high } = cuts;
-	if (high - low < MIN_FITTED_SPAN_C) {
+	if (high - low < minSpan) {
 		const middle = (low + high) / 2;
-		low = middle - MIN_FITTED_SPAN_C / 2;
-		high = middle + MIN_FITTED_SPAN_C / 2;
+		low = middle - minSpan / 2;
+		high = middle + minSpan / 2;
 	}
 	const range = { min: Math.floor(low), max: Math.ceil(high) };
 	return {
@@ -188,12 +191,17 @@ export const fitRange = (
  * zero up to the largest value in the field, rounded up to a whole number.
  *
  * @param field - The values, none below zero.
+ * @param minSpan - The smallest span of the scale, above zero;
+ * {@link MIN_FITTED_SPAN_C} when left out.
  * @returns From 0 to the largest finite value rounded up to a whole number,
- * or to {@link MIN_FITTED_SPAN_C} if that is smaller. Values that are not
- * numbers or are infinite are passed over.
+ * or to `minSpan` if that is larger. Values that are not numbers or are
+ * infinite are passed over.
  * @throws RangeError if the field holds no finite value.
  */
-export const fitRangeFromZero = (field: Float32Array): ValueRange => {
+export const fitRangeFromZero = (
+	field: Float32Array,
+	minSpan: number = MIN_FITTED_SPAN_C,
+): ValueRange => {
 	let max = Number.NEGATIVE_INFINITY;
 	for (const value of field) {
 		if (Number.isFinite(value)) {
@@ -203,7 +211,61 @@ export const fitRangeFromZero = (field: Float32Array): ValueRange => {
 	if (!Number.isFinite(max)) {
 		throw new RangeError('A scale needs at least one finite value to fit');
 	}
-	return { min: 0, max: Math.max(MIN_FITTED_SPAN_C, Math.ceil(max)) };
+	return { min: 0, max: Math.max(minSpan, Math.ceil(max)) };
+};
+
+/**
+ * The scale a year of a layer is fitted to about a centre, such as the
+ * planet's mean pressure: reaching as far either side of it, the same in
+ * every month, and spanning the middle 99% of the world by area.
+ *
+ * @remarks
+ * The centre is rounded to a whole number first. The scale then reaches
+ * either way as far as the further of the weighted quantiles
+ * {@link FIT_TAIL_SHARE} in from either end of every value, as for
+ * {@link fitRange}, and at least half the smallest span, rounded up to a
+ * whole number, so that its ends are whole numbers too. Values beyond the
+ * ends take the end colours.
+ *
+ * @param months - The fields, such as the twelve months of a year, each one
+ * value per cell. Values that are not numbers or are infinite are passed
+ * over.
+ * @param weights - What each cell counts for, one per cell, as from
+ * {@link cellWeights}.
+ * @param centre - The value the scale is centred on; finite.
+ * @param minSpan - The smallest span of the scale, above zero;
+ * {@link MIN_FITTED_SPAN_C} when left out.
+ * @returns The range, centred on the rounded centre and at least `minSpan`
+ * wide, and whether any finite value lies below its low end or above its
+ * high end.
+ * @throws RangeError if the centre is not finite, if no field holds a
+ * finite value, or if a field or the weights are not as
+ * {@link weightedQuantiles} takes them.
+ */
+export const fitRangeCentred = (
+	months: readonly Float32Array[],
+	weights: ArrayLike<number>,
+	centre: number,
+	minSpan: number = MIN_FITTED_SPAN_C,
+): FittedScale => {
+	if (!Number.isFinite(centre)) {
+		throw new RangeError(
+			`A scale must be centred on a finite value; got ${centre}`,
+		);
+	}
+	const cuts = weightedQuantiles(months, weights, FIT_TAIL_SHARE);
+	const middle = Math.round(centre);
+	const reach = Math.ceil(
+		Math.max(middle - cuts.low, cuts.high - middle, minSpan / 2),
+	);
+	const range = { min: middle - reach, max: middle + reach };
+	return {
+		range,
+		beyond: {
+			below: cuts.lowest < range.min,
+			above: cuts.highest > range.max,
+		},
+	};
 };
 
 /**
@@ -379,10 +441,12 @@ const signedTenths = (value: number): string => {
  * rounds to zero is `0.0` with no sign; the root-mean-square difference is
  * never below zero and has no sign.
  *
- * @param figures - The mean and root-mean-square difference, in degrees.
+ * @param figures - The mean and root-mean-square difference, in the
+ * layer's unit.
+ * @param unit - The layer's unit, such as `°C`.
  */
-export const formatFigures = (figures: FieldDifference): string =>
-	`Mean ${signedTenths(figures.meanDifference)} °C · RMS ${(Math.round(figures.rmsDifference * 10) / 10).toFixed(1)} °C`;
+export const formatFigures = (figures: FieldDifference, unit: string): string =>
+	`Mean ${signedTenths(figures.meanDifference)} ${unit} · RMS ${(Math.round(figures.rmsDifference * 10) / 10).toFixed(1)} ${unit}`;
 
 /**
  * Where a value sits along the scale, as a percentage of its length from
@@ -395,8 +459,9 @@ export const tickPosition = (value: number, range: ValueRange): number =>
 	((value - range.min) / (range.max - range.min)) * 100;
 
 /**
- * The line the legend shows while a result is being calculated, such as
- * `Calculating · year 3, about 2 to go`.
+ * The line the legend shows while a result of a layer that tells its years,
+ * such as the temperature, is being calculated, such as `Calculating ·
+ * year 3, about 2 to go`.
  *
  * @param progress - How far the calculation has come, or null before its
  * first year is done.
@@ -515,27 +580,41 @@ export type LegendContent = {
 };
 
 /**
- * What the legend shows for the temperature layer as it stands.
+ * What the legend shows for a layer as it stands.
  *
- * @param layer - The layer, from the store.
- * @param source - The range, ramp and caption the globe is showing the
- * layer with, or null when it shows no scale.
+ * @param layer - The description of the layer chosen: its words for a
+ * result that cannot be calculated or shown, and whether its calculation
+ * tells its years.
+ * @param reading - Where the layer's result stands and how far its
+ * calculation has come, from the store.
+ * @param source - The range, ramp and caption the globe is showing, or
+ * null when it shows no scale.
  * @param showsResult - Whether what the globe shows is the layer's own
  * result, and not an earlier one it kept when it refused this one. False
  * whenever it shows no scale.
+ * @param sourceLayer - The description of the layer the source is of: its
+ * unit and how its ticks are written. It differs from `layer` only while
+ * the globe keeps a field of another layer, having refused the first field
+ * of the one chosen; `layer` when left out.
  * @returns The scale whenever the globe shows one, with a line and, while
  * calculating, a bar. A current result has no line while the globe shows
  * it. While the globe does not, the line is {@link LEGEND_OUT_OF_DATE_TEXT}
  * over the earlier result's scale, which is what the globe then shows, and
- * {@link LEGEND_NOT_SHOWN_TEXT} when there is no scale at all. The scale's
- * ticks are at its own step when it has one, and it says what its end
- * colours stand for at each end that has values beyond it, and gives the
- * source's error figures when it has them.
+ * the layer's words for a result not shown when there is no scale at all.
+ * While calculating, a layer that tells its years has the line of
+ * {@link progressLine} and a bar of {@link progressFraction}, and any other
+ * {@link LEGEND_CALCULATING_TEXT} and a bar that does not know how far it
+ * has come. The scale's ticks are at its own step when it has one, written
+ * as the source's layer writes them, and it says what its end colours
+ * stand for at each end that has values beyond it, and gives the source's
+ * error figures in that layer's unit when it has them.
  */
 export const legendContent = (
-	layer: TemperatureLayer,
+	layer: ScalarLayerSpec,
+	reading: Pick<ScalarLayerReading, 'status' | 'progress'>,
 	source: LegendSource | null,
 	showsResult: boolean,
+	sourceLayer: Pick<ScalarLayerSpec, 'formatTick' | 'unit'> = layer,
 ): LegendContent => {
 	const scale =
 		source === null
@@ -548,24 +627,24 @@ export const legendContent = (
 						source.range.max,
 						source.tickStep,
 					).map((value) => ({
-						label: formatTick(value),
+						label: sourceLayer.formatTick(value),
 						position: tickPosition(value, source.range),
 					})),
 					below: source.beyond.below
-						? `${formatTick(source.range.min)} and below`
+						? `${sourceLayer.formatTick(source.range.min)} and below`
 						: null,
 					above: source.beyond.above
-						? `${formatTick(source.range.max)} and above`
+						? `${sourceLayer.formatTick(source.range.max)} and above`
 						: null,
 					figures:
 						source.figures === undefined || source.figures === null
 							? null
-							: formatFigures(source.figures),
+							: formatFigures(source.figures, sourceLayer.unit),
 				};
-	switch (layer.status) {
+	switch (reading.status) {
 		case 'current': {
 			if (scale === null) {
-				return { scale, status: LEGEND_NOT_SHOWN_TEXT, bar: null };
+				return { scale, status: layer.notShownText, bar: null };
 			}
 			return {
 				scale,
@@ -576,13 +655,15 @@ export const legendContent = (
 		case 'outOfDate':
 			return { scale, status: LEGEND_OUT_OF_DATE_TEXT, bar: null };
 		case 'calculating':
-			return {
-				scale,
-				status: progressLine(layer.progress),
-				bar: { fraction: progressFraction(layer.progress) },
-			};
+			return layer.yearProgress
+				? {
+						scale,
+						status: progressLine(reading.progress),
+						bar: { fraction: progressFraction(reading.progress) },
+					}
+				: { scale, status: LEGEND_CALCULATING_TEXT, bar: { fraction: null } };
 		case 'unavailable':
-			return { scale, status: LEGEND_UNAVAILABLE_TEXT, bar: null };
+			return { scale, status: layer.unavailableText, bar: null };
 		case 'empty':
 			return { scale, status: LEGEND_EMPTY_TEXT, bar: null };
 	}

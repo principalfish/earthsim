@@ -11,24 +11,30 @@ import {
 } from '../globe/ramp';
 import type { TemperatureLayer } from '../layers';
 import {
+	TEMPERATURE_LAYER,
+	TEMPERATURE_NOT_SHOWN_TEXT,
+	TEMPERATURE_UNAVAILABLE_TEXT,
+} from '../scalarLayer';
+import {
 	createFakeDocument,
 	type FakeElement,
 	oneByClass,
 } from '../testing/fakeDocument';
-import { TWO_STOP_RAMP } from '../testing/rampFixtures';
+import { SEVEN_STOP_RAMP, TWO_STOP_RAMP } from '../testing/rampFixtures';
+import { MADE_UP_LAYER } from '../testing/scalarLayerFixtures';
 import {
 	cellWeights,
 	createLegend,
 	FIT_TAIL_SHARE,
 	fitRange,
+	fitRangeCentred,
 	fitRangeFromZero,
 	formatFigures,
 	formatTick,
+	LEGEND_CALCULATING_TEXT,
 	LEGEND_EMPTY_TEXT,
 	LEGEND_FIRST_YEAR_TEXT,
-	LEGEND_NOT_SHOWN_TEXT,
 	LEGEND_OUT_OF_DATE_TEXT,
-	LEGEND_UNAVAILABLE_TEXT,
 	legendContent,
 	legendTicks,
 	MAX_LEGEND_TICKS,
@@ -395,26 +401,26 @@ describe('formatTick', () => {
 describe('formatFigures', () => {
 	it('writes the mean signed and the RMS unsigned, each to one decimal', () => {
 		expect(
-			formatFigures({ meanDifference: -0.145, rmsDifference: 3.934 }),
+			formatFigures({ meanDifference: -0.145, rmsDifference: 3.934 }, '°C'),
 		).toBe('Mean −0.1 °C · RMS 3.9 °C');
-		expect(formatFigures({ meanDifference: 0.26, rmsDifference: 12.05 })).toBe(
-			'Mean +0.3 °C · RMS 12.1 °C',
-		);
+		expect(
+			formatFigures({ meanDifference: 0.26, rmsDifference: 12.05 }, '°C'),
+		).toBe('Mean +0.3 °C · RMS 12.1 °C');
 	});
 
 	it('writes a mean that rounds to zero as 0.0, with no sign', () => {
 		for (const meanDifference of [0, -0, 0.04, -0.04, -0.049]) {
 			expect(
-				formatFigures({ meanDifference, rmsDifference: 0 }),
+				formatFigures({ meanDifference, rmsDifference: 0 }, '°C'),
 				`${meanDifference}`,
 			).toBe('Mean 0.0 °C · RMS 0.0 °C');
 		}
 	});
 
 	it('rounds a half away from zero', () => {
-		expect(formatFigures({ meanDifference: -1.25, rmsDifference: 1.25 })).toBe(
-			'Mean −1.3 °C · RMS 1.3 °C',
-		);
+		expect(
+			formatFigures({ meanDifference: -1.25, rmsDifference: 1.25 }, '°C'),
+		).toBe('Mean −1.3 °C · RMS 1.3 °C');
 	});
 });
 
@@ -511,7 +517,9 @@ describe('legendContent', () => {
 	});
 
 	it('draws the ramp and its ticks for a current result, with nothing said', () => {
-		expect(legendContent(layerOf('current'), source, true)).toEqual({
+		expect(
+			legendContent(TEMPERATURE_LAYER, layerOf('current'), source, true),
+		).toEqual({
 			scale: {
 				caption: 'Air temperature in July, °C',
 				gradient: rampGradient(TEMPERATURE_RAMP),
@@ -534,18 +542,27 @@ describe('legendContent', () => {
 	it('writes the error figures of a source that has them', () => {
 		const figures = { meanDifference: 0.31, rmsDifference: 4.44 };
 		expect(
-			legendContent(layerOf('current'), { ...source, figures }, true).scale
-				?.figures,
+			legendContent(
+				TEMPERATURE_LAYER,
+				layerOf('current'),
+				{ ...source, figures },
+				true,
+			).scale?.figures,
 		).toBe('Mean +0.3 °C · RMS 4.4 °C');
 		expect(
-			legendContent(layerOf('current'), { ...source, figures: null }, true)
-				.scale?.figures,
+			legendContent(
+				TEMPERATURE_LAYER,
+				layerOf('current'),
+				{ ...source, figures: null },
+				true,
+			).scale?.figures,
 		).toBeNull();
 	});
 
 	it('says what the end colours stand for at each end with values beyond it', () => {
 		const ends = (below: boolean, above: boolean) => {
 			const { scale } = legendContent(
+				TEMPERATURE_LAYER,
 				layerOf('current'),
 				{ ...source, beyond: { below, above } },
 				true,
@@ -560,6 +577,7 @@ describe('legendContent', () => {
 
 	it('marks the scale at its own step when it has one', () => {
 		const content = legendContent(
+			TEMPERATURE_LAYER,
 			layerOf('current'),
 			{
 				...source,
@@ -584,15 +602,22 @@ describe('legendContent', () => {
 	});
 
 	it('says a current result the globe shows no scale for could not be shown', () => {
-		expect(legendContent(layerOf('current'), null, false)).toEqual({
+		expect(
+			legendContent(TEMPERATURE_LAYER, layerOf('current'), null, false),
+		).toEqual({
 			scale: null,
-			status: LEGEND_NOT_SHOWN_TEXT,
+			status: TEMPERATURE_NOT_SHOWN_TEXT,
 			bar: null,
 		});
 	});
 
 	it('marks a current result out of date while the globe still shows an earlier one', () => {
-		const content = legendContent(layerOf('current'), source, false);
+		const content = legendContent(
+			TEMPERATURE_LAYER,
+			layerOf('current'),
+			source,
+			false,
+		);
 		expect(content.scale).not.toBeNull();
 		expect(content.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		expect(content.bar).toBeNull();
@@ -600,6 +625,7 @@ describe('legendContent', () => {
 
 	it('draws the ramp it is given', () => {
 		const content = legendContent(
+			TEMPERATURE_LAYER,
 			layerOf('current'),
 			{ ...source, ramp: TWO_STOP_RAMP },
 			true,
@@ -608,7 +634,12 @@ describe('legendContent', () => {
 	});
 
 	it('marks an out-of-date result, still drawn', () => {
-		const content = legendContent(layerOf('outOfDate'), source, true);
+		const content = legendContent(
+			TEMPERATURE_LAYER,
+			layerOf('outOfDate'),
+			source,
+			true,
+		);
 		expect(content.scale).not.toBeNull();
 		expect(content.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		expect(content.bar).toBeNull();
@@ -616,6 +647,7 @@ describe('legendContent', () => {
 
 	it('marks a calculation under way with its progress, over the result on hand', () => {
 		const content = legendContent(
+			TEMPERATURE_LAYER,
 			layerOf('calculating', true, progressWith(3, 2)),
 			source,
 			true,
@@ -626,7 +658,12 @@ describe('legendContent', () => {
 	});
 
 	it('shows the progress alone while the first result is calculated', () => {
-		const content = legendContent(layerOf('calculating', false), null, false);
+		const content = legendContent(
+			TEMPERATURE_LAYER,
+			layerOf('calculating', false),
+			null,
+			false,
+		);
 		expect(content).toEqual({
 			scale: null,
 			status: LEGEND_FIRST_YEAR_TEXT,
@@ -635,7 +672,9 @@ describe('legendContent', () => {
 	});
 
 	it('says there is nothing yet before the first result', () => {
-		expect(legendContent(layerOf('empty', false), null, false)).toEqual({
+		expect(
+			legendContent(TEMPERATURE_LAYER, layerOf('empty', false), null, false),
+		).toEqual({
 			scale: null,
 			status: LEGEND_EMPTY_TEXT,
 			bar: null,
@@ -643,13 +682,153 @@ describe('legendContent', () => {
 	});
 
 	it('says the temperature is unavailable, keeping a result on hand', () => {
-		const kept = legendContent(layerOf('unavailable'), source, true);
+		const kept = legendContent(
+			TEMPERATURE_LAYER,
+			layerOf('unavailable'),
+			source,
+			true,
+		);
 		expect(kept.scale).not.toBeNull();
-		expect(kept.status).toBe(LEGEND_UNAVAILABLE_TEXT);
-		const none = legendContent(layerOf('unavailable', false), null, false);
+		expect(kept.status).toBe(TEMPERATURE_UNAVAILABLE_TEXT);
+		const none = legendContent(
+			TEMPERATURE_LAYER,
+			layerOf('unavailable', false),
+			null,
+			false,
+		);
 		expect(none.scale).toBeNull();
-		expect(none.status).toBe(LEGEND_UNAVAILABLE_TEXT);
+		expect(none.status).toBe(TEMPERATURE_UNAVAILABLE_TEXT);
 		expect(none.bar).toBeNull();
+	});
+});
+
+describe('fitRangeCentred', () => {
+	const ones = (cells: number) => new Float64Array(cells).fill(1);
+
+	it('reaches as far either side of the rounded centre as the further end of the year', () => {
+		const months = [Float32Array.of(1000, 1031), Float32Array.of(1010, 1020)];
+		expect(fitRangeCentred(months, ones(2), 1015.6)).toEqual({
+			range: { min: 1000, max: 1032 },
+			beyond: { below: false, above: false },
+		});
+	});
+
+	it('reaches at least half the smallest span either way, rounded up', () => {
+		const months = [Float32Array.of(1012, 1013)];
+		expect(fitRangeCentred(months, ones(2), 1012, 5).range).toEqual({
+			min: 1009,
+			max: 1015,
+		});
+		expect(fitRangeCentred(months, ones(2), 1012).range).toEqual({
+			min: 1011,
+			max: 1013,
+		});
+	});
+
+	it('leaves out the tails by area and says what lies beyond', () => {
+		const grid = getGrid(64);
+		const field = new Float32Array(grid.cellCount).fill(0);
+		const smallest = Array.from(grid.areas.keys()).sort(
+			(a, b) => (grid.areas[a] as number) - (grid.areas[b] as number),
+		)[0] as number;
+		field[smallest] = 500;
+		const { range, beyond } = fitRangeCentred([field], grid.areas, 0);
+		expect(range).toEqual({ min: -1, max: 1 });
+		expect(beyond).toEqual({ below: false, above: true });
+	});
+
+	it('refuses a centre that is not finite', () => {
+		expect(() =>
+			fitRangeCentred([Float32Array.of(1, 2)], ones(2), Number.NaN),
+		).toThrow(RangeError);
+	});
+});
+
+describe('legendContent for another layer', () => {
+	const source = {
+		range: { min: 1000, max: 1030 },
+		ramp: SEVEN_STOP_RAMP,
+		caption: 'Made-up pressure in month 7, hPa',
+		beyond: { below: true, above: true },
+	};
+	const reading = (
+		status: TemperatureLayer['status'],
+		progress: TemperatureProgress | null = null,
+	) => ({ status, progress });
+
+	it('writes the ticks, the ends and the figures as the layer writes them, in its unit', () => {
+		const { scale } = legendContent(
+			MADE_UP_LAYER,
+			reading('current'),
+			{ ...source, figures: { meanDifference: 1.26, rmsDifference: 2 } },
+			true,
+		);
+		expect(scale?.caption).toBe('Made-up pressure in month 7, hPa');
+		expect(scale?.gradient).toBe(rampGradient(SEVEN_STOP_RAMP));
+		expect(scale?.ticks.map((tick) => tick.label)).toEqual([
+			'≈1,000',
+			'≈1,010',
+			'≈1,020',
+			'≈1,030',
+		]);
+		expect(scale?.below).toBe('≈1,000 and below');
+		expect(scale?.above).toBe('≈1,030 and above');
+		expect(scale?.figures).toBe('Mean +1.3 hPa · RMS 2.0 hPa');
+	});
+
+	it('says what the layer says when it cannot be calculated or shown', () => {
+		expect(
+			legendContent(MADE_UP_LAYER, reading('unavailable'), null, false).status,
+		).toBe('Made-up pressure unavailable');
+		expect(
+			legendContent(MADE_UP_LAYER, reading('current'), null, false).status,
+		).toBe('Made-up pressure could not be shown');
+	});
+
+	it('has no year line for a calculation that tells no years', () => {
+		expect(
+			legendContent(MADE_UP_LAYER, reading('calculating'), source, true),
+		).toMatchObject({
+			status: LEGEND_CALCULATING_TEXT,
+			bar: { fraction: null },
+		});
+		expect(LEGEND_CALCULATING_TEXT).toBe('Calculating');
+	});
+
+	it('writes a scale kept from another layer as that layer does, and the line in the chosen layer’s words', () => {
+		const temperatureSource = {
+			range: { min: -10, max: 30 },
+			ramp: TEMPERATURE_RAMP,
+			caption: 'Air temperature in July, °C',
+			beyond: { below: true, above: true },
+			figures: { meanDifference: 1.26, rmsDifference: 2 },
+		};
+		const kept = legendContent(
+			MADE_UP_LAYER,
+			reading('calculating'),
+			temperatureSource,
+			false,
+			TEMPERATURE_LAYER,
+		);
+		expect(kept.scale).toEqual(
+			legendContent(
+				TEMPERATURE_LAYER,
+				reading('current'),
+				temperatureSource,
+				true,
+			).scale,
+		);
+		expect(kept.scale?.ticks.map((tick) => tick.label)).toEqual([
+			'−10',
+			'0',
+			'10',
+			'20',
+			'30',
+		]);
+		expect(kept.scale?.below).toBe('−10 and below');
+		expect(kept.scale?.figures).toBe('Mean +1.3 °C · RMS 2.0 °C');
+		expect(kept.status).toBe(LEGEND_CALCULATING_TEXT);
+		expect(kept.bar).toEqual({ fraction: null });
 	});
 });
 

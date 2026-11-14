@@ -1,18 +1,15 @@
 /**
- * The comparison controls in the Layers section: where the temperature on
- * the globe comes from, Simulated, Observed or the Difference of the two,
- * offered only while the world is the measured Earth, with a line for what
- * the page has to say of the observed temperature.
+ * The comparison controls in the Layers section: where a layer on the globe,
+ * such as the temperature, comes from, Simulated, Observed or the
+ * Difference of the two, offered only while the world is the measured
+ * Earth, with a line for what the page has to say of the observed year.
  *
  * The controls only show what they are told and pass on what is chosen;
  * the layer panel decides when they are offered.
  */
 
-import {
-	TEMPERATURE_SOURCE_LABELS,
-	TEMPERATURE_SOURCES,
-	type TemperatureSource,
-} from '../view';
+import type { ObservedComparison } from '../scalarLayer';
+import { SOURCE_LABELS, SOURCES, type Source } from '../view';
 import { createElement, createSegmentedChoice } from './fields';
 
 /** What the comparison controls show at one moment. */
@@ -23,17 +20,19 @@ export type ComparisonContent = {
 	 */
 	readonly offered: boolean;
 	/** The source shown as chosen. */
-	readonly source: TemperatureSource;
+	readonly source: Source;
 	/** What the line under the choice says, or null for nothing. */
 	readonly message: string | null;
 };
 
 /** What the comparison controls start with and whom they tell of a choice. */
 export type ComparisonControlsOptions = {
+	/** The layer's comparison, which names the controls. */
+	readonly observed: Pick<ObservedComparison, 'sourceName' | 'sourceLegend'>;
 	/** The source shown as chosen at first. */
-	readonly source: TemperatureSource;
+	readonly source: Source;
 	/** Called with the source when another is chosen. */
-	readonly onSource: (source: TemperatureSource) => void;
+	readonly onSource: (source: Source) => void;
 };
 
 /** The comparison controls on the page. */
@@ -50,14 +49,17 @@ export type ComparisonControls = {
  *
  * @remarks
  * The choice is a row of three segments, built like the choice of layer,
- * whose group a screen reader names "Temperature source". The line under
+ * named as the layer's comparison names it, such as `temperature-source`,
+ * whose group a screen reader names by the comparison's words, such as
+ * "Temperature source". The line under
  * it is a polite live region, so a screen reader announces a message such
  * as a failed load without the focus moving. It is rewritten only when its
  * words change, and while the controls show it is left empty rather than
  * hidden when there is nothing to say.
  *
  * @param container - Where to add the controls, after what it holds.
- * @param options - The starting source and whom to tell of a choice.
+ * @param options - The layer's comparison, the starting source and whom to
+ * tell of a choice.
  * @returns The controls.
  */
 export const createComparisonControls = (
@@ -67,11 +69,11 @@ export const createComparisonControls = (
 	const element = createElement('div', 'comparison');
 	element.hidden = true;
 	const choice = createSegmentedChoice({
-		name: 'temperature-source',
-		legend: 'Temperature source',
-		choices: TEMPERATURE_SOURCES.map((value) => ({
+		name: options.observed.sourceName,
+		legend: options.observed.sourceLegend,
+		choices: SOURCES.map((value) => ({
 			value,
-			label: TEMPERATURE_SOURCE_LABELS[value],
+			label: SOURCE_LABELS[value],
 		})),
 		value: options.source,
 		onChange: options.onSource,

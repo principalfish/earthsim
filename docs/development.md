@@ -82,17 +82,18 @@ A pure library with no DOM, Three.js or worker globals.
 | `refresh.ts` | When to ask a worker again after the world changes; the winds after each new temperature result and each change of the day length; with `oneAtATime` (statistics, winds) one request at a time, an overtaken answer ignored |
 | `workerService.ts` | The statistics, temperature and winds services, each on its own worker |
 | `layers.ts` | The computed layers the page holds, the temperature and the winds worked out from it, and whether each is current |
-| `view.ts` | What the globe shows: the layer, the part of the year, the source, the month, the sunlight and the winds |
+| `view.ts` | What the globe shows: the layer, each computed layer's part of the year and source, the month, the sunlight and the winds |
+| `scalarLayer.ts` | Each layer of one computed value per cell described as data, the temperature the one offered: its name, unit, how its values are written, its legend wording, its views of the year with their colours and scale fitting, its comparison with the observed Earth and where in the layer store its months come from; the layer panel, legend, cursor readout, comparison controls, date line and lighting take a description rather than naming the temperature |
 | `playback.ts` | Playing through the year |
 | `storage.ts`, `autosave.ts` | The saved world in IndexedDB, export and import, and when to save |
 | `panelMemory.ts` | Which panel sections are open, remembered by the browser |
 | `preferences.ts` | The page's preferences, remembered by the browser apart from the world: the wind speed unit |
 | `windUnits.ts` | Wind speeds in m/s, km/h and mph, the eight compass points, and a wind in words |
-| `earthData.ts`, `observedData.ts` | Fetching the Earth data files when first needed |
+| `earthData.ts`, `observedData.ts` | Fetching the Earth data files when first needed, the observed years through a description of their file |
 | `globe/` | The renderer, shaders, camera, picking, colour ramps and the wind arrows |
 | `ui/` | The panel's sections and controls, the New world dialog, the legend, the key to the wind arrows and the cursor readout |
 | `styles.css` | The page's styles |
-| `testing/` | Stand-ins for the canvas, document, storage and timers, which only the tests use |
+| `testing/` | Stand-ins for the canvas, document, storage and timers, and a made-up layer description, which only the tests use |
 
 ### `src/worker/`: the Web Worker
 

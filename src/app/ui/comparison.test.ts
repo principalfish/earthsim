@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TEMPERATURE_OBSERVED } from '../scalarLayer';
 import {
 	byClass,
 	createFakeDocument,
@@ -6,7 +7,7 @@ import {
 	type FakeElement,
 	oneByClass,
 } from '../testing/fakeDocument';
-import type { TemperatureSource } from '../view';
+import type { Source } from '../view';
 import { createComparisonControls } from './comparison';
 
 describe('createComparisonControls', () => {
@@ -19,12 +20,16 @@ describe('createComparisonControls', () => {
 		vi.unstubAllGlobals();
 	});
 
-	const make = (source: TemperatureSource = 'simulated') => {
-		const chosen: TemperatureSource[] = [];
+	const make = (source: Source = 'simulated') => {
+		const chosen: Source[] = [];
 		const container = fake.createElement('div');
 		const controls = createComparisonControls(
 			container as unknown as HTMLElement,
-			{ source, onSource: (next) => chosen.push(next) },
+			{
+				observed: TEMPERATURE_OBSERVED,
+				source,
+				onSource: (next) => chosen.push(next),
+			},
 		);
 		const [root] = container.children as [FakeElement];
 		return {
@@ -82,5 +87,31 @@ describe('createComparisonControls', () => {
 		expect(root.hidden).toBe(true);
 		// Showing a source is not choosing one.
 		expect(chosen).toEqual([]);
+	});
+
+	it('is named as the layer’s comparison names it', () => {
+		const container = fake.createElement('div');
+		createComparisonControls(container as unknown as HTMLElement, {
+			observed: {
+				sourceName: 'made-up-source',
+				sourceLegend: 'Made-up source',
+			},
+			source: 'observed',
+			onSource: () => {},
+		});
+		const [root] = container.children as [FakeElement];
+		expect(oneByClass(root, 'u-visually-hidden').textContent).toBe(
+			'Made-up source',
+		);
+		expect(
+			byClass(root, 'segmented__input').map((input) => [
+				input.name,
+				input.checked,
+			]),
+		).toEqual([
+			['made-up-source', false],
+			['made-up-source', true],
+			['made-up-source', false],
+		]);
 	});
 });

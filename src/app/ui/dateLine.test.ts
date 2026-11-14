@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PAGE_VIEW, type PageView } from '../view';
+import { DEFAULT_PAGE_VIEW, type PageView, type Summary } from '../view';
 import { createDateLine, dateLineText, formatWorldAge } from './dateLine';
 
 /** The view in Temperature view with the month and summary given. */
 const temperatureView = (
-	temperature: PageView['temperatureView'] = 'month',
+	temperature: Summary = 'month',
 	month = 6,
 ): PageView => ({
 	layer: 'temperature',
-	temperatureView: temperature,
-	source: 'simulated',
+	summaries: { temperature },
+	sources: { temperature: 'simulated' },
 	month,
 	sunlight: false,
 	winds: false,
@@ -51,7 +51,10 @@ describe('dateLineText', () => {
 	it('gives the age alone in Terrain view', () => {
 		expect(dateLineText(0, DEFAULT_PAGE_VIEW)).toBe('Year 0');
 		expect(
-			dateLineText(0, { ...DEFAULT_PAGE_VIEW, temperatureView: 'range' }),
+			dateLineText(0, {
+				...DEFAULT_PAGE_VIEW,
+				summaries: { temperature: 'range' },
+			}),
 		).toBe('Year 0');
 	});
 
@@ -77,7 +80,11 @@ describe('dateLineText, under sunlight', () => {
 		const terrain = { ...DEFAULT_PAGE_VIEW, sunlight: true };
 		expect(dateLineText(0, terrain)).toBe('Year 0 · July');
 		expect(
-			dateLineText(0, { ...terrain, temperatureView: 'range', month: 0 }),
+			dateLineText(0, {
+				...terrain,
+				summaries: { temperature: 'range' },
+				month: 0,
+			}),
 		).toBe('Year 0 · January');
 	});
 

@@ -2,10 +2,9 @@
  * The view settings that choose what the globe shows. Like the camera and
  * the relief exaggeration, they belong to the page, not to the world: they
  * are not saved, and a new world keeps them, all but the month, which a new
- * world sets back to {@link DEFAULT_MONTH}, and the temperature's source,
- * which it sets back to {@link DEFAULT_TEMPERATURE_SOURCE}. Whether the
- * globe is lit by the sun and whether the winds are shown are kept with the
- * rest.
+ * world sets back to {@link DEFAULT_MONTH}, and each layer's source, which
+ * it sets back to {@link DEFAULT_SOURCE}. Whether the globe is lit by the
+ * sun and whether the winds are shown are kept with the rest.
  */
 
 /** What the globe can be coloured by. */
@@ -14,20 +13,36 @@ export const LAYERS = ['terrain', 'temperature'] as const;
 /** What the globe is coloured by: the height, or a computed layer. */
 export type Layer = (typeof LAYERS)[number];
 
+/**
+ * A layer that colours the globe by one computed value per cell: every
+ * layer but the terrain, which is coloured by its height.
+ */
+export type ScalarLayerId = Exclude<Layer, 'terrain'>;
+
+/**
+ * Whether a layer colours the globe by one computed value per cell, rather
+ * than by the height.
+ *
+ * @param layer - The layer.
+ */
+export const isScalarLayer = (layer: Layer): layer is ScalarLayerId =>
+	layer !== 'terrain';
+
+/** The layers that colour the globe by one computed value per cell. */
+export const SCALAR_LAYER_IDS: readonly ScalarLayerId[] =
+	LAYERS.filter(isScalarLayer);
+
 /** What the globe is coloured by when the page opens. */
 export const DEFAULT_LAYER: Layer = 'terrain';
 
-/** The name each layer goes by on the page. */
-export const LAYER_LABELS: Readonly<Record<Layer, string>> = {
-	terrain: 'Terrain',
-	temperature: 'Temperature',
-};
+/** The name the terrain goes by on the page. */
+export const TERRAIN_LABEL = 'Terrain';
 
 /**
- * What of the temperature's year the globe shows: one month, or a summary
- * of all twelve.
+ * What of a layer's year the globe can show: one month, or a summary of all
+ * twelve. A layer offers some of them.
  */
-export const TEMPERATURE_VIEWS = [
+export const SUMMARIES = [
 	'month',
 	'annualMean',
 	'warmest',
@@ -36,19 +51,20 @@ export const TEMPERATURE_VIEWS = [
 ] as const;
 
 /**
- * What of the temperature's year the globe shows: the month on screen, the
- * mean of the twelve months, the warmest or the coldest month's
- * temperature, or the seasonal range, the warmest less the coldest.
+ * What of a layer's year the globe shows: the month on screen, the mean of
+ * the twelve months, the highest or the lowest month's value, or the
+ * seasonal range, the highest less the lowest.
  */
-export type TemperatureView = (typeof TEMPERATURE_VIEWS)[number];
+export type Summary = (typeof SUMMARIES)[number];
 
-/** What of the temperature's year the globe shows when the page opens. */
-export const DEFAULT_TEMPERATURE_VIEW: TemperatureView = 'month';
+/**
+ * What of its year each layer shows when the page opens: the Month view,
+ * which every layer offers.
+ */
+export const DEFAULT_SUMMARY: Summary = 'month';
 
-/** The name each temperature view goes by on the page. */
-export const TEMPERATURE_VIEW_LABELS: Readonly<
-	Record<TemperatureView, string>
-> = {
+/** The name each view of the year goes by on the page. */
+export const SUMMARY_LABELS: Readonly<Record<Summary, string>> = {
 	month: 'Month',
 	annualMean: 'Annual average',
 	warmest: 'Warmest month',
@@ -57,29 +73,23 @@ export const TEMPERATURE_VIEW_LABELS: Readonly<
 };
 
 /**
- * Where the temperature on the globe comes from: the simulation, the
- * observed Earth, or the one less the other. Only the measured Earth is
- * offered more than the simulation.
+ * Where a layer on the globe comes from: the simulation, the observed
+ * Earth, or the one less the other. Only the measured Earth is offered
+ * more than the simulation, and only for a layer with an observed year.
  */
-export const TEMPERATURE_SOURCES = [
-	'simulated',
-	'observed',
-	'difference',
-] as const;
+export const SOURCES = ['simulated', 'observed', 'difference'] as const;
 
 /**
- * Where the temperature on the globe comes from: the simulated year, the
- * observed one, or the simulated less the observed.
+ * Where a layer on the globe comes from: the simulated year, the observed
+ * one, or the simulated less the observed.
  */
-export type TemperatureSource = (typeof TEMPERATURE_SOURCES)[number];
+export type Source = (typeof SOURCES)[number];
 
-/** Where the temperature comes from when the page opens and for a new world. */
-export const DEFAULT_TEMPERATURE_SOURCE: TemperatureSource = 'simulated';
+/** Where each layer comes from when the page opens and for a new world. */
+export const DEFAULT_SOURCE: Source = 'simulated';
 
-/** The name each source of the temperature goes by on the page. */
-export const TEMPERATURE_SOURCE_LABELS: Readonly<
-	Record<TemperatureSource, string>
-> = {
+/** The name each source of a layer goes by on the page. */
+export const SOURCE_LABELS: Readonly<Record<Source, string>> = {
 	simulated: 'Simulated',
 	observed: 'Observed',
 	difference: 'Difference',
@@ -98,13 +108,16 @@ export const DEFAULT_MONTH = 6;
 export type PageView = {
 	/** What the globe is coloured by. */
 	readonly layer: Layer;
-	/** What of the temperature's year is shown in Temperature view. */
-	readonly temperatureView: TemperatureView;
 	/**
-	 * Where the temperature shown comes from: always the simulation unless
-	 * the world is the measured Earth.
+	 * What of its year each computed layer shows when it is on screen: each
+	 * layer keeps its own while another is shown.
 	 */
-	readonly source: TemperatureSource;
+	readonly summaries: Readonly<Record<ScalarLayerId, Summary>>;
+	/**
+	 * Where each computed layer shown comes from: always the simulation
+	 * unless the world is the measured Earth. Each layer keeps its own.
+	 */
+	readonly sources: Readonly<Record<ScalarLayerId, Source>>;
 	/**
 	 * The month on screen, from January at 0 to December at 11: the one the
 	 * Month view shows and the sun stands in.
@@ -116,25 +129,40 @@ export type PageView = {
 	readonly winds: boolean;
 };
 
+/** The same value for every computed layer. */
+const forEveryLayer = <T>(value: T): Readonly<Record<ScalarLayerId, T>> =>
+	Object.fromEntries(SCALAR_LAYER_IDS.map((id) => [id, value])) as Record<
+		ScalarLayerId,
+		T
+	>;
+
 /** The view settings the page opens on. */
 export const DEFAULT_PAGE_VIEW: PageView = {
 	layer: DEFAULT_LAYER,
-	temperatureView: DEFAULT_TEMPERATURE_VIEW,
-	source: DEFAULT_TEMPERATURE_SOURCE,
+	summaries: forEveryLayer(DEFAULT_SUMMARY),
+	sources: forEveryLayer(DEFAULT_SOURCE),
 	month: DEFAULT_MONTH,
 	sunlight: false,
 	winds: false,
 };
 
 /**
- * Whether the month on screen is chosen and played in a view: in the Month
- * view of Temperature, and in Terrain view while the globe is lit by the
- * sun, whose place in the sky follows the month, or the winds, which are
- * those of the month, are shown.
+ * What of its year the layer on screen shows, or null in Terrain view.
  *
  * @param view - The view settings.
  */
-export const offersMonth = (view: PageView): boolean =>
-	view.layer === 'temperature'
-		? view.temperatureView === 'month'
-		: view.sunlight || view.winds;
+export const shownSummary = (view: PageView): Summary | null =>
+	isScalarLayer(view.layer) ? view.summaries[view.layer] : null;
+
+/**
+ * Whether the month on screen is chosen and played in a view: in the Month
+ * view of a computed layer, and in Terrain view while the globe is lit by
+ * the sun, whose place in the sky follows the month, or the winds, which
+ * are those of the month, are shown.
+ *
+ * @param view - The view settings.
+ */
+export const offersMonth = (view: PageView): boolean => {
+	const summary = shownSummary(view);
+	return summary === null ? view.sunlight || view.winds : summary === 'month';
+};

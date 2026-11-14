@@ -34,6 +34,7 @@ import { createPanelMemory, panelMemoryKey } from './panelMemory';
 import { PLAYBACK_STEP_MS } from './playback';
 import { createPreferences, WIND_SPEED_UNIT_KEY } from './preferences';
 import { TEMPERATURE_DEBOUNCE_MS } from './refresh';
+import { TEMPERATURE_LAYER } from './scalarLayer';
 import type { SculptOptions, StrokeChanges } from './sculpt';
 import { RESTORE_FAILED_MESSAGE } from './startup';
 import type { LoadOutcome } from './storage';
@@ -45,7 +46,7 @@ import type { ComparisonContent } from './ui/comparison';
 import {
 	createLayerPanel,
 	type LayerControlsOptions,
-	type ShownTemperature,
+	type ShownLayer,
 	type ShownWinds,
 } from './ui/layerPanel';
 import {
@@ -117,7 +118,7 @@ type Stage = {
 	/** What the stand-in for the Layers section was asked to do, in order. */
 	readonly sectionCalls: string[];
 	/** What the stand-in for the layer panel says the globe shows. */
-	shownTemperature: ShownTemperature | null;
+	shownTemperature: ShownLayer | null;
 	/** What the stand-in for the layer panel says the globe shows of the winds. */
 	shownWinds: ShownWinds | null;
 	/** The storage the page's preferences are kept in. */
@@ -1779,16 +1780,17 @@ describe('the cursor readout', () => {
 		expect(stage.readoutOptions.isStrokeActive()).toBe(false);
 		stage.strokeActive = true;
 		expect(stage.readoutOptions.isStrokeActive()).toBe(true);
-		expect(stage.readoutOptions.shownTemperature()).toBeNull();
-		const shown: ShownTemperature = {
+		expect(stage.readoutOptions.shownLayer()).toBeNull();
+		const shown: ShownLayer = {
+			layer: TEMPERATURE_LAYER,
 			field: new Float32Array(next.elevation.length),
-			view: 'warmest',
+			summary: 'warmest',
 			month: 6,
 			source: 'simulated',
 			current: true,
 		};
 		stage.shownTemperature = shown;
-		expect(stage.readoutOptions.shownTemperature()).toBe(shown);
+		expect(stage.readoutOptions.shownLayer()).toBe(shown);
 	});
 
 	it('looks again after each turn and zoom of the camera', async () => {
@@ -1830,8 +1832,8 @@ describe('the cursor readout', () => {
 		const stage = await createStartedStage();
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			temperatureView: 'month',
-			source: 'simulated',
+			summaries: { temperature: 'month' },
+			sources: { temperature: 'simulated' },
 			month: 3,
 			sunlight: false,
 			winds: false,
@@ -1886,19 +1888,20 @@ describe('the cursor readout', () => {
 				}),
 		});
 		required(choose, 'layer controls')('temperature');
-		expect(stage.readoutOptions.shownTemperature()).toBeNull();
+		expect(stage.readoutOptions.shownLayer()).toBeNull();
 		const result = temperatureOf(1, stage.state.world.elevation.length);
 		stage.layerOptions.store.markCalculating();
 		stage.layerOptions.store.setResult(result, true);
-		expect(stage.readoutOptions.shownTemperature()).toEqual({
+		expect(stage.readoutOptions.shownLayer()).toEqual({
+			layer: TEMPERATURE_LAYER,
 			field: result.months[DEFAULT_MONTH],
-			view: 'month',
+			summary: 'month',
 			month: DEFAULT_MONTH,
 			source: 'simulated',
 			current: true,
 		});
 		stage.layerOptions.store.markOutOfDate();
-		expect(stage.readoutOptions.shownTemperature()?.current).toBe(false);
+		expect(stage.readoutOptions.shownLayer()?.current).toBe(false);
 	});
 });
 
@@ -1907,32 +1910,32 @@ describe('the date line', () => {
 		const stage = await createStartedStage();
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			temperatureView: 'month',
-			source: 'simulated',
+			summaries: { temperature: 'month' },
+			sources: { temperature: 'simulated' },
 			month: 6,
 			sunlight: false,
 			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			temperatureView: 'month',
-			source: 'simulated',
+			summaries: { temperature: 'month' },
+			sources: { temperature: 'simulated' },
 			month: 7,
 			sunlight: false,
 			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			temperatureView: 'annualMean',
-			source: 'simulated',
+			summaries: { temperature: 'annualMean' },
+			sources: { temperature: 'simulated' },
 			month: 7,
 			sunlight: false,
 			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'terrain',
-			temperatureView: 'annualMean',
-			source: 'simulated',
+			summaries: { temperature: 'annualMean' },
+			sources: { temperature: 'simulated' },
 			month: 7,
 			sunlight: false,
 			winds: false,
@@ -2008,15 +2011,15 @@ describe('the month on screen', () => {
 
 	it('goes back to July for a new world, which the date line says', async () => {
 		const { page, controls, views } = await createMonthStage();
-		controls.onTemperatureView('warmest');
-		controls.onTemperatureView('month');
+		controls.onSummary('temperature', 'warmest');
+		controls.onSummary('temperature', 'month');
 		controls.onMonth(2);
 		page.stage.log.length = 0;
 		page.stage.state.replaceWorld(createBlankWorld(64));
 		expect(views.at(-1)).toEqual({
 			layer: 'temperature',
-			temperatureView: 'month',
-			source: 'simulated',
+			summaries: { temperature: 'month' },
+			sources: { temperature: 'simulated' },
 			month: DEFAULT_MONTH,
 			sunlight: false,
 			winds: false,
@@ -2088,14 +2091,17 @@ describe('the sun', () => {
 		const { planet } = stage.state.world;
 		const view: PageView = {
 			layer: 'temperature',
-			temperatureView: 'month',
-			source: 'simulated',
+			summaries: { temperature: 'month' },
+			sources: { temperature: 'simulated' },
 			month: 3,
 			sunlight: false,
 			winds: false,
 		};
 		stage.layerOptions.onView(view);
-		stage.layerOptions.onView({ ...view, temperatureView: 'annualMean' });
+		stage.layerOptions.onView({
+			...view,
+			summaries: { temperature: 'annualMean' },
+		});
 		stage.layerOptions.onView({ ...view, layer: 'terrain', sunlight: true });
 		stage.layerOptions.onView({ ...view, month: 4 });
 		expect(stage.suns).toEqual([sunOf(3, planet), sunOf(4, planet)]);
@@ -2134,7 +2140,7 @@ describe('the sun', () => {
 		const { stage, controls } = await createSunStage();
 		controls.onLayer('temperature');
 		controls.onMonth(1);
-		controls.onTemperatureView('coldest');
+		controls.onSummary('temperature', 'coldest');
 		controls.onLayer('terrain');
 		stage.suns.length = 0;
 		const planet: PlanetSettings = { ...DEFAULT_PLANET, axialTiltDeg: 60 };
@@ -2512,7 +2518,7 @@ describe('the cursor readout, of the winds', () => {
 		arriveWinds(4);
 		controls.onLayer('temperature');
 		stage.readoutCalls.length = 0;
-		controls.onTemperatureView('annualMean');
+		controls.onSummary('temperature', 'annualMean');
 		expect(stage.readoutCalls).toContain('invalidate');
 		expect(stage.readoutOptions.shownWinds()?.annualMean).toBe(true);
 		stage.readoutCalls.length = 0;
@@ -2544,7 +2550,7 @@ describe('the Sunlight control', () => {
 		controls.onLayer('temperature');
 		stage.log.length = 0;
 		stage.viewPanelOptions.onSunlight(true);
-		expect(stage.readoutOptions.shownTemperature()).toBeNull();
+		expect(stage.readoutOptions.shownLayer()).toBeNull();
 		expect(sunlightCalls(stage.log)).toEqual(['globe.setSunlight line']);
 	});
 
@@ -2735,7 +2741,7 @@ describe('the comparison on the measured Earth', () => {
 			createLayerPanel: (options) =>
 				createLayerPanel({
 					...options,
-					loadObserved: async (resolution) =>
+					loadObserved: async (_layer, resolution) =>
 						Array.from(
 							{ length: 12 },
 							() => new Float32Array(6 * resolution * resolution),
@@ -2749,7 +2755,7 @@ describe('the comparison on the measured Earth', () => {
 						return {
 							showLegend: () => {},
 							showView: () => {},
-							showComparison: (content) => comparisons.push(content),
+							showComparison: (_layer, content) => comparisons.push(content),
 							showWindKey: () => {},
 							setWindUnit: () => {},
 						};
@@ -2774,14 +2780,14 @@ describe('the comparison on the measured Earth', () => {
 			arrive,
 			offered: (): boolean => comparisons.at(-1)?.offered ?? false,
 			source: () => comparisons.at(-1)?.source,
-			shownSource: () => stage.readoutOptions.shownTemperature()?.source,
+			shownSource: () => stage.readoutOptions.shownLayer()?.source,
 		};
 	};
 
 	/** A page on the measured Earth showing the observed temperature. */
 	const createObservingStage = async () => {
 		const page = await createComparisonStage();
-		page.controls.onSource('observed');
+		page.controls.onSource('temperature', 'observed');
 		await settle();
 		expect(page.shownSource()).toBe('observed');
 		return page;

@@ -12,6 +12,7 @@ import {
 	loadObservedTemperature,
 	OBSERVED_DATA_PATH,
 	OBSERVED_FETCH_TIMEOUT_MS,
+	OBSERVED_TEMPERATURE_FILE,
 } from './observedData';
 
 const URL_OF_DATA = '/somewhere/data/earth-temperature-1deg.bin';
@@ -54,7 +55,11 @@ const fetchGiving = (
 describe('createObservedLoader', () => {
 	it('fetches the file, decodes it and gives it on the grid asked for', async () => {
 		const { urls, fetchFile } = fetchGiving(() => respond(goodBody(200)));
-		const load = createObservedLoader({ fetchFile, url: URL_OF_DATA });
+		const load = createObservedLoader({
+			fetchFile,
+			url: URL_OF_DATA,
+			file: OBSERVED_TEMPERATURE_FILE,
+		});
 		expect(urls).toEqual([]);
 		const months = await load(64);
 		expect(urls).toEqual([URL_OF_DATA]);
@@ -67,7 +72,11 @@ describe('createObservedLoader', () => {
 
 	it('keeps the file and each grid, fetching once for every resolution', async () => {
 		const { urls, fetchFile } = fetchGiving(() => respond(goodBody()));
-		const load = createObservedLoader({ fetchFile, url: URL_OF_DATA });
+		const load = createObservedLoader({
+			fetchFile,
+			url: URL_OF_DATA,
+			file: OBSERVED_TEMPERATURE_FILE,
+		});
 		const first = await load(64);
 		expect(await load(64)).toBe(first);
 		const finer = await load(128);
@@ -85,7 +94,11 @@ describe('createObservedLoader', () => {
 					answer = resolve;
 				}),
 		);
-		const load = createObservedLoader({ fetchFile, url: URL_OF_DATA });
+		const load = createObservedLoader({
+			fetchFile,
+			url: URL_OF_DATA,
+			file: OBSERVED_TEMPERATURE_FILE,
+		});
 		const first = load(64);
 		const second = load(64);
 		const finer = load(128);
@@ -102,7 +115,11 @@ describe('createObservedLoader', () => {
 			() => respond(new ArrayBuffer(0), 404),
 			() => respond(goodBody()),
 		);
-		const load = createObservedLoader({ fetchFile, url: URL_OF_DATA });
+		const load = createObservedLoader({
+			fetchFile,
+			url: URL_OF_DATA,
+			file: OBSERVED_TEMPERATURE_FILE,
+		});
 		await expect(load(64)).rejects.toThrow(
 			'The observed temperature could not be fetched: the server answered 404',
 		);
@@ -117,7 +134,11 @@ describe('createObservedLoader', () => {
 			() => respond(new TextEncoder().encode('<!doctype html>').buffer),
 			() => respond(goodBody()),
 		);
-		const load = createObservedLoader({ fetchFile, url: URL_OF_DATA });
+		const load = createObservedLoader({
+			fetchFile,
+			url: URL_OF_DATA,
+			file: OBSERVED_TEMPERATURE_FILE,
+		});
 		await expect(load(64)).rejects.toThrow(RangeError);
 		await expect(load(64)).rejects.toThrow('got 15');
 		expect(await load(64)).toHaveLength(12);
@@ -130,7 +151,11 @@ describe('createObservedLoader', () => {
 			() => Promise.reject(error),
 			() => respond(goodBody()),
 		);
-		const load = createObservedLoader({ fetchFile, url: URL_OF_DATA });
+		const load = createObservedLoader({
+			fetchFile,
+			url: URL_OF_DATA,
+			file: OBSERVED_TEMPERATURE_FILE,
+		});
 		await expect(load(64)).rejects.toBe(error);
 		expect(await load(64)).toHaveLength(12);
 		expect(urls).toHaveLength(2);
@@ -145,7 +170,11 @@ describe('createObservedLoader', () => {
 			() => Promise.reject(timeout),
 			() => respond(goodBody()),
 		);
-		const load = createObservedLoader({ fetchFile, url: URL_OF_DATA });
+		const load = createObservedLoader({
+			fetchFile,
+			url: URL_OF_DATA,
+			file: OBSERVED_TEMPERATURE_FILE,
+		});
 		await expect(load(64)).rejects.toBe(timeout);
 		expect(await load(64)).toHaveLength(12);
 		expect(urls).toHaveLength(2);
@@ -160,7 +189,11 @@ describe('createObservedLoader', () => {
 				}),
 			() => respond(goodBody()),
 		);
-		const load = createObservedLoader({ fetchFile, url: URL_OF_DATA });
+		const load = createObservedLoader({
+			fetchFile,
+			url: URL_OF_DATA,
+			file: OBSERVED_TEMPERATURE_FILE,
+		});
 		const first = load(64);
 		const second = load(128);
 		const error = new Error('offline');

@@ -1,16 +1,12 @@
 /**
- * The date line under the world's description: the world's age and, in
- * Temperature view, the month on screen or the summary shown, such as
- * `Year 0 · July`, and in Terrain view the month on screen while the globe
- * is lit by the sun.
+ * The date line under the world's description: the world's age and, on a
+ * computed layer such as the temperature, the month on screen or the
+ * summary shown, such as `Year 0 · July`, and in Terrain view the month on
+ * screen while the globe is lit by the sun.
  */
 
-import {
-	MONTH_NAMES,
-	offersMonth,
-	type PageView,
-	TEMPERATURE_VIEW_LABELS,
-} from '../view';
+import { scalarLayerOf, summaryOf } from '../scalarLayer';
+import { MONTH_NAMES, offersMonth, type PageView } from '../view';
 
 /** What separates the parts of the date line. */
 const PART_SEPARATOR = ' · ';
@@ -68,19 +64,21 @@ export const formatWorldAge = (years: number): string => {
  * @param view - What the globe shows.
  * @returns The age and the month on screen, `Year 0 · July`, wherever the
  * month can be chosen, as {@link offersMonth} says: in the Month view, and
- * in Terrain view while the globe is lit by the sun. Otherwise in
- * Temperature view the age and the summary shown, `Year 0 · Annual
- * average`, and in Terrain view the age alone, `Year 0`.
+ * in Terrain view while the globe is lit by the sun. Otherwise on a
+ * computed layer the age and the summary shown, named as the layer names
+ * it, `Year 0 · Annual average`, and in Terrain view the age alone, `Year
+ * 0`.
  */
 export const dateLineText = (years: number, view: PageView): string => {
 	const age = formatWorldAge(years);
 	if (offersMonth(view)) {
 		return [age, MONTH_NAMES[view.month]].join(PART_SEPARATOR);
 	}
-	if (view.layer !== 'temperature') {
+	const layer = scalarLayerOf(view.layer);
+	if (layer === null) {
 		return age;
 	}
-	return [age, TEMPERATURE_VIEW_LABELS[view.temperatureView]].join(
+	return [age, summaryOf(layer, view.summaries[layer.id]).label].join(
 		PART_SEPARATOR,
 	);
 };
