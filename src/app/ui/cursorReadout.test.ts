@@ -9,7 +9,7 @@ import {
 	type Vec3,
 	type World,
 } from '../../core/index';
-import { summaryOf, TEMPERATURE_LAYER } from '../scalarLayer';
+import { PRESSURE_LAYER, summaryOf, TEMPERATURE_LAYER } from '../scalarLayer';
 import {
 	createFakeCanvas,
 	createFakeFrames,
@@ -717,6 +717,39 @@ const createStage = (world: World = createBlankWorld(64)) => {
 		last: () => shows.at(-1),
 	});
 };
+
+describe('the readout of the pressure', () => {
+	it('writes the month’s and the annual average’s pressure in whole hPa', () => {
+		expect(formatLayerValue(PRESSURE_LAYER, 1018.4, 'month', 6)).toBe(
+			'July 1,018 hPa',
+		);
+		expect(formatLayerValue(PRESSURE_LAYER, 1012.6, 'annualMean', 6)).toBe(
+			'Annual average 1,013 hPa',
+		);
+		expect(formatLayerValue(PRESSURE_LAYER, 996.2, 'month', 0)).toBe(
+			'January 996 hPa',
+		);
+	});
+
+	it('reads the pressure on screen at the place', () => {
+		const world = createBlankWorld(64);
+		const { direction, cell } = placeAt(40, -100);
+		const field = new Float32Array(world.elevation.length).fill(1013);
+		field[cell] = 1018.3;
+		const parts = readoutPartsAt(world, direction, {
+			layer: PRESSURE_LAYER,
+			field,
+			summary: 'month',
+			month: DEFAULT_MONTH,
+			source: 'simulated',
+			current: true,
+		});
+		expect(describeReadout(parts)).toMatchObject({
+			value: 'July 1,018 hPa',
+			status: null,
+		});
+	});
+});
 
 describe('the readout of another layer', () => {
 	it('writes its value as the layer does, named by its own views, in its unit', () => {

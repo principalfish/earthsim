@@ -8,8 +8,8 @@ const temperatureView = (
 	month = 6,
 ): PageView => ({
 	layer: 'temperature',
-	summaries: { temperature },
-	sources: { temperature: 'simulated' },
+	summaries: { temperature, pressure: 'month' },
+	sources: { temperature: 'simulated', pressure: 'simulated' },
 	month,
 	sunlight: false,
 	winds: false,
@@ -53,7 +53,7 @@ describe('dateLineText', () => {
 		expect(
 			dateLineText(0, {
 				...DEFAULT_PAGE_VIEW,
-				summaries: { temperature: 'range' },
+				summaries: { temperature: 'range', pressure: 'month' },
 			}),
 		).toBe('Year 0');
 	});
@@ -73,6 +73,19 @@ describe('dateLineText', () => {
 	] as const)('gives the age and the summary for %s', (view, text) => {
 		expect(dateLineText(0, temperatureView(view, 2))).toBe(text);
 	});
+
+	it('gives the age and the month, or the Annual average, in Pressure view', () => {
+		const pressure = (summary: Summary, month: number): PageView => ({
+			...DEFAULT_PAGE_VIEW,
+			layer: 'pressure',
+			summaries: { temperature: 'range', pressure: summary },
+			month,
+		});
+		expect(dateLineText(0, pressure('month', 0))).toBe('Year 0 · January');
+		expect(dateLineText(0, pressure('annualMean', 0))).toBe(
+			'Year 0 · Annual average',
+		);
+	});
 });
 
 describe('dateLineText, under sunlight', () => {
@@ -82,7 +95,7 @@ describe('dateLineText, under sunlight', () => {
 		expect(
 			dateLineText(0, {
 				...terrain,
-				summaries: { temperature: 'range' },
+				summaries: { temperature: 'range', pressure: 'month' },
 				month: 0,
 			}),
 		).toBe('Year 0 · January');

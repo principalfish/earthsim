@@ -5,12 +5,14 @@ import {
 	temperatureOf,
 } from '../../core/testing/temperatureFixtures';
 import {
+	PRESSURE_RAMP,
 	rampGradient,
 	SEASONAL_RANGE_RAMP,
 	TEMPERATURE_RAMP,
 } from '../globe/ramp';
 import type { TemperatureLayer } from '../layers';
 import {
+	PRESSURE_LAYER,
 	TEMPERATURE_LAYER,
 	TEMPERATURE_NOT_SHOWN_TEXT,
 	TEMPERATURE_UNAVAILABLE_TEXT,
@@ -741,6 +743,63 @@ describe('fitRangeCentred', () => {
 		expect(() =>
 			fitRangeCentred([Float32Array.of(1, 2)], ones(2), Number.NaN),
 		).toThrow(RangeError);
+	});
+});
+
+describe('legendContent for the pressure', () => {
+	const source = {
+		range: { min: 996, max: 1030 },
+		ramp: PRESSURE_RAMP,
+		caption: 'July sea-level pressure, hPa',
+		beyond: { below: true, above: true },
+	};
+	const reading = (status: TemperatureLayer['status']) => ({
+		status,
+		progress: null,
+	});
+
+	it('writes its ticks and ends as whole hPa, grouped in thousands', () => {
+		const { scale, status } = legendContent(
+			PRESSURE_LAYER,
+			reading('current'),
+			source,
+			true,
+		);
+		expect(status).toBeNull();
+		expect(scale?.caption).toBe('July sea-level pressure, hPa');
+		expect(scale?.gradient).toBe(rampGradient(PRESSURE_RAMP));
+		expect(scale?.ticks.map((tick) => tick.label)).toEqual([
+			'1,000',
+			'1,010',
+			'1,020',
+			'1,030',
+		]);
+		expect(scale?.below).toBe('996 and below');
+		expect(scale?.above).toBe('1,030 and above');
+		expect(scale?.figures).toBeNull();
+	});
+
+	it('says Pressure unavailable, and that it could not be shown, in its own words', () => {
+		expect(
+			legendContent(PRESSURE_LAYER, reading('unavailable'), null, false).status,
+		).toBe('Pressure unavailable');
+		expect(
+			legendContent(PRESSURE_LAYER, reading('current'), null, false).status,
+		).toBe('Pressure could not be shown');
+	});
+
+	it('says Calculating while it is worked out, with no year count', () => {
+		expect(
+			legendContent(PRESSURE_LAYER, reading('calculating'), null, false),
+		).toEqual({
+			scale: null,
+			status: 'Calculating',
+			bar: { fraction: null },
+		});
+		expect(
+			legendContent(PRESSURE_LAYER, reading('calculating'), source, true)
+				.status,
+		).toBe('Calculating');
 	});
 });
 

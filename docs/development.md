@@ -83,7 +83,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `workerService.ts` | The statistics, temperature and winds services, each on its own worker |
 | `layers.ts` | The computed layers the page holds, the temperature and the winds worked out from it, and whether each is current |
 | `view.ts` | What the globe shows: the layer, each computed layer's part of the year and source, the month, the sunlight and the winds |
-| `scalarLayer.ts` | Each layer of one computed value per cell described as data, the temperature the one offered: its name, unit, how its values are written, its legend wording, its views of the year with their colours and scale fitting, its comparison with the observed Earth and where in the layer store its months come from; the layer panel, legend, cursor readout, comparison controls, date line and lighting take a description rather than naming the temperature |
+| `scalarLayer.ts` | Each layer of one computed value per cell described as data, the temperature and the sea-level pressure the two offered: its name, unit, how its values are written, its legend wording, its views of the year with their colours and scale fitting, its comparison with the observed Earth and where in the layer store its months come from; the layer panel, legend, cursor readout, comparison controls, date line and lighting take a description rather than naming the temperature |
 | `playback.ts` | Playing through the year |
 | `storage.ts`, `autosave.ts` | The saved world in IndexedDB, export and import, and when to save |
 | `panelMemory.ts` | Which panel sections are open, remembered by the browser |

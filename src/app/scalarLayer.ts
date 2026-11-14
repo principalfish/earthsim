@@ -5,8 +5,8 @@
  * need to know of a layer to show it. Each takes a description as data, so
  * that another such layer is added by describing it.
  *
- * The temperature, {@link TEMPERATURE_LAYER}, is the one such layer the
- * page offers.
+ * The page offers two: the temperature, {@link TEMPERATURE_LAYER}, and the
+ * sea-level pressure, {@link PRESSURE_LAYER}.
  */
 
 import {
@@ -19,6 +19,7 @@ import type { SunlightStyle } from './globe/material';
 import {
 	type ColourRamp,
 	DIFFERENCE_RAMP,
+	PRESSURE_RAMP,
 	SEASONAL_RANGE_RAMP,
 	TEMPERATURE_RAMP,
 } from './globe/ramp';
@@ -390,11 +391,149 @@ export const TEMPERATURE_LAYER: ScalarLayerSpec = {
 	summaryControlId: 'temperature-view',
 };
 
+/** What the legend says once no pressure can be calculated. */
+export const PRESSURE_UNAVAILABLE_TEXT = 'Pressure unavailable';
+
+/**
+ * What the legend says when the pressure is current but the globe shows
+ * none of it, as when the globe refused its first field.
+ */
+export const PRESSURE_NOT_SHOWN_TEXT = 'Pressure could not be shown';
+
+/** The narrowest span, in hectopascals, the pressure's scale is fitted to. */
+export const MIN_PRESSURE_SPAN_HPA = 10;
+
+/**
+ * The mean of every value of some fields, each weighted by its cell's
+ * weight, as the planet's mean over a year is by area.
+ */
+const weightedMeanOf = (
+	months: readonly Float32Array[],
+	weights: ArrayLike<number>,
+): number => {
+	let total = 0;
+	let weight = 0;
+	for (const month of months) {
+		for (let cell = 0; cell < month.length; cell++) {
+			const w = weights[cell] as number;
+			total += (month[cell] as number) * w;
+			weight += w;
+		}
+	}
+	return total / weight;
+};
+
+/**
+ * The mean of some months cell by cell, as a new field: the annual average
+ * of a year's twelve. The total is kept in double precision and divided
+ * once, as the winds' own annual mean is, so the two agree to the bit.
+ */
+const meanOfMonths = (months: readonly Float32Array[]): Float32Array => {
+	const mean = new Float32Array(months[0]?.length ?? 0);
+	for (let cell = 0; cell < mean.length; cell++) {
+		let total = 0;
+		for (const month of months) {
+			total += month[cell] as number;
+		}
+		mean[cell] = total / months.length;
+	}
+	return mean;
+};
+
+/**
+ * A scale centred on the mean of the whole year, its twelve months, over
+ * the whole surface by area: one for every month and the annual average.
+ */
+const CENTRED_ON_YEAR_MEAN: ScaleFit = {
+	kind: 'centred',
+	centre: weightedMeanOf,
+};
+
+/**
+ * Where the pressure stands, from where the temperature and the winds do.
+ *
+ * @remarks
+ * The winds are worked out from the temperature, and are not asked for
+ * until there is one. So while there are no winds at all and the
+ * temperature is being worked out, the pressure is being worked out too,
+ * since the winds follow it. Otherwise it stands where the winds do; the
+ * store itself makes the winds unavailable when the temperature is.
+ *
+ * @param temperature - Where the temperature stands.
+ * @param winds - Where the winds stand.
+ */
+const pressureStatus = (
+	temperature: LayerStatus,
+	winds: LayerStatus,
+): LayerStatus =>
+	winds === 'empty' && temperature === 'calculating' ? 'calculating' : winds;
+
+/**
+ * The sea-level pressure, in hectopascals, of the winds' calculation.
+ *
+ * @remarks
+ * Its two views are the month on screen and the annual average, the mean
+ * of the twelve months cell by cell, both in
+ * {@link PRESSURE_RAMP} on one scale centred on the planet's mean over the
+ * whole year by area, so that a colour means the same in every month and
+ * the near white of the middle is that mean; the far tails are clipped as
+ * the centred fit clips them, and the scale is at least
+ * {@link MIN_PRESSURE_SPAN_HPA} wide. Values and ticks are whole numbers,
+ * such as `1,018`. It has no observed year to compare with. It is read
+ * from the store's winds, whose calculation tells nothing of its progress,
+ * and is calculated by the winds, so choosing it asks for them; before the
+ * first winds it is being calculated while the temperature the winds wait
+ * for is. Over it,
+ * sunlight is shown as the line between day and night, as over the
+ * temperature.
+ */
+export const PRESSURE_LAYER: ScalarLayerSpec = {
+	id: 'pressure',
+	label: 'Pressure',
+	unit: 'hPa',
+	formatValue: formatWhole,
+	formatTick: (value) => formatWhole(value, false),
+	unavailableText: PRESSURE_UNAVAILABLE_TEXT,
+	notShownText: PRESSURE_NOT_SHOWN_TEXT,
+	yearProgress: false,
+	summaries: [
+		{
+			id: 'month',
+			label: SUMMARY_LABELS.month,
+			subject: (month) => `${MONTH_NAMES[month]} sea-level pressure`,
+			comparedSubject: (month) => ` in ${MONTH_NAMES[month]}`,
+			ramp: PRESSURE_RAMP,
+			scale: CENTRED_ON_YEAR_MEAN,
+		},
+		{
+			id: 'annualMean',
+			label: SUMMARY_LABELS.annualMean,
+			subject: () => 'annual average sea-level pressure',
+			comparedSubject: () => ', annual average sea-level pressure',
+			ramp: PRESSURE_RAMP,
+			scale: CENTRED_ON_YEAR_MEAN,
+		},
+	],
+	summarise: (months) => ({ annualMean: meanOfMonths(months) }),
+	minSpan: MIN_PRESSURE_SPAN_HPA,
+	observed: null,
+	read: ({ temperature, winds }) => ({
+		status: pressureStatus(temperature.status, winds.status),
+		result: winds.result,
+		months: winds.result?.winds.pressure ?? null,
+		progress: null,
+	}),
+	scheduler: 'winds',
+	sunlightStyle: 'line',
+	summaryControlId: 'pressure-view',
+};
+
 /** The description of each layer that colours the globe by a value per cell. */
 export const SCALAR_LAYER_SPECS: Readonly<
 	Record<ScalarLayerId, ScalarLayerSpec>
 > = {
 	temperature: TEMPERATURE_LAYER,
+	pressure: PRESSURE_LAYER,
 };
 
 /**

@@ -8,7 +8,7 @@
  */
 
 /** What the globe can be coloured by. */
-export const LAYERS = ['terrain', 'temperature'] as const;
+export const LAYERS = ['terrain', 'temperature', 'pressure'] as const;
 
 /** What the globe is coloured by: the height, or a computed layer. */
 export type Layer = (typeof LAYERS)[number];

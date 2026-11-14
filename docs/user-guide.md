@@ -110,6 +110,7 @@ The Layers section chooses what the globe is coloured by.
 
 - **Terrain:** the height colours the page opens on.
 - **Temperature:** the near-surface air temperature. The relief is still raised and shaded, and the coastline is drawn as a thin line.
+- **Pressure:** the sea-level pressure, in hPa; see [Pressure](#pressure). The relief and the coastline are drawn as in Temperature view.
 
 In Temperature view, **Show** chooses what of the year is on the globe:
 
@@ -122,7 +123,19 @@ In Temperature view, **Show** chooses what of the year is on the globe:
 
 - **The legend** sits over the bottom-right corner of the globe and says what is shown, such as "Air temperature in July, °C". While a new result is being worked out it says "Calculating" with a progress bar.
 - **On an untouched Earth,** a second choice offers the simulated temperature, the observed one, or the difference between them. See [Temperature](temperature.md#earth-comparison).
-- The layer, the view and the month are not saved. A new world goes back to July.
+- The layer, the view and the month are not saved. A new world goes back to July. Each layer keeps its own **Show** while another is on screen.
+
+### Pressure
+
+Pressure view colours the globe by the sea-level pressure of the winds' calculation, in hectopascals, for the month on screen.
+
+- **Reduced to sea level.** The value is what the pressure would be at sea level at that place, so high ground does not show as low pressure: over a mountain it is the sea-level pressure there, not the thinner air at the summit.
+- **Its colours** run from teal for low pressure, through near white, to brown for high. The near white is the planet's own mean over the whole year and the whole surface, and the scale is the same for every month and for the annual average, so a colour means the same in each as the year plays. The scale is at least 10 hPa wide, and the few places beyond its ends take the end colours.
+- **Show** offers **Month** and **Annual average** only.
+- **The legend** says what is shown, such as "July sea-level pressure, hPa" or "Annual average sea-level pressure, hPa". While the winds are being worked out it says "Calculating", with no year count, and "Pressure unavailable" if they cannot be.
+- **The strip under the pointer** gives the pressure there, such as `July 1,018 hPa` or `Annual average 1,013 hPa`.
+- **It is worked out with the winds,** from the temperature. Choosing Pressure asks for them even while Winds is off, and the colours appear once they are ready. Winds can be shown over it.
+- **There is no Earth comparison** for it yet: on an untouched Earth it shows the simulated pressure alone.
 
 ### The value under the pointer
 
@@ -130,7 +143,7 @@ A strip at the bottom left of the globe describes the place under the pointer:
 
 - its position, such as `27.9° N, 86.9° E`;
 - its elevation from the sea level, such as `1,234 m` on land or `3,400 m deep` at sea;
-- in Temperature view, its value in what the globe shows, such as `July 18 °C` or `Seasonal range 12 °C`, followed by "out of date" when the result on the globe is not current;
+- in Temperature or Pressure view, its value in what the globe shows, such as `July 18 °C`, `Seasonal range 12 °C` or `July 1,018 hPa`, followed by "out of date" when the result on the globe is not current;
 - while Winds is on, on a line of its own, the wind there: its speed in the **Wind speed** unit, as a whole number, and the direction it blows from, one of the eight points of the compass, such as `7 m/s from the north-east`.
 
 About the wind's line:
@@ -155,12 +168,12 @@ The star is drawn in the scene as a glowing disc.
 **Sunlight**, in the View section, lights the globe from the sun:
 
 - **In Terrain view** the day side is evenly lit and the night side drawn at 30% brightness, with a soft edge between them.
-- **In Temperature view** the colours are left alone, since a darkened colour would read as a colder one. The edge between day and night is drawn as a thin line.
+- **In Temperature and Pressure view** the colours are left alone, since a darkened colour would read as another value. The edge between day and night is drawn as a thin line.
 - While Sunlight is on, the month slider and **Play** also show in Terrain view, where they move the sun through the year.
 
 ## Winds
 
-**Winds**, in the View section, draws the surface winds as arrows over whichever colours the globe shows, Terrain or Temperature. The winds are worked out from the temperature, so ticking Winds asks for the temperature too, and the arrows appear once both are ready. [Winds](winds.md) explains how they are worked out and how far to trust them.
+**Winds**, in the View section, draws the surface winds as arrows over whichever colours the globe shows, Terrain, Temperature or Pressure. The winds are worked out from the temperature, so ticking Winds asks for the temperature too, and the arrows appear once both are ready. [Winds](winds.md) explains how they are worked out and how far to trust them.
 
 - **Each arrow** points the way the wind blows and stands for the patch of the surface around it: it shows the mean wind of that patch, the winds of its cells averaged as arrows, the larger cells counting for more.
 - **Length and weight** grow with the speed, from 8 pixels just above 0.5 m/s to 26 pixels at 10 m/s, and no further for a stronger wind. A wind below 0.5 m/s is calm and has no arrow.
@@ -172,12 +185,12 @@ Which winds are shown follows the Layers section:
 
 | Shown | Winds |
 |-|-|
-| Terrain, or Temperature by month | The month on screen. While Winds is on, the month slider and **Play** also show in Terrain view |
+| Terrain, or Temperature or Pressure by month | The month on screen. While Winds is on, the month slider and **Play** also show in Terrain view |
 | Annual average | The mean of the twelve months, worked out as arrows, so winds that turn round through the year, such as a monsoon's, largely cancel |
 | Warmest month, Coldest month, Seasonal range | The month last on screen |
 
 - While new winds are being worked out, the last ones stay on the globe. A new world drops them until its own are ready.
-- Clearing Winds removes the arrows and stops the winds being worked out.
+- Clearing Winds removes the arrows and stops the winds being worked out, unless Pressure is on screen, which needs them.
 - The strip under the pointer gives the wind of the place under it; see [The value under the pointer](#the-value-under-the-pointer).
 
 ## Statistics

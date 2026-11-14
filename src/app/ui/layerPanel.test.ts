@@ -17,6 +17,7 @@ import {
 import {
 	type ColourRamp,
 	DIFFERENCE_RAMP,
+	PRESSURE_RAMP,
 	rampGradient,
 	SEASONAL_RANGE_RAMP,
 	TEMPERATURE_RAMP,
@@ -30,7 +31,9 @@ import {
 	layerCaption,
 	OBSERVED_FAILED_TEXT,
 	OBSERVED_LOADING_TEXT,
+	PRESSURE_LAYER,
 	SCALAR_LAYERS,
+	type ScalarLayerSpec,
 	SEASONAL_RANGE_TICK_STEP,
 	summaryOf,
 	TEMPERATURE_LAYER,
@@ -713,8 +716,8 @@ describe('createLayerPanel, the month', () => {
 		expect(tickLabels(stage.lastLegend())).toEqual(ticks);
 		expect(stage.told.at(-1)).toEqual({
 			layer: 'temperature',
-			summaries: { temperature: 'month' },
-			sources: { temperature: 'simulated' },
+			summaries: { temperature: 'month', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 11,
 			sunlight: false,
 			winds: false,
@@ -764,8 +767,8 @@ describe('createLayerPanel, the month', () => {
 		expect(stage.lastView()).toEqual({
 			view: {
 				layer: 'temperature',
-				summaries: { temperature: 'month' },
-				sources: { temperature: 'simulated' },
+				summaries: { temperature: 'month', pressure: 'month' },
+				sources: { temperature: 'simulated', pressure: 'simulated' },
 				month: 6,
 				sunlight: false,
 				winds: false,
@@ -788,8 +791,8 @@ describe('createLayerPanel, the month', () => {
 		expect(stage.lastView()).toEqual({
 			view: {
 				layer: 'temperature',
-				summaries: { temperature: 'month' },
-				sources: { temperature: 'simulated' },
+				summaries: { temperature: 'month', pressure: 'month' },
+				sources: { temperature: 'simulated', pressure: 'simulated' },
 				month: 6,
 				sunlight: false,
 				winds: false,
@@ -807,8 +810,8 @@ describe('createLayerPanel, the month', () => {
 		stage.panel.newWorld(null);
 		expect(stage.lastView()?.view).toEqual({
 			layer: 'temperature',
-			summaries: { temperature: 'range' },
-			sources: { temperature: 'simulated' },
+			summaries: { temperature: 'range', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: DEFAULT_MONTH,
 			sunlight: false,
 			winds: false,
@@ -836,8 +839,8 @@ describe('createLayerPanel, playing the year', () => {
 		expect(stage.lastView()).toEqual({
 			view: {
 				layer: 'temperature',
-				summaries: { temperature: 'month' },
-				sources: { temperature: 'simulated' },
+				summaries: { temperature: 'month', pressure: 'month' },
+				sources: { temperature: 'simulated', pressure: 'simulated' },
 				month: 7,
 				sunlight: false,
 				winds: false,
@@ -907,8 +910,8 @@ describe('createLayerPanel, playing the year', () => {
 		expect(stage.lastView()).toEqual({
 			view: {
 				layer: 'temperature',
-				summaries: { temperature: 'month' },
-				sources: { temperature: 'simulated' },
+				summaries: { temperature: 'month', pressure: 'month' },
+				sources: { temperature: 'simulated', pressure: 'simulated' },
 				month: 3,
 				sunlight: false,
 				winds: false,
@@ -933,8 +936,8 @@ describe('createLayerPanel, playing the year', () => {
 		expect(stage.lastView()).toEqual({
 			view: {
 				layer: 'temperature',
-				summaries: { temperature: 'month' },
-				sources: { temperature: 'simulated' },
+				summaries: { temperature: 'month', pressure: 'month' },
+				sources: { temperature: 'simulated', pressure: 'simulated' },
 				month: 7,
 				sunlight: false,
 				winds: false,
@@ -965,8 +968,8 @@ describe('createLayerPanel, playing the year', () => {
 		expect(stage.lastView()).toEqual({
 			view: {
 				layer: 'temperature',
-				summaries: { temperature: 'month' },
-				sources: { temperature: 'simulated' },
+				summaries: { temperature: 'month', pressure: 'month' },
+				sources: { temperature: 'simulated', pressure: 'simulated' },
 				month: 7,
 				sunlight: false,
 				winds: false,
@@ -1109,8 +1112,8 @@ describe('createLayerPanel, under sunlight', () => {
 		stage.controls.onLayer('terrain');
 		expect(stage.told.at(-1)).toEqual({
 			layer: 'terrain',
-			summaries: { temperature: 'range' },
-			sources: { temperature: 'simulated' },
+			summaries: { temperature: 'range', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 2,
 			sunlight: true,
 			winds: false,
@@ -2122,7 +2125,14 @@ describe('createLayerControls', () => {
 		vi.unstubAllGlobals();
 	});
 
-	const make = (view: Partial<PageView> = {}) => {
+	/**
+	 * The controls on the view given, offering the layers given: every layer
+	 * the page offers when left out.
+	 */
+	const make = (
+		view: Partial<PageView> = {},
+		layers: readonly ScalarLayerSpec[] = SCALAR_LAYERS,
+	) => {
 		const chosen: string[] = [];
 		const section = fake.createElement('div');
 		const place = fake.createElement('div');
@@ -2134,7 +2144,7 @@ describe('createLayerControls', () => {
 				windKey: keyPlace as unknown as HTMLElement,
 			},
 			{
-				layers: SCALAR_LAYERS,
+				layers,
 				view: { ...DEFAULT_PAGE_VIEW, ...view },
 				onLayer: (next) => chosen.push(next),
 				onSummary: (_layer, next) => chosen.push(next),
@@ -2162,12 +2172,14 @@ describe('createLayerControls', () => {
 		).toEqual([
 			['terrain', true],
 			['temperature', false],
+			['pressure', false],
 		]);
 		expect(
 			byClass(section, 'segmented__label').map((label) => label.textContent),
 		).toEqual([
 			'Terrain',
 			'Temperature',
+			'Pressure',
 			'Simulated',
 			'Observed',
 			'Difference',
@@ -2179,9 +2191,10 @@ describe('createLayerControls', () => {
 	});
 
 	it('puts the comparison controls under the Show control, above the month, and shows them as told', () => {
-		const { controls, chosen, section, radios } = make({
-			layer: 'temperature',
-		});
+		const { controls, chosen, section, radios } = make(
+			{ layer: 'temperature' },
+			[TEMPERATURE_LAYER],
+		);
 		const temperature = oneByClass(section, 'temperature-view');
 		expect(temperature.children.map((child) => child.className)).toEqual([
 			'field temperature-view__show',
@@ -2214,6 +2227,7 @@ describe('createLayerControls', () => {
 		).toEqual([
 			['terrain', false],
 			['temperature', true],
+			['pressure', false],
 		]);
 	});
 
@@ -2264,7 +2278,7 @@ describe('createLayerControls', () => {
 			{
 				...DEFAULT_PAGE_VIEW,
 				layer: 'temperature',
-				summaries: { temperature: 'warmest' },
+				summaries: { temperature: 'warmest', pressure: 'month' },
 			},
 			false,
 		);
@@ -2272,7 +2286,7 @@ describe('createLayerControls', () => {
 	});
 
 	it('shows the month controls alone in Terrain view while sunlight is on', () => {
-		const { controls, section } = make();
+		const { controls, section } = make({}, [TEMPERATURE_LAYER]);
 		const temperature = oneByClass(section, 'temperature-view');
 		const show = oneByClass(section, 'temperature-view__show');
 		const month = oneByClass(section, 'month-controls');
@@ -2287,7 +2301,7 @@ describe('createLayerControls', () => {
 	});
 
 	it('shows the month controls alone in Terrain view while the winds are on', () => {
-		const { controls, section } = make();
+		const { controls, section } = make({}, [TEMPERATURE_LAYER]);
 		const temperature = oneByClass(section, 'temperature-view');
 		const show = oneByClass(section, 'temperature-view__show');
 		const month = oneByClass(section, 'month-controls');
@@ -2302,7 +2316,7 @@ describe('createLayerControls', () => {
 	});
 
 	it('shows the temperature controls as without sunlight in Temperature view', () => {
-		const { controls, section } = make();
+		const { controls, section } = make({}, [TEMPERATURE_LAYER]);
 		const temperature = oneByClass(section, 'temperature-view');
 		const show = oneByClass(section, 'temperature-view__show');
 		const month = oneByClass(section, 'month-controls');
@@ -2320,7 +2334,7 @@ describe('createLayerControls', () => {
 				{
 					...DEFAULT_PAGE_VIEW,
 					layer: 'temperature',
-					summaries: { temperature: 'annualMean' },
+					summaries: { temperature: 'annualMean', pressure: 'month' },
 					sunlight,
 				},
 				false,
@@ -2334,10 +2348,13 @@ describe('createLayerControls', () => {
 	});
 
 	it('offers the five views in a labelled drop-down, on the one given', () => {
-		const { section, chosen } = make({
-			layer: 'temperature',
-			summaries: { temperature: 'coldest' },
-		});
+		const { section, chosen } = make(
+			{
+				layer: 'temperature',
+				summaries: { temperature: 'coldest', pressure: 'month' },
+			},
+			[TEMPERATURE_LAYER],
+		);
 		const select = oneByClass(section, 'field__select');
 		expect(select.tagName).toBe('SELECT');
 		const label = byClass(section, 'field__label').find(
@@ -2847,8 +2864,14 @@ describe('createLayerPanel, another layer described', () => {
 	/** The view settings with the made-up layer's own, as the panel keeps them. */
 	const twoLayerView = (view: Partial<PageView> = {}): PageView => ({
 		...DEFAULT_PAGE_VIEW,
-		summaries: { ...DEFAULT_PAGE_VIEW.summaries, [MADE_UP_ID]: 'month' },
-		sources: { ...DEFAULT_PAGE_VIEW.sources, [MADE_UP_ID]: 'simulated' },
+		summaries: Object.fromEntries([
+			['temperature', 'month'],
+			[MADE_UP_ID, 'month'],
+		]) as PageView['summaries'],
+		sources: Object.fromEntries([
+			['temperature', 'simulated'],
+			[MADE_UP_ID, 'simulated'],
+		]) as PageView['sources'],
 		...view,
 	});
 
@@ -3141,6 +3164,303 @@ describe('createLayerPanel, another layer described', () => {
 			status: LEGEND_CALCULATING_TEXT,
 			bar: { fraction: null },
 		});
+	});
+});
+
+describe('createLayerPanel, the pressure', () => {
+	/** Has winds and pressure arrive, current, as the scheduler does. */
+	const arriveWinds = (
+		stage: ReturnType<typeof createStage>,
+		solved: SolvedWinds = pressureWinds(),
+	): SolvedWinds => {
+		stage.store.markWindsCalculating();
+		stage.store.setWindsResult(solved, true);
+		return solved;
+	};
+	/** The scale the pressure of a year is drawn on: centred on its mean. */
+	const pressureRange = (solved: SolvedWinds): ValueRange =>
+		fitRangeCentred(
+			solved.winds.pressure,
+			cellWeights(2),
+			weightedMean(solved.winds.pressure, cellWeights(2)),
+			10,
+		).range;
+
+	it('offers the Pressure after the Temperature, with only the Month and the Annual average', () => {
+		const stage = createStage();
+		expect(stage.controls.layers).toEqual([TEMPERATURE_LAYER, PRESSURE_LAYER]);
+		expect(stage.controls.view.summaries.pressure).toBe('month');
+		stage.controls.onLayer('pressure');
+		stage.controls.onSummary('pressure', 'warmest');
+		expect(stage.told.at(-1)?.summaries.pressure).toBe('month');
+		stage.controls.onSummary('pressure', 'annualMean');
+		expect(stage.told.at(-1)?.summaries.pressure).toBe('annualMean');
+	});
+
+	it('tells the winds they are showing while it is on screen, and the temperature it is not', () => {
+		const stage = createStage();
+		stage.controls.onLayer('temperature');
+		expect(stage.showing).toEqual([true]);
+		expect(stage.windsShowing).toEqual([]);
+		stage.controls.onLayer('pressure');
+		expect(stage.showing).toEqual([true, false]);
+		expect(stage.windsShowing).toEqual([true]);
+		stage.controls.onLayer('terrain');
+		expect(stage.windsShowing).toEqual([true, false]);
+		expect(stage.showing).toEqual([true, false]);
+	});
+
+	it('leaves the winds showing when it is left with the Winds control on', () => {
+		const stage = createStage();
+		stage.panel.setWinds(true);
+		stage.controls.onLayer('pressure');
+		stage.controls.onLayer('temperature');
+		stage.controls.onLayer('terrain');
+		expect(stage.windsShowing).toEqual([true]);
+		stage.controls.onLayer('pressure');
+		stage.panel.setWinds(false);
+		expect(stage.windsShowing).toEqual([true]);
+		stage.controls.onLayer('terrain');
+		expect(stage.windsShowing).toEqual([true, false]);
+	});
+
+	it('shows the month’s pressure of the winds’ result, centred on the year’s mean, in its colours and words', () => {
+		const stage = createStage();
+		stage.controls.onLayer('pressure');
+		expect(stage.lastLegend()).toEqual({
+			scale: null,
+			status: LEGEND_EMPTY_TEXT,
+			bar: null,
+		});
+		// The temperature's result is not where its months are.
+		stage.arrive(resultWith());
+		expect(stage.shown).toEqual([]);
+		const solved = arriveWinds(stage);
+		const last = stage.shown.at(-1);
+		expect(last?.field).toBe(solved.winds.pressure[DEFAULT_MONTH]);
+		expect(last?.ramp).toBe(PRESSURE_RAMP);
+		expect(last?.range).toEqual(pressureRange(solved));
+		expect(((last?.range?.min ?? 0) + (last?.range?.max ?? 0)) / 2).toBe(1016);
+		const legend = stage.lastLegend();
+		expect(legend?.status).toBeNull();
+		expect(legend?.scale?.caption).toBe('July sea-level pressure, hPa');
+		expect(legend?.scale?.gradient).toBe(rampGradient(PRESSURE_RAMP));
+		expect(tickLabels(legend)).toContain('1,010');
+		expect(stage.panel.shown()).toEqual({
+			layer: PRESSURE_LAYER,
+			field: solved.winds.pressure[DEFAULT_MONTH],
+			summary: 'month',
+			month: DEFAULT_MONTH,
+			source: 'simulated',
+			current: true,
+		});
+		stage.controls.onMonth(0);
+		expect(stage.shown.at(-1)?.field).toBe(solved.winds.pressure[0]);
+		expect(stage.shown.at(-1)?.range).toEqual(last?.range);
+		expect(stage.lastLegend()?.scale?.caption).toBe(
+			'January sea-level pressure, hPa',
+		);
+	});
+
+	it('shows the year’s mean pressure on its Annual average, on the months’ scale, worked out once', () => {
+		const stage = createStage();
+		stage.controls.onLayer('pressure');
+		const solved = arriveWinds(stage);
+		const monthRange = stage.shown.at(-1)?.range;
+		stage.controls.onSummary('pressure', 'annualMean');
+		const mean = stage.shown.at(-1)?.field;
+		expect(mean).toEqual(summariseWinds(solved.winds).pressure);
+		expect(stage.shown.at(-1)?.range).toEqual(monthRange);
+		expect(stage.lastLegend()?.scale?.caption).toBe(
+			'Annual average sea-level pressure, hPa',
+		);
+		const sent = stage.shown.length;
+		stage.store.markWindsOutOfDate();
+		stage.controls.onSummary('pressure', 'month');
+		stage.controls.onSummary('pressure', 'annualMean');
+		expect(stage.shown).toHaveLength(sent + 2);
+		expect(stage.shown.at(-1)?.field).toBe(mean);
+	});
+
+	it('says Calculating with no year count, and its own words when it cannot be calculated or shown', () => {
+		const stage = createStage();
+		stage.controls.onLayer('pressure');
+		stage.store.markWindsCalculating();
+		expect(stage.lastLegend()).toEqual({
+			scale: null,
+			status: LEGEND_CALCULATING_TEXT,
+			bar: { fraction: null },
+		});
+		expect(LEGEND_CALCULATING_TEXT).toBe('Calculating');
+		stage.store.markWindsUnavailable();
+		expect(stage.lastLegend()?.status).toBe('Pressure unavailable');
+
+		const refused = createStage();
+		refused.controls.onLayer('pressure');
+		refused.failNext(new Error('The globe refuses this field'));
+		arriveWinds(refused);
+		expect(refused.lastLegend()).toEqual({
+			scale: null,
+			status: 'Pressure could not be shown',
+			bar: null,
+		});
+	});
+
+	it('offers no comparison for it, on the measured Earth or elsewhere', async () => {
+		const stage = createStage();
+		const asked: number[] = [];
+		stage.setLoader((resolution) => {
+			asked.push(resolution);
+			return Promise.reject(new Error('No observed pressure'));
+		});
+		for (const earth of [null, 64] as const) {
+			stage.panel.setEarth(earth);
+			stage.controls.onLayer('pressure');
+			arriveWinds(stage);
+			expect(stage.lastComparison()?.offered).toBe(false);
+			stage.controls.onSource('pressure', 'observed');
+			stage.controls.onSource('pressure', 'difference');
+			await settle();
+			expect(asked).toEqual([]);
+			expect(stage.told.at(-1)?.sources.pressure).toBe('simulated');
+			expect(stage.panel.shown()?.source).toBe('simulated');
+			expect(stage.lastLegend()?.scale?.caption).toBe(
+				'July sea-level pressure, hPa',
+			);
+			expect(stage.lastLegend()?.scale?.figures).toBeNull();
+		}
+		stage.controls.onLayer('temperature');
+		expect(stage.lastComparison()?.offered).toBe(true);
+	});
+
+	it('has the winds over it follow the month, and the year’s mean on its Annual average', () => {
+		const stage = createStage();
+		stage.panel.setWinds(true);
+		const solved = arriveWinds(stage);
+		stage.controls.onLayer('pressure');
+		expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
+		expect(stage.panel.shownWinds()?.annualMean).toBe(false);
+		stage.controls.onSummary('pressure', 'annualMean');
+		const mean = stage.winds.at(-1);
+		expect(mean?.east).toEqual(summariseWinds(solved.winds).east);
+		expect(mean?.north).toEqual(summariseWinds(solved.winds).north);
+		expect(mean?.east).not.toBe(solved.winds.east[DEFAULT_MONTH]);
+		expect(stage.panel.shownWinds()?.annualMean).toBe(true);
+		expect(stage.panel.shownWinds()?.annualMeanLabel).toBe('Annual average');
+		stage.controls.onSummary('pressure', 'month');
+		stage.controls.onMonth(2);
+		expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[2]);
+	});
+
+	it('keeps each layer’s own view of the year while the other is shown', () => {
+		const stage = createStage();
+		stage.arrive(resultWith());
+		arriveWinds(stage);
+		stage.controls.onLayer('temperature');
+		stage.controls.onSummary('temperature', 'warmest');
+		stage.controls.onLayer('pressure');
+		expect(stage.panel.shown()?.summary).toBe('month');
+		stage.controls.onSummary('pressure', 'annualMean');
+		stage.controls.onLayer('temperature');
+		expect(stage.panel.shown()?.summary).toBe('warmest');
+		expect(stage.panel.shown()?.layer).toBe(TEMPERATURE_LAYER);
+		expect(stage.told.at(-1)?.summaries).toEqual({
+			temperature: 'warmest',
+			pressure: 'annualMean',
+		});
+		stage.controls.onLayer('pressure');
+		expect(stage.panel.shown()?.summary).toBe('annualMean');
+	});
+});
+
+describe('createLayerControls, the pressure', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const make = () => {
+		const chosen: string[] = [];
+		const section = fake.createElement('div');
+		const controls = createLayerControls(
+			section as unknown as HTMLElement,
+			{
+				legend: fake.createElement('div') as unknown as HTMLElement,
+				windKey: fake.createElement('div') as unknown as HTMLElement,
+			},
+			{
+				layers: SCALAR_LAYERS,
+				view: DEFAULT_PAGE_VIEW,
+				onLayer: (next) => chosen.push(next),
+				onSummary: (layer, next) => chosen.push(`${layer} ${next}`),
+				onMonth: () => {},
+				onPlay: () => {},
+				onSource: (layer, next) => chosen.push(`${layer} ${next}`),
+			},
+		);
+		return { controls, chosen, section };
+	};
+
+	it('offers three layers, Terrain, Temperature and Pressure, in that order', () => {
+		const { section, chosen } = make();
+		const inputs = byClass(section, 'segmented__input').filter(
+			(input) => input.name === 'layer',
+		);
+		expect(inputs.map((input) => input.value)).toEqual([
+			'terrain',
+			'temperature',
+			'pressure',
+		]);
+		expect(
+			byClass(section, 'segmented__label')
+				.slice(0, 3)
+				.map((label) => label.textContent),
+		).toEqual(['Terrain', 'Temperature', 'Pressure']);
+		fake.pick(inputs[2] as FakeElement);
+		expect(chosen).toEqual(['pressure']);
+	});
+
+	it('gives it a Show control of its own, of the Month and the Annual average, and no comparison', () => {
+		const { controls, section, chosen } = make();
+		const box = oneByClass(section, 'temperature-view');
+		expect(box.children.map((child) => child.className)).toEqual([
+			'field temperature-view__show',
+			'comparison',
+			'field temperature-view__show',
+			'month-controls',
+		]);
+		const select = byClass(section, 'field__select').find(
+			(element) => element.id === 'pressure-view',
+		) as FakeElement;
+		expect(
+			select.children.map((option) => [option.value, option.textContent]),
+		).toEqual([
+			['month', 'Month'],
+			['annualMean', 'Annual average'],
+		]);
+		select.value = 'annualMean';
+		select.fire('change');
+		expect(chosen).toEqual(['pressure annualMean']);
+		const [temperature, pressure] = byClass(
+			section,
+			'temperature-view__show',
+		) as [FakeElement, FakeElement];
+		controls.showView({ ...DEFAULT_PAGE_VIEW, layer: 'pressure' }, false);
+		expect([temperature.hidden, pressure.hidden]).toEqual([true, false]);
+		expect(oneByClass(section, 'month-controls').hidden).toBe(false);
+		controls.showView(
+			{
+				...DEFAULT_PAGE_VIEW,
+				layer: 'pressure',
+				summaries: { ...DEFAULT_PAGE_VIEW.summaries, pressure: 'annualMean' },
+			},
+			false,
+		);
+		expect(oneByClass(section, 'month-controls').hidden).toBe(true);
 	});
 });
 

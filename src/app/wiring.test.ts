@@ -1832,8 +1832,8 @@ describe('the cursor readout', () => {
 		const stage = await createStartedStage();
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			summaries: { temperature: 'month' },
-			sources: { temperature: 'simulated' },
+			summaries: { temperature: 'month', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 3,
 			sunlight: false,
 			winds: false,
@@ -1910,32 +1910,32 @@ describe('the date line', () => {
 		const stage = await createStartedStage();
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			summaries: { temperature: 'month' },
-			sources: { temperature: 'simulated' },
+			summaries: { temperature: 'month', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 6,
 			sunlight: false,
 			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			summaries: { temperature: 'month' },
-			sources: { temperature: 'simulated' },
+			summaries: { temperature: 'month', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 7,
 			sunlight: false,
 			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			summaries: { temperature: 'annualMean' },
-			sources: { temperature: 'simulated' },
+			summaries: { temperature: 'annualMean', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 7,
 			sunlight: false,
 			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'terrain',
-			summaries: { temperature: 'annualMean' },
-			sources: { temperature: 'simulated' },
+			summaries: { temperature: 'annualMean', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 7,
 			sunlight: false,
 			winds: false,
@@ -2018,8 +2018,8 @@ describe('the month on screen', () => {
 		page.stage.state.replaceWorld(createBlankWorld(64));
 		expect(views.at(-1)).toEqual({
 			layer: 'temperature',
-			summaries: { temperature: 'month' },
-			sources: { temperature: 'simulated' },
+			summaries: { temperature: 'month', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: DEFAULT_MONTH,
 			sunlight: false,
 			winds: false,
@@ -2091,8 +2091,8 @@ describe('the sun', () => {
 		const { planet } = stage.state.world;
 		const view: PageView = {
 			layer: 'temperature',
-			summaries: { temperature: 'month' },
-			sources: { temperature: 'simulated' },
+			summaries: { temperature: 'month', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 3,
 			sunlight: false,
 			winds: false,
@@ -2100,7 +2100,7 @@ describe('the sun', () => {
 		stage.layerOptions.onView(view);
 		stage.layerOptions.onView({
 			...view,
-			summaries: { temperature: 'annualMean' },
+			summaries: { temperature: 'annualMean', pressure: 'month' },
 		});
 		stage.layerOptions.onView({ ...view, layer: 'terrain', sunlight: true });
 		stage.layerOptions.onView({ ...view, month: 4 });
@@ -2318,6 +2318,18 @@ describe('the Winds control', () => {
 		const { stage } = await createSunStage();
 		stage.viewPanelOptions.onWinds(true);
 		stage.viewPanelOptions.onWinds(false);
+		expect(stage.log.filter((line) => line.includes('setShowing'))).toEqual([
+			'winds.setShowing true',
+			'temperature.setShowing true',
+			'winds.setShowing false',
+			'temperature.setShowing false',
+		]);
+	});
+
+	it('is asked for, with the temperature it needs, by choosing Pressure, as by turning it on, through the real layer panel', async () => {
+		const { stage, controls } = await createSunStage();
+		controls.onLayer('pressure');
+		controls.onLayer('terrain');
 		expect(stage.log.filter((line) => line.includes('setShowing'))).toEqual([
 			'winds.setShowing true',
 			'temperature.setShowing true',
@@ -2551,6 +2563,16 @@ describe('the Sunlight control', () => {
 		stage.log.length = 0;
 		stage.viewPanelOptions.onSunlight(true);
 		expect(stage.readoutOptions.shownLayer()).toBeNull();
+		expect(sunlightCalls(stage.log)).toEqual(['globe.setSunlight line']);
+	});
+
+	it('draws the line in Pressure view, as in Temperature view', async () => {
+		const { stage, controls } = await createSunStage();
+		controls.onLayer('pressure');
+		stage.log.length = 0;
+		stage.viewPanelOptions.onSunlight(true);
+		controls.onLayer('temperature');
+		controls.onLayer('pressure');
 		expect(sunlightCalls(stage.log)).toEqual(['globe.setSunlight line']);
 	});
 

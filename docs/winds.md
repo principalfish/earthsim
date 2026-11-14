@@ -56,6 +56,8 @@ A place colder than its latitude's mean carries higher pressure, and a hotter on
 
 The bands and the thermal part are then shifted together so that the globe's mean is 1,011 hPa: the model neither makes air nor loses it.
 
+The **Pressure** layer shows this sea-level pressure on the globe, for the month on screen or as the year's mean, on a scale centred on the globe's mean over the year; see [Pressure](user-guide.md#pressure).
+
 ### The wind
 
 The wind follows from the pressure by one balance everywhere: the push of the pressure gradient, the turning of the planet, and a friction that slows the wind in proportion to its speed. Away from the equator this gives a wind along the isobars, low pressure on the left in the north, crossing them a little towards the low; at the equator, where the planet's turning has no effect, it blows straight down the gradient.
@@ -115,6 +117,7 @@ The direction is judged only where the observed wind is at least 1 m/s, 85% of t
 - **The hemispheres' bands are alike:** the deep trough round Antarctica is missing.
 - **Land winds cross the isobars at about 50°,** more than the observed.
 - **Thermal winds are too strong at a 4-day day.**
+- **Winds on slow spinners are too strong,** because the bands' pressure strength is fixed whatever the spin, while a slower turn balances a pressure gradient with a faster wind: on the Earth the fastest wind reaches 31 m/s at a 4-day day and 42 m/s at 30 days.
 - **The ocean world tilted 60° is almost calm:** its temperature is nearly flat from equator to pole, about 8 K from its warmest latitude to its coolest in every month, so its hottest latitude lies in mid-latitudes, its bands are weak, and its pressure varies by under 2 hPa by latitude.
 - **The Earth tilted 60° has no tropical easterlies in July:** the low lies near 58°N, and the tropical cell's winter side, stretched across the equator from it, puts its subtropical high at about 3°N, so the deep tropics lie in the westerlies beyond it, at about +1.3 m/s in the zonal mean.
 - **Two hot regions far apart** that are within 4 K of each other give a low over neither: on the Earth tilted 60°, October's low lies at 38.7°N while the North Pole is hottest, and November has no bands at all.
