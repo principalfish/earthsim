@@ -16,7 +16,7 @@ The whole-simulator design for earth_sim and the nine-step build order, so each 
 - A biome map is a step of its own, before plate tectonics (added 2026-11-13). It is what most worldbuilders want from the tool: what grows where, not the climate fields themselves.
 - The simulation must be pauseable, with the user able to edit the map while it is paused; a run continues from the edited state. The main thread holds the editable, authoritative world and the worker computes from copies of it, which is what makes this possible.
 
-- Fine tuning against the Earth waits until every part of the climate loop is in (added 2026-11-14): "i also think we probably shouldn't spend too much time trtying to make everything fit earth perfectly until all processing pieces are in. as we could fine tune one then find a later stage changes things". Until then each step gets its model right in kind, records what it gets wrong, and keeps an Earth baseline only as a guard against getting worse. A tuning pass over the whole loop comes once heat carried by winds, ocean currents and sea ice are built (see the status table). Every model's settings live in one file of their own, in one shared shape, and are listed in a generated `docs/settings.md` (step 3, piece 7d, for the temperature and the winds); each later model adds its settings the same way.
+- Fine tuning against the Earth waits until every part of the climate loop is in (added 2026-11-14): "i also think we probably shouldn't spend too much time trtying to make everything fit earth perfectly until all processing pieces are in. as we could fine tune one then find a later stage changes things". Until then each step gets its model right in kind, records what it gets wrong, and keeps an Earth baseline only as a guard against getting worse. A tuning pass over the whole loop comes once heat carried by winds, ocean currents and sea ice are built (see the status table). Every model's settings live in one `src/core/config.ts`, with a `config.md` beside it (step 3d); each later model adds its section there.
 
 ## Proposed, not yet confirmed
 
@@ -71,7 +71,7 @@ Each step adds a viewable map layer and gets its own issue.
 8. Biome map
 9. Plate tectonics and time stepping
 
-Added since (see the status table): 3c, the layers brought into the main view; 3a, the core and page folders; and 3b, heat carried by winds and the climate loop; all between steps 3 and 4, in that order. Also 10, an optional simulated atmosphere, after step 9.
+Added since (see the status table): 3c, the layers brought into the main view; 3a, the core and page folders; 3d, one config file for every model's settings; and 3b, heat carried by winds and the climate loop; all between steps 3 and 4, in that order. Also 10, an optional simulated atmosphere, after step 9.
 
 ## Status and carried-over items (as of 2026-11-13)
 
@@ -84,6 +84,7 @@ Keep this section current when a step is merged.
 | 3 Winds | Building | 0003, GitHub #5, PR #6 |
 | 3c Layers in the main view, out of the side panel | Not started; next after step 3 merges, before 3a | |
 | 3a Core folders by component, page folders by role (refactor, no behaviour change) | Not started; after step 3 merges, before step 4 | |
+| 3d One config.ts for every model's settings, with config.md | Not started; after 3a | |
 | 3b Heat carried by winds, and the climate loop | Not started; after 3a. Could instead open step 5; decide when planned | |
 | 4 Moisture, rainfall and Köppen zones | Not started | |
 | 5 Ocean currents | Not started | |
@@ -123,6 +124,15 @@ The user, 2026-11-14: "i think we will do a separate UI piece to bring out layer
 - **Worker (`src/worker/`):** left as it is (three small files). Split the handlers into `worker/handlers/` only if `handle.ts` grows unwieldy as layers are added.
 - **Watch file size:** `globe/material.ts` (1,035 lines) and `ui/layerPanel.ts` (1,013) grow with every layer. Step 3's piece 12 (scalar layers made general) is where to keep a new layer a data entry rather than more code in them.
 - Probably `/quick-build` once the layout is agreed, since it is one mechanical commit; `/planner refactor` if the layout needs discussion.
+
+### Step 3d: one config.ts for every model's settings, with config.md
+The user, 2026-11-14: "remind me of the parameters we are fine tuning at the moment. these probably need to be easily editrable and documented"; "both, but ultimately structured to expand to all"; "maybe as a follow up to the folders refactor (or as part of it) we can make a config.ts which is referenced in wind/ and temp/", "with a config.md beside it"; and chose "One config.ts + config.md" as "Its own step after the folders".
+- **Where the settings are before this step:** two objects in two files and two shapes, each overridable for a run: the winds' 31 as `DEFAULT_WIND_SETTINGS` in `src/core/wind/rules.ts` (step 3, piece 7c-1) and the temperature's 18 (13 physical, 5 for the solver) as `TEMPERATURE_MODEL` in `src/core/temperature.ts`. What each is and where it comes from is in doc comments only.
+- **What this step makes:** `src/core/config.ts`, one file at the top of the core (it stays there; the folder step leaves it flat), with a section for each model that `temperature/` and `wind/` read their numbers from. Each setting carries its value, its unit, one line on what it does, where its starting value comes from (an observed figure, a published figure with its source, or a guess), and whether and against what it was tuned. Changing a setting is changing one number in that file. Each later model (heat carried by winds, ocean currents, ice, rain) adds its section there.
+- **`src/core/config.md` beside it,** written from `config.ts` by an npm command: a table of every setting for each model, in the project's Markdown style, with a test that fails when the committed page differs from what the command would write, so it cannot drift. The models' own docs point to it. The solver's numerical settings are listed apart from the physical ones.
+- **No value changes:** the Earth temperature baseline is unchanged and the Earth's wind figures are the same bit for bit; both models stay overridable for a run as now, and the page and its workers never override.
+- **Why after 3a:** the folder step is a pure move, checked by nothing changing; this step changes how the models read their numbers, so it is checked separately.
+- **To settle when planned:** the names (`TEMPERATURE_SETTINGS` in `planet.ts` already means something else); whether the tuning script and step 6b read their list of tunable settings from `config.ts`.
 
 ### Step 3b: heat carried by winds, and the climate loop
 The first feedback into temperature, and the loop that later feedbacks (ocean currents, ice) plug into; design under "How the layers feed back into each other". Today heat spreads evenly between neighbouring cells, so west and east coasts get the same climate; winds carrying heat should give mild west coasts and cold east coasts at mid-latitudes, and set how far inland the sea's influence reaches.
