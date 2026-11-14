@@ -56,6 +56,9 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - Arrows keep the same size on the screen; zooming in brings more arrows at a finer spacing, in steps, and the key stays fixed. The user: "Same size, more arrows (Recommended)" (2026-11-14)
 - Each arrow shows the mean wind over the patch it stands for, becoming the single cell's wind when zoomed right in. The user: "Mean over its patch (Recommended)" (2026-11-14)
 - Piece 9 approved after the manual review, with the arrows as built: spacing 8° to 2°, the key as it is, the ragged doc comment accepted. The user: "ok looks good", then "Tried it, approve as is" (2026-11-14)
+- Piece 7b: if a paper does not say what the plan expects, the builder stops before writing that check and the difference comes to the user. The user: "Stop and ask (Recommended)" (2026-11-14)
+- Piece 7b: the two high-tilt checks read January and July; the day-length check reads the annual mean. The user: "Solstices for tilt (Recommended)" (2026-11-14)
+- Piece 7b: the report keeps nine cases; no ocean worlds are added for the day-length check, and the section says continents are present. The user: "Keep nine cases (Recommended)" (2026-11-14)
 - The flaky observed-temperature test gets a timeout in piece 2. The user: "Yes, fold it in" (2026-11-13)
 
 - Piece 2 adds a direct Laplacian operator, accurate at the cube's seams. The user: "A: add it now" (2026-11-13)
