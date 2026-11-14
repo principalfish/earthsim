@@ -6,15 +6,20 @@
  * scheduler is built on it: it asks only while the temperature is showing,
  * starts each request from the last completed result, and keeps the
  * result, where it stands against the world and the progress of the
- * calculation under way in the page's layer store.
+ * calculation under way in the page's layer store. The winds scheduler is
+ * built on it too: it asks only while the winds are showing, as soon as
+ * each new temperature result arrives and after a change of the day
+ * length, and keeps the winds beside the temperature in the store.
  */
 
 import type {
 	TemperatureProgress,
 	TemperatureResult,
 	TemperatureStart,
+	WindResult,
+	World,
 } from '../core/index';
-import type { LayerStore } from './layers';
+import type { LayerStore, SolvedWinds } from './layers';
 
 /**
  * How long the statistics wait after the last change before they are asked
@@ -71,6 +76,14 @@ export type RefreshOptions<T, H> = {
 	 * request is always made when the wait ends.
 	 */
 	readonly isBusy?: () => boolean;
+	/**
+	 * Whether a request waits for the one under way to be answered rather
+	 * than being made beside it. When true, a wait that ends while a
+	 * request is under way makes no request then: the answer of the one
+	 * under way is dropped when it arrives, and the request is made then,
+	 * as a wait ending then would make it. False when left out.
+	 */
+	readonly oneAtATime?: boolean;
 	/** Called with each result that no newer request has overtaken. */
 	readonly onResult: (result: T) => void;
 	/** Called with what went wrong when a request fails. */
@@ -97,6 +110,15 @@ export type RefreshScheduler = {
 	 */
 	refresh(): void;
 	/**
+	 * Says that what the result is computed from has changed, and asks at
+	 * once rather than after the debounce time: a wait under way is
+	 * cancelled. If `isBusy` says a change is under way, it waits as
+	 * `refresh` does instead, and with `oneAtATime` a request under way is
+	 * answered first. Once marked unavailable, it does what `refresh` does
+	 * then.
+	 */
+	refreshNow(): void;
+	/**
 	 * Says that what the result is computed from has been replaced by
 	 * something else, as a world is by another. The answer to a request
 	 * already made, whether a result or an error, is dropped when it
@@ -107,8 +129,9 @@ export type RefreshScheduler = {
 	reset(): void;
 	/**
 	 * Cancels a request that is waiting to be made, if there is one, so that
-	 * none is made until the next `refresh`. A request already made is left
-	 * to finish, and its answer is reported as usual.
+	 * none is made until the next `refresh`, whether it waits for the
+	 * debounce time or for the answer to the one under way. A request
+	 * already made is left to finish, and its answer is reported as usual.
 	 */
 	cancel(): void;
 	/**
@@ -143,9 +166,23 @@ export type RefreshScheduler = {
  * it ends with nothing under way, so the request is put off and never
  * dropped.
  *
- * A request already under way is not waited for: the next is made on time
- * and the earlier one comes back superseded, which is not an error and is
- * reported to nobody. A result is therefore never replaced by an older one.
+ * Without `oneAtATime`, a request already under way is not waited for: the
+ * next is made on time and the earlier one comes back superseded, which is
+ * not an error and is reported to nobody. A result is therefore never
+ * replaced by an older one.
+ *
+ * With `oneAtATime`, at most one request is under way. A wait that ends, or
+ * a `refreshNow`, while one is under way makes no request then, and the
+ * request under way is overtaken: its answer, a result or an error, is
+ * reported to nobody when it arrives. The request held back is then made
+ * as if the wait had ended at that moment: `isBusy` is asked first, so
+ * nothing is asked partway through a change, and the request describes
+ * things as they are then, all of it read at once by `request`. A
+ * `refresh` meanwhile starts the wait again, so the request is made when
+ * both the wait and the answer are over, and its answer is then reported
+ * as usual; `cancel` drops the request held back. So a worker is never
+ * asked for more than one computation at a time, nor for one already
+ * overtaken.
  *
  * A request that fails is reported and forgotten: the next `refresh` asks
  * again. Only `markUnavailable` stops the asking for good.
@@ -161,29 +198,60 @@ export const createRefreshScheduler = <T, H>(
 	let unavailable = false;
 	/** Counts the calls of `reset`: an answer is wanted only by its own. */
 	let generation = 0;
+	/** With `oneAtATime`, whether a request is under way. */
+	let underWay = false;
+	/**
+	 * With `oneAtATime`, whether a request is to be made once the one under
+	 * way is answered.
+	 */
+	let held = false;
 
 	// As an async function, so that a request that throws instead of
 	// returning a promise is reported like one that rejects.
 	const ask = async (): Promise<LatestOutcome<T>> => options.request();
 
+	/**
+	 * The request under way has been answered and reported: the one held
+	 * back, if any, is made now, as a wait ending now would make it.
+	 */
+	const answered = (): void => {
+		underWay = false;
+		if (held) {
+			held = false;
+			fire();
+		}
+	};
+
 	const send = (): void => {
 		const asked = generation;
 		const wanted = (): boolean => !disposed && asked === generation;
+		underWay = options.oneAtATime === true;
 		ask().then(
 			(outcome) => {
-				if (wanted() && !unavailable && !outcome.superseded) {
-					options.onResult(outcome.result);
+				try {
+					// An answer arriving with a newer request held back for it
+					// has been overtaken, as a superseded one has.
+					if (wanted() && !unavailable && !held && !outcome.superseded) {
+						options.onResult(outcome.result);
+					}
+				} finally {
+					answered();
 				}
 			},
 			(error: unknown) => {
-				if (wanted()) {
-					options.onError(error);
+				try {
+					if (wanted() && !held) {
+						options.onError(error);
+					}
+				} finally {
+					answered();
 				}
 			},
 		);
 	};
 
 	const cancel = (): void => {
+		held = false;
 		if (timer !== null) {
 			options.clearTimer(timer.handle);
 			timer = null;
@@ -196,8 +264,15 @@ export const createRefreshScheduler = <T, H>(
 
 	const fire = (): void => {
 		timer = null;
+		if (disposed || unavailable) {
+			return;
+		}
 		if (options.isBusy?.() === true) {
 			arm();
+			return;
+		}
+		if (underWay) {
+			held = true;
 			return;
 		}
 		send();
@@ -214,6 +289,17 @@ export const createRefreshScheduler = <T, H>(
 			}
 			cancel();
 			arm();
+		},
+		refreshNow: () => {
+			if (disposed) {
+				return;
+			}
+			if (unavailable) {
+				options.onUnavailable();
+				return;
+			}
+			cancel();
+			fire();
 		},
 		reset: () => {
 			if (disposed || unavailable) {
@@ -404,6 +490,271 @@ export const createTemperatureScheduler = <H>(
 			} else if (stale) {
 				scheduler.refresh();
 			}
+		},
+		markUnavailable: scheduler.markUnavailable,
+	};
+};
+
+/** What a winds scheduler asks for, when, and where it keeps it. */
+export type WindsSchedulerOptions<H> = {
+	/**
+	 * Asks for the winds of a world from a temperature result's months, as
+	 * a worker service's latest-wins request does. It must copy what it
+	 * sends before it returns, as posting to a worker does, so that the
+	 * world solved is the world as it was when asked.
+	 *
+	 * @param world - The world as it is at the moment of asking.
+	 * @param temperature - The current temperature result, whose months the
+	 * winds are worked out from.
+	 */
+	readonly request: (
+		world: World,
+		temperature: TemperatureResult,
+	) => Promise<LatestOutcome<WindResult>>;
+	/** The world being edited, at the time it is asked. */
+	readonly currentWorld: () => World;
+	/**
+	 * Where the temperature is read from and the winds, their status
+	 * included, are kept.
+	 */
+	readonly store: LayerStore;
+	/**
+	 * How long to wait after a change of the day length, in milliseconds.
+	 * A new temperature result is not waited after.
+	 */
+	readonly debounceMs: number;
+	/** Starts a timer, as `setTimeout` does, and returns its handle. */
+	readonly setTimer: (callback: () => void, delayMs: number) => H;
+	/** Cancels a timer by its handle, as `clearTimeout` does. */
+	readonly clearTimer: (handle: H) => void;
+	/** Whether a brush stroke is under way; see {@link RefreshOptions}. */
+	readonly isBusy?: () => boolean;
+	/** Called with what went wrong when a request fails. */
+	readonly onError: (error: unknown) => void;
+};
+
+/**
+ * Keeps the winds up to date with the temperature and the day length while
+ * they are showing.
+ */
+export type WindsScheduler = {
+	/**
+	 * Says that the day length has changed. The winds on hand are out of
+	 * date from now on. While they are showing, they are asked for again
+	 * once no further change has come for the debounce time, if the
+	 * temperature is current then; while they are not, nothing is asked for.
+	 */
+	refresh(): void;
+	/**
+	 * Says that the world has been replaced by another. The store's winds
+	 * describe a world that is gone and are dropped, as is the answer to any
+	 * winds request already made; the temperature is left to its own
+	 * scheduler.
+	 */
+	reset(): void;
+	/**
+	 * Says whether the winds are showing. Switched on, they are asked for if
+	 * there are none for the current temperature and day length, on hand or
+	 * on their way, after the debounce time as for a change, or when the
+	 * temperature they need arrives; winds on hand that are marked out of
+	 * date but were worked out from the current temperature and day length,
+	 * as after a change since undone, are marked current instead. Switched
+	 * off, a request waiting to be made is cancelled. Saying what is already
+	 * so does nothing.
+	 *
+	 * @remarks
+	 * The winds are worked out from the temperature, which this does not
+	 * ask for: whoever switches the winds on also says that the temperature
+	 * is needed.
+	 */
+	setShowing(showing: boolean): void;
+	/**
+	 * Says that no request can be answered from now on, as when the worker
+	 * is gone: the store marks the winds unavailable, and nothing is asked
+	 * for again.
+	 */
+	markUnavailable(): void;
+};
+
+/** Nothing was asked: an outcome that is reported to nobody. */
+const NOTHING_ASKED = { superseded: true } as const;
+
+/**
+ * Asks for the winds whenever what they are worked out from changes, while
+ * they are showing, and keeps what comes back in the store.
+ *
+ * @remarks
+ * The winds are worked out from the current temperature result and the
+ * world as it is when asked, its day length among the rest. They are
+ * asked for as soon as a new temperature result arrives in the store as
+ * current, with no wait: the temperature has already waited for the
+ * changes to stop. A change of the day length, which the temperature does
+ * not depend on, asks after the debounce time instead, as a change does
+ * for the temperature. Nothing is asked for while the temperature on hand
+ * is not current, as after an edit until its next result: that result asks
+ * when it comes.
+ *
+ * Each result is kept with the temperature result and the day length it
+ * was worked out from ({@link SolvedWinds}). It is kept as current only if,
+ * when it arrives, that temperature result is still the store's and still
+ * current and the world's day length is still that one; otherwise it is
+ * kept as out of date. So an answer for an older temperature or an older
+ * day length is never shown as current. When the temperature goes out of
+ * date, so do the winds, which the store sees to.
+ *
+ * One request is under way at a time (`oneAtATime` of
+ * {@link createRefreshScheduler}), since a wind solve is left to finish
+ * once asked. A new temperature or a change of the day length that comes
+ * while one is under way is asked for once its answer has arrived, and
+ * that answer, overtaken, is reported to nobody. Then the world, the
+ * temperature and the day length are read together, at the moment the
+ * request is sent, and the answer is kept with what was read then.
+ * Nothing is asked then during a stroke, without a current temperature or
+ * once the winds are switched off. Nor is anything asked when the winds on
+ * hand are current again, as after a change of the day length undone
+ * within the wait: they are marked current instead. A change made while
+ * the winds are not showing asks for nothing, and switching them off
+ * leaves a request already made to finish, its result kept and judged as
+ * any other.
+ *
+ * @param options - The request, the world, the store, the wait and the
+ * timers.
+ * @returns The scheduler, with the winds not showing.
+ */
+export const createWindsScheduler = <H>(
+	options: WindsSchedulerOptions<H>,
+): WindsScheduler => {
+	const { store } = options;
+	let showing = false;
+	/**
+	 * What the newest request made was for, or null if there has been none
+	 * since the last failure or replacement of the world.
+	 */
+	let askedFor: Omit<SolvedWinds, 'winds'> | null = null;
+	/** The newest temperature result seen in the store as current. */
+	let seen: TemperatureResult | null = null;
+	/**
+	 * Whether the answer to the last request sent is still to come, whether
+	 * or not it will then be dropped.
+	 */
+	let awaiting = false;
+
+	/** The store's temperature result, if it is current; otherwise null. */
+	const currentTemperature = (): TemperatureResult | null =>
+		store.currentTemperature;
+
+	/** The world's day length, as it is now. */
+	const dayLength = (): number => options.currentWorld().planet.dayLengthHours;
+
+	/** Whether winds of that temperature and day length would be current. */
+	const isCurrent = (made: Omit<SolvedWinds, 'winds'>): boolean =>
+		made.temperature === currentTemperature() &&
+		made.dayLengthHours === dayLength();
+
+	const scheduler = createRefreshScheduler<SolvedWinds, H>({
+		// The world, the temperature and the day length are read here, at the
+		// moment the request is sent and the world copied for the worker, so
+		// the answer is kept with what it was worked out from.
+		request: () => {
+			const temperature = currentTemperature();
+			if (temperature === null) {
+				// The winds need a current temperature, and its next result
+				// asks for them when it arrives. Winds left calculating by a
+				// request whose answer was dropped for this one are not.
+				if (store.winds.status === 'calculating') {
+					store.markWindsFailed();
+				}
+				return Promise.resolve(NOTHING_ASKED);
+			}
+			const held = store.winds.result;
+			if (held !== null && isCurrent(held)) {
+				// Marked out of date by a change since undone: current again,
+				// with no solve needed.
+				store.setWindsResult(held, true);
+				return Promise.resolve(NOTHING_ASKED);
+			}
+			const world = options.currentWorld();
+			const made = { temperature, dayLengthHours: world.planet.dayLengthHours };
+			askedFor = made;
+			store.markWindsCalculating();
+			awaiting = true;
+			return options
+				.request(world, temperature)
+				.then((outcome) =>
+					outcome.superseded
+						? outcome
+						: { superseded: false, result: { ...made, winds: outcome.result } },
+				)
+				.finally(() => {
+					awaiting = false;
+				});
+		},
+		debounceMs: options.debounceMs,
+		setTimer: options.setTimer,
+		clearTimer: options.clearTimer,
+		isBusy: options.isBusy,
+		oneAtATime: true,
+		onResult: (result) => store.setWindsResult(result, isCurrent(result)),
+		onError: (error) => {
+			// Asked for again at the next change, or when switched on.
+			askedFor = null;
+			store.markWindsFailed();
+			options.onError(error);
+		},
+		onUnavailable: store.markWindsUnavailable,
+	});
+
+	store.addListener(() => {
+		const temperature = currentTemperature();
+		if (temperature === null || temperature === seen) {
+			return;
+		}
+		seen = temperature;
+		if (showing) {
+			scheduler.refreshNow();
+		}
+	});
+
+	return {
+		refresh: () => {
+			store.markWindsOutOfDate();
+			if (showing) {
+				scheduler.refresh();
+			}
+		},
+		reset: () => {
+			askedFor = null;
+			// Whatever temperature is on hand is the old world's until its own
+			// scheduler drops it, and is not a new result to ask winds for.
+			seen = currentTemperature();
+			store.clearWinds();
+			scheduler.reset();
+		},
+		setShowing: (next) => {
+			if (next === showing) {
+				return;
+			}
+			showing = next;
+			if (!showing) {
+				scheduler.cancel();
+				return;
+			}
+			const { status, result } = store.winds;
+			if (status === 'calculating' && awaiting) {
+				if (askedFor === null || !isCurrent(askedFor)) {
+					scheduler.refresh();
+				}
+				// Otherwise the answer on its way is for things as they are.
+				return;
+			}
+			if (result !== null && isCurrent(result)) {
+				// The winds on hand were marked out of date by a change since
+				// undone, such as a day length changed and changed back: they
+				// are current again, and need no solve.
+				store.setWindsResult(result, true);
+				return;
+			}
+			scheduler.refresh();
 		},
 		markUnavailable: scheduler.markUnavailable,
 	};

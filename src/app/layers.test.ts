@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import type { TemperatureResult } from '../core/index';
 import { progressOf, temperatureOf } from '../core/testing/temperatureFixtures';
+import { windResultOf } from '../core/testing/windFixtures';
 import {
 	createLayerStore,
+	type LayerStatus,
 	type LayerStore,
 	MAX_CHANGES_TOLD_IN_A_ROUND,
+	type SolvedWinds,
 	type TemperatureLayer,
-	type TemperatureStatus,
 } from './layers';
 
 /** For a store whose listeners never throw: there is nothing to report. */
@@ -15,7 +18,7 @@ const ignore = (): void => {};
 const createWatched = (): {
 	readonly store: LayerStore;
 	readonly heard: TemperatureLayer[];
-	readonly statuses: () => TemperatureStatus[];
+	readonly statuses: () => LayerStatus[];
 } => {
 	const store = createLayerStore(ignore);
 	const heard: TemperatureLayer[] = [];
@@ -64,12 +67,12 @@ describe('createLayerStore', () => {
 	});
 
 	it('makes the change, tells every listener and reports the error of one that throws, throwing nothing', () => {
-		const reported: [unknown, TemperatureStatus][] = [];
+		const reported: [unknown, LayerStatus][] = [];
 		const store = createLayerStore((error) =>
 			reported.push([error, store.temperature.status]),
 		);
 		const failure = new Error('could not draw');
-		const heard: TemperatureStatus[] = [];
+		const heard: LayerStatus[] = [];
 		store.addListener(() => {
 			throw failure;
 		});
@@ -86,7 +89,7 @@ describe('createLayerStore', () => {
 		const store = createLayerStore((error) => reported.push(error));
 		const first = new Error('first');
 		const second = new Error('second');
-		const heard: TemperatureStatus[] = [];
+		const heard: LayerStatus[] = [];
 		store.addListener(() => {
 			throw first;
 		});
@@ -107,7 +110,7 @@ describe('createLayerStore', () => {
 			reports++;
 			throw new Error('the record of errors failed');
 		});
-		const heard: TemperatureStatus[] = [];
+		const heard: LayerStatus[] = [];
 		store.addListener(() => {
 			throw new Error('could not draw');
 		});
@@ -183,7 +186,7 @@ describe('a listener that writes to the store', () => {
 
 	it('does not tell a listener it adds of a change made before it was added', () => {
 		const store = calculating(ignore);
-		const late: TemperatureStatus[] = [];
+		const late: LayerStatus[] = [];
 		store.addListener((layer) => {
 			if (layer.status === 'current') {
 				store.markOutOfDate();
@@ -408,5 +411,218 @@ describe('unavailability', () => {
 			result: null,
 			progress: null,
 		});
+	});
+});
+
+/** Winds worked out from a temperature result, told apart by their value. */
+const windsFrom = (
+	temperature: TemperatureResult,
+	value = 1,
+	dayLengthHours = 24,
+): SolvedWinds => ({
+	winds: windResultOf(value),
+	temperature,
+	dayLengthHours,
+});
+
+describe('the winds', () => {
+	it('start empty, with no result, beside an empty temperature', () => {
+		expect(createLayerStore(ignore).winds).toEqual({
+			status: 'empty',
+			result: null,
+		});
+	});
+
+	it('follow the temperature through calculating, current and out of date', () => {
+		const { store, statuses } = createWatched();
+		const temperature = temperatureOf(1);
+		store.setResult(temperature, true);
+		const first = windsFrom(temperature, 1);
+
+		store.markWindsCalculating();
+		expect(store.winds).toEqual({ status: 'calculating', result: null });
+		store.setWindsResult(first, true);
+		expect(store.winds).toEqual({ status: 'current', result: first });
+
+		// A change of the world puts both out of date, in one change.
+		store.markOutOfDate();
+		expect(store.temperature.status).toBe('outOfDate');
+		expect(store.winds).toEqual({ status: 'outOfDate', result: first });
+
+		// The winds on hand stay while the next are calculated.
+		store.markWindsCalculating();
+		expect(store.winds).toEqual({ status: 'calculating', result: first });
+		const second = windsFrom(temperature, 2);
+		store.setWindsResult(second, false);
+		expect(store.winds).toEqual({ status: 'outOfDate', result: second });
+
+		expect(statuses()).toEqual([
+			'current',
+			'current',
+			'current',
+			'outOfDate',
+			'outOfDate',
+			'outOfDate',
+		]);
+	});
+
+	it('tell every listener of each change of theirs, with the temperature layer as it stands', () => {
+		const { store, heard } = createWatched();
+		const before = store.winds;
+		store.markWindsCalculating();
+		store.markWindsCalculating();
+		expect(heard).toEqual([store.temperature]);
+		expect(heard[0]).toBe(store.temperature);
+		expect(store.winds).not.toBe(before);
+		expect(Object.isFrozen(store.winds)).toBe(true);
+	});
+
+	it('alone go out of date for a change of the day length', () => {
+		const { store } = createWatched();
+		const temperature = temperatureOf(1);
+		store.setResult(temperature, true);
+		const winds = windsFrom(temperature);
+		store.setWindsResult(winds, true);
+
+		store.markWindsOutOfDate();
+		expect(store.winds).toEqual({ status: 'outOfDate', result: winds });
+		expect(store.temperature.status).toBe('current');
+	});
+
+	it('leave a calculation under way as it is when the world changes', () => {
+		const { store } = createWatched();
+		store.markWindsCalculating();
+		store.markOutOfDate();
+		store.markWindsOutOfDate();
+		expect(store.winds.status).toBe('calculating');
+	});
+
+	it('are dropped with the temperature when the world is replaced', () => {
+		const { store } = createWatched();
+		const temperature = temperatureOf(1);
+		store.setResult(temperature, true);
+		store.setWindsResult(windsFrom(temperature), true);
+
+		store.clear();
+		expect(store.winds).toEqual({ status: 'empty', result: null });
+		expect(store.temperature.status).toBe('empty');
+	});
+
+	it('keep their result, out of date, when a request fails, and are empty with none', () => {
+		const { store } = createWatched();
+		store.markWindsCalculating();
+		store.markWindsFailed();
+		expect(store.winds).toEqual({ status: 'empty', result: null });
+
+		const winds = windsFrom(temperatureOf(1));
+		store.setWindsResult(winds, true);
+		store.markWindsCalculating();
+		store.markWindsFailed();
+		expect(store.winds).toEqual({ status: 'outOfDate', result: winds });
+	});
+
+	it('are unavailable for good on their own, keeping their result until cleared, and leave the temperature be', () => {
+		const { store } = createWatched();
+		const winds = windsFrom(temperatureOf(1));
+		store.setWindsResult(winds, true);
+
+		store.markWindsUnavailable();
+		expect(store.winds).toEqual({ status: 'unavailable', result: winds });
+		store.markWindsCalculating();
+		store.markWindsFailed();
+		store.markOutOfDate();
+		store.markWindsOutOfDate();
+		expect(store.winds.status).toBe('unavailable');
+		const late = windsFrom(temperatureOf(2), 2);
+		store.setWindsResult(late, true);
+		expect(store.winds).toEqual({ status: 'unavailable', result: late });
+		store.clear();
+		expect(store.winds).toEqual({ status: 'unavailable', result: null });
+
+		store.markCalculating();
+		expect(store.temperature.status).toBe('calculating');
+	});
+
+	it('are still worked out while the unavailable temperature is current', () => {
+		const { store } = createWatched();
+		const temperature = temperatureOf(1);
+		store.setResult(temperature, true);
+		const winds = windsFrom(temperature);
+		store.setWindsResult(winds, true);
+
+		store.markUnavailable();
+		expect(store.winds).toEqual({ status: 'current', result: winds });
+		expect(store.currentTemperature).toBe(temperature);
+		store.markWindsOutOfDate();
+		store.markWindsCalculating();
+		expect(store.winds.status).toBe('calculating');
+		const next = windsFrom(temperature, 2, 30);
+		store.setWindsResult(next, true);
+		expect(store.winds).toEqual({ status: 'current', result: next });
+	});
+
+	it('become unavailable once the temperature is unavailable with no current result', () => {
+		const { store } = createWatched();
+		const temperature = temperatureOf(1);
+		store.setResult(temperature, true);
+		const winds = windsFrom(temperature);
+		store.setWindsResult(winds, true);
+		store.markUnavailable();
+
+		// A change of the world leaves no temperature to work them out from.
+		store.markOutOfDate();
+		expect(store.currentTemperature).toBeNull();
+		expect(store.winds).toEqual({ status: 'unavailable', result: winds });
+		store.markWindsCalculating();
+		store.markWindsFailed();
+		store.setWindsResult(windsFrom(temperature, 2), true);
+		expect(store.winds.status).toBe('unavailable');
+		store.clear();
+		expect(store.winds).toEqual({ status: 'unavailable', result: null });
+	});
+
+	it('become unavailable at once when the temperature does with a result out of date, or none', () => {
+		const outOfDate = createWatched().store;
+		outOfDate.setResult(temperatureOf(1), false);
+		outOfDate.markUnavailable();
+		expect(outOfDate.winds.status).toBe('unavailable');
+
+		const none = createWatched().store;
+		none.markUnavailable();
+		expect(none.winds).toEqual({ status: 'unavailable', result: null });
+	});
+
+	it('give the temperature result as current only while it describes the world', () => {
+		const { store } = createWatched();
+		const temperature = temperatureOf(1);
+		expect(store.currentTemperature).toBeNull();
+		store.setResult(temperature, false);
+		expect(store.currentTemperature).toBeNull();
+		store.setResult(temperature, true);
+		expect(store.currentTemperature).toBe(temperature);
+		store.markCalculating();
+		expect(store.currentTemperature).toBeNull();
+		store.setResult(temperature, true);
+		store.markFailed();
+		expect(store.currentTemperature).toBeNull();
+		store.setResult(temperature, true);
+		store.clear();
+		expect(store.currentTemperature).toBeNull();
+	});
+
+	it('alone are dropped by clearWinds, the temperature left as it is', () => {
+		const { store } = createWatched();
+		const temperature = temperatureOf(1);
+		store.setResult(temperature, true);
+		store.setWindsResult(windsFrom(temperature), true);
+		store.clearWinds();
+		expect(store.winds).toEqual({ status: 'empty', result: null });
+		expect(store.temperature).toMatchObject({
+			status: 'current',
+			result: temperature,
+		});
+		store.markWindsUnavailable();
+		store.clearWinds();
+		expect(store.winds).toEqual({ status: 'unavailable', result: null });
 	});
 });

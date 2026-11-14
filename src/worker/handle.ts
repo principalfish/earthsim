@@ -13,8 +13,10 @@ import {
 	type SimResults,
 	simFailure,
 	solveTemperature,
+	solveWinds,
 	type TemperatureProgress,
 	type TemperatureResult,
+	type WindResult,
 } from '../core/index';
 
 /** A response, and the buffers to transfer with it rather than copy. */
@@ -39,7 +41,8 @@ export type HandledRequest = {
  * particular has no say over the solver's cap, tolerance or constants,
  * which are always the solver's own, nor over the grid it is solved on, so
  * that no message can make a solve run longer than the solver allows by
- * default.
+ * default. Nor has a winds request: its winds are always solved on the
+ * solver's own grid.
  */
 const COMPUTE: {
 	readonly [K in SimKind]: (
@@ -50,6 +53,7 @@ const COMPUTE: {
 	terrainStats: (request) => computeTerrainStats(request.world),
 	temperature: (request, report) =>
 		solveTemperature(request.world, { start: request.start, onYear: report }),
+	winds: (request) => solveWinds(request.world, request.temperatures),
 };
 
 /** The buffers of a temperature result's arrays. */
@@ -60,12 +64,19 @@ const temperatureBuffers = (result: TemperatureResult): ArrayBufferLike[] => [
 	result.state.referenceCoolingK.buffer,
 ];
 
+/** The buffers of a winds result's arrays. */
+const windBuffers = (result: WindResult): ArrayBufferLike[] =>
+	[...result.east, ...result.north, ...result.pressure].map(
+		(month) => month.buffer,
+	);
+
 /** The buffers each kind of result can hand over, which may repeat. */
 const BUFFERS: {
 	readonly [K in SimKind]: (result: SimResults[K]) => ArrayBufferLike[];
 } = {
 	terrainStats: () => [],
 	temperature: temperatureBuffers,
+	winds: windBuffers,
 };
 
 /**
@@ -101,7 +112,9 @@ const reasonOf = (error: unknown): string =>
  * back as a failure like any other. Its planet settings are brought within
  * their limits by the solver, as for any other caller. While it runs,
  * `onProgress` hears of each year as it finishes; nothing else reports
- * progress.
+ * progress. A winds request is solved from the world and the twelve months
+ * of temperature it carries; temperatures the solver refuses, such as
+ * months of the wrong length, come back as a failure.
  *
  * Nothing is kept between calls, and the world and start in the request
  * are only read, never changed.
@@ -112,7 +125,9 @@ const reasonOf = (error: unknown): string =>
  * runs, with the request's id and kind. Left out, nobody is told.
  * @returns The response to post back, and its transfer list: for a
  * temperature result, the buffers of its twelve months and of the three
- * arrays of its state; for anything else, nothing.
+ * arrays of its state; for a winds result, those of its twelve months each
+ * of eastward wind, northward wind and pressure; for anything else,
+ * nothing.
  */
 export const handleRequest = (
 	request: unknown,

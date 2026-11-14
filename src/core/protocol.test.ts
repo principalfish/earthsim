@@ -67,6 +67,7 @@ describe('isSimKind', () => {
 	it('accepts the kinds of request', () => {
 		expect(isSimKind('terrainStats')).toBe(true);
 		expect(isSimKind('temperature')).toBe(true);
+		expect(isSimKind('winds')).toBe(true);
 	});
 
 	it('refuses other strings', () => {
@@ -498,6 +499,75 @@ describe('parseSimRequest for temperature', () => {
 				start: 'nonsense',
 			}),
 		).toEqual({ id: 7, kind: 'terrainStats', world });
+	});
+});
+
+describe('parseSimRequest for winds', () => {
+	const BAD_TEMPERATURES =
+		"A winds request's temperatures must be an array of 12 Float32Arrays, one a month";
+
+	it('keeps the very months in a new array, and nothing else of the message', () => {
+		const temperatures = months();
+		const parsed = parseSimRequest({
+			id: 8,
+			kind: 'winds',
+			world,
+			temperatures,
+			fullResolution: true,
+		});
+		expect(parsed).toEqual({ id: 8, kind: 'winds', world, temperatures });
+		const request = parsed as SimRequest<'winds'>;
+		expect(request.temperatures).not.toBe(temperatures);
+		request.temperatures.forEach((month, index) => {
+			expect(month).toBe(temperatures[index]);
+		});
+	});
+
+	it('leaves the lengths and values of the months for the solver to judge', () => {
+		const temperatures = [
+			...months().slice(1),
+			Float32Array.of(Number.NaN, 1, 2, 3, 4),
+		];
+		expect(
+			parseSimRequest({ id: 9, kind: 'winds', world, temperatures }),
+		).toEqual({ id: 9, kind: 'winds', world, temperatures });
+	});
+
+	it('refuses temperatures that are not twelve Float32Arrays, keeping the id and kind', () => {
+		for (const temperatures of [
+			undefined,
+			null,
+			'warm',
+			months()[0],
+			{ length: 12 },
+			months().slice(1),
+			[...months(), new Float32Array(3)],
+			[],
+			[...months().slice(1), new Float64Array(3)],
+			[...months().slice(1), [0, 0, 0]],
+			[...months().slice(1), null],
+		]) {
+			expect(
+				refusal({ id: 10, kind: 'winds', world, temperatures }),
+				String(temperatures),
+			).toEqual({
+				id: 10,
+				kind: 'winds',
+				ok: false,
+				error: BAD_TEMPERATURES,
+			});
+		}
+	});
+
+	it('refuses a request without a world of the right form, keeping the id and kind', () => {
+		expect(
+			refusal({
+				id: 11,
+				kind: 'winds',
+				world: { ...world, elevation: [0] },
+				temperatures: months(),
+			}),
+		).toMatchObject({ id: 11, kind: 'winds', ok: false });
 	});
 });
 

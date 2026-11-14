@@ -15,6 +15,7 @@ import {
 	sunColour,
 	sunDirection,
 	sunDrawnSize,
+	TEMPERATURE_SETTINGS,
 	type World,
 	type WorldFileResult,
 } from '../core/index';
@@ -25,7 +26,11 @@ import type { SunlightStyle } from './globe/material';
 import type { Globe } from './globe/renderer';
 import { createLayerStore, type LayerStore } from './layers';
 import type { ObservedLoader } from './observedData';
-import type { RefreshScheduler, TemperatureScheduler } from './refresh';
+import type {
+	RefreshScheduler,
+	TemperatureScheduler,
+	WindsScheduler,
+} from './refresh';
 import {
 	DEFAULT_TOOL,
 	rotateButtonFor,
@@ -89,9 +94,15 @@ export type PageStatisticsOptions = {
 	readonly isStrokeActive: () => boolean;
 };
 
-/** What the page's temperature is computed from, and where it is kept. */
+/**
+ * What the page's temperature, or its winds, are computed from, and where
+ * they are kept.
+ */
 export type PageTemperatureOptions = PageStatisticsOptions & {
-	/** Where the temperature is kept, for whatever shows it to read. */
+	/**
+	 * Where the temperature and the winds are kept, for whatever shows them
+	 * to read.
+	 */
 	readonly store: LayerStore;
 };
 
@@ -101,6 +112,12 @@ export type PageLayerOptions = {
 	readonly store: LayerStore;
 	/** What calculates the temperature, told whether it is showing. */
 	readonly temperature: Pick<TemperatureScheduler, 'setShowing'>;
+	/**
+	 * The switch for the winds: tells what calculates them whether they are
+	 * showing, which also says whether the temperature they need is wanted.
+	 * The layer panel is handed it and does not call it.
+	 */
+	readonly winds: Pick<WindsScheduler, 'setShowing'>;
 	/** Called with the view settings whenever any of them changes. */
 	readonly onView: (view: PageView) => void;
 	/** Gives the observed temperature on a world's grid. */
@@ -168,6 +185,13 @@ export type PageParts = {
 	readonly createTemperature: (
 		options: PageTemperatureOptions,
 	) => Pick<TemperatureScheduler, 'refresh' | 'reset' | 'setShowing'>;
+	/**
+	 * Starts whatever computes the winds from the temperature, not yet
+	 * showing, on the store the temperature writes.
+	 */
+	readonly createWinds: (
+		options: PageTemperatureOptions,
+	) => Pick<WindsScheduler, 'refresh' | 'reset' | 'setShowing'>;
 	/**
 	 * Adds the layer controls to the panel, which hold the view settings:
 	 * what the globe is coloured by, and so whether the temperature is
@@ -245,10 +269,17 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * the panel shows them, so the parts that fill them can be made in an
  * order of their own: the world controls, the tools, the view controls,
  * the planet controls, the layers and then the statistics. The
- * temperature, which has nothing of its own in the panel, is made just
- * before the layers, which switch it on and off. The page opens on the
- * height colours with the temperature not showing, so nothing asks for the
- * temperature until it is chosen.
+ * temperature and then the winds, which have nothing of their own in the
+ * panel, are made just before the layers, which switch them on and off.
+ * The page opens on the height colours with neither showing, so nothing
+ * asks for the temperature until it is chosen.
+ *
+ * The temperature is needed while the Temperature layer is chosen or the
+ * winds are showing, and is told it is showing while either is so: the
+ * winds are worked out from it, so switching them on with no current
+ * temperature asks for the temperature, and its result then asks for the
+ * winds. The layer panel is handed the switch for the winds, and does not
+ * call it; the page shows no winds.
  *
  * The date line under the world's description is written as soon as the
  * world controls are made, and follows the world's age and every change of
@@ -291,18 +322,24 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * temperature, each first reset and then asked for again; the layer panel,
  * which stops the year playing, puts July back on screen and is told
  * whether the world is the measured Earth; the date line;
- * the panel's message, which is taken back; and the autosave. An edit of
- * the world, which is no new world, keeps the month on screen.
+ * the panel's message, which is taken back; and the autosave. The winds
+ * are reset just after the temperature, and asked for again by its next
+ * result if they are showing. An edit of the world, which is no new world,
+ * keeps the month on screen.
  *
  * A committed stroke, an undo, a redo and the sea-level control each ask
  * for the statistics and the temperature again, tell the layer panel
  * whether the world is still, or is again, the measured Earth, and mark
- * the world changed for the autosave. A change of the planet settings,
- * which {@link AppState.setPlanet} tells the planet listeners of, asks for
- * the temperature again, tells the layer panel the same and marks the world
- * changed; the statistics do not depend on it. Whether the world is the
- * measured Earth is worked out once for each of these, and once for each
- * new world, never during a stroke. The planet
+ * the world changed for the autosave; the winds follow from the
+ * temperature's next result. A change of the planet settings, which
+ * {@link AppState.setPlanet} tells the planet listeners of, asks for the
+ * temperature again, tells the layer panel the same and marks the world
+ * changed; the statistics do not depend on it. A change of the day length
+ * alone, which the temperature does not depend on, asks for the winds
+ * again instead and never for the temperature; a change of several
+ * settings that includes any other goes to the temperature. Whether the
+ * world is the measured Earth is worked out once for each of these, and
+ * once for each new world, never during a stroke. The planet
  * controls make such a change through {@link AppState.setPlanet} at each
  * movement of a slider. A drag needs no wait of its own: the temperature
  * waits for the changes to stop, and stops a calculation a later change
@@ -501,9 +538,33 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		isStrokeActive: sculpt.isStrokeActive,
 		store: layers,
 	});
+	const winds = parts.createWinds({
+		currentWorld: () => state.world,
+		isStrokeActive: sculpt.isStrokeActive,
+		store: layers,
+	});
+	/** Whether the Temperature layer is chosen, as the layer panel last said. */
+	let temperatureChosen = false;
+	/** Whether the winds are showing, as last said. */
+	let windsShowing = false;
+	/** Tells the temperature whether anything needs it. */
+	const needTemperature = (): void =>
+		temperature.setShowing(temperatureChosen || windsShowing);
 	const layerPanel = parts.createLayerPanel({
 		store: layers,
-		temperature,
+		temperature: {
+			setShowing: (showing) => {
+				temperatureChosen = showing;
+				needTemperature();
+			},
+		},
+		winds: {
+			setShowing: (showing) => {
+				windsShowing = showing;
+				winds.setShowing(showing);
+				needTemperature();
+			},
+		},
 		onView: (next) => {
 			date.setView(next);
 			layer = next.layer;
@@ -552,6 +613,9 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// world's solve starts from.
 	state.addListener(temperature.reset);
 	state.addListener(temperature.refresh);
+	// So are the winds on hand and any on their way; the new world's
+	// temperature asks for its winds when it comes.
+	state.addListener(winds.reset);
 	// The month on screen is the view's, but a new world starts again from
 	// July and from the simulated temperature, after the store has dropped
 	// the old world's result so that the old result is not shown for July
@@ -572,11 +636,29 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// The autosave takes no note of this until it is started, which is
 	// after the world brought back when the page opens is in place.
 	state.addListener(autosave.markChanged);
+	/**
+	 * The planet settings as the planet listener last saw them, to tell a
+	 * change of the day length alone from one the temperature depends on.
+	 */
+	let planetSeen = { ...state.world.planet };
+	state.addListener((world) => {
+		planetSeen = { ...world.planet };
+	});
 	// The planet settings are saved with the world, and the temperature
-	// depends on them.
-	state.addPlanetListener(() => {
+	// depends on all of them but the day length, which the winds alone read.
+	// A change the temperature depends on reaches the winds through the
+	// temperature's next result.
+	state.addPlanetListener((world) => {
 		placeSun();
-		temperature.refresh();
+		const forTemperature = TEMPERATURE_SETTINGS.some(
+			(name) => world.planet[name] !== planetSeen[name],
+		);
+		planetSeen = { ...world.planet };
+		if (forTemperature) {
+			temperature.refresh();
+		} else {
+			winds.refresh();
+		}
 		checkEarth();
 		autosave.markChanged();
 	});

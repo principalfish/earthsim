@@ -46,7 +46,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `brush.ts` | The sculpting brushes: raise, lower and smooth |
 | `history.ts` | The history of terrain edits, for undo and redo |
 | `stats.ts` | Summary statistics of a world's terrain |
-| `protocol.ts` | The messages between the page and the worker |
+| `protocol.ts` | The messages between the page and the worker, of three kinds: the terrain statistics, the temperature and the winds |
 | `index.ts` | What the core exports |
 | `serialize.ts` | The world file format and the checks a file must pass |
 | `earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
@@ -78,9 +78,9 @@ A pure library with no DOM, Three.js or worker globals.
 | `appState.ts` | The world being edited, and the ways to replace it or change its planet settings |
 | `sculpt.ts` | Sculpting with the mouse |
 | `undo.ts` | Undo and redo of strokes |
-| `refresh.ts` | When to ask a worker again after the world changes |
-| `workerService.ts` | The statistics and temperature services, each on its own worker |
-| `layers.ts` | The computed layers the page holds, and whether each is current |
+| `refresh.ts` | When to ask a worker again after the world changes; the winds after each new temperature result and each change of the day length; with `oneAtATime` (statistics, winds) one request at a time, an overtaken answer ignored |
+| `workerService.ts` | The statistics, temperature and winds services, each on its own worker |
+| `layers.ts` | The computed layers the page holds, the temperature and the winds worked out from it, and whether each is current |
 | `view.ts` | What the globe shows: the layer, the part of the year, the source and the month |
 | `playback.ts` | Playing through the year |
 | `storage.ts`, `autosave.ts` | The saved world in IndexedDB, export and import, and when to save |
@@ -93,12 +93,12 @@ A pure library with no DOM, Three.js or worker globals.
 
 ### `src/worker/`: the Web Worker
 
-It computes from a copy of the world and keeps nothing between requests. The page runs two: one for the statistics and one for the temperature.
+It computes from a copy of the world, and its answers depend on the request alone: it keeps no results between requests, only tables it can build again, such as the grid's. The page runs three: one for the statistics, one for the temperature and one for the winds, which is sent the temperature's twelve months with the world.
 
 | File | What it holds |
 |-|-|
 | `sim.worker.ts` | The worker itself, which only passes messages to the handler |
-| `handle.ts` | The message handler, a plain function that answers one request |
+| `handle.ts` | The message handler, a plain function that answers one request of any kind |
 | `client.ts` | The page's side of the channel |
 | `testing/` | A stand-in worker for the tests |
 

@@ -12,6 +12,7 @@ import {
 	PLANET_SETTINGS,
 	type PlanetSettings,
 	type Rgb,
+	type SimKind,
 	type SimRequest,
 	serializeWorld,
 	sunColour,
@@ -22,6 +23,7 @@ import {
 	type WorldFileResult,
 } from '../core/index';
 import { temperatureOf } from '../core/testing/temperatureFixtures';
+import { windResultOf } from '../core/testing/windFixtures';
 import {
 	createFakeWorker,
 	type FakeWorker,
@@ -73,6 +75,7 @@ import {
 import {
 	createStatisticsService,
 	createTemperatureService,
+	createWindsService,
 } from './workerService';
 
 /** A page made of stand-ins, each writing what it is asked into one log. */
@@ -104,6 +107,7 @@ type Stage = {
 	readonly planetPanelOptions: PlanetPanelOptions;
 	readonly statisticsOptions: PageStatisticsOptions;
 	readonly temperatureOptions: PageTemperatureOptions;
+	readonly windsOptions: PageTemperatureOptions;
 	readonly layerOptions: PageLayerOptions;
 	readonly readoutOptions: PageReadoutOptions;
 	/** What the stand-in for the cursor readout was asked to do, in order. */
@@ -163,6 +167,7 @@ type StageParts = Partial<
 		PageParts,
 		| 'createStatistics'
 		| 'createTemperature'
+		| 'createWinds'
 		| 'createLayerPanel'
 		| 'layersSection'
 	>
@@ -188,6 +193,7 @@ const createStage = (
 	let planetPanelOptions: PlanetPanelOptions | undefined;
 	let statisticsOptions: PageStatisticsOptions | undefined;
 	let temperatureOptions: PageTemperatureOptions | undefined;
+	let windsOptions: PageTemperatureOptions | undefined;
 	let layerOptions: PageLayerOptions | undefined;
 	let readoutOptions: PageReadoutOptions | undefined;
 	let onCameraMove: (() => void) | undefined;
@@ -232,6 +238,9 @@ const createStage = (
 		},
 		get temperatureOptions() {
 			return required(temperatureOptions, 'temperature');
+		},
+		get windsOptions() {
+			return required(windsOptions, 'winds');
 		},
 		get layerOptions() {
 			return required(layerOptions, 'layer panel');
@@ -395,6 +404,18 @@ const createStage = (
 				setShowing: (showing) => log.push(`temperature.setShowing ${showing}`),
 			};
 		},
+		createWinds: (options) => {
+			log.push('createWinds');
+			windsOptions = options;
+			if (own.createWinds !== undefined) {
+				return own.createWinds(options);
+			}
+			return {
+				refresh: () => log.push('winds.refresh'),
+				reset: () => log.push('winds.reset'),
+				setShowing: (showing) => log.push(`winds.setShowing ${showing}`),
+			};
+		},
 		createLayerPanel: (options) => {
 			log.push('createLayerPanel');
 			layerOptions = options;
@@ -498,6 +519,7 @@ describe('startPage', () => {
 			`createViewPanel ${DEFAULT_SEA_LEVEL_M}`,
 			`createPlanetPanel ${EARTH}`,
 			'createTemperature',
+			'createWinds',
 			'createLayerPanel',
 			'createStatistics',
 			'statistics.refresh',
@@ -538,6 +560,42 @@ describe('startPage', () => {
 		]);
 	});
 
+	it('gives the winds the world of the moment, the stroke and the store the temperature writes', async () => {
+		const stage = await createStartedStage();
+		const { windsOptions } = stage;
+		expect(windsOptions.store).toBe(stage.temperatureOptions.store);
+		expect(windsOptions.store.winds.status).toBe('empty');
+		const next = generateWorld({ resolution: 64, seed: 3, landFraction: 0.3 });
+		stage.state.replaceWorld(next);
+		expect(windsOptions.currentWorld()).toBe(next);
+		expect(windsOptions.isStrokeActive()).toBe(false);
+		stage.strokeActive = true;
+		expect(windsOptions.isStrokeActive()).toBe(true);
+	});
+
+	it('needs the temperature while the Temperature layer is chosen or the winds are showing', async () => {
+		const stage = await createStartedStage();
+		const { temperature, winds } = stage.layerOptions;
+		winds.setShowing(true);
+		temperature.setShowing(true);
+		winds.setShowing(false);
+		temperature.setShowing(false);
+		winds.setShowing(true);
+		winds.setShowing(false);
+		expect(stage.log).toEqual([
+			'winds.setShowing true',
+			'temperature.setShowing true',
+			'temperature.setShowing true',
+			'winds.setShowing false',
+			'temperature.setShowing true',
+			'temperature.setShowing false',
+			'winds.setShowing true',
+			'temperature.setShowing true',
+			'winds.setShowing false',
+			'temperature.setShowing false',
+		]);
+	});
+
 	it('gives the temperature the world of the moment, the stroke and an empty store', async () => {
 		const stage = await createStartedStage();
 		const { temperatureOptions } = stage;
@@ -573,6 +631,7 @@ describe('a world replacement', () => {
 			'statistics.refresh',
 			'temperature.reset',
 			'temperature.refresh',
+			'winds.reset',
 			'layerPanel.newWorld null',
 			'globe.setSun',
 			'worldPanel.setMessage null',
@@ -637,6 +696,7 @@ describe('the start of the page', () => {
 			'statistics.refresh',
 			'temperature.reset',
 			'temperature.refresh',
+			'winds.reset',
 			'layerPanel.newWorld null',
 			'globe.setSun',
 			'worldPanel.setDate 2.4 million years',
@@ -926,6 +986,49 @@ describe('the planet controls', () => {
 			'layerPanel.setEarth null',
 			'autosave.markChanged',
 		]);
+	});
+
+	it('send a change of the day length alone to the winds, and never to the temperature', async () => {
+		const stage = await createStartedStage();
+		stage.planetPanelOptions.onChange({
+			...DEFAULT_PLANET,
+			dayLengthHours: 30,
+		});
+		expect(stage.log).toEqual([
+			'globe.setSun',
+			'winds.refresh',
+			'layerPanel.setEarth null',
+			'autosave.markChanged',
+		]);
+	});
+
+	it('send a change of several settings that includes another to the temperature alone', async () => {
+		const stage = await createStartedStage();
+		stage.planetPanelOptions.onChange({ ...TILTED, dayLengthHours: 30 });
+		stage.planetPanelOptions.onChange({ ...TILTED, dayLengthHours: 30 });
+		stage.planetPanelOptions.onChange({ ...TILTED, dayLengthHours: 20 });
+		expect(stage.log).toEqual([
+			'globe.setSun',
+			'temperature.refresh',
+			'layerPanel.setEarth null',
+			'autosave.markChanged',
+			'globe.setSun',
+			'winds.refresh',
+			'layerPanel.setEarth null',
+			'autosave.markChanged',
+		]);
+	});
+
+	it('tell a change of the day length alone from the settings of the world of the moment', async () => {
+		const stage = await createStartedStage();
+		const world = generateWorld({ resolution: 64, seed: 2, landFraction: 0.2 });
+		world.planet = { ...TILTED, dayLengthHours: 30 };
+		stage.state.replaceWorld(world, { keepSettings: true });
+		stage.log.length = 0;
+
+		stage.planetPanelOptions.onChange({ ...TILTED, dayLengthHours: 24 });
+		expect(stage.log).toContain('winds.refresh');
+		expect(stage.log).not.toContain('temperature.refresh');
 	});
 
 	it('reach nothing with the settings the world already has', async () => {
@@ -1383,6 +1486,251 @@ describe('the temperature, on its worker', () => {
 		page.stage.strokeActive = false;
 		await page.wait();
 		expect(page.posted()).toHaveLength(2);
+	});
+});
+
+/**
+ * A started stage whose temperature and winds run on the real services,
+ * each on fake workers of its own, with fake timers, and the statistics on
+ * stand-ins as elsewhere. Neither is showing.
+ *
+ * @param options - Whether the winds can have a worker (true when left
+ * out).
+ */
+const createWindyStage = async (
+	options: { readonly windsWorker?: boolean } = {},
+) => {
+	const timers = createFakeTimers();
+	const temperatureWorkers: FakeWorker[] = [];
+	const windWorkers: FakeWorker[] = [];
+	/** The kind of every request posted to any worker, in order. */
+	const kinds: string[] = [];
+	const logged: unknown[] = [];
+	const starting = (workers: FakeWorker[]) => (): FakeWorker => {
+		const worker = createFakeWorker();
+		const post = worker.postMessage;
+		worker.postMessage = (message) => {
+			kinds.push(message.kind);
+			post(message);
+		};
+		workers.push(worker);
+		return worker;
+	};
+	const services = {
+		setTimer: timers.setTimer,
+		clearTimer: timers.clearTimer,
+		logError: (error: unknown) => logged.push(error),
+	};
+	const stage = await createStartedStage(undefined, {
+		createTemperature: (temperatureOptions) =>
+			createTemperatureService({
+				...temperatureOptions,
+				...services,
+				createWorker: starting(temperatureWorkers),
+			}),
+		createWinds: (windsOptions) =>
+			createWindsService({
+				...windsOptions,
+				...services,
+				createWorker:
+					options.windsWorker === false ? () => null : starting(windWorkers),
+			}),
+	});
+	const { store } = stage.temperatureOptions;
+	/** Answers the newest request on the newest of the workers. */
+	const answer = async (
+		workers: readonly FakeWorker[],
+		kind: SimKind,
+		result: unknown,
+	): Promise<void> => {
+		const worker = required(workers.at(-1), `${kind} worker`);
+		const request = required(worker.posted.at(-1), `${kind} request`);
+		worker.respond({ id: request.id, kind, ok: true, result });
+		await settle();
+	};
+	return {
+		stage,
+		store,
+		kinds,
+		logged,
+		temperatureWorkers,
+		windWorkers,
+		/** Moves past the wait, and lets what follows run. */
+		wait: async (): Promise<void> => {
+			timers.advance(TEMPERATURE_DEBOUNCE_MS);
+			await settle();
+		},
+		/** Answers the newest temperature request with a made-up result. */
+		answerTemperature: (yearsRun: number) =>
+			answer(
+				temperatureWorkers,
+				'temperature',
+				temperatureOf(yearsRun, stage.state.world.elevation.length),
+			),
+		/** Answers the newest winds request with made-up winds. */
+		answerWinds: (value: number) =>
+			answer(windWorkers, 'winds', windResultOf(value)),
+		/** The newest winds request. */
+		lastWinds: () =>
+			required(
+				windWorkers.flatMap((worker) => worker.posted).at(-1),
+				'winds request',
+			) as SimRequest<'winds'>,
+	};
+};
+
+describe('the winds, on their worker', () => {
+	it('with the winds switched on, a stroke leads to one temperature request and then one winds request, and the store ends holding winds for the edited world', async () => {
+		const page = await createWindyStage();
+		const { store } = page;
+		page.stage.layerOptions.winds.setShowing(true);
+		// With no temperature yet, the temperature is asked for first, and
+		// its result asks for the winds at once.
+		await page.wait();
+		expect(page.kinds).toEqual(['temperature']);
+		await page.answerTemperature(1);
+		expect(page.kinds).toEqual(['temperature', 'winds']);
+		await page.answerWinds(1);
+		expect(store.winds.status).toBe('current');
+
+		makeStroke(page.stage);
+		expect(store.winds.status).toBe('outOfDate');
+		await page.wait();
+		await page.wait();
+		expect(page.kinds).toEqual(['temperature', 'winds', 'temperature']);
+		await page.answerTemperature(2);
+		await page.wait();
+		expect(page.kinds).toEqual([
+			'temperature',
+			'winds',
+			'temperature',
+			'winds',
+		]);
+		const temperature = required(
+			store.temperature.result ?? undefined,
+			'temperature',
+		);
+		const request = page.lastWinds();
+		expect(request.world.elevation[5]).toBe(1234);
+		expect(request.world).toEqual(page.stage.state.world);
+		expect(request.temperatures).toEqual(temperature.months);
+
+		await page.answerWinds(2);
+		expect(store.winds).toEqual({
+			status: 'current',
+			result: { winds: windResultOf(2), temperature, dayLengthHours: 24 },
+		});
+		await page.wait();
+		expect(page.kinds).toHaveLength(4);
+		expect(page.logged).toEqual([]);
+	});
+
+	it('with the winds off, never asks for them, whatever changes', async () => {
+		const page = await createWindyStage();
+		page.stage.layerOptions.temperature.setShowing(true);
+		await page.wait();
+		await page.answerTemperature(1);
+		const changes: ((stage: Stage) => void)[] = [
+			makeStroke,
+			(stage) => stage.pressKey(UNDO_KEYS),
+			(stage) => stage.viewPanelOptions.onSeaLevel(-500),
+			(stage) =>
+				stage.planetPanelOptions.onChange({
+					...stage.state.world.planet,
+					axialTiltDeg: 10,
+				}),
+			(stage) =>
+				stage.planetPanelOptions.onChange({
+					...stage.state.world.planet,
+					dayLengthHours: 30,
+				}),
+			(stage) => stage.state.replaceWorld(createBlankWorld(64)),
+		];
+		for (const change of changes) {
+			change(page.stage);
+			await page.wait();
+			await page.wait();
+			await page.answerTemperature(2);
+		}
+		expect(page.windWorkers.flatMap((worker) => worker.posted)).toEqual([]);
+		expect(page.kinds.every((kind) => kind === 'temperature')).toBe(true);
+		expect(page.store.winds.status).toBe('empty');
+	});
+
+	it('asks for the winds and not the temperature for a change of the day length, and for the temperature and then the winds for another setting', async () => {
+		const page = await createWindyStage();
+		page.stage.layerOptions.winds.setShowing(true);
+		await page.wait();
+		await page.answerTemperature(1);
+		await page.answerWinds(1);
+		page.kinds.length = 0;
+
+		page.stage.planetPanelOptions.onChange({
+			...DEFAULT_PLANET,
+			dayLengthHours: 30,
+		});
+		expect(page.store.winds.status).toBe('outOfDate');
+		expect(page.store.temperature.status).toBe('current');
+		await page.wait();
+		await page.wait();
+		expect(page.kinds).toEqual(['winds']);
+		expect(page.lastWinds().world.planet.dayLengthHours).toBe(30);
+		await page.answerWinds(2);
+		expect(page.store.winds).toMatchObject({
+			status: 'current',
+			result: { dayLengthHours: 30 },
+		});
+
+		page.stage.planetPanelOptions.onChange({
+			...DEFAULT_PLANET,
+			dayLengthHours: 30,
+			axialTiltDeg: 10,
+		});
+		expect(page.store.winds.status).toBe('outOfDate');
+		await page.wait();
+		expect(page.kinds).toEqual(['winds', 'temperature']);
+		await page.answerTemperature(2);
+		expect(page.kinds).toEqual(['winds', 'temperature', 'winds']);
+	});
+
+	it('clears the winds for a new world, whose temperature then asks for its winds', async () => {
+		const page = await createWindyStage();
+		page.stage.layerOptions.winds.setShowing(true);
+		await page.wait();
+		await page.answerTemperature(1);
+
+		const next = createBlankWorld(64);
+		next.elevation[0] = 4321;
+		page.stage.state.replaceWorld(next);
+		expect(page.store.winds).toEqual({ status: 'empty', result: null });
+		// The old world's winds, answered late, are not kept.
+		await page.answerWinds(1);
+		expect(page.store.winds).toEqual({ status: 'empty', result: null });
+
+		await page.wait();
+		await page.answerTemperature(2);
+		expect(page.lastWinds().world).toEqual(next);
+		await page.answerWinds(2);
+		expect(page.store.winds.status).toBe('current');
+	});
+
+	it('with no worker for the winds, leaves them unavailable and the rest of the page working', async () => {
+		const page = await createWindyStage({ windsWorker: false });
+		expect(page.store.winds.status).toBe('unavailable');
+		page.stage.layerOptions.winds.setShowing(true);
+		await page.wait();
+		await page.answerTemperature(1);
+		expect(page.store.temperature.status).toBe('current');
+
+		makeStroke(page.stage);
+		await page.wait();
+		await page.wait();
+		await page.answerTemperature(2);
+		expect(page.store.temperature.status).toBe('current');
+		expect(page.store.winds.status).toBe('unavailable');
+		expect(page.kinds).toEqual(['temperature', 'temperature']);
+		expect(page.stage.log).toContain('statistics.refresh');
+		expect(page.stage.errors).toEqual([]);
 	});
 });
 
@@ -2006,7 +2354,7 @@ describe('the temperature, with a part showing it that fails', () => {
 });
 
 describe('a worker that fails to load', () => {
-	it('leaves both services unavailable and the page working', async () => {
+	it('leaves every service unavailable and the page working', async () => {
 		const failing = (): FakeWorker => {
 			const worker = createFakeWorker();
 			// A script that fails to load says so once, soon after it starts.
@@ -2044,12 +2392,22 @@ describe('a worker that fails to load', () => {
 					clearTimer: timers.clearTimer,
 					logError: (error) => temperatureLog.push(error),
 				}),
+			createWinds: (options) =>
+				createWindsService({
+					...options,
+					createWorker: make,
+					setTimer: timers.setTimer,
+					clearTimer: timers.clearTimer,
+					logError: (error) => temperatureLog.push(error),
+				}),
 		});
 		await settle();
-		expect(workers).toHaveLength(2);
+		expect(workers).toHaveLength(3);
 		expect(readout).toContain('showUnavailable');
 		const { store } = stage.temperatureOptions;
 		expect(store.temperature.status).toBe('unavailable');
+		expect(store.winds.status).toBe('unavailable');
+		stage.layerOptions.winds.setShowing(true);
 
 		// The page goes on: a stroke and its undo still work.
 		makeStroke(stage);
@@ -2059,6 +2417,7 @@ describe('a worker that fails to load', () => {
 		await settle();
 		expect(workers.flatMap((worker) => worker.posted)).toEqual([]);
 		expect(store.temperature.status).toBe('unavailable');
+		expect(store.winds.status).toBe('unavailable');
 		expect(stage.errors).toEqual([]);
 		expect(temperatureLog).toEqual([]);
 	});

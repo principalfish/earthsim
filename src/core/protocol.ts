@@ -1,11 +1,14 @@
 /**
  * The messages that pass between the page and the simulation worker.
  *
- * The worker is a compute service that keeps nothing between requests:
- * every request carries the whole world it is about, and its answer is
- * computed from what the request carries alone. For a temperature request
- * that is the world and, when the page has one, an earlier result to start
- * from. The page's world stays the one that is edited.
+ * The worker is a compute service whose answers depend on nothing but the
+ * request: it keeps no results between requests, only tables it can build
+ * again, such as the grid's. Every request carries the whole world it is
+ * about, and its answer is computed from what the request carries alone.
+ * For a temperature request that is the world and, when the page has one,
+ * an earlier result to start from; for a winds request, the world and the
+ * twelve months of its temperature. The page's world stays the one that
+ * is edited.
  *
  * A request and its response share an id, so that answers can be told apart
  * whatever order they arrive in, and a kind, which says what is computed.
@@ -14,6 +17,7 @@
  * plain data that survives a structured clone.
  */
 
+import { MONTHS_PER_YEAR } from './insolation';
 import {
 	PLANET_SETTINGS,
 	TEMPERATURE_SETTINGS,
@@ -26,6 +30,7 @@ import type {
 	TemperatureResult,
 	TemperatureStart,
 } from './temperature';
+import type { WindResult } from './wind/model';
 import type { World } from './world';
 
 /**
@@ -42,6 +47,8 @@ export type SimResults = {
 	readonly terrainStats: TerrainStats;
 	/** The world's near-surface air temperature through its year. */
 	readonly temperature: TemperatureResult;
+	/** The world's surface winds and sea-level pressure through its year. */
+	readonly winds: WindResult;
 };
 
 /** What a request can ask the worker to compute. */
@@ -72,6 +79,15 @@ type SimExtras = {
 		 * from before an edit. Left out, the solve starts from nothing.
 		 */
 		readonly start?: TemperatureStart;
+	};
+	readonly winds: {
+		/**
+		 * The twelve months, January to December, of the world's near-surface
+		 * air temperature in degrees Celsius, one value per cell, as a
+		 * temperature result's `months` hold them. Posting the request copies
+		 * them, as it does the world.
+		 */
+		readonly temperatures: readonly Float32Array[];
 	};
 };
 
@@ -140,6 +156,7 @@ export type SimProgress = {
 const KINDS: { readonly [K in SimKind]: true } = {
 	terrainStats: true,
 	temperature: true,
+	winds: true,
 };
 
 /** The most characters of an unknown kind that an error message repeats. */
@@ -196,6 +213,19 @@ const isTemperatureStartShaped = (value: unknown): value is TemperatureStart =>
 	isStateShaped(value.state);
 
 /**
+ * Whether a value has the form of a year of temperatures: an array of
+ * twelve `Float32Array`s.
+ *
+ * @remarks
+ * As for a start, how many values each holds and what they are is for the
+ * solver to refuse.
+ */
+const isTemperaturesShaped = (value: unknown): value is Float32Array[] =>
+	Array.isArray(value) &&
+	value.length === MONTHS_PER_YEAR &&
+	value.every((month) => month instanceof Float32Array);
+
+/**
  * A copy of a checked record, holding only the sea level and the planet's
  * settings that the temperature reads.
  */
@@ -235,6 +265,15 @@ const PAYLOADS: {
 				solvedFor: copyConditions(start.solvedFor),
 			},
 		};
+	},
+	winds: (message, world) => {
+		const { temperatures } = message;
+		if (!isTemperaturesShaped(temperatures)) {
+			return `A winds request's temperatures must be an array of ${MONTHS_PER_YEAR} Float32Arrays, one a month`;
+		}
+		// A new array of the very months, so nothing else the array holds is
+		// taken.
+		return { world, temperatures: [...temperatures] };
 	},
 };
 
@@ -289,13 +328,16 @@ export const simFailure = (
  * request is not given the solver's cap, tolerance or constants, nor asked
  * to solve on the world's own grid, whatever the message says, and of its
  * start only the state and the record are taken, so the months of a whole
- * result sent as a start are left behind.
+ * result sent as a start are left behind. Of a winds request's temperatures
+ * only the twelve months are taken, into a new array.
  *
  * @param message - What arrived, of any type at all.
  * @returns The request, or the failure to answer it with: for a message
  * that is not an object, an id that is not a finite number, a kind that is
  * missing or not known, a world that is not {@link isWorldShaped}, or, for
- * a temperature request, a start that is there but not of the form of one.
+ * a temperature request, a start that is there but not of the form of one,
+ * or, for a winds request, temperatures that are not twelve
+ * `Float32Array`s.
  * The failure carries the message's id and kind where it has usable ones.
  * An unknown kind is repeated in the failure's error, cut short if long.
  */

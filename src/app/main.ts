@@ -24,6 +24,7 @@ import { startPage } from './wiring';
 import {
 	createStatisticsService,
 	createTemperatureService,
+	createWindsService,
 } from './workerService';
 
 /** Looks up an element the page markup is required to contain. */
@@ -69,7 +70,8 @@ const createGlobeOrExplain = (): Globe | null => {
 
 /**
  * Starts an instance of the simulation worker. Each service has one of its
- * own, so that a slow temperature solve never holds up the statistics.
+ * own, so that a slow temperature or wind solve never holds up the
+ * statistics or the other.
  */
 const createWorker = (): Worker =>
 	new Worker(new URL('../worker/sim.worker.ts', import.meta.url), {
@@ -130,6 +132,14 @@ if (globe !== null) {
 			}),
 		createTemperature: (options) =>
 			createTemperatureService({
+				...options,
+				createWorker,
+				setTimer,
+				clearTimer,
+				logError,
+			}),
+		createWinds: (options) =>
+			createWindsService({
 				...options,
 				createWorker,
 				setTimer,
