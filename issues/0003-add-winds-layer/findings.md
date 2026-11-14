@@ -42,7 +42,7 @@ Cost: 7 subagents · about 567,000 tokens · about 14 min
 | round | correctness | low | defect | dropped | - | `src/core/wind/rules.ts:851` | Some override values give NaN or flip the low's sign — dropped: overrides only, and the settings' remarks already say values are unchecked |
 | round | coverage | low | test | dropped | - | `src/core/wind/rules.test.ts:746` | The cold limit's knee and the warm side are not asserted — dropped: the planned test is met and the warm branch is unchanged code |
 | round | coverage | low | test | dropped | - | `src/core/wind/rules.test.ts:452` | "Exactly as before" at the Earth's spin is shown only as ratios — dropped: true by construction, and the check itself called it acceptable |
-| re-check | correctness | low | docs | verified | open | `docs/winds.md:17` | "Beyond two of its spin's cells from it" is wrong: the reach is 60° counted in cells of the spin's width, about 3.5 cells at an 8-hour day |
-| re-check | correctness | low | docs | verified | open | `docs/winds.md:154` | The search's bounds are described as "a latitude at most 90°"; they also cover two cell-width settings |
+| re-check | correctness | low | docs | verified | fixed | `docs/winds.md:17` | "Beyond two of its spin's cells from it" is wrong: the reach is 60° counted in cells of the spin's width, about 3.5 cells at an 8-hour day |
+| re-check | correctness | low | docs | verified | fixed | `docs/winds.md:154` | The search's bounds are described as "a latitude at most 90°"; they also cover two cell-width settings |
 | re-check | coverage | low | test | dropped | - | `src/core/wind/solve.test.ts:274` | The winter-winds test does not assert where the low lies — dropped: it runs on the real tilted case and would fail under the rejected rule |
 | re-check | coverage | low | test | dropped | - | `scripts/tune-winds.ts:139` | The script's wiring of bounds and held settings has no direct test — dropped: a console script whose parts are tested |
