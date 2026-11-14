@@ -60,6 +60,10 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - Piece 7b: the two high-tilt checks read January and July; the day-length check reads the annual mean. The user: "Solstices for tilt (Recommended)" (2026-11-14)
 - Piece 7b: the report keeps nine cases; no ocean worlds are added for the day-length check, and the section says continents are present. The user: "Keep nine cases (Recommended)" (2026-11-14)
 - Piece 7b: whenever a paper's result cannot be read in the paper itself (abstract only, or not reached), the builder flags it to the user at once, before writing that check, and never presents it as confirmed; the report and the review request carry an access table. The user: "please flag when you can't access paper results - it is important to get this right" (2026-11-14)
+- Piece 7b check (a) asks, on the 60° cases in each solstice month, for summer-hemisphere mid-latitude westerlies, easterlies in the deep tropics and weak winter-hemisphere winds, as Ferreira et al. 2014 report at 90° (and weak mid-latitude winds in both hemispheres at 54°). The user: "The fuller wording (Recommended)" (2026-11-14)
+- Piece 7b check (b) rests on Lobo and Bordoni 2020's abstract, marked "abstract only" (the full text could not be reached), with Ferreira et al.'s own text cited beside it. The user: "Accept the abstract (Recommended)" (2026-11-14)
+- Piece 7b check (c) adds Kaspi and Showman 2015 as the source for the cell widths, read off its Fig. 6a to about ±2°; Held and Hou 1980 stays as the steeper theory and Way et al. 2018 for the cell reaching the pole by about 16 days. The user: "Add Kaspi and Showman (Recommended)" (2026-11-14)
+- The slow-end note cites Way et al. 2018 ("between 32 d and 64 d"); Salameh et al. 2018, not reached, is dropped. The user: "Cite Way, drop Salameh (Recommended)" (2026-11-14)
 - The flaky observed-temperature test gets a timeout in piece 2. The user: "Yes, fold it in" (2026-11-13)
 
 - Piece 2 adds a direct Laplacian operator, accurate at the cube's seams. The user: "A: add it now" (2026-11-13)
