@@ -100,3 +100,4 @@ No findings: the correctness, security and coverage checks each came back clean,
 | Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
 |-|-|-|-|-|-|-|-|
 | round | correctness | low | defect | verified | fixed | `src/app/ui/layerPanel.ts:970` | The key has one status line, and the line about the observed winds (loading, or could not be loaded) took it ahead of where the winds themselves stand, so after a failed fetch the key could not say "Calculating", "Out of date" or "Winds unavailable"; the winds' own status now comes first |
+| manual | user | low | docs | - | fixed | `src/app/scalarLayer.ts:548` | Pressure's month caption read "July sea-level pressure" where the temperature's reads "air temperature in July"; reordered to "Sea-level pressure in July, hPa" (and "Simulated…", "Observed…" to match) at the user's request |
