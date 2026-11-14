@@ -114,3 +114,13 @@ No findings: the correctness, security and coverage checks each came back clean,
 | re-check | correctness | low | test | verified | fixed | `scripts/update-earth-winds-baseline.test.ts:12` | A test named for the script reporting the committed file unchanged only shows the file parses, which another test already shows; nothing in the suite now shows the script would report unchanged after a fresh solve (dropped on purpose in the round; run by hand) |
 | re-check | correctness | low | docs | verified | fixed | `scripts/baselineUpdate.ts:9` | A comment says "unchanged" is printed when the text is the file's as it was; it is printed when every figure is the same, formatting aside |
 | re-check | other | low | test | noticed | fixed | `src/core/baseline/earthWinds.test.ts:145` | Noticed by the verifier: the core test's check of the file's form would throw on a `null` figure in the same way, and mostly repeats the script test's |
+
+## piece 15 · 2026-11-14 · Moving streaks
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | high | defect | verified | fixed | `src/app/globe/streaks.ts:976` | With Streaks chosen, the last trails stayed on the globe, frozen, once their winds were gone: after Winds was turned off, after Arrows then Winds off then Streaks again, and after a new world on the same grid (confirmed in a browser) |
+| round | correctness | low | cleanup | verified | fixed | `src/app/globe/streaks.ts:349` | A module-level cache of the cells' frames repeated the one the core already keeps for each grid |
+| round | coverage | low | test | dropped | - | `src/app/globe/renderer.ts:418` | The renderer's swap between drawing arrows and drawing streaks is untested — dropped: the renderer has never had unit tests (WebGL does not run under the test environment); the swap is thin, the loop's rule and the loop are tested, and each state was looked at in a browser |
+| re-check | correctness | low | cleanup | verified | open | `src/app/globe/renderer.ts:174` | A doc comment line added with the fix runs to about 120 columns where its neighbours wrap near 76 (a nit, as the check and the verifier both rate it) |
+| re-check | other | low | cleanup | noticed | open | `src/app/globe/renderer.ts` | Noticed by the verifier: the renderer builds a small view object and a camera-position array each frame while the streaks run, there before the fixes |
