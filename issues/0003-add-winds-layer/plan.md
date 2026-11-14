@@ -259,7 +259,7 @@ earth_sim is a browser planet simulator for worldbuilding: believable results an
 - [x] 9. The Winds switch and arrows on the globe
 - [x] 7b. The yardstick: a ninth case and three literature checks
 - [x] 7c-1. The tuning script and the small fixes
-- [ ] 7c-2. Bands by longitude
+- [x] 7c-2. Bands by longitude
 - [ ] ~~7d. The models' settings in one place, documented~~ (moved to the roadmap's step 3d on 2026-11-14; not to be built here)
 - [ ] 10. Day length in the Planet section
 - [ ] 11. Wind under the pointer, and the unit option
@@ -429,3 +429,5 @@ Scripted browser checks keep their browser profiles in the session's scratch fol
 - 2026-11-14, piece 7c-2, deviations and checks: the swing's measure lives in a new `scripts/report/oceanBands.ts` with its test, and `npm run tune:winds -- cases` prints it; the one-continent case's id is a shared constant in `scripts/report/cases.ts`; `docs/winds.md` gains the bands by longitude and a table "The Earth's known faults", recorded and not tuned. The before-and-after pictures and the earlier report are under the ignored `reports/winds/7c-2/`. Lint and type-check clean; 96 test files, 2,895 tests; the build passes; the temperature baseline is unchanged. Changed-lines coverage 98%: 25 lines uncovered, 24 from earlier pieces with reasons accepted then, and `src/core/wind/rules.ts:1350`, the fallback for a latitude band with no cells, which no supported grid reaches. The builder looked at the globe in a headless browser (the Earth in July with Winds on): it draws with the change.
 
 - 2026-11-14, at piece 7c-2's pause: `planner.py path` stopped with a `UnicodeDecodeError` while a PDF sat in the issue folder (the helper copies every file as text). The planner chat moved the diagram's files to `investigations/2026-11-14-climate-process-diagram/` and `path` works again; these piece 7c-2 notes were written a second time after the first copy was overwritten in that repair.
+
+- 2026-11-14, piece 7c-2, approved and committed as `4f2912a`, pushed: the user tried it and approved it ("Tried it, approve", answering "Tried 7c-2, and approve it with the tuning-script finding accepted?"). Accepted as they are, not to be fixed in this issue: the low finding at `scripts/tune-winds.ts:113` (a sweep or search of either blend-latitude setting stops with an error once a value crosses the other setting), and the verifier's noticed 0.3° offset of the local lows on a field with sharp steps in latitude (`src/core/wind/rules.ts:1480`). The committed tree is the reviewed one, byte for byte.
