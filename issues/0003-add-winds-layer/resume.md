@@ -1,5 +1,14 @@
 # Resume point — read this first
 
-Nothing is pending. Pieces 1 to 5, 7a, 8, 9 and 7b are committed and pushed on branch `claude/add-winds-layer-991a60` (HEAD is piece 7b's commit; `git log --oneline -9`); piece 6 was dropped; the tree is clean. The next piece in build order is 7c, "The improvements", which waits for the user's go-ahead relayed by the planner chat. See `plan.md` (`## Checkpoints`, `## Notes`) and `findings.md`.
+Piece 7c-1, "The tuning script and the small fixes", is **built but not yet reviewed or committed**. Pieces 1 to 5, 7a, 8, 9 and 7b are committed and pushed on branch `claude/add-winds-layer-991a60` (HEAD is piece 7b's commit, `92b5e6d`). The working tree holds piece 7c-1 (17 files). The project checks pass on it.
 
-Build order from here: 7c, then 10 onward. Review is one round and a light re-check per piece, recorded in `findings.md`. For 7c the user's rule holds: report, don't chase; stop tuning when the listed faults are better in kind, after two rounds running with no clear gain, or at ten rounds at most.
+## Pending decision (sent to the planner chat 2026-11-14)
+
+The outer-band rule. The user chose "weaken only the last band"; built that way, the 8-hour case counts 5 bands a hemisphere, but on the Earth tilted 60° the winter hemisphere's bands come to full strength (winter mid-latitude wind 1.21 and 2.89 times the summer's in January and July, where it was 0.20 and 0.61 and the paper reports weak winter winds). A narrower rule is in the tree as a candidate: bands in full within two cells of the low, or within 60° of it at a faster spin than the Earth's. With it every 24-hour and 96-hour case is as before this piece, the tilted Earth's winter winds are weak again (0.22, 0.61), and the 8-hour case counts 4 bands (south) and 5 (north) against the Earth's 3 and 3.
+- A (recommended): keep the candidate.
+- B: the user's original rule (only the last band weakened).
+- C: the rule before this piece (the 8-hour case counts 2 and 3).
+
+## Next step
+
+On the relayed answer (the user's words): put the tree in the chosen state, re-run the project checks and coverage, take the after picture of the 60° maps, run one review round and a light re-check, write `findings.md`, and send the review request with the report's path and the before-and-after maps.
