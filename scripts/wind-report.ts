@@ -3,7 +3,8 @@
  * `reports/winds/index.html`, to open in a browser. It shows the observed
  * Earth's winds and sea-level pressure in January and July, the worlds the
  * wind models are run on, and each registered model's winds on them, its
- * error figures against the observed Earth and its solve times.
+ * error figures against the observed Earth, its solve times, and its
+ * measures set beside what published studies report.
  *
  * Run with `npm run report:winds`. It prints the file's path, its size and
  * the time taken. The file is not committed.

@@ -15,8 +15,10 @@ import {
 	readObservedWindFile,
 } from '../earth/dataFile.mjs';
 import { cases } from './cases';
+import { ACCESS, HOW_READ, LITERATURE_CHECKS, SLOW_END } from './literature';
 import { escapeText } from './markup';
 import { type BuiltCase, buildReport, type ModelRun } from './page';
+import { summariseChecks } from './summary';
 import { parseXml } from './testing/xml';
 
 const earth = decodeEarth(readEarthDataFile());
@@ -209,6 +211,103 @@ describe('buildReport', () => {
 		for (const drawing of drawings) {
 			parseXml(drawing);
 		}
+	});
+
+	it('with a model’s checks shows its section against published studies, quoting only the papers’ given words', () => {
+		// The ocean world tilted 60°, nearly calm, fills a row of each
+		// steep-tilt table.
+		const tilted = cases.find(({ id }) => id === 'ocean-tilt-60');
+		if (tilted === undefined) {
+			throw new Error('No case ocean-tilt-60');
+		}
+		const withTilt = [
+			...shownCases,
+			{ case: tilted, world: tilted.build(earth) },
+		];
+		const echo = run(ECHO, observed);
+		const results = new Map([
+			...echo.results,
+			['ocean-tilt-60', steady(0.1, 0, 1013)],
+		]);
+		const page = buildReport({
+			cases: withTilt,
+			observed,
+			models: [
+				{
+					...echo,
+					results,
+					checks: summariseChecks({ cases: withTilt, results }),
+				},
+			],
+		});
+		const start = page.indexOf('<h2>Against published studies: Echo</h2>');
+		expect(start).toBeGreaterThan(page.indexOf('<h2>Model: Echo</h2>'));
+		const section = page.slice(start);
+		// The access table: each paper, and each way a paper was read.
+		expect(section).toContain('<h3>How each paper was read</h3>');
+		for (const { paper, howRead, where } of ACCESS) {
+			expect(section).toContain(
+				`<tr><td>${escapeText(paper)}</td><td>${escapeText(howRead)}</td><td>${escapeText(where)}</td></tr>`,
+			);
+		}
+		for (const label of Object.values(HOW_READ)) {
+			expect(section).toContain(`(${escapeText(label)})`);
+		}
+		// Each check, with what the papers report and what the model shows.
+		for (const check of LITERATURE_CHECKS) {
+			expect(section).toContain(`<h3>${escapeText(check.title)}</h3>`);
+			for (const caveat of check.caveats) {
+				expect(section).toContain(`<li>${escapeText(caveat)}</li>`);
+			}
+		}
+		expect(count(section, '<h4>What the papers report</h4>')).toBe(3);
+		expect(count(section, '<h4>What the model shows</h4>')).toBe(3);
+		expect(section).toContain('<h3>The slow end</h3>');
+		expect(section).toContain(escapeText(SLOW_END.model));
+		// The cases not shown here are noted; the Earth's annual mean is
+		// measured.
+		expect(section).toContain(
+			'<strong>Not measured:</strong> earth-tilt-60: the case is not in the report.',
+		);
+		expect(section).toContain(
+			'<td>The Earth</td><td class="number">24 hours</td>',
+		);
+		// The steep-tilt rows: a weak summer has no ratio and no easterly,
+		// and the low's latitude is written with its side.
+		for (const month of ['January', 'July']) {
+			expect(section).toContain(
+				`<td>An ocean world tilted 60°</td><td>${month}</td><td>${month === 'January' ? 'Southern' : 'Northern'}</td>`,
+			);
+		}
+		expect(section).toMatch(
+			/<td>the summer’s is under 0\.5 m\/s<\/td><td class="number">\+0\.1<\/td><td class="number">0 of 10<\/td><td>no band is easterly by 0\.5 m\/s or more<\/td>/,
+		);
+		expect(section).toMatch(
+			/<td>Southern<\/td><td class="number">\d+°[NS]<\/td><td class="number">[−+]?\d+°<\/td><td class="number">1013\.0<\/td>/,
+		);
+		// A note after a quotation starts a sentence of its own.
+		expect(section).toContain(
+			'nonnegligible precipitation</q>. The abstract gives no latitudes.',
+		);
+		// Every quotation is one of the papers' given words, and each is
+		// quoted.
+		const given = [
+			...LITERATURE_CHECKS.flatMap(({ reports }) => reports),
+			SLOW_END.report,
+		].flatMap(({ quotations }) => quotations.map(escapeText));
+		const quoted = [...section.matchAll(/<q>(.*?)<\/q>/g)].map(
+			(match) => match[1] as string,
+		);
+		expect(quoted.length).toBeGreaterThan(0);
+		for (const text of quoted) {
+			expect(given).toContain(text);
+		}
+		expect([...new Set(quoted)].sort()).toEqual([...new Set(given)].sort());
+		expect(page.slice(0, start)).not.toContain('<q>');
+		// Observations only: no word that judges the model.
+		expect(section).not.toMatch(
+			/\b(agrees?|fail(s|ed)?|pass(es|ed)?|wrong)\b/i,
+		);
 	});
 
 	it('refuses cases without the Earth, or a model missing a case', () => {

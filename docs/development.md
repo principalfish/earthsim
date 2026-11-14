@@ -17,7 +17,7 @@ Requires Node.js and npm. Run `npm install` once.
 | `npm run baseline:temperature` | Write the Earth temperature baseline afresh; see below |
 | `npm run time:temperature` | Time the temperature solver at every resolution and print the simulated Earth's error figures, as Markdown tables. Takes a few minutes |
 | `npm run time:winds` | Time a year of the Earth's winds at every resolution, as `solveWinds` solves them by default (the pressure on the 64 grid) and wholly on the world's own grid beside it, and print how far the two lie apart, as Markdown tables. Takes about half a minute; see [Winds](winds.md#the-pressure-of-finer-worlds-is-worked-out-on-the-64-grid) |
-| `npm run report:winds` | Write the wind report, `reports/winds/index.html`, to open in a browser: the observed Earth's winds and sea-level pressure in January and July, the worlds the wind models are run on, and each registered model's maps, error figures and solve times. The file is not committed |
+| `npm run report:winds` | Write the wind report, `reports/winds/index.html`, to open in a browser: the observed Earth's winds and sea-level pressure in January and July, the nine worlds the wind models are run on, and each registered model's maps, error figures and solve times, and its section against published studies: how each paper was read, and for three checks (winds and the pressure low at a 60° tilt, and the tropical cell and bands of wind with a faster and a slower day) the papers' words beside what the model shows. The file is not committed |
 
 ## The Earth temperature baseline
 
@@ -119,7 +119,7 @@ Run with Node, not in the browser.
 | `time-winds.ts` | The wind model's timings, and how far its solve with the pressure on the 64 grid lies from one wholly on the world's own grid |
 | `update-earth-temperature-baseline.ts` | Writes the Earth temperature baseline afresh |
 | `wind-report.ts` | Writes the wind report, and lists the wind models it runs |
-| `report/` | The parts of the wind report that touch no file: the cases (`cases.ts`), the maps (`map.ts`), the zonal-mean chart (`chart.ts`), the PNG writer (`png.ts`), the page (`page.ts`), running the models on the cases (`run.ts`), and in `testing/` the XML and PNG readers only its tests use |
+| `report/` | The parts of the wind report that touch no file: the cases (`cases.ts`), the maps (`map.ts`), the zonal-mean chart (`chart.ts`), the PNG writer (`png.ts`), the page (`page.ts`), the measures and checks against published studies (`summary.ts`) and the papers' words they are set beside (`literature.ts`), running the models on the cases (`run.ts`), and in `testing/` the XML and PNG readers only its tests use |
 | `run-with-vite.mjs` | Runs a TypeScript script through Vite, so it can import the core |
 
 ### `public/data/`

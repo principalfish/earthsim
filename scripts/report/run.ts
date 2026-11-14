@@ -1,7 +1,8 @@
 /**
  * Works out the wind report from the bytes of the data files: builds the
- * cases, runs every model on each with its temperatures and times each on
- * the Earth, and puts the page together. It reads and writes no file; the
+ * cases, runs every model on each with its temperatures, times each on the
+ * Earth, measures each against published studies, and puts the page
+ * together. It reads and writes no file; the
  * clock and where warnings go are passed in.
  */
 
@@ -29,6 +30,7 @@ import {
 	type ModelRun,
 	type ModelTiming,
 } from './page';
+import { summariseChecks } from './summary';
 
 /** A wind model as the report runs it, under its name. */
 export type RegisteredModel = {
@@ -188,7 +190,8 @@ export const workOutReport = (options: ReportOptions): string => {
 					return { resolution, seconds: (now() - began) / 1000 };
 				},
 			);
-			runs.push({ name, results, faults, timings });
+			const checks = summariseChecks({ cases: built, results, faults });
+			runs.push({ name, results, faults, timings, checks });
 		}
 	}
 	return buildReport({ cases: built, observed, models: runs });

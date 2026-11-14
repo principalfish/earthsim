@@ -1,6 +1,6 @@
 /**
  * The worlds the wind report runs every model on: the Earth, the Earth
- * with one planet setting changed, and three invented worlds.
+ * with one planet setting changed, and four invented worlds.
  */
 
 import {
@@ -55,6 +55,14 @@ export const CONTINENT_ROUNDNESS = 4;
 
 /** The height of the one continent's land, in metres: a flat plain. */
 export const CONTINENT_ELEVATION_M = 500;
+
+/**
+ * The steep tilt of two cases, in degrees: the Earth's and an ocean
+ * world's. It lies between the 54° and the 90° of the ocean planets of
+ * Ferreira, Marshall, O'Gorman and Seager, "Climate at high-obliquity"
+ * (Icarus, 2014), which the report sets these cases beside.
+ */
+export const STEEP_TILT_DEG = 60;
 
 /** The depth of the invented worlds' ocean, as the descriptions give it. */
 const OCEAN_DEPTH = (-BLANK_OCEAN_ELEVATION_M).toLocaleString('en-GB');
@@ -144,6 +152,16 @@ const earthWith = (
 	return world;
 };
 
+/** A world with no land, tilted {@link STEEP_TILT_DEG}. */
+const steepOceanWorld = (): World => {
+	const world = createBlankWorld(CASE_RESOLUTION);
+	world.planet = normalisePlanet({
+		...DEFAULT_PLANET,
+		axialTiltDeg: STEEP_TILT_DEG,
+	});
+	return world;
+};
+
 /** Every case, the Earth first. */
 export const cases: readonly ReportCase[] = [
 	{
@@ -176,11 +194,17 @@ export const cases: readonly ReportCase[] = [
 	},
 	{
 		id: 'earth-tilt-60',
-		title: 'The Earth tilted 60°',
-		description:
-			'The Earth with its axis tilted 60°: the sun overhead as far as 60° from the equator.',
+		title: `The Earth tilted ${STEEP_TILT_DEG}°`,
+		description: `The Earth with its axis tilted ${STEEP_TILT_DEG}°: the sun overhead as far as ${STEEP_TILT_DEG}° from the equator.`,
 		invented: false,
-		build: (earth) => earthWith(earth, { axialTiltDeg: 60 }),
+		build: (earth) => earthWith(earth, { axialTiltDeg: STEEP_TILT_DEG }),
+	},
+	{
+		id: 'ocean-tilt-60',
+		title: `An ocean world tilted ${STEEP_TILT_DEG}°`,
+		description: `No land at all: ocean ${OCEAN_DEPTH} m deep everywhere, with its axis tilted ${STEEP_TILT_DEG}° and the Earth’s other planet settings.`,
+		invented: true,
+		build: steepOceanWorld,
 	},
 	{
 		id: 'generated',

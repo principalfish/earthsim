@@ -19,6 +19,12 @@ import {
 import { CASE_RESOLUTION, landShare, type ReportCase } from './cases';
 import { drawZonalChart } from './chart';
 import {
+	LITERATURE_CHECKS,
+	type LiteratureCheck,
+	type PaperReport,
+	SLOW_END,
+} from './literature';
+import {
 	ARROW_FULL_SPEED_M_PER_S,
 	ARROW_MAX_UNITS,
 	ARROW_MIN_UNITS,
@@ -34,6 +40,16 @@ import {
 	UNITS_PER_DEGREE,
 } from './map';
 import { escapeText, figure } from './markup';
+import {
+	type CheckObservation,
+	type ChecksSummary,
+	DEEP_TROPICS_DEG,
+	type Hemisphere,
+	MEASURE_BANDS,
+	type Measure,
+	MID_LATITUDES_DEG,
+	WEAK_WIND_M_PER_S,
+} from './summary';
 
 /** The id of the case that is compared with the observed Earth. */
 export const EARTH_CASE_ID = 'earth';
@@ -91,6 +107,11 @@ export type ModelRun = {
 	readonly faults?: ReadonlyMap<string, ModelFault>;
 	/** Its times on the Earth, from the coarsest grid. */
 	readonly timings: readonly ModelTiming[];
+	/**
+	 * Its checks against published studies, as {@link summariseChecks}
+	 * measures them; the section on them is left out when they are.
+	 */
+	readonly checks?: ChecksSummary;
 };
 
 /** What the page is made from. */
@@ -116,6 +137,7 @@ body { margin: 0; padding: 1.5rem 1rem 3rem; font: 16px/1.5 system-ui, sans-seri
 h1 { font-size: 1.7rem; margin: 0 0 .5rem; }
 h2 { font-size: 1.35rem; margin: 2.5rem 0 .5rem; border-bottom: 1px solid var(--rule); padding-bottom: .25rem; }
 h3 { font-size: 1.1rem; margin: 1.75rem 0 .5rem; }
+h4 { font-size: 1rem; margin: 1.25rem 0 .25rem; }
 p, ul { max-width: 60rem; }
 .muted { color: var(--muted); }
 .note { border-left: 4px solid #d9730d; padding: .25rem .75rem; }
@@ -206,6 +228,194 @@ const ERROR_HEADER = [
 	'Mean pressure difference, hPa',
 	'RMS pressure difference, hPa',
 ];
+
+/** A measure as a table cell: the number, or why it was not measured. */
+const measureCell = (
+	measure: Measure,
+	digits: number,
+	signed = false,
+	unit = '',
+): string =>
+	measure.value === null
+		? escapeText(measure.missing)
+		: `${figure(measure.value, digits, signed)}${unit}`;
+
+/** A latitude in degrees north as text: `0°`, or its size and its side. */
+const latitudeText = (latitude: number, digits: number): string => {
+	const size = figure(Math.abs(latitude), digits);
+	return Number(size) === 0
+		? `${size}°`
+		: `${size}°${latitude > 0 ? 'N' : 'S'}`;
+};
+
+const HEMISPHERE_NAMES: { readonly [K in Hemisphere]: string } = {
+	southern: 'Southern',
+	northern: 'Northern',
+};
+
+/** What a paper reports at one place in it, as a list item. */
+const reportItem = (report: PaperReport): string => {
+	const joined = report.quotations
+		.map((text) => `<q>${escapeText(text)}</q>`)
+		.join('; ');
+	// A note that follows the quotations starts a sentence of its own.
+	const quotations =
+		joined !== '' && report.note !== undefined ? `${joined}.` : joined;
+	const parts = [
+		`<strong>${escapeText(report.source)}</strong> <span class="muted">(${escapeText(report.howRead)})</span>.`,
+		report.setting === undefined
+			? quotations
+			: `${escapeText(report.setting)}: ${quotations}`,
+		report.note === undefined ? '' : escapeText(report.note),
+	];
+	return `<li>${parts.filter((part) => part !== '').join(' ')}</li>`;
+};
+
+/** The cases a check could not measure, as notes. */
+const unmeasuredNotes = <Row>(observation: CheckObservation<Row>): string =>
+	observation.unmeasured
+		.map(
+			({ title, why }) =>
+				`<p class="note"><strong>Not measured:</strong> ${escapeText(title)}: ${escapeText(why)}.</p>`,
+		)
+		.join('');
+
+/**
+ * One check: the question, what the papers report, what the model shows
+ * and the caveats.
+ *
+ * @param check - The question, the papers' words and the caveats.
+ * @param shows - What the model shows, already HTML.
+ */
+const checkPart = (check: LiteratureCheck, shows: string): string =>
+	[
+		`<h3>${escapeText(check.title)}</h3>`,
+		`<p><strong>The question:</strong> ${escapeText(check.question)}</p>`,
+		'<h4>What the papers report</h4>',
+		`<ul>${check.simulated
+			.map(
+				({ paper, simulated }) =>
+					`<li><strong>${escapeText(paper)}</strong> simulated: ${escapeText(simulated)}</li>`,
+			)
+			.join('')}</ul>`,
+		`<ul>${check.reports.map(reportItem).join('')}</ul>`,
+		'<h4>What the model shows</h4>',
+		shows,
+		'<h4>Caveats</h4>',
+		`<ul>${check.caveats.map((caveat) => `<li>${escapeText(caveat)}</li>`).join('')}</ul>`,
+	].join('\n');
+
+/** The page's section setting a model beside published studies. */
+const checksSection = (name: string, checks: ChecksSummary): string => {
+	const escaped = escapeText(name);
+	const [windsCheck, lowCheck, dayCheck] = LITERATURE_CHECKS as [
+		LiteratureCheck,
+		LiteratureCheck,
+		LiteratureCheck,
+	];
+	const range = `${MID_LATITUDES_DEG.from}°–${MID_LATITUDES_DEG.to}°`;
+	const bands = `${MEASURE_BANDS} bands of latitude of ${180 / MEASURE_BANDS}° each`;
+	const winds = [
+		`<p>The model shows these means of its eastward wind by latitude, in ${bands}: westerly above zero, easterly below. A range’s mean weights each band by its area. The mid-latitudes are the bands whose middles lie ${range} from the equator, around the paper’s “near 50°S”; the deep tropics are those within ${DEEP_TROPICS_DEG}° of it. A band counts as easterly when its mean is at least ${WEAK_WIND_M_PER_S} m/s from the east. The winter’s size to the summer’s is the size of the winter hemisphere’s mid-latitude mean over the summer hemisphere’s, either way.</p>`,
+		table(
+			[
+				'Case',
+				'Month',
+				'Summer hemisphere',
+				`Summer ${range}, m/s`,
+				`Winter ${range}, m/s`,
+				'Winter’s size to summer’s',
+				`Within ${DEEP_TROPICS_DEG}° of the equator, m/s`,
+				`Bands easterly within ${DEEP_TROPICS_DEG}°`,
+				`Strongest easterly within ${DEEP_TROPICS_DEG}°, m/s`,
+			],
+			checks.windsAtTilt.rows.map(({ title, month, summer, measures }) => [
+				escapeText(title),
+				monthName(month),
+				HEMISPHERE_NAMES[summer],
+				measureCell(measures.summerMidLatitudesEast, 1, true),
+				measureCell(measures.winterMidLatitudesEast, 1, true),
+				measureCell(measures.winterToSummerSize, 2),
+				measureCell(measures.tropicsEast, 1, true),
+				`${measures.tropicsEasterlyBands} of ${measures.tropicsBands}`,
+				measureCell(measures.tropicsStrongestEasterly, 1, true),
+			]),
+		),
+		unmeasuredNotes(checks.windsAtTilt),
+	].join('\n');
+	const low = [
+		`<p>The model shows this low in its mean sea-level pressure by latitude, in the same bands: the middle of the band whose mean is lowest. How far it lies into the summer hemisphere is counted from the equator towards the summer pole, below zero in the winter hemisphere. The highest band’s mean less the lowest’s shows how deep the low is.</p>`,
+		table(
+			[
+				'Case',
+				'Month',
+				'Summer hemisphere',
+				'Latitude of the lowest mean pressure',
+				'Into the summer hemisphere',
+				'Lowest mean pressure, hPa',
+				'Highest less lowest, hPa',
+			],
+			checks.lowAtTilt.rows.map(({ title, month, summer, measures }) => [
+				escapeText(title),
+				monthName(month),
+				HEMISPHERE_NAMES[summer],
+				measures.latitude.value === null
+					? escapeText(measures.latitude.missing)
+					: latitudeText(measures.latitude.value, 0),
+				measureCell(measures.intoSummerDeg, 0, true, '°'),
+				measureCell(measures.pressureHpa, 1),
+				measureCell(measures.spreadHpa, 1),
+			]),
+		),
+		unmeasuredNotes(checks.lowAtTilt),
+	].join('\n');
+	const day = [
+		`<p>The model shows these on the annual mean of its eastward wind, the twelve months averaged as vectors, by latitude in the same bands. Only bands whose mean is at least ${WEAK_WIND_M_PER_S} m/s either way are counted as bands of wind or turns between them. The tropical cell’s edge is where the wind first turns from easterly to westerly going poleward from the equator, in degrees from the equator: put where the mean of every band between the two counted either side of the turn, weak ones too, first crosses zero, along a straight line between the bands either side of the crossing. The bands of wind are the runs of easterlies and of westerlies from the equator to the pole. The ratios are to the Earth case’s edge in the same hemisphere.</p>`,
+		table(
+			[
+				'Case',
+				'Day length',
+				'Southern edge',
+				'Southern edge to the Earth’s',
+				'Southern bands',
+				'Northern edge',
+				'Northern edge to the Earth’s',
+				'Northern bands',
+			],
+			checks.dayLength.rows.map(
+				({ title, dayLengthHours, southern, northern }) => [
+					escapeText(title),
+					`${Number(dayLengthHours.toFixed(2))} hours`,
+					...[southern, northern].flatMap((hemisphere) => [
+						measureCell(hemisphere.edgeDeg, 1, false, '°'),
+						measureCell(hemisphere.edgeToEarth, 2),
+						String(hemisphere.bands),
+					]),
+				],
+			),
+		),
+		unmeasuredNotes(checks.dayLength),
+	].join('\n');
+	return [
+		`<h2>Against published studies: ${escaped}</h2>`,
+		`<p>What the model ${escaped} shows, set beside what published studies report, in three checks. The papers’ words are quoted exactly, each with how it was read; the model’s numbers are measured from its own winds and pressure by latitude. Nothing in the model was changed to match the papers.</p>`,
+		'<h3>How each paper was read</h3>',
+		table(
+			['Paper', 'How it was read', 'Where'],
+			checks.access.map(({ paper, howRead, where }) => [
+				escapeText(paper),
+				escapeText(howRead),
+				escapeText(where),
+			]),
+		),
+		checkPart(windsCheck, winds),
+		checkPart(lowCheck, low),
+		checkPart(dayCheck, day),
+		'<h3>The slow end</h3>',
+		`<ul>${reportItem(SLOW_END.report)}</ul>`,
+		`<p>${escapeText(SLOW_END.model)}</p>`,
+	].join('\n');
+};
 
 /** The page's section for one model. */
 const modelSection = (
@@ -315,6 +525,9 @@ const modelSection = (
 			}).join('')}</div>`,
 		);
 	}
+	if (model.checks !== undefined) {
+		parts.push(checksSection(model.name, model.checks));
+	}
 	return parts.join('\n');
 };
 
@@ -329,10 +542,12 @@ const modelSection = (
  * Earth; for each case its January and July maps; and on the Earth the
  * observed beside the simulated, the error figures for January, July and
  * the whole year, and the mean eastward wind by latitude against the
- * observed. A case among a model's faults has in their place a note of
- * where its first value that is not a finite number is; the model's other
- * cases and its times are shown as ever. Every text put into the page is
- * escaped.
+ * observed; and, when the model's checks are given, its section against
+ * published studies: how each paper was read, and for each check the
+ * question, the papers' words, what the model shows and the caveats. A
+ * case among a model's faults has in their place a note of where its first
+ * value that is not a finite number is; the model's other cases and its
+ * times are shown as ever. Every text put into the page is escaped.
  *
  * @param input - The cases, the observed Earth and the models' results.
  * Not changed.

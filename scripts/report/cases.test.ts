@@ -8,7 +8,13 @@ import {
 	type World,
 } from '../../src/core/index';
 import { readEarthDataFile } from '../earth/dataFile.mjs';
-import { CASE_RESOLUTION, cases, landShare, oneContinentWorld } from './cases';
+import {
+	CASE_RESOLUTION,
+	cases,
+	landShare,
+	oneContinentWorld,
+	STEEP_TILT_DEG,
+} from './cases';
 
 const earth = decodeEarth(readEarthDataFile());
 const built = new Map(cases.map((shown) => [shown.id, shown.build(earth)]));
@@ -34,6 +40,7 @@ describe('cases', () => {
 			'earth-day-96h',
 			'earth-tilt-0',
 			'earth-tilt-60',
+			'ocean-tilt-60',
 			'generated',
 			'ocean',
 			'one-continent',
@@ -69,7 +76,20 @@ describe('cases', () => {
 			expect(cases.find((shown) => shown.id === id)?.invented).toBe(true);
 			expect(worldOf(id).planet).toEqual(DEFAULT_PLANET);
 		}
-		expect(cases.filter(({ invented }) => invented)).toHaveLength(3);
+		expect(cases.filter(({ invented }) => invented)).toHaveLength(4);
+	});
+
+	it('give the ocean world tilted 60° no land, the ocean world’s ocean and the Earth’s other settings', () => {
+		const world = worldOf('ocean-tilt-60');
+		expect(cases.find((shown) => shown.id === 'ocean-tilt-60')?.invented).toBe(
+			true,
+		);
+		expect(landShare(world)).toBe(0);
+		expect(world.elevation).toEqual(worldOf('ocean').elevation);
+		expect(world.seaLevel).toBe(worldOf('ocean').seaLevel);
+		expect(STEEP_TILT_DEG).toBe(60);
+		expect(world.planet).toEqual({ ...DEFAULT_PLANET, axialTiltDeg: 60 });
+		expect(worldOf('earth-tilt-60').planet.axialTiltDeg).toBe(60);
 	});
 });
 

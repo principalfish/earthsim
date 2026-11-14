@@ -152,6 +152,14 @@ describe('workOutReport', () => {
 			'<tr><td class="number">64</td><td class="number">0.250</td></tr><tr><td class="number">128</td><td class="number">0.250</td></tr>',
 		);
 		expect(page).toContain('<td>The whole year</td>');
+		// Each model is measured against published studies; the cases
+		// missing here are noted as not measured.
+		expect(page).toContain(
+			'<h2>Against published studies: Tenth of the temperature</h2>',
+		);
+		expect(page).toContain(
+			'<strong>Not measured:</strong> ocean-tilt-60: the case is not in the report.',
+		);
 	}, 60_000);
 
 	// This test solves two temperatures, the Earth's and the ocean world's,
