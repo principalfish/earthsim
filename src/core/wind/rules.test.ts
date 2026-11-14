@@ -6,19 +6,15 @@ import { createBlankWorld, PLANET_RADIUS_KM, type World } from '../world';
 import { type ZonalMean, zonalMean } from './model';
 import {
 	AIR_DENSITY_KG_M3,
-	EARTH_CONTRAST_K,
-	LAND_FRICTION_FACTOR,
-	LOW_SHIFT_FADE_DEG,
-	LOW_SHIFT_GAIN,
-	POLE_LOW_FROM_DEG,
-	POLE_LOW_TO_DEG,
+	DEFAULT_WIND_SETTINGS,
 	PROFILE_BANDS,
 	REFERENCE_PRESSURE_HPA,
 	rulesPressureMonth,
 	rulesWindsOnGrid,
-	SEA_FRICTION_PER_S,
-	SIDE_CONTRAST_K,
 	thermalPressure,
+	WIND_SETTING_NAMES,
+	type WindSettings,
+	windSettings,
 	windsFromPressure,
 	windsFromPressures,
 	zonalBands,
@@ -108,14 +104,14 @@ const profileOf = (temperature: (latitude: number) => number): ZonalMean => {
 
 /**
  * A profile with the Earth's contrast: 28 °C at the hottest latitude,
- * {@link EARTH_CONTRAST_K} colder at the poles when the hottest is the
+ * `earthContrastK` colder at the poles when the hottest is the
  * equator.
  */
 const earthLike =
 	(hottest = 0) =>
 	(latitude: number): number =>
 		28 -
-		EARTH_CONTRAST_K *
+		DEFAULT_WIND_SETTINGS.earthContrastK *
 			(1 - Math.cos((latitude - hottest) * RADIANS_PER_DEGREE));
 
 /**
@@ -167,7 +163,8 @@ describe('zonalBands', () => {
 		expect(bands.lowLatitude).toBeCloseTo(0, 6);
 		// The polar bands' middles lie 1° from the poles.
 		expect(bands.contrast).toBeCloseTo(
-			EARTH_CONTRAST_K * (1 - Math.cos(89 * RADIANS_PER_DEGREE)),
+			DEFAULT_WIND_SETTINGS.earthContrastK *
+				(1 - Math.cos(89 * RADIANS_PER_DEGREE)),
 			1,
 		);
 		expect(bands.cellWidth).toBeCloseTo(30, 0);
@@ -231,12 +228,12 @@ describe('zonalBands', () => {
 	it('stays sane with the hottest latitude near a pole, and with no contrast at all', () => {
 		for (const hottest of [85, -89, 60]) {
 			const bands = zonalBands(profileOf(earthLike(hottest)), DEFAULT_PLANET);
-			expect(Math.abs(bands.lowLatitude)).toBeLessThanOrEqual(90);
-			// The low lies at the hottest latitude or beyond it, towards its
-			// pole.
+			// The low lies towards the hottest latitude's pole, at the hottest
+			// latitude or, short of it, near the limit.
 			expect(Math.sign(bands.lowLatitude)).toBe(Math.sign(hottest));
+			expect(Math.abs(bands.lowLatitude)).toBeLessThanOrEqual(bands.lowLimit);
 			expect(Math.abs(bands.lowLatitude)).toBeGreaterThanOrEqual(
-				Math.abs(bands.hottestLatitude),
+				Math.min(Math.abs(bands.hottestLatitude), bands.lowLimit - 5),
 			);
 			expect(bands.northEdge).toBeGreaterThanOrEqual(bands.lowLatitude);
 			expect(bands.southEdge).toBeLessThanOrEqual(bands.lowLatitude);
@@ -255,34 +252,65 @@ describe('zonalBands', () => {
 		expect(Number.isFinite(flat.offset(45))).toBe(true);
 	});
 
-	it('puts the low at a pole that is the hottest place, with no high beyond it', () => {
+	it('holds the low short of a pole that is the hottest place at the Earth’s spin or faster, with no high beyond it', () => {
 		for (const pole of [90, -90]) {
-			for (const dayLengthHours of [8, 24, 96, 720]) {
+			for (const dayLengthHours of [8, 24, 48, 96, 720]) {
 				const bands = zonalBands(
 					profileOf(earthLike(pole)),
 					normalisePlanet({ ...DEFAULT_PLANET, dayLengthHours }),
 				);
 				const label = `${pole}°, ${dayLengthHours} h`;
+				const low = Math.abs(bands.lowLatitude);
 				// The hottest latitude is about 76°, the bands being weighted by
-				// their area, and the low moved on to within 2° of the pole.
-				expect(Math.abs(bands.lowLatitude), label).toBeGreaterThan(88);
-				// The pole's pressure is no higher than 20° from it, and no more
-				// than 0.1 hPa above the low between.
-				const atPole = bands.offset(pole);
-				expect(atPole, label).toBeLessThanOrEqual(
-					bands.offset(pole - Math.sign(pole) * 20),
-				);
-				for (let away = 0; away <= 20; away += 0.25) {
+				// their area. At 8 and 24 hours the low is held near 70°; at 96
+				// hours and slower, where the limit is the pole, it lies at the
+				// hottest latitude.
+				expect(low, label).toBeLessThanOrEqual(bands.lowLimit);
+				if (dayLengthHours <= 24) {
+					expect(low, label).toBeGreaterThan(65);
+					expect(low, label).toBeLessThan(70);
+				}
+				if (dayLengthHours >= 96) {
+					expect(low, label).toBeCloseTo(Math.abs(bands.hottestLatitude), 1);
+				}
+				// The pole is warmer than the low, so its side has no bands: from
+				// the low to the pole the pressure stays within 0.1 hPa of the
+				// low's, with no cap over the pole.
+				expect(pole > 0 ? bands.northStrength : bands.southStrength).toBe(0);
+				for (let away = 0; away <= 90 - low; away += 0.25) {
 					const value = bands.offset(pole - Math.sign(pole) * away);
 					expect(Number.isFinite(value), label).toBe(true);
-					expect(value, label).toBeGreaterThanOrEqual(atPole - 0.1);
+					expect(Math.abs(value), label).toBeLessThanOrEqual(0.1);
 				}
-				const cells = pole > 0 ? bands.northCells : bands.southCells;
-				// The tropical cell's summer side reaches the pole at a quarter or
-				// so of its phase, over the last degree and a half, where the
-				// slope is eased to nothing.
-				expect(cells, label).toBeLessThan(0.3);
 			}
+		}
+	});
+
+	it('follows the cells’ width with the low’s limit: about 70° at an 8-hour and a 24-hour day, between at 48 hours, the pole at 96 hours and slower, never falling as the day lengthens', () => {
+		const limitAt = (dayLengthHours: number) => {
+			const bands = zonalBands(
+				profileOf(earthLike()),
+				normalisePlanet({ ...DEFAULT_PLANET, dayLengthHours }),
+			);
+			return { limit: bands.lowLimit, width: bands.cellWidth };
+		};
+		const { lowLimitDeg, lowLimitToWidthDeg } = DEFAULT_WIND_SETTINGS;
+		expect(limitAt(8).limit).toBe(lowLimitDeg);
+		expect(limitAt(24).limit).toBeCloseTo(lowLimitDeg, 2);
+		const between = limitAt(48).limit;
+		expect(between).toBeGreaterThan(lowLimitDeg + 1);
+		expect(between).toBeLessThan(89);
+		// The profile's contrast is a little under the Earth's, so its cells
+		// at 96 hours are 59.7° wide, just short of the width at which the
+		// limit is the pole.
+		expect(limitAt(96).limit).toBeCloseTo(90, 1);
+		expect(limitAt(720).width).toBeGreaterThanOrEqual(lowLimitToWidthDeg);
+		expect(limitAt(720).limit).toBe(90);
+		let before = 0;
+		for (let hours = 3; hours <= 720; hours *= 1.05) {
+			const { limit } = limitAt(hours);
+			expect(limit, `${hours} h`).toBeGreaterThanOrEqual(before);
+			before = limit;
 		}
 	});
 
@@ -293,7 +321,8 @@ describe('zonalBands', () => {
 		// a step of 0.1°, near 8.5°, where the low moves 2.5° for each degree
 		// and the summer side of the tropical cell widens; for a step of
 		// 0.02° it is about 0.15 hPa, a fifth as much, as it is for bands
-		// with no step anywhere, where a step would stay the same size.
+		// with no step anywhere, where a step would stay the same size. The
+		// same holds where the low nears its limit, from 55° to 90°.
 		const largestChange = (
 			sign: number,
 			from: number,
@@ -324,16 +353,58 @@ describe('zonalBands', () => {
 			return largest;
 		};
 		for (const sign of [1, -1]) {
-			expect(largestChange(sign, 0, 90, 0.1)).toBeLessThan(1);
+			const coarse = largestChange(sign, 0, 90, 0.1);
+			expect(coarse).toBeLessThan(1);
 			expect(largestChange(sign, 7, 10, 0.02)).toBeLessThan(0.25);
+			expect(largestChange(sign, 55, 90, 0.02)).toBeLessThan(coarse / 3);
 		}
 	});
 
-	it('places the low by the faded gain, and moves a low near a pole on to it, in both hemispheres', () => {
-		const smoothStepOf = (x: number): number => {
-			const t = Math.min(1, Math.max(0, x));
-			return t * t * (3 - 2 * t);
+	// Thousands of band tables, a second or so, several under coverage,
+	// hence the longer time allowed.
+	it('moves the bands smoothly as the day length changes, the low near its limit and away from it', () => {
+		// The pressure at every 5° as the day lengthens by 0.2% at a time
+		// from 6 to 200 hours, with the hottest latitude at the equator and
+		// near a pole, where the low's limit moves with the cells' width.
+		// The largest change is about 0.35 and 0.57 hPa, near 75° at a day
+		// of 6 to 7 hours, where the many narrow bands move fastest; for
+		// steps of 0.05%, a quarter as large, it is about a quarter as large
+		// too, as it is for bands with no step anywhere.
+		const largestChange = (hottest: number, factor: number): number => {
+			let largest = 0;
+			let before: number[] | null = null;
+			for (let hours = 6; hours <= 200; hours *= factor) {
+				const bands = zonalBands(
+					profileOf(earthLike(hottest)),
+					normalisePlanet({ ...DEFAULT_PLANET, dayLengthHours: hours }),
+				);
+				const values = Array.from({ length: 37 }, (_, index) =>
+					bands.offset(-90 + 5 * index),
+				);
+				if (before !== null) {
+					for (const [index, value] of values.entries()) {
+						largest = Math.max(
+							largest,
+							Math.abs(value - (before[index] as number)),
+						);
+					}
+				}
+				before = values;
+			}
+			return largest;
 		};
+		for (const hottest of [0, 85]) {
+			const coarse = largestChange(hottest, 1.002);
+			expect(coarse, `${hottest}°`).toBeLessThan(1);
+			expect(largestChange(hottest, 1.0005), `${hottest}°`).toBeLessThan(
+				coarse / 3,
+			);
+		}
+	}, 60_000);
+
+	it('places the low by the faded gain, and holds a low far from the equator short of its limit, in both hemispheres', () => {
+		const { lowShiftGain, lowShiftFadeDeg, lowLimitDeg, lowLimitEaseShare } =
+			DEFAULT_WIND_SETTINGS;
 		for (const nominal of [0, 3, 6, 10, 20, 30, 45, 55, 62, 70, 76, 85, 90]) {
 			for (const sign of [1, -1]) {
 				const bands = zonalBands(
@@ -344,39 +415,112 @@ describe('zonalBands', () => {
 				const shifted =
 					hottest *
 					(1 +
-						(LOW_SHIFT_GAIN - 1) *
-							Math.exp(-((hottest / LOW_SHIFT_FADE_DEG) ** 2)));
+						(lowShiftGain - 1) * Math.exp(-((hottest / lowShiftFadeDeg) ** 2)));
 				const away = Math.abs(shifted);
+				// At the Earth's spin the cells are never wider than the
+				// Earth's, so the limit is lowLimitDeg throughout.
+				expect(bands.lowLimit).toBe(lowLimitDeg);
+				const ease = lowLimitEaseShare * (90 - lowLimitDeg);
+				const knee = lowLimitDeg - ease;
 				const expected =
-					shifted +
-					Math.sign(shifted) *
-						smoothStepOf(
-							(away - POLE_LOW_FROM_DEG) /
-								(POLE_LOW_TO_DEG - POLE_LOW_FROM_DEG),
-						) *
-						(90 - away);
+					away <= knee
+						? shifted
+						: Math.sign(shifted) *
+							(knee + ease * Math.tanh((away - knee) / ease));
 				const label = `${sign * nominal}°`;
 				// The rule, to rounding.
 				expect(bands.lowLatitude, label).toBeCloseTo(expected, 10);
 				expect(Math.sign(bands.lowLatitude) || 1, label).toBe(
 					Math.sign(hottest) || 1,
 				);
-				if (away <= POLE_LOW_FROM_DEG) {
+				if (away <= knee) {
 					expect(bands.lowLatitude, label).toBe(shifted);
 				}
-				if (away >= POLE_LOW_TO_DEG) {
-					expect(bands.lowLatitude, label).toBe(sign * 90);
-				}
+				expect(Math.abs(bands.lowLatitude), label).toBeLessThan(lowLimitDeg);
 			}
 		}
 		// Near the equator the gain is almost whole, and by twice the fading
 		// distance almost gone.
 		const near = zonalBands(profileOf(earthLike(3)), DEFAULT_PLANET);
 		expect(near.lowLatitude / near.hottestLatitude).toBeGreaterThan(
-			0.95 * LOW_SHIFT_GAIN,
+			0.95 * lowShiftGain,
 		);
 		const far = zonalBands(profileOf(earthLike(45)), DEFAULT_PLANET);
 		expect(far.lowLatitude / far.hottestLatitude).toBeLessThan(1.05);
+	});
+
+	it('puts a low beyond its limit at the limit itself when it is not eased', () => {
+		for (const sign of [1, -1]) {
+			const bands = zonalBands(
+				profileOf(earthLike(sign * 85)),
+				DEFAULT_PLANET,
+				{ lowLimitEaseShare: 0 },
+			);
+			expect(Math.abs(bands.hottestLatitude)).toBeGreaterThan(70);
+			expect(bands.lowLatitude).toBe(sign * bands.lowLimit);
+			expect(bands.lowLimit).toBe(DEFAULT_WIND_SETTINGS.lowLimitDeg);
+			for (let latitude = -90; latitude <= 90; latitude += 0.5) {
+				expect(Number.isFinite(bands.offset(latitude))).toBe(true);
+			}
+		}
+	});
+
+	it('keeps the bands in full within two cells of the low, or within 60° of it at a faster spin than the Earth’s, and weakens those beyond', () => {
+		const { outerCellShare } = DEFAULT_WIND_SETTINGS;
+		// The bands' slope by default over their slope with every band in
+		// full, at the middle of each band of phase (the low is at the
+		// equator, so each band is a cell wide from it).
+		const shares = (dayLengthHours: number, contrast = 1) => {
+			const planet = normalisePlanet({ ...DEFAULT_PLANET, dayLengthHours });
+			const profile = profileOf(
+				(latitude) => 28 + contrast * (earthLike()(latitude) - 28),
+			);
+			const weak = zonalBands(profile, planet);
+			const full = zonalBands(profile, planet, {
+				outerCellShare: 1,
+			});
+			const slope = (bands: typeof weak, latitude: number): number =>
+				bands.offset(latitude + 0.25) - bands.offset(latitude - 0.25);
+			const cells = Math.round(weak.northCells);
+			return {
+				cells,
+				shares: Array.from({ length: cells }, (_, band) => {
+					// Short of the poles' taper, the last band is read a little
+					// in from its middle.
+					const phase = Math.min(band + 0.5, cells - 0.4);
+					const latitude = phase * weak.cellWidth;
+					return slope(weak, latitude) / slope(full, latitude);
+				}),
+			};
+		};
+		// About 18° cells at 8.7 hours: five a hemisphere, of which the
+		// first three lie within 60° of the low, in full, and the weakening
+		// is whole by the fourth's middle.
+		const five = shares(8.7);
+		expect(five.cells).toBe(5);
+		for (const [band, share] of five.shares.entries()) {
+			expect(share, `band ${band + 1} of 5`).toBeCloseTo(
+				band >= 3 ? outerCellShare : 1,
+				6,
+			);
+		}
+		// The Earth's three: the third band weakened, as it was when every
+		// band beyond the second was; and the same at the Earth's spin with a
+		// third of the contrast, whose narrower cells fit four, as on the
+		// Earth tilted 60°.
+		for (const [contrast, count] of [
+			[1, 3],
+			[1 / 3, 4],
+		] as const) {
+			const atEarthSpin = shares(24, contrast);
+			expect(atEarthSpin.cells).toBe(count);
+			for (const [band, share] of atEarthSpin.shares.entries()) {
+				expect(share, `band ${band + 1} of ${count}`).toBeCloseTo(
+					band >= 2 ? outerCellShare : 1,
+					6,
+				);
+			}
+		}
 	});
 
 	it('scales each side’s bands by how much cooler its pole is than the low, leaving the other side alone', () => {
@@ -388,7 +532,9 @@ describe('zonalBands', () => {
 		const slow = normalisePlanet({ ...DEFAULT_PLANET, dayLengthHours: 720 });
 		const base = profileOf(earthLike());
 		const full = zonalBands(base, slow);
-		const atLow = 28 - EARTH_CONTRAST_K * (1 - Math.cos(RADIANS_PER_DEGREE));
+		const atLow =
+			28 -
+			DEFAULT_WIND_SETTINGS.earthContrastK * (1 - Math.cos(RADIANS_PER_DEGREE));
 		for (const [index, side] of [
 			[PROFILE_BANDS - 1, 1],
 			[0, -1],
@@ -397,7 +543,7 @@ describe('zonalBands', () => {
 				const means = [...(base.means as number[])];
 				means[index] = atLow - drop;
 				const bands = zonalBands({ latitudes: base.latitudes, means }, slow);
-				const s = Math.min(1, drop / SIDE_CONTRAST_K);
+				const s = Math.min(1, drop / DEFAULT_WIND_SETTINGS.sideContrastK);
 				const expected = s * s * (3 - 2 * s);
 				const strength = side > 0 ? bands.northStrength : bands.southStrength;
 				const other = side > 0 ? bands.southStrength : bands.northStrength;
@@ -613,6 +759,38 @@ describe('thermalPressure', () => {
 		expect(Math.abs(corner.wind / face.wind - 1)).toBeLessThan(0.08);
 	});
 
+	it('limits the high of a place far colder than its latitude, and leaves a cold short of the knee as it was', () => {
+		const { thermalHpaPerK, coldKneeK, coldLimitK } = DEFAULT_WIND_SETTINGS;
+		const world = continentWorld();
+		const thermalOf = (cold: number, settings = {}) => {
+			const field = zonalField(0);
+			for (const cell of CONTINENT) {
+				field[cell] = (field[cell] as number) - cold;
+			}
+			return thermalPressure(
+				world,
+				field,
+				zonalMean(grid, field, PROFILE_BANDS),
+				settings,
+			);
+		};
+		// No limit at all: a knee beyond any cold.
+		const unlimited = { coldKneeK: 1e9 };
+		const highest = (field: Float64Array) => Math.max(...field);
+		// The continent, 200 m high and so nearly all of the land's response,
+		// is taken against its latitudes' means, which it pulls down, so a
+		// cold of 80 K is well under 80 K below them: with no limit its high
+		// is about 142 hPa after smoothing.
+		const extreme = thermalOf(80);
+		const free = thermalOf(80, unlimited);
+		expect(highest(free)).toBeGreaterThan(130);
+		expect(highest(extreme)).toBeLessThanOrEqual(thermalHpaPerK * coldLimitK);
+		// About 61 hPa: the limit's 75 hPa, smoothed at the continent's edges.
+		expect(highest(extreme)).toBeGreaterThan(0.9 * thermalHpaPerK * coldKneeK);
+		// A cold short of the knee everywhere is worked out as with no limit.
+		expect(thermalOf(10)).toEqual(thermalOf(10, unlimited));
+	});
+
 	it('refuses a field of the wrong length, or one with a value that is not finite', () => {
 		const field = zonalField(0);
 		expect(() =>
@@ -640,6 +818,63 @@ describe('thermalPressure', () => {
 	});
 });
 
+describe('windSettings', () => {
+	it('gives the defaults when nothing is overridden, and the defaults with the overrides otherwise', () => {
+		expect(windSettings()).toBe(DEFAULT_WIND_SETTINGS);
+		expect(windSettings({})).toBe(DEFAULT_WIND_SETTINGS);
+		expect(windSettings({ bandAmplitudeHpa: undefined })).toBe(
+			DEFAULT_WIND_SETTINGS,
+		);
+		const changed = windSettings({ bandAmplitudeHpa: 7, warmLimitK: 5 });
+		expect(changed).toEqual({
+			...DEFAULT_WIND_SETTINGS,
+			bandAmplitudeHpa: 7,
+			warmLimitK: 5,
+		});
+		expect(Object.isFrozen(changed)).toBe(true);
+		expect(Object.isFrozen(DEFAULT_WIND_SETTINGS)).toBe(true);
+		expect(WIND_SETTING_NAMES).toEqual(Object.keys(DEFAULT_WIND_SETTINGS));
+		expect(WIND_SETTING_NAMES).toContain('lowLimitToWidthDeg');
+	});
+
+	it('refuses a name that is not a setting, or a value that is not a finite number', () => {
+		expect(() =>
+			windSettings({ bandAmplitude: 7 } as unknown as Partial<WindSettings>),
+		).toThrow(RangeError);
+		for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, '7']) {
+			expect(() =>
+				windSettings({
+					bandAmplitudeHpa: bad,
+				} as unknown as Partial<WindSettings>),
+			).toThrow(RangeError);
+		}
+		expect(() =>
+			zonalBands(profileOf(earthLike()), DEFAULT_PLANET, {
+				hotWindowK: Number.NaN,
+			}),
+		).toThrow(RangeError);
+	});
+
+	it('changes the model’s parts when a setting is overridden', () => {
+		const profile = profileOf(earthLike(5));
+		const base = zonalBands(profile, DEFAULT_PLANET);
+		const stronger = zonalBands(profile, DEFAULT_PLANET, {
+			bandAmplitudeHpa: 2 * DEFAULT_WIND_SETTINGS.bandAmplitudeHpa,
+		});
+		expect(stronger.offset(30)).toBeCloseTo(2 * base.offset(30), 9);
+		const world = continentWorld();
+		const pressure = zonalField(0).map(
+			(value) => REFERENCE_PRESSURE_HPA - value,
+		);
+		const winds = windsFromPressure(world, pressure);
+		const slower = windsFromPressure(world, pressure, {
+			seaFrictionPerS: 2 * DEFAULT_WIND_SETTINGS.seaFrictionPerS,
+		});
+		expect(slower.east).not.toEqual(winds.east);
+		expect(windsFromPressure(world, pressure, {})).toEqual(winds);
+	});
+});
+
 describe('windsFromPressure', () => {
 	it('balances the gradient, the turning and the friction: along the isobars away from the equator and down the gradient at it', () => {
 		const world = oceanWorld();
@@ -650,7 +885,7 @@ describe('windsFromPressure', () => {
 		}
 		const { east, north } = windsFromPressure(world, pressure);
 		const push = -100 / METRES_PER_DEGREE / AIR_DENSITY_KG_M3;
-		const k = SEA_FRICTION_PER_S;
+		const k = DEFAULT_WIND_SETTINGS.seaFrictionPerS;
 		for (const latitude of [0.5, 20, 45, -45]) {
 			const cell = cellAt(grid, latLonToDirection(latitude, 10));
 			const f =
@@ -695,8 +930,8 @@ describe('windsFromPressure', () => {
 			2 *
 			rotationRate(world.planet) *
 			Math.sin((latitudes[middle] as number) * RADIANS_PER_DEGREE);
-		const k = SEA_FRICTION_PER_S;
-		const kLand = LAND_FRICTION_FACTOR * k;
+		const k = DEFAULT_WIND_SETTINGS.seaFrictionPerS;
+		const kLand = DEFAULT_WIND_SETTINGS.landFrictionFactor * k;
 		expect(speed(land, middle) / speed(sea, middle)).toBeCloseTo(
 			Math.sqrt((f * f + k * k) / (f * f + kLand * kLand)),
 			6,
@@ -776,7 +1011,7 @@ describe('the rules model through solveWinds', () => {
 			world.planet,
 		);
 		const omega = rotationRate(world.planet);
-		const k = SEA_FRICTION_PER_S;
+		const k = DEFAULT_WIND_SETTINGS.seaFrictionPerS;
 		const cornerCosine = Math.cos(4 * RADIANS_PER_DEGREE);
 		let worst = 0;
 		let worstAtCorners = 0;

@@ -3,11 +3,13 @@ import { readEarthDataFile } from '../../../scripts/earth/dataFile.mjs';
 import { decodeEarth, earthWorld } from '../earth';
 import { getGrid, type Resolution } from '../grid';
 import { cellLatitudes, MONTHS_PER_YEAR } from '../insolation';
-import { DEFAULT_PLANET } from '../planet';
-import { lapseCooling } from '../temperature';
+import { DEFAULT_PLANET, normalisePlanet } from '../planet';
+import { lapseCooling, solveTemperature } from '../temperature';
 import { createBlankWorld, type World } from '../world';
-import type { WindResult } from './model';
+import { type WindResult, zonalMean } from './model';
 import {
+	DEFAULT_WIND_SETTINGS,
+	REFERENCE_PRESSURE_HPA,
 	rulesPressureMonth,
 	rulesWindsOnGrid,
 	windsFromPressure,
@@ -194,6 +196,118 @@ describe('solveWinds', () => {
 				year,
 			),
 		).toThrow(RangeError);
+	}, 60_000);
+
+	// Four runs of a year at 64 cells per face edge and three at 128, about
+	// half a second each, more under coverage, hence the longer time
+	// allowed.
+	it('runs the default model exactly when no setting is changed, and another when one is', () => {
+		const world = earthWorld(EARTH, 64);
+		const year = madeUpYear(world);
+		const solved = solveWinds(world, year);
+		expect(solveWinds(world, year, { settings: {} })).toEqual(solved);
+		expect(
+			solveWinds(world, year, { settings: { ...DEFAULT_WIND_SETTINGS } }),
+		).toEqual(solved);
+		const changed = solveWinds(world, year, {
+			settings: { thermalHpaPerK: 2 },
+		});
+		expect(changed.pressure[JANUARY]).not.toEqual(solved.pressure[JANUARY]);
+		expect(changed.east[JANUARY]).not.toEqual(solved.east[JANUARY]);
+		// The settings reach the pressure worked out on the 64 grid for a
+		// finer world too, and the winds worked out on its own grid.
+		const fine = earthWorld(EARTH, 128);
+		const fineYear = madeUpYear(fine);
+		const fineSolved = solveWinds(fine, fineYear);
+		expect(
+			solveWinds(fine, fineYear, { settings: { seaFrictionPerS: 5e-5 } }).east[
+				JULY
+			],
+		).not.toEqual(fineSolved.east[JULY]);
+		expect(
+			solveWinds(fine, fineYear, { settings: { thermalHpaPerK: 2 } }).pressure[
+				JULY
+			],
+		).not.toEqual(fineSolved.pressure[JULY]);
+		expect(() =>
+			solveWinds(world, year, {
+				settings: { hotWindowK: Number.NaN },
+			}),
+		).toThrow(RangeError);
+	}, 60_000);
+
+	// Two solves of the temperature, a second or so each, and four runs of
+	// a year of winds, more under coverage, hence the longer time allowed.
+	it('leaves the Earth’s pressure as it was under the cold limit, and keeps a cold world’s highs short of the Earth’s record', () => {
+		// No cold limit at all: a knee beyond any cold.
+		const unlimited = { settings: { coldKneeK: 1e9 } };
+		const world = earthWorld(EARTH, 64);
+		const months = solveTemperature(world).months;
+		// The Earth's coldest place against its latitude is 17 K below it,
+		// short of the knee, so its pressure is the same to the last bit.
+		expect(solveWinds(world, months)).toEqual(
+			solveWinds(world, months, unlimited),
+		);
+		// The Earth twice as far from the Sun: frozen over, and so nearly as
+		// cold everywhere at a latitude that its highs are low, the cold
+		// limit not reached.
+		const cold: World = {
+			...world,
+			planet: normalisePlanet({ ...DEFAULT_PLANET, orbitDistanceAu: 2 }),
+		};
+		const coldMonths = solveTemperature(cold).months;
+		const limited = solveWinds(cold, coldMonths);
+		const highest = Math.max(
+			...limited.pressure.map((field) => Math.max(...field)),
+		);
+		expect(highest).toBeGreaterThan(REFERENCE_PRESSURE_HPA);
+		expect(highest).toBeLessThan(1084);
+		expect(limited).toEqual(solveWinds(cold, coldMonths, unlimited));
+	}, 60_000);
+
+	// A solve of the temperature of the Earth tilted 60°, a second or so,
+	// and a year of its winds, more under coverage, hence the longer time
+	// allowed. Its own temperatures are used, not made-up ones: what keeps
+	// its winter winds weak is how its cells fit between a low far into the
+	// summer hemisphere and a cold winter pole, which a made-up profile did
+	// not reproduce.
+	it('keeps the winter hemisphere’s mid-latitude winds weaker than the summer’s on the Earth tilted 60°, in January and July', () => {
+		const world = earthWorld(EARTH, 64);
+		world.planet = normalisePlanet({ ...DEFAULT_PLANET, axialTiltDeg: 60 });
+		const result = solveWinds(world, solveTemperature(world).months);
+		const grid = getGrid(64);
+		// The size of the mean eastward wind over the bands of 2° whose
+		// middles lie 40° to 60° from the equator in one hemisphere, each
+		// band weighted by its area.
+		const midLatitudes = (month: number, sign: number): number => {
+			const { latitudes, means } = zonalMean(
+				grid,
+				result.east[month] as Float32Array,
+				90,
+			);
+			let total = 0;
+			let weights = 0;
+			for (const [band, latitude] of latitudes.entries()) {
+				const away = sign * latitude;
+				if (away >= 40 && away <= 60) {
+					const weight = Math.cos(latitude * RADIANS_PER_DEGREE);
+					total += weight * (means[band] as number);
+					weights += weight;
+				}
+			}
+			return Math.abs(total / weights);
+		};
+		// About 1.1 against 0.2 m/s in January and 0.6 against 0.4 in July;
+		// with every band in full out to the last before the pole, the
+		// winter's were 1.3 and 1.6 m/s, stronger than the summer's.
+		for (const [month, summer] of [
+			[JANUARY, -1],
+			[JULY, 1],
+		] as const) {
+			expect(midLatitudes(month, -summer), `month ${month}`).toBeLessThan(
+				midLatitudes(month, summer),
+			);
+		}
 	}, 60_000);
 
 	it('refuses other than twelve months, a month of the wrong length, temperatures for another grid, and a temperature that is not finite', () => {

@@ -13,7 +13,21 @@ import { normalisePlanet } from '../planet';
 import { assertSolvableWorld } from '../temperature';
 import type { World } from '../world';
 import type { WindResult } from './model';
-import { rulesPressure, rulesWindsOnGrid, windsFromPressures } from './rules';
+import {
+	rulesPressure,
+	rulesWindsOnGrid,
+	type WindSettings,
+	windSettings,
+	windsFromPressures,
+} from './rules';
+
+export {
+	DEFAULT_WIND_SETTINGS,
+	WIND_SETTING_NAMES,
+	type WindSettingName,
+	type WindSettings,
+	windSettings,
+} from './rules';
 
 /**
  * The grid every world's winds are solved on, in cells per face edge,
@@ -33,6 +47,16 @@ export type SolveWindsOptions = {
 	 * at 128 cells per face edge and some twenty times at 256.
 	 */
 	readonly fullResolution?: boolean;
+	/**
+	 * Settings of the model to change from {@link DEFAULT_WIND_SETTINGS}
+	 * for this run, by name; none by default, and with none the run is the
+	 * default one exactly.
+	 *
+	 * @remarks
+	 * For the tuning script, which runs the model many times with settings
+	 * changed; the page and its worker never pass any.
+	 */
+	readonly settings?: Partial<WindSettings>;
 };
 
 /** The annual means of a year of winds, one value per cell. */
@@ -110,13 +134,16 @@ const assertTemperatures = (
  * near-surface air temperature in degrees Celsius, one finite value per
  * cell of the world's grid, as {@link solveTemperature} gives them in its
  * result's `months`. They are not changed.
- * @param options - Whether to solve on the world's own grid.
+ * @param options - Whether to solve on the world's own grid, and any
+ * settings of the model to change.
  * @returns New arrays the caller owns, one value per cell of the world's
  * grid in each.
  * @throws RangeError if the world's resolution is not supported, if its
  * elevations are not one finite value per cell, if its sea level does not
  * lie within the elevation limits, if a planet setting is not a number, or
- * if the temperatures are not twelve fields of one finite value per cell.
+ * if the temperatures are not twelve fields of one finite value per cell;
+ * and if a setting given is not one of the model's or not a finite number,
+ * before anything costly is done.
  */
 export const solveWinds = (
 	world: World,
@@ -124,6 +151,7 @@ export const solveWinds = (
 	options: SolveWindsOptions = {},
 ): WindResult => {
 	const { fullResolution = false } = options;
+	const settings = windSettings(options.settings);
 	// The world is checked as the temperature's solve checks it, and then
 	// the temperatures, before anything costly is done.
 	assertSolvableWorld(world);
@@ -132,7 +160,7 @@ export const solveWinds = (
 	assertTemperatures(temperatures, cellCount);
 	const settled: World = { ...world, planet };
 	if (fullResolution || world.resolution === WIND_SOLVE_RESOLUTION) {
-		return rulesWindsOnGrid(settled, temperatures);
+		return rulesWindsOnGrid(settled, temperatures, settings);
 	}
 	// The grids from the world's down to the one solved on, finest first.
 	const steps: Resolution[] = [];
@@ -145,7 +173,7 @@ export const solveWinds = (
 		coarse = coarsenWorld(coarse);
 	}
 	const upwards = steps.reverse();
-	const fine = rulesPressure(coarse, months).map((month) => {
+	const fine = rulesPressure(coarse, months, settings).map((month) => {
 		let field: Float64Array = month;
 		for (const resolution of upwards) {
 			field = refineField(field, resolution);
@@ -153,7 +181,7 @@ export const solveWinds = (
 		return field;
 	});
 	return {
-		...windsFromPressures(settled, fine),
+		...windsFromPressures(settled, fine, settings),
 		pressure: fine.map((field) => Float32Array.from(field)),
 	};
 };

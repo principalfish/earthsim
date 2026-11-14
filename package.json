@@ -13,6 +13,7 @@
     "time:temperature": "node scripts/run-with-vite.mjs scripts/time-temperature.ts",
     "time:winds": "node scripts/run-with-vite.mjs scripts/time-winds.ts",
     "report:winds": "node scripts/run-with-vite.mjs scripts/wind-report.ts",
+    "tune:winds": "node scripts/run-with-vite.mjs scripts/tune-winds.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "check": "biome check .",
