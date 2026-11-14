@@ -68,7 +68,7 @@ Each step adds a viewable map layer and gets its own issue.
 8. Biome map
 9. Plate tectonics and time stepping
 
-Added since (see the status table): 3a, the core and page folders, and 3b, heat carried by winds and the climate loop, both between steps 3 and 4. Also 10, an optional simulated atmosphere, after step 9.
+Added since (see the status table): 3c, the layers brought into the main view; 3a, the core and page folders; and 3b, heat carried by winds and the climate loop; all between steps 3 and 4, in that order. Also 10, an optional simulated atmosphere, after step 9.
 
 ## Status and carried-over items (as of 2026-11-13)
 
@@ -79,6 +79,7 @@ Keep this section current when a step is merged.
 | 1 Globe, grid and sculpting | Done, merged 2026-11-11 | 0001, GitHub #1, PR #2 |
 | 2 Sunlight and seasonal temperature | Done, merged 2026-11-13 | 0002, GitHub #3, PR #4 |
 | 3 Winds | Building | 0003, GitHub #5, PR #6 |
+| 3c Layers in the main view, out of the side panel | Not started; next after step 3 merges, before 3a | |
 | 3a Core folders by component, page folders by role (refactor, no behaviour change) | Not started; after step 3 merges, before step 4 | |
 | 3b Heat carried by winds, and the climate loop | Not started; after 3a. Could instead open step 5; decide when planned | |
 | 4 Moisture, rainfall and Köppen zones | Not started | |
@@ -88,6 +89,13 @@ Keep this section current when a step is merged.
 | 8 Biome map | Not started | |
 | 9 Plate tectonics and time stepping | Not started | |
 | 10 A simulated atmosphere (optional) | Deferred from step 3 by the user, 2026-11-13 | |
+
+### Step 3c: layers in the main view, out of the side panel
+The user, 2026-11-14: "i think we will do a separate UI piece to bring out layers from the side entirely - it lives in the main UI i think", and chose it as a step of its own right after winds merges ("New step after winds merges").
+- **Why:** the side panel's Layers section picks one colour layer, and step 3 puts the Winds switch in View beside Sunlight, though winds are an overlay, not lighting. More layers and overlays are coming (pressure in step 3, rainfall, ocean currents, storms), so they move out of the panel into the main view together.
+- **What it covers, to settle when planned:** the colour layer (Terrain, Temperature, Pressure, later rainfall and more) and the overlays (Winds and its streaks, later ocean currents), each overlay with its own small options (the wind unit); what stays in the panel (World, View with relief, sea level, grid and Sunlight, Planet, Tools, Statistics); the month controls, the legend and the wind key; narrow windows.
+- **Order:** before 3a, which moves the page's files into role folders, so the UI is rearranged once and the files then moved once; 3a should place whatever new files 3c adds.
+- **Meanwhile:** step 3 keeps its planned places (the Winds switch and, in piece 11, the Wind speed option in View; streaks beside the Winds switch).
 
 ### Step 3a: core folders by component, page folders by role
 `src/core/` is flat today, except `src/core/wind/`, which step 3 started because it holds several models. With five more layers to come, a flat folder would pass 40 files, so the core moves into one folder per component in one refactor, between steps 3 and 4. It is a pure move: no behaviour change, checked by the existing tests and the temperature baseline. It waits for step 3's merge because that branch edits the files that would move.
