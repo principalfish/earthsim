@@ -65,6 +65,7 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - Piece 7b check (c) adds Kaspi and Showman 2015 as the source for the cell widths, read off its Fig. 6a to about ±2°; Held and Hou 1980 stays as the steeper theory and Way et al. 2018 for the cell reaching the pole by about 16 days. The user: "Add Kaspi and Showman (Recommended)" (2026-11-14)
 - The slow-end note cites Way et al. 2018 ("between 32 d and 64 d"); Salameh et al. 2018, not reached, is dropped. The user: "Cite Way, drop Salameh (Recommended)" (2026-11-14)
 - Matching the papers or the Earth exactly is not the aim. 7b reports what the model shows against each paper and changes nothing to match; 7c's tuning stops when the listed faults are better in kind, when two rounds running bring no clear gain, or at ten rounds at most, and then reports what still differs. The user: "lets not get too caught up making this perfect - dont over iterate trying to match . flag results after an appropriate number of iterations" (2026-11-14)
+- The Planet section's winds note also warns when the axial tilt is above 54° (where the poles get more sunlight over the year than the equator), since piece 7b found the model least like the published studies at a steep tilt; built in piece 10 with the day-length note. The user: "add that warning yes" (2026-11-14)
 - The flaky observed-temperature test gets a timeout in piece 2. The user: "Yes, fold it in" (2026-11-13)
 
 - Piece 2 adds a direct Laplacian operator, accurate at the cube's seams. The user: "A: add it now" (2026-11-13)
