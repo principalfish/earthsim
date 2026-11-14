@@ -24,4 +24,4 @@ Cost: 6 subagents · about 418,000 tokens · about 7 min
 | round | coverage | low | test | verified | fixed | `scripts/report/page.test.ts:216` | The tilt tables were rendered with no rows in the page test |
 | round | coverage | low | test | verified | fixed | `scripts/report/page.test.ts:260` | Quotations were checked only against their own data, so a changed quotation would pass |
 | round | coverage | low | test | verified | fixed | `scripts/report/summary.ts:186` | The "a hemisphere's mean is not measured" branch was untested |
-| round | other | medium | defect | noticed | open | `reports/winds/index.html` | The ocean world tilted 60° comes out almost calm in the model (winds within 0.2 m/s, 0.9 hPa of pressure spread), unlike Ferreira et al.'s westerlies and trades at 90°; a result for piece 7c, not a fault in this piece |
+| round | other | medium | defect | noticed | accepted | `reports/winds/index.html` | The ocean world tilted 60° comes out almost calm in the model (winds within 0.2 m/s, 0.9 hPa of pressure spread), unlike Ferreira et al.'s westerlies and trades at 90°; a result for piece 7c, not a fault in this piece; accepted here and carried to 7c |
