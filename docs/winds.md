@@ -110,6 +110,24 @@ The page shows the same comparison on an untouched Earth, at the world's own res
 - **The Planet section shows a note** when the winds are rough, naming each reason that applies: a day shorter than 6 hours, a day longer than 4 days, or a tilt above 54°.
 - **The Earth's own tuning.** The model was tuned against the observed Earth and against a few invented worlds (the Earth with an 8-hour and a 4-day day, with no tilt and tilted 60°, a generated world, an ocean world and a one-continent world), so that their winds look right in kind; the error figures were not tuned for.
 
+### The Earth winds baseline
+
+`src/core/baseline/earthWinds.json` records the figures above, so that a change to the model cannot make them worse unnoticed.
+
+- **What it holds:** for the Earth at 64 cells per face edge, given the temperature model's own temperatures, for the whole year, January and July: the RMS of the wind's difference as vectors (m/s), the share within 45° in direction (as a percentage) and the RMS pressure difference (hPa).
+- **The test:** a test solves that Earth and fails, naming each figure, if any is worse than the file's by more than its tolerance, or is not a number:
+
+  | Figure | Worse when | Tolerance |
+  |-|-|-|
+  | RMS of the wind's difference as vectors | Higher | 0.02 m/s |
+  | Direction within 45° | Lower | 0.2 percentage points |
+  | RMS pressure difference | Higher | 0.05 hPa |
+
+  A figure that has improved passes.
+- **It guards, and is not a target.** It keeps the model from getting worse; it is not a figure to tune towards. Tuning the model against the Earth waits for a later step, once the rest of the loop the winds belong to is built (see [The Earth's known faults](#the-earths-known-faults)).
+- **The winds follow the temperature,** so a change to the temperature model moves this baseline as well as the temperature's own ([Development](development.md#the-earth-temperature-baseline)): run both `npm run baseline:temperature` and `npm run baseline:winds`.
+- **When a change is meant to move the figures:** run `npm run baseline:winds`, which rewrites the file and prints what moved, and commit the file with the change.
+
 ## What it gets wrong
 
 - **The July heat low sits over Siberia, not South Asia**, and the northern subtropical high runs unbroken over North Africa and Asia in July. Both are the simulated temperature's (see below).

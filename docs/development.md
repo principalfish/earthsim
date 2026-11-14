@@ -15,6 +15,7 @@ Requires Node.js and npm. Run `npm install` once.
 | `npm run build:observed-temperature` | Rebuild the Earth's observed temperature data; see [Data](data.md) |
 | `npm run build:observed-winds` | Rebuild the Earth's observed winds and sea-level pressure data; see [Data](data.md) |
 | `npm run baseline:temperature` | Write the Earth temperature baseline afresh; see below |
+| `npm run baseline:winds` | Write the Earth winds baseline afresh; see [Winds](winds.md#the-earth-winds-baseline) |
 | `npm run time:temperature` | Time the temperature solver at every resolution and print the simulated Earth's error figures, as Markdown tables. Takes a few minutes |
 | `npm run time:winds` | Time a year of the Earth's winds at every resolution, as `solveWinds` solves them by default (the pressure on the 64 grid) and wholly on the world's own grid beside it, and print how far the two lie apart, as Markdown tables. Takes about half a minute; see [Winds](winds.md#the-pressure-of-finer-worlds-is-worked-out-on-the-64-grid) |
 | `npm run tune:winds` | Run the wind model many times with its settings changed, on the wind report's nine cases, and print the Earth's error figures and every case's measures, as Markdown tables: a sweep of one setting, a search over several, every case for some settings, or the model run on the observed temperature; run with nothing after it to list the settings and the forms. It changes no setting; see [Winds](winds.md#the-settings-and-the-tuning-script) |
@@ -27,6 +28,7 @@ Requires Node.js and npm. Run `npm install` once.
 - **What it holds:** for the Earth at 64 cells per face edge, the mean and root-mean-square difference (simulated less observed, in kelvin) for the annual average, each month, the warmest month, the coldest month and the seasonal range.
 - **The test:** a test solves that Earth and fails, naming each figure, if any is worse than the file's by more than 0.05 K. A figure that has improved passes.
 - **When a change is meant to move the figures:** run `npm run baseline:temperature`, which rewrites the file and prints what moved, and commit the file with the change.
+- **The winds follow the temperature,** so a change to the temperature model moves the Earth winds baseline too: run `npm run baseline:winds` as well; see [Winds](winds.md#the-earth-winds-baseline).
 
 ## Type-checking rules
 
@@ -66,7 +68,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
 | `compare.ts` | One field less another, and area-weighted error figures |
 | `quantile.ts` | Area-weighted quantiles of values on the grid |
-| `baseline/` | The Earth temperature baseline and its check |
+| `baseline/` | The Earth temperature baseline and the Earth winds baseline (`earthWinds.ts`, the figures in `earthWinds.json`), each with its check |
 | `testing/` | Helpers only the tests use |
 
 ### `src/app/`: the page
@@ -122,6 +124,8 @@ Run with Node, not in the browser.
 | `time-temperature.ts` | The solver's timings and the simulated Earth's error figures |
 | `time-winds.ts` | The wind model's timings, and how far its solve with the pressure on the 64 grid lies from one wholly on the world's own grid |
 | `update-earth-temperature-baseline.ts` | Writes the Earth temperature baseline afresh |
+| `update-earth-winds-baseline.ts` | Writes the Earth winds baseline afresh |
+| `baselineUpdate.ts` | What both baseline updates share: naming each number of a baseline, saying which moved, and writing the file |
 | `wind-report.ts` | Writes the wind report, and lists the wind models it runs |
 | `tune-winds.ts` | Runs the wind model with its settings changed and prints what each run gives |
 | `tune/` | The parts of the tuning script that touch no file: its command line (`command.ts`), the sweep and the search (`search.ts`), the cases and their temperatures worked out once and the runs on them (`tuning.ts`), the numbers that show each known fault on the Earth (`faults.ts`), and the printout (`text.ts`) |
