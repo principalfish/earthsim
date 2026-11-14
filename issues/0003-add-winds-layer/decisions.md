@@ -52,6 +52,9 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - The page side of "day length alone never re-solves the temperature" is done in piece 8, not piece 10 (this replaces the earlier "With the slider, piece 10"): a day-length change alone goes to the winds only. The user: "Do it in piece 8 (Recommended)" (2026-11-13)
 - An overtaken wind solve is left to finish and its answer ignored, keeping the worker and its grid tables. The user: "Let it finish, ignore it (Recommended)" (2026-11-13)
 - From piece 8's current round onward, review follows the framework's one-round rule: one round of checks and the verifier, every verified finding fixed, one light re-check by the checks that raised findings; anything the re-check verifies is not fixed but comes to the user at the review pause with the options. This replaces "stop at low only" and the user's "iterate as long as you need" for this issue. The user: "Yes, one round" (2026-11-14)
+- Wind arrows are dark with a thin light edge, so they read on every colour scheme. The user: "Dark, with a light edge (Recommended)" (2026-11-14)
+- Arrows keep the same size on the screen; zooming in brings more arrows at a finer spacing, in steps, and the key stays fixed. The user: "Same size, more arrows (Recommended)" (2026-11-14)
+- Each arrow shows the mean wind over the patch it stands for, becoming the single cell's wind when zoomed right in. The user: "Mean over its patch (Recommended)" (2026-11-14)
 - The flaky observed-temperature test gets a timeout in piece 2. The user: "Yes, fold it in" (2026-11-13)
 
 - Piece 2 adds a direct Laplacian operator, accurate at the cube's seams. The user: "A: add it now" (2026-11-13)
