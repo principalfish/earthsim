@@ -12,6 +12,7 @@ const temperatureView = (
 	source: 'simulated',
 	month,
 	sunlight: false,
+	winds: false,
 });
 
 describe('formatWorldAge', () => {

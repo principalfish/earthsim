@@ -426,6 +426,7 @@ const createStage = (
 				newWorld: (earth) => log.push(`layerPanel.newWorld ${earth}`),
 				setEarth: (earth) => log.push(`layerPanel.setEarth ${earth}`),
 				setSunlight: (on) => log.push(`layerPanel.setSunlight ${on}`),
+				setWinds: (on) => log.push(`layerPanel.setWinds ${on}`),
 				shown: () => stage.shownTemperature,
 			};
 		},
@@ -1329,7 +1330,10 @@ describe('the temperature, on its worker', () => {
 			createLayerPanel: (options) =>
 				createLayerPanel({
 					...options,
-					globe: { setLayer: (field) => shown.push(field) },
+					globe: {
+						setLayer: (field) => shown.push(field),
+						setWinds: () => {},
+					},
 					setTimer: () => 0,
 					clearTimer: () => {},
 					reportError: () => {},
@@ -1339,6 +1343,7 @@ describe('the temperature, on its worker', () => {
 							showLegend: () => {},
 							showView: () => {},
 							showComparison: () => {},
+							showWindKey: () => {},
 						};
 					},
 				}),
@@ -1798,6 +1803,7 @@ describe('the cursor readout', () => {
 			source: 'simulated',
 			month: 3,
 			sunlight: false,
+			winds: false,
 		});
 		expect(stage.readoutCalls).toEqual(['invalidate']);
 		stage.layerOptions.store.markCalculating();
@@ -1832,7 +1838,7 @@ describe('the cursor readout', () => {
 			createLayerPanel: (options) =>
 				createLayerPanel({
 					...options,
-					globe: { setLayer: () => {} },
+					globe: { setLayer: () => {}, setWinds: () => {} },
 					setTimer: () => 0,
 					clearTimer: () => {},
 					reportError: () => {},
@@ -1842,6 +1848,7 @@ describe('the cursor readout', () => {
 							showLegend: () => {},
 							showView: () => {},
 							showComparison: () => {},
+							showWindKey: () => {},
 						};
 					},
 				}),
@@ -1872,6 +1879,7 @@ describe('the date line', () => {
 			source: 'simulated',
 			month: 6,
 			sunlight: false,
+			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
@@ -1879,6 +1887,7 @@ describe('the date line', () => {
 			source: 'simulated',
 			month: 7,
 			sunlight: false,
+			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
@@ -1886,6 +1895,7 @@ describe('the date line', () => {
 			source: 'simulated',
 			month: 7,
 			sunlight: false,
+			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'terrain',
@@ -1893,6 +1903,7 @@ describe('the date line', () => {
 			source: 'simulated',
 			month: 7,
 			sunlight: false,
+			winds: false,
 		});
 		expect(stage.log).toEqual([
 			'worldPanel.setDate Year 0 · July',
@@ -1929,7 +1940,7 @@ describe('the month on screen', () => {
 			createLayerPanel: (options) =>
 				createLayerPanel({
 					...options,
-					globe: { setLayer: () => {} },
+					globe: { setLayer: () => {}, setWinds: () => {} },
 					setTimer: timers.setTimer,
 					clearTimer: timers.clearTimer,
 					reportError: () => {},
@@ -1939,6 +1950,7 @@ describe('the month on screen', () => {
 							showLegend: () => {},
 							showView: (view) => views.push(view),
 							showComparison: () => {},
+							showWindKey: () => {},
 						};
 					},
 				}),
@@ -1974,6 +1986,7 @@ describe('the month on screen', () => {
 			source: 'simulated',
 			month: DEFAULT_MONTH,
 			sunlight: false,
+			winds: false,
 		});
 		expect(page.stage.log).toContain('worldPanel.setDate Year 0 · July');
 	});
@@ -1997,7 +2010,7 @@ const createSunStage = async (world?: World) => {
 		createLayerPanel: (options) =>
 			createLayerPanel({
 				...options,
-				globe: { setLayer: () => {} },
+				globe: { setLayer: () => {}, setWinds: () => {} },
 				setTimer: timers.setTimer,
 				clearTimer: timers.clearTimer,
 				reportError: () => {},
@@ -2007,6 +2020,7 @@ const createSunStage = async (world?: World) => {
 						showLegend: () => {},
 						showView: (view) => views.push(view),
 						showComparison: () => {},
+						showWindKey: () => {},
 					};
 				},
 			}),
@@ -2044,6 +2058,7 @@ describe('the sun', () => {
 			source: 'simulated',
 			month: 3,
 			sunlight: false,
+			winds: false,
 		};
 		stage.layerOptions.onView(view);
 		stage.layerOptions.onView({ ...view, temperatureView: 'annualMean' });
@@ -2186,6 +2201,29 @@ describe('the panel’s sections', () => {
 		expect(storage.writes).toHaveLength(1);
 	});
 
+	it('have the Layers section opened when Winds is ticked, and nothing when it is cleared', async () => {
+		const stage = await createStartedStage();
+		stage.viewPanelOptions.onWinds(false);
+		expect(stage.sectionCalls).toEqual([]);
+		stage.viewPanelOptions.onWinds(true);
+		stage.viewPanelOptions.onWinds(false);
+		expect(stage.sectionCalls).toEqual(['layersSection.setOpen true']);
+	});
+
+	it('open a closed Layers section when Winds is ticked, and remember it as a click would', async () => {
+		const { storage, sections } = createSections();
+		const stage = await createStartedStage(undefined, {
+			layersSection: sections.layers,
+		});
+		stage.viewPanelOptions.onWinds(true);
+		expect(sections.layers.isOpen()).toBe(true);
+		expect(sections.layers.body.hidden).toBe(false);
+		expect(storage.writes).toEqual([[panelMemoryKey('layers'), 'open']]);
+		stage.viewPanelOptions.onWinds(false);
+		expect(sections.layers.isOpen()).toBe(true);
+		expect(storage.writes).toHaveLength(1);
+	});
+
 	it('leave an open Layers section alone when Sunlight is ticked', async () => {
 		const { storage, sections } = createSections({
 			[panelMemoryKey('layers')]: 'open',
@@ -2222,6 +2260,42 @@ describe('the panel’s sections', () => {
 		expect(states()).toEqual(before);
 		expect(stage.sectionCalls).toEqual([]);
 		expect(storage.writes).toEqual([]);
+	});
+});
+
+describe('the Winds control', () => {
+	it('tells the layer panel, and nothing of the globe or the sunlight', async () => {
+		const stage = await createStartedStage();
+		stage.viewPanelOptions.onWinds(true);
+		stage.viewPanelOptions.onWinds(false);
+		expect(stage.log).toEqual([
+			'layerPanel.setWinds true',
+			'layerPanel.setWinds false',
+		]);
+	});
+
+	it('asks for the winds, and the temperature they need, while it is on, and for neither once it is off, through the real layer panel', async () => {
+		const { stage } = await createSunStage();
+		stage.viewPanelOptions.onWinds(true);
+		stage.viewPanelOptions.onWinds(false);
+		expect(stage.log.filter((line) => line.includes('setShowing'))).toEqual([
+			'winds.setShowing true',
+			'temperature.setShowing true',
+			'winds.setShowing false',
+			'temperature.setShowing false',
+		]);
+	});
+
+	it('shows the month controls in Terrain view while it is on, through the real layer panel', async () => {
+		const { stage, views } = await createSunStage();
+		const before = stage.log.length;
+		stage.viewPanelOptions.onWinds(true);
+		expect(views.at(-1)).toEqual({ ...DEFAULT_PAGE_VIEW, winds: true });
+		expect(stage.log.slice(before)).toContain(
+			'worldPanel.setDate Year 0 · July',
+		);
+		stage.viewPanelOptions.onWinds(false);
+		expect(views.at(-1)).toEqual(DEFAULT_PAGE_VIEW);
 	});
 });
 
@@ -2283,7 +2357,7 @@ describe('the Sunlight control', () => {
 			createLayerPanel: (options) =>
 				createLayerPanel({
 					...options,
-					globe: { setLayer: () => {} },
+					globe: { setLayer: () => {}, setWinds: () => {} },
 					setTimer: () => 0,
 					clearTimer: () => {},
 					reportError: () => {},
@@ -2293,6 +2367,7 @@ describe('the Sunlight control', () => {
 							showLegend: () => {},
 							showView: (view) => views.push(view),
 							showComparison: () => {},
+							showWindKey: () => {},
 						};
 					},
 				}),
@@ -2441,7 +2516,7 @@ describe('the comparison on the measured Earth', () => {
 							{ length: 12 },
 							() => new Float32Array(6 * resolution * resolution),
 						),
-					globe: { setLayer: () => {} },
+					globe: { setLayer: () => {}, setWinds: () => {} },
 					setTimer: () => 0,
 					clearTimer: () => {},
 					reportError: () => {},
@@ -2451,6 +2526,7 @@ describe('the comparison on the measured Earth', () => {
 							showLegend: () => {},
 							showView: () => {},
 							showComparison: (content) => comparisons.push(content),
+							showWindKey: () => {},
 						};
 					},
 				}),

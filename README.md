@@ -32,8 +32,9 @@ Open the address Vite prints. The first visit shows the New world dialog; press 
 
 | Document | What is in it |
 |-|-|
-| [User guide](docs/user-guide.md) | Every control on the page: worlds, tools, view, planet, layers and the sun |
+| [User guide](docs/user-guide.md) | Every control on the page: worlds, tools, view, planet, layers, the sun and the winds |
 | [Temperature](docs/temperature.md) | How the temperature is worked out, when it is recalculated, its colours, and the Earth comparison |
+| [Winds](docs/winds.md) | How the surface winds and sea-level pressure are worked out, which planet settings they read, and how far to trust them |
 | [Development](docs/development.md) | Commands, the source layout, and the Earth temperature baseline |
 | [Data](docs/data.md) | The Earth data files: formats, sources, licences and how to rebuild them |
 

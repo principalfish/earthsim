@@ -81,13 +81,13 @@ A pure library with no DOM, Three.js or worker globals.
 | `refresh.ts` | When to ask a worker again after the world changes; the winds after each new temperature result and each change of the day length; with `oneAtATime` (statistics, winds) one request at a time, an overtaken answer ignored |
 | `workerService.ts` | The statistics, temperature and winds services, each on its own worker |
 | `layers.ts` | The computed layers the page holds, the temperature and the winds worked out from it, and whether each is current |
-| `view.ts` | What the globe shows: the layer, the part of the year, the source and the month |
+| `view.ts` | What the globe shows: the layer, the part of the year, the source, the month, the sunlight and the winds |
 | `playback.ts` | Playing through the year |
 | `storage.ts`, `autosave.ts` | The saved world in IndexedDB, export and import, and when to save |
 | `panelMemory.ts` | Which panel sections are open, remembered by the browser |
 | `earthData.ts`, `observedData.ts` | Fetching the Earth data files when first needed |
-| `globe/` | The renderer, shaders, camera, picking and colour ramps |
-| `ui/` | The panel's sections and controls, the New world dialog, the legend and the cursor readout |
+| `globe/` | The renderer, shaders, camera, picking, colour ramps and the wind arrows |
+| `ui/` | The panel's sections and controls, the New world dialog, the legend, the key to the wind arrows and the cursor readout |
 | `styles.css` | The page's styles |
 | `testing/` | Stand-ins for the canvas, document, storage and timers, which only the tests use |
 

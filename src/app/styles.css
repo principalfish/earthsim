@@ -792,14 +792,70 @@ body {
   accent-color: var(--color-accent);
 }
 
-/* The row along the bottom of the globe's area that the legend and the
-   cursor readout sit in, a small margin in from its edges. The legend comes
-   first and the row runs from right to left, so the legend takes the
-   bottom-right corner and the strip, pushed along by its margin, the left
-   edge. The lines stack upwards, so when the two do not fit side by side the
-   legend keeps the bottom and the strip's line sits directly above it; on
-   one line both stand on the bottom edge. The pointer passes through the
-   row and all it holds to the globe. */
+/* The key to the wind arrows, on the legend's backing, beside the legend
+   or in the corner while it is hidden: a caption, an arrow and its speed
+   on each line, and the status line, worded as the legend's. The arrows
+   are drawn at their size on the globe, one CSS pixel to a pixel. */
+.wind-key {
+  display: grid;
+  flex: none;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  background: var(--color-overlay-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+}
+
+/* Hidden by the page, which the display set on it would otherwise undo. */
+.wind-key[hidden] {
+  display: none;
+}
+
+.wind-key__caption,
+.wind-key__status {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Each arrow stands in a column as wide as the longest, so the speeds line
+   up after them. */
+.wind-key__row {
+  display: grid;
+  grid-template-columns: 2.25rem auto;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.wind-key__arrow {
+  display: block;
+  overflow: visible;
+}
+
+.wind-key__label {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+/* Left empty rather than hidden when there is nothing to say, as the
+   legend's line is, with its one line kept. */
+.wind-key__status {
+  min-height: 1.4em;
+  color: var(--color-text-muted);
+}
+
+/* The row along the bottom of the globe's area that the legend, the key to
+   the wind arrows and the cursor readout sit in, a small margin in from its
+   edges. The legend comes first, then the key, then the strip, and the row
+   runs from right to left, so the legend takes the bottom-right corner, the
+   key stands to its left, or in the corner while the legend is hidden, and
+   the strip, pushed along by its margin, takes the left edge. The lines
+   stack upwards, so when they do not all fit side by side the legend keeps
+   the bottom and what does not fit sits on a line directly above; on one
+   line all stand on the bottom edge. The pointer passes through the row and
+   all it holds to the globe. */
 .globe-overlays {
   grid-area: 1 / 1;
   display: flex;

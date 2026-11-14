@@ -154,7 +154,7 @@ if (globe !== null) {
 				clearTimer,
 				reportError: logError,
 				createControls: (controls) =>
-					createLayerControls(sections.layers.body, overlays.legend, controls),
+					createLayerControls(sections.layers.body, overlays, controls),
 			}),
 		createCursorReadout: (options) =>
 			createCursorReadout({

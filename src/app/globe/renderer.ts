@@ -1,6 +1,6 @@
 /**
- * The globe on the page: a Three.js scene holding the globe's mesh and the
- * sun's, drawn only when something has changed.
+ * The globe on the page: a Three.js scene holding the globe's mesh, the
+ * sun's and the wind arrows, drawn only when something has changed.
  *
  * The mesh's own coordinates are core coordinates. Its model matrix is the
  * rotation into the Three.js frame, so the shaders look elevation up with
@@ -60,6 +60,7 @@ import {
 import { clientToNdc, raySphere } from './picking';
 import type { ColourRamp, ValueRange } from './ramp';
 import { createSunMaterial, shapeSun, sunPosition } from './sun';
+import { createWindArrows, pixelsPerRadian, type WindField } from './wind';
 
 /** The most device pixels drawn per CSS pixel, to bound the cost per frame. */
 const MAX_PIXEL_RATIO = 2;
@@ -86,7 +87,7 @@ export type Globe = {
 	 * {@link Globe.setSeaLevel} would. After editing the array in place,
 	 * call {@link Globe.updateElevation}. A data layer shown for the world
 	 * before is dropped, so the height colours show until one is set for
-	 * this world.
+	 * this world, and so are the winds.
 	 */
 	setWorld(world: World): void;
 	/**
@@ -151,6 +152,25 @@ export type Globe = {
 		range?: ValueRange,
 		ramp?: ColourRamp,
 	): void;
+	/**
+	 * Shows the wind as arrows over the globe, or none.
+	 *
+	 * @remarks
+	 * The arrows lie over whatever colours the globe shows, raised onto the
+	 * relief as it is drawn, and follow changes of the terrain, the sea
+	 * level and the exaggeration with nothing more done. Their spacing
+	 * follows the zoom. A new world drops them. With none shown, the globe
+	 * is drawn exactly as it is without them. The globe keeps hold of the
+	 * field without copying it, so it must not be changed while shown; to
+	 * show other winds, set them again.
+	 *
+	 * @param field - One month's wind or a mean of the year, one value of
+	 * each part per cell of the world on show; or null for no arrows.
+	 * @throws RangeError if the field does not hold one value of each part
+	 * per cell of the world on show; the arrows shown are then left as they
+	 * were.
+	 */
+	setWinds(field: WindField | null): void;
 	/**
 	 * Sets where the sun stands, how large it is drawn and its colour.
 	 *
@@ -317,6 +337,13 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 	sunMesh.renderOrder = 1;
 	scene.add(sunMesh);
 
+	// The arrows read the globe's own relief uniforms, so they stand on the
+	// relief as it is drawn whatever changes it.
+	const arrows = createWindArrows(uniforms);
+	arrows.mesh.matrix.copy(mesh.matrix);
+	arrows.mesh.matrixWorldNeedsUpdate = true;
+	scene.add(arrows.mesh);
+
 	let cameraState = createCameraState();
 	let elevation: CellTexture | null = null;
 	let layer: PreparedLayer | null = null;
@@ -354,6 +381,9 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		);
 		camera.up.copy(toVector3(coreToThree([0, 0, 1])));
 		camera.lookAt(0, 0, 0);
+		arrows.setZoom(
+			pixelsPerRadian(cameraState.distance, canvas.clientHeight, aspect()),
+		);
 		const brushCentre =
 			brushCursor === null
 				? null
@@ -391,6 +421,7 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		camera.aspect = clientWidth / clientHeight;
 		camera.fov = verticalFovDeg(camera.aspect);
 		camera.updateProjectionMatrix();
+		arrows.setViewport(clientWidth, clientHeight);
 		// Resizing clears the canvas, so it is redrawn before the browser
 		// paints rather than a frame later.
 		if (frame !== 0) {
@@ -433,6 +464,7 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		uniforms.uElevation.value = elevation.texture;
 		uniforms.uResolution.value = world.resolution;
 		uniforms.uSeaLevel.value = drawnSeaLevel(world.seaLevel);
+		arrows.setWorld(world.resolution);
 
 		const wanted = meshSegments(world.resolution);
 		if (wanted !== segments) {
@@ -537,6 +569,11 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		invalidate();
 	};
 
+	const setWinds = (field: WindField | null): void => {
+		arrows.setWinds(field);
+		invalidate();
+	};
+
 	const setSun = (direction: Vec3, sizeDeg: number, colour: Rgb): void => {
 		// Everything is checked before anything changes.
 		const unit = unitSunDirection(direction);
@@ -610,6 +647,7 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		material.dispose();
 		sunMesh.geometry.dispose();
 		sun.material.dispose();
+		arrows.dispose();
 		renderer.dispose();
 	};
 
@@ -620,6 +658,7 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		setExaggeration,
 		setGridVisible,
 		setLayer,
+		setWinds,
 		setSun,
 		setSunlight,
 		pick,

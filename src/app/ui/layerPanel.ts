@@ -4,14 +4,16 @@
  * shown, with a slider and a play button for the month, and, on the
  * measured Earth, whether it is the simulated temperature, the observed one
  * or the difference; the slider and the play button in Terrain view too
- * while the globe is lit by the sun; and the legend, which is laid over the
- * globe rather than in the section.
+ * while the globe is lit by the sun or shows the winds; and the legend and
+ * the key to the wind arrows, which are laid over the globe rather than in
+ * the section.
  *
- * {@link createLayerPanel} decides what the globe and the legend show, from
- * the view settings and the layer store, and switches the temperature's
- * calculation on and off with the layer. {@link createLayerControls} is the
- * section's controls and the legend on the page, which only show what they
- * are told and pass on what is chosen.
+ * {@link createLayerPanel} decides what the globe, the legend and the key
+ * show, from the view settings and the layer store, and switches the
+ * temperature's calculation on and off with the layer and the winds' with
+ * the Winds control. {@link createLayerControls} is the section's controls,
+ * the legend and the key on the page, which only show what they are told
+ * and pass on what is chosen.
  */
 
 import {
@@ -22,8 +24,10 @@ import {
 	type MonthlyTemperature,
 	type Resolution,
 	summariseTemperature,
+	summariseWinds,
 	type TemperatureResult,
 	type TemperatureSummary,
+	type WindSummary,
 } from '../../core/index';
 import {
 	type ColourRamp,
@@ -33,10 +37,11 @@ import {
 	TEMPERATURE_RAMP,
 } from '../globe/ramp';
 import type { Globe } from '../globe/renderer';
-import type { LayerStore, TemperatureLayer } from '../layers';
+import type { WindField } from '../globe/wind';
+import type { LayerStore, SolvedWinds, TemperatureLayer } from '../layers';
 import type { ObservedLoader } from '../observedData';
 import { createPlayback, type PlaybackOptions } from '../playback';
-import type { TemperatureScheduler } from '../refresh';
+import type { TemperatureScheduler, WindsScheduler } from '../refresh';
 import {
 	DEFAULT_MONTH,
 	DEFAULT_PAGE_VIEW,
@@ -60,6 +65,7 @@ import {
 	createSegmentedPicker,
 	createSelectField,
 } from './fields';
+import type { GlobeOverlays } from './globeOverlays';
 import {
 	cellWeights,
 	createLegend,
@@ -71,6 +77,7 @@ import {
 	legendContent,
 	NOTHING_BEYOND,
 } from './legend';
+import { createWindKey, type WindKeyContent, windKeyContent } from './windKey';
 
 /** The step, in degrees, the seasonal range's legend is marked at. */
 export const SEASONAL_RANGE_TICK_STEP = 5;
@@ -186,6 +193,8 @@ export type LayerControlsOptions = {
 export type LayerControls = {
 	/** Shows a legend, or hides it for null. */
 	showLegend(content: LegendContent | null): void;
+	/** Shows the key to the wind arrows, or hides it for null. */
+	showWindKey(content: WindKeyContent | null): void;
 	/**
 	 * Shows the view settings: the controls for the temperature in
 	 * Temperature view, the month controls where {@link offersMonth} says,
@@ -201,12 +210,17 @@ export type LayerPanelOptions = Pick<
 	PlaybackOptions,
 	'setTimer' | 'clearTimer'
 > & {
-	/** Where the temperature is kept. */
-	readonly store: Pick<LayerStore, 'temperature' | 'addListener'>;
-	/** The globe the layer is drawn on, showing the world already. */
-	readonly globe: Pick<Globe, 'setLayer'>;
+	/** Where the temperature and the winds are kept. */
+	readonly store: Pick<LayerStore, 'temperature' | 'winds' | 'addListener'>;
+	/**
+	 * The globe the layer and the winds are drawn on, showing the world
+	 * already.
+	 */
+	readonly globe: Pick<Globe, 'setLayer' | 'setWinds'>;
 	/** What calculates the temperature, told whether it is showing. */
 	readonly temperature: Pick<TemperatureScheduler, 'setShowing'>;
+	/** What calculates the winds, told whether they are showing. */
+	readonly winds: Pick<WindsScheduler, 'setShowing'>;
 	/** Adds the controls to the page. */
 	readonly createControls: (options: LayerControlsOptions) => LayerControls;
 	/** Called with the view settings whenever any of them changes. */
@@ -257,7 +271,8 @@ export type LayerPanel = {
 	 * Takes a new world: stops the year playing, puts {@link DEFAULT_MONTH}
 	 * on screen and the source back to {@link DEFAULT_TEMPERATURE_SOURCE},
 	 * and forgets the observed temperature and the comparison of the world
-	 * before. The layer, the temperature view and the sunlight are kept.
+	 * before. The layer, the temperature view, the sunlight and the winds
+	 * are kept.
 	 *
 	 * @param earth - The new world's resolution if it is the measured Earth;
 	 * null if it is not.
@@ -280,6 +295,16 @@ export type LayerPanel = {
 	 * @param on - Whether the globe is lit by the sun.
 	 */
 	setSunlight(on: boolean): void;
+	/**
+	 * Takes whether the winds are shown, as the view controls set it, and
+	 * tells what calculates them. Turned on in Terrain view, the month
+	 * controls show there, as for sunlight; turned off there with sunlight
+	 * off too, they are hidden again and the year stops playing. Turned
+	 * off, the arrows leave the globe.
+	 *
+	 * @param on - Whether the winds are shown.
+	 */
+	setWinds(on: boolean): void;
 	/**
 	 * What the globe shows of the temperature: exactly what it was last
 	 * given, as of the panel's latest update, which follows every change of
@@ -330,6 +355,15 @@ type Derived = {
 	sharedSpread?: FittedScale;
 	differences: Map<FieldKey, Float32Array>;
 	figures: Map<FieldKey, FieldDifference>;
+};
+
+/**
+ * What is worked out from one winds result: its annual mean, when first
+ * needed, kept with it until the next result.
+ */
+type DerivedWinds = {
+	readonly solved: SolvedWinds;
+	summary?: WindSummary;
 };
 
 /** The difference's scale: centred on zero, with values beyond both ends. */
@@ -412,14 +446,33 @@ const DIFFERENCE_SCALE: FittedScale = {
  * whenever the simulated temperature would be. All three need a result:
  * until there is one, the globe shows the height colours.
  *
- * In the Month view, and in Terrain view while the globe is lit by the sun,
- * the play button plays the year, a month a second and from December back
- * to January. A move of the slider while it plays is where it carries on
- * from: each move restarts the wait of a whole second. It stops when
+ * In the Month view, and in Terrain view while the globe is lit by the sun
+ * or shows the winds, the play button plays the year, a month a second and
+ * from December back to January. A move of the slider while it plays is
+ * where it carries on from: each move restarts the wait of a whole second.
+ * It stops when
  * pressed again, on a new world, and whenever a change of the view hides
  * the month controls, as {@link offersMonth} decides: another temperature
- * view, Terrain without sunlight, sunlight turned off in Terrain view, or
- * a summary chosen on the way back to Temperature view.
+ * view, Terrain without sunlight or winds, sunlight or the winds turned
+ * off in Terrain view with the other off, or a summary chosen on the way
+ * back to Temperature view.
+ *
+ * While the winds are shown, as the page says through
+ * {@link LayerPanel.setWinds}, the winds are told they are showing, which
+ * asks for them, and the globe shows the latest winds result in the store
+ * as arrows over whatever colours it shows: in Terrain view and in the
+ * Month view the winds of the month on screen, following the year as it
+ * plays; on Annual average their annual mean, worked out by
+ * {@link summariseWinds} once for each result, when first shown; and on the
+ * warmest month, the coldest and the seasonal range the month last on
+ * screen. Winds that are out of date or being worked out again stay on the
+ * globe until the next arrive; until there is a result there are none, and
+ * when the store drops its result, as for a new world, they go. A field is
+ * sent to the globe when it arrives or another month or the annual mean is
+ * chosen, not again as the status changes. Turned off, the winds are told
+ * they are not showing and the globe is given no winds. The key to the
+ * arrows shows while the winds are shown, its line saying where the
+ * store's winds stand, as {@link windKeyContent} words it.
  *
  * The legend's scale, ramp, caption, ticks and words for what lies beyond
  * the ends are always those of what the globe shows: what it was last
@@ -440,17 +493,25 @@ const DIFFERENCE_SCALE: FittedScale = {
  * brought up to date as for any other refusal. What is thrown as the
  * observed temperature arrives goes to `reportError` too.
  *
- * @param options - The store, the globe, the temperature, the controls,
- * the timers the year plays by, the observed temperature's loader, whom to
- * tell of the view and of an error with no control to hand it back to.
+ * @param options - The store, the globe, the temperature, the winds, the
+ * controls, the timers the year plays by, the observed temperature's
+ * loader, whom to tell of the view and of an error with no control to hand
+ * it back to.
  * @returns The panel.
  */
 export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
-	const { store, globe, temperature } = options;
+	const { store, globe, temperature, winds } = options;
 	let layer: Layer = DEFAULT_PAGE_VIEW.layer;
 	let temperatureView: TemperatureView = DEFAULT_PAGE_VIEW.temperatureView;
 	let source: TemperatureSource = DEFAULT_PAGE_VIEW.source;
 	let sunlight = DEFAULT_PAGE_VIEW.sunlight;
+	let windsOn = DEFAULT_PAGE_VIEW.winds;
+	/**
+	 * What has been worked out from the latest winds result, dropped with it.
+	 */
+	let derivedWinds: DerivedWinds | null = null;
+	/** The winds the globe was last given, or null for none. */
+	let shownWinds: WindField | null = null;
 	/**
 	 * The world's resolution while it is the measured Earth, as the page
 	 * last said; null while it is not, and the comparison is not offered.
@@ -648,7 +709,48 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		}
 	};
 
-	const update = (): void => {
+	/** The winds the globe is to show of a result, for the view settings. */
+	const windsTarget = (from: DerivedWinds): WindField => {
+		const { winds: year } = from.solved;
+		if (layer === 'temperature' && temperatureView === 'annualMean') {
+			from.summary ??= summariseWinds(year);
+			return from.summary;
+		}
+		const month = playback.month;
+		return {
+			east: year.east[month] as Float32Array,
+			north: year.north[month] as Float32Array,
+		};
+	};
+
+	/** Brings the arrows on the globe and the key up to date. */
+	const updateWinds = (): void => {
+		const { result } = store.winds;
+		if (derivedWinds !== null && derivedWinds.solved !== result) {
+			derivedWinds = null;
+		}
+		try {
+			let next: WindField | null = null;
+			if (windsOn && result !== null) {
+				derivedWinds ??= { solved: result };
+				next = windsTarget(derivedWinds);
+			}
+			// Sent again only for other arrays: a month's are the result's
+			// own, and the mean is kept with the result.
+			if (
+				next?.east !== shownWinds?.east ||
+				next?.north !== shownWinds?.north
+			) {
+				globe.setWinds(next);
+				shownWinds = next;
+			}
+		} finally {
+			controls.showWindKey(windsOn ? windKeyContent(store.winds) : null);
+		}
+	};
+
+	/** Brings what the globe shows of the temperature and the legend up to date. */
+	const updateTemperature = (): void => {
 		const { result } = store.temperature;
 		if (derived !== null && derived.result !== result) {
 			derived = null;
@@ -714,12 +816,22 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		}
 	};
 
+	/** Brings the globe, the legend and the key up to date. */
+	const update = (): void => {
+		try {
+			updateTemperature();
+		} finally {
+			updateWinds();
+		}
+	};
+
 	const view = (): PageView => ({
 		layer,
 		temperatureView,
 		source,
 		month: playback.month,
 		sunlight,
+		winds: windsOn,
 	});
 	/** Shows the view settings and the comparison, and tells of them. */
 	const announce = (): void => {
@@ -896,6 +1008,18 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			}
 			announce();
 		},
+		setWinds: (on) => {
+			if (on === windsOn) {
+				return;
+			}
+			windsOn = on;
+			if (!offersMonth(view())) {
+				playback.pause();
+			}
+			winds.setShowing(on);
+			announce();
+			update();
+		},
 		setEarth: (next) => {
 			if (next === earth) {
 				return;
@@ -921,26 +1045,27 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
  * {@link createComparisonControls}, hidden unless they are offered; and,
  * for the Month view, a slider from January to December, which a screen
  * reader hears by the month's name, and a play button. The slider and the
- * button show in Terrain view too while the globe is lit by the sun, on
- * their own. The button is a toggle whose pressed state says whether the
- * year is playing.
+ * button show in Terrain view too while the globe is lit by the sun or
+ * shows the winds, on their own. The button is a toggle whose pressed state
+ * says whether the year is playing.
  *
- * The legend is shown and hidden only as it is told, whether the Layers
- * section is open or closed.
+ * The legend and the key to the wind arrows are shown and hidden only as
+ * they are told, whether the Layers section is open or closed.
  *
  * @param body - The section's body, to add the controls to, after what it
  * holds.
- * @param legendPlace - Where the legend goes, over the globe, after what it
- * holds.
+ * @param places - Where the legend and the key go, over the globe, each
+ * after what its place holds.
  * @param options - The starting view settings and whom to tell of a choice.
- * @returns The controls, with the legend hidden.
+ * @returns The controls, with the legend and the key hidden.
  */
 export const createLayerControls = (
 	body: HTMLElement,
-	legendPlace: HTMLElement,
+	places: Pick<GlobeOverlays, 'legend' | 'windKey'>,
 	options: LayerControlsOptions,
 ): LayerControls => {
 	const legend = createLegend();
+	const windKey = createWindKey();
 
 	const temperatureControls = createElement('div', 'temperature-view');
 	const viewField = createSelectField({
@@ -1004,9 +1129,11 @@ export const createLayerControls = (
 		}),
 		temperatureControls,
 	);
-	legendPlace.append(legend.element);
+	places.legend.append(legend.element);
+	places.windKey.append(windKey.element);
 	return {
 		showLegend: legend.show,
+		showWindKey: windKey.show,
 		showView,
 		showComparison: comparison.show,
 	};

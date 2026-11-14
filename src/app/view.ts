@@ -4,7 +4,8 @@
  * are not saved, and a new world keeps them, all but the month, which a new
  * world sets back to {@link DEFAULT_MONTH}, and the temperature's source,
  * which it sets back to {@link DEFAULT_TEMPERATURE_SOURCE}. Whether the
- * globe is lit by the sun is kept with the rest.
+ * globe is lit by the sun and whether the winds are shown are kept with the
+ * rest.
  */
 
 /** What the globe can be coloured by. */
@@ -111,6 +112,8 @@ export type PageView = {
 	readonly month: number;
 	/** Whether the globe is lit by the sun. */
 	readonly sunlight: boolean;
+	/** Whether the winds are shown as arrows over the globe. */
+	readonly winds: boolean;
 };
 
 /** The view settings the page opens on. */
@@ -120,16 +123,18 @@ export const DEFAULT_PAGE_VIEW: PageView = {
 	source: DEFAULT_TEMPERATURE_SOURCE,
 	month: DEFAULT_MONTH,
 	sunlight: false,
+	winds: false,
 };
 
 /**
  * Whether the month on screen is chosen and played in a view: in the Month
  * view of Temperature, and in Terrain view while the globe is lit by the
- * sun, whose place in the sky follows the month.
+ * sun, whose place in the sky follows the month, or the winds, which are
+ * those of the month, are shown.
  *
  * @param view - The view settings.
  */
 export const offersMonth = (view: PageView): boolean =>
 	view.layer === 'temperature'
 		? view.temperatureView === 'month'
-		: view.sunlight;
+		: view.sunlight || view.winds;

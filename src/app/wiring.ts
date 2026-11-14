@@ -115,7 +115,7 @@ export type PageLayerOptions = {
 	/**
 	 * The switch for the winds: tells what calculates them whether they are
 	 * showing, which also says whether the temperature they need is wanted.
-	 * The layer panel is handed it and does not call it.
+	 * The layer panel flips it as the Winds control is ticked and cleared.
 	 */
 	readonly winds: Pick<WindsScheduler, 'setShowing'>;
 	/** Called with the view settings whenever any of them changes. */
@@ -200,7 +200,10 @@ export type PageParts = {
 	 */
 	readonly createLayerPanel: (
 		options: PageLayerOptions,
-	) => Pick<LayerPanel, 'newWorld' | 'setEarth' | 'setSunlight' | 'shown'>;
+	) => Pick<
+		LayerPanel,
+		'newWorld' | 'setEarth' | 'setSunlight' | 'setWinds' | 'shown'
+	>;
 	/**
 	 * Lays the cursor readout over the globe, hidden until the pointer is
 	 * over it, and has it follow the pointer.
@@ -210,7 +213,7 @@ export type PageParts = {
 	) => Pick<CursorReadout, 'invalidate' | 'clear'>;
 	/**
 	 * The panel's Layers section, already in the panel, which ticking the
-	 * Sunlight control opens.
+	 * Sunlight or the Winds control opens.
 	 */
 	readonly layersSection: Pick<Section, 'setOpen'>;
 	/** Opens the dialog that starts a new world. */
@@ -278,8 +281,10 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * winds are showing, and is told it is showing while either is so: the
  * winds are worked out from it, so switching them on with no current
  * temperature asks for the temperature, and its result then asks for the
- * winds. The layer panel is handed the switch for the winds, and does not
- * call it; the page shows no winds.
+ * winds. The layer panel is handed the switch for the winds, and flips it
+ * as the Winds control is ticked and cleared: the control tells the layer
+ * panel, which shows the winds on the globe, and the month controls in
+ * Terrain view, while it is on; a new world keeps it.
  *
  * The date line under the world's description is written as soon as the
  * world controls are made, and follows the world's age and every change of
@@ -299,10 +304,10 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * drawn instead, whether or not there is a temperature on the globe yet.
  * The globe is told how it is lit once for each change of that, by the
  * Sunlight control or by a change of layer. Ticking the Sunlight control
- * also opens the Layers section, where the month controls are, if it is
- * closed; clearing it leaves the section as it is. Nothing else the page
- * does opens or closes a section: a new, imported or restored world leaves
- * every section as it is.
+ * or the Winds control also opens the Layers section, where the month
+ * controls are, if it is closed; clearing either leaves the section as it
+ * is. Nothing else the page does opens or closes a section: a new,
+ * imported or restored world leaves every section as it is.
  *
  * The cursor readout over the globe is made after the statistics, and reads
  * what the globe shows of the temperature from the layer panel. Besides
@@ -521,6 +526,12 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		onSunlight: (on) => {
 			lightGlobe(on);
 			layerPanel.setSunlight(on);
+			if (on) {
+				parts.layersSection.setOpen(true);
+			}
+		},
+		onWinds: (on) => {
+			layerPanel.setWinds(on);
 			if (on) {
 				parts.layersSection.setOpen(true);
 			}

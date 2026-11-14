@@ -7,6 +7,7 @@ import {
 	getGrid,
 	type MonthlyTemperature,
 	summariseTemperature,
+	summariseWinds,
 	type TemperatureResult,
 } from '../../core/index';
 import {
@@ -21,7 +22,8 @@ import {
 	TEMPERATURE_RAMP,
 	type ValueRange,
 } from '../globe/ramp';
-import { createLayerStore, type LayerStore } from '../layers';
+import type { WindField } from '../globe/wind';
+import { createLayerStore, type LayerStore, type SolvedWinds } from '../layers';
 import type { ObservedLoader } from '../observedData';
 import { PLAYBACK_STEP_MS } from '../playback';
 import {
@@ -66,6 +68,11 @@ import {
 	legendContent,
 } from './legend';
 import { createSection } from './section';
+import {
+	WINDS_CALCULATING_TEXT,
+	WINDS_UNAVAILABLE_TEXT,
+	type WindKeyContent,
+} from './windKey';
 
 /** What the globe was asked to show: a field, its range and ramp, or none. */
 type Shown = {
@@ -138,6 +145,12 @@ const createStage = () => {
 	const store: LayerStore = createLayerStore((error) => errors.push(error));
 	const shown: Shown[] = [];
 	const showing: boolean[] = [];
+	/** What the winds were told of whether they are showing. */
+	const windsShowing: boolean[] = [];
+	/** Every wind field the globe was given, or null for none. */
+	const winds: (WindField | null)[] = [];
+	/** What the key to the arrows was told to show. */
+	const keys: (WindKeyContent | null)[] = [];
 	const legends: (LegendContent | null)[] = [];
 	/** What the comparison controls were told to show. */
 	const comparisons: ComparisonContent[] = [];
@@ -175,14 +188,19 @@ const createStage = () => {
 				}
 				shown.push({ field, range, ramp });
 			},
+			setWinds: (field) => {
+				winds.push(field);
+			},
 		},
 		temperature: { setShowing: (next) => showing.push(next) },
+		winds: { setShowing: (next) => windsShowing.push(next) },
 		createControls: (options) => {
 			controls = options;
 			return {
 				showLegend: (content) => legends.push(content),
 				showView: (view, playing) => views.push({ view, playing }),
 				showComparison: (content) => comparisons.push(content),
+				showWindKey: (content) => keys.push(content),
 			};
 		},
 	});
@@ -203,6 +221,9 @@ const createStage = () => {
 		reported,
 		shown,
 		showing,
+		windsShowing,
+		winds,
+		keys,
 		legends,
 		comparisons,
 		views,
@@ -660,6 +681,7 @@ describe('createLayerPanel, the month', () => {
 			source: 'simulated',
 			month: 11,
 			sunlight: false,
+			winds: false,
 		});
 	});
 
@@ -710,6 +732,7 @@ describe('createLayerPanel, the month', () => {
 				source: 'simulated',
 				month: 6,
 				sunlight: false,
+				winds: false,
 			},
 			playing: false,
 		});
@@ -733,6 +756,7 @@ describe('createLayerPanel, the month', () => {
 				source: 'simulated',
 				month: 6,
 				sunlight: false,
+				winds: false,
 			},
 			playing: false,
 		});
@@ -751,6 +775,7 @@ describe('createLayerPanel, the month', () => {
 			source: 'simulated',
 			month: DEFAULT_MONTH,
 			sunlight: false,
+			winds: false,
 		});
 	});
 });
@@ -779,6 +804,7 @@ describe('createLayerPanel, playing the year', () => {
 				source: 'simulated',
 				month: 7,
 				sunlight: false,
+				winds: false,
 			},
 			playing: true,
 		});
@@ -849,6 +875,7 @@ describe('createLayerPanel, playing the year', () => {
 				source: 'simulated',
 				month: 3,
 				sunlight: false,
+				winds: false,
 			},
 			playing: true,
 		});
@@ -874,6 +901,7 @@ describe('createLayerPanel, playing the year', () => {
 				source: 'simulated',
 				month: 7,
 				sunlight: false,
+				winds: false,
 			},
 			playing: false,
 		});
@@ -905,6 +933,7 @@ describe('createLayerPanel, playing the year', () => {
 				source: 'simulated',
 				month: 7,
 				sunlight: false,
+				winds: false,
 			},
 			playing: false,
 		});
@@ -982,6 +1011,7 @@ describe('createLayerPanel, under sunlight', () => {
 			...DEFAULT_PAGE_VIEW,
 			month: 1,
 			sunlight: true,
+			winds: false,
 		});
 		expect(stage.shown).toEqual([]);
 	});
@@ -1047,6 +1077,7 @@ describe('createLayerPanel, under sunlight', () => {
 			source: 'simulated',
 			month: 2,
 			sunlight: true,
+			winds: false,
 		});
 	});
 
@@ -2056,9 +2087,13 @@ describe('createLayerControls', () => {
 		const chosen: string[] = [];
 		const section = fake.createElement('div');
 		const place = fake.createElement('div');
+		const keyPlace = fake.createElement('div');
 		const controls = createLayerControls(
 			section as unknown as HTMLElement,
-			place as unknown as HTMLElement,
+			{
+				legend: place as unknown as HTMLElement,
+				windKey: keyPlace as unknown as HTMLElement,
+			},
 			{
 				view: { ...DEFAULT_PAGE_VIEW, ...view },
 				onLayer: (next) => chosen.push(next),
@@ -2072,7 +2107,7 @@ describe('createLayerControls', () => {
 			byClass(section, 'segmented__input').filter(
 				(input) => input.name === name,
 			);
-		return { controls, chosen, section, place, radios };
+		return { controls, chosen, section, place, keyPlace, radios };
 	};
 
 	it('adds the layer controls with Terrain chosen, and the legend to its own place, hidden', () => {
@@ -2149,6 +2184,21 @@ describe('createLayerControls', () => {
 		expect(chosen).toEqual(['temperature', 'terrain']);
 	});
 
+	it('adds the key to the wind arrows to its own place, hidden, and shows it as told', () => {
+		const { controls, section, keyPlace } = make();
+		expect(keyPlace.children.map((child) => child.className)).toEqual([
+			'wind-key',
+		]);
+		expect(byClass(section, 'wind-key')).toEqual([]);
+		const key = oneByClass(keyPlace, 'wind-key');
+		expect(key.hidden).toBe(true);
+		controls.showWindKey({ status: 'x' });
+		expect(key.hidden).toBe(false);
+		expect(oneByClass(key, 'wind-key__status').textContent).toBe('x');
+		controls.showWindKey(null);
+		expect(key.hidden).toBe(true);
+	});
+
 	it('shows the legend it is given', () => {
 		const { controls, place } = make();
 		controls.showLegend({ scale: null, status: 'x', bar: null });
@@ -2187,6 +2237,21 @@ describe('createLayerControls', () => {
 		const show = oneByClass(section, 'temperature-view__show');
 		const month = oneByClass(section, 'month-controls');
 		controls.showView({ ...DEFAULT_PAGE_VIEW, sunlight: true }, false);
+		expect([temperature.hidden, show.hidden, month.hidden]).toEqual([
+			false,
+			true,
+			false,
+		]);
+		controls.showView(DEFAULT_PAGE_VIEW, false);
+		expect([temperature.hidden, month.hidden]).toEqual([true, true]);
+	});
+
+	it('shows the month controls alone in Terrain view while the winds are on', () => {
+		const { controls, section } = make();
+		const temperature = oneByClass(section, 'temperature-view');
+		const show = oneByClass(section, 'temperature-view__show');
+		const month = oneByClass(section, 'month-controls');
+		controls.showView({ ...DEFAULT_PAGE_VIEW, winds: true }, false);
 		expect([temperature.hidden, show.hidden, month.hidden]).toEqual([
 			false,
 			true,
@@ -2330,12 +2395,16 @@ describe('the legend over the globe', () => {
 			loadObserved: () =>
 				Promise.reject(new Error('The observed temperature is not asked for')),
 			reportError: () => {},
-			globe: { setLayer: () => {} },
+			globe: { setLayer: () => {}, setWinds: () => {} },
 			temperature: { setShowing: () => {} },
+			winds: { setShowing: () => {} },
 			createControls: (options) =>
 				createLayerControls(
 					section.body,
-					place as unknown as HTMLElement,
+					{
+						legend: place as unknown as HTMLElement,
+						windKey: fake.createElement('div') as unknown as HTMLElement,
+					},
 					options,
 				),
 		});
@@ -2406,5 +2475,231 @@ describe('the legend over the globe', () => {
 		expect(oneByClass(legend, 'legend__caption').textContent).toBe(
 			temperatureCaption('month', DEFAULT_MONTH),
 		);
+	});
+});
+
+/**
+ * A year of winds over two cells whose months are told apart: month m
+ * blows m + 1 m/s eastward in the first cell and m + 1 m/s northward in the
+ * second.
+ */
+const solvedWinds = (offset = 0): SolvedWinds => {
+	const months = Array.from({ length: 12 }, (_, m) => m);
+	return {
+		winds: {
+			east: months.map((m) => Float32Array.of(m + 1 + offset, 0)),
+			north: months.map((m) => Float32Array.of(0, m + 1 + offset)),
+			pressure: months.map(() => Float32Array.of(1013, 1013)),
+		},
+		temperature: temperatureOf(1),
+		dayLengthHours: 24,
+	};
+};
+
+describe('createLayerPanel, the winds', () => {
+	/** A stage with the winds switched on. */
+	const windy = () => {
+		const stage = createStage();
+		stage.panel.setWinds(true);
+		return stage;
+	};
+	/** Has winds arrive, current, as the scheduler does. */
+	const arrive = (
+		stage: ReturnType<typeof createStage>,
+		solved: SolvedWinds,
+	) => {
+		stage.store.markWindsCalculating();
+		stage.store.setWindsResult(solved, true);
+	};
+	/** The field of a month of a year of winds. */
+	const monthOf = (solved: SolvedWinds, month: number) => ({
+		east: solved.winds.east[month],
+		north: solved.winds.north[month],
+	});
+
+	it('starts off, giving the globe no winds and hiding the key', () => {
+		const stage = createStage();
+		expect(stage.controls.view.winds).toBe(false);
+		expect(stage.windsShowing).toEqual([]);
+		arrive(stage, solvedWinds());
+		expect(stage.winds).toEqual([]);
+		expect(stage.keys.every((key) => key === null)).toBe(true);
+	});
+
+	it('switches the winds on when turned on, telling of it with the view, and says nothing is there yet', () => {
+		const stage = createStage();
+		stage.panel.setWinds(true);
+		expect(stage.windsShowing).toEqual([true]);
+		expect(stage.told.at(-1)).toEqual({ ...DEFAULT_PAGE_VIEW, winds: true });
+		expect(stage.winds).toEqual([]);
+		expect(stage.keys.at(-1)).toEqual({ status: LEGEND_EMPTY_TEXT });
+	});
+
+	it('tells nothing for the setting it already has', () => {
+		const stage = createStage();
+		stage.panel.setWinds(false);
+		expect(stage.windsShowing).toEqual([]);
+		expect(stage.told).toEqual([]);
+	});
+
+	it('gives the globe the month on screen of a result as it arrives, the result’s own arrays, and clears the key’s line', () => {
+		const stage = windy();
+		const solved = solvedWinds();
+		arrive(stage, solved);
+		expect(stage.winds).toHaveLength(1);
+		expect(stage.winds[0]?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
+		expect(stage.winds[0]?.north).toBe(solved.winds.north[DEFAULT_MONTH]);
+		expect(stage.keys.at(-1)).toEqual({ status: null });
+	});
+
+	it('follows the month on the slider and as the year plays, in Terrain view', () => {
+		const stage = windy();
+		const solved = solvedWinds();
+		arrive(stage, solved);
+		stage.controls.onMonth(0);
+		stage.controls.onPlay();
+		stage.timers.advance(2 * PLAYBACK_STEP_MS);
+		expect(stage.winds).toEqual([
+			monthOf(solved, DEFAULT_MONTH),
+			monthOf(solved, 0),
+			monthOf(solved, 1),
+			monthOf(solved, 2),
+		]);
+	});
+
+	it('gives the new result’s month when a new result arrives, and nothing more as the status changes', () => {
+		const stage = windy();
+		const first = solvedWinds();
+		arrive(stage, first);
+		stage.store.markWindsOutOfDate();
+		stage.store.markWindsCalculating();
+		expect(stage.winds).toHaveLength(1);
+		const second = solvedWinds(5);
+		stage.store.setWindsResult(second, true);
+		expect(stage.winds).toEqual([
+			monthOf(first, DEFAULT_MONTH),
+			monthOf(second, DEFAULT_MONTH),
+		]);
+	});
+
+	it.each([
+		[
+			'out of date',
+			(store: LayerStore) => store.markWindsOutOfDate(),
+			LEGEND_OUT_OF_DATE_TEXT,
+		],
+		[
+			'being worked out',
+			(store: LayerStore) => store.markWindsCalculating(),
+			WINDS_CALCULATING_TEXT,
+		],
+		[
+			'no longer calculable',
+			(store: LayerStore) => store.markWindsUnavailable(),
+			WINDS_UNAVAILABLE_TEXT,
+		],
+	])(
+		'keeps the arrows while the winds are %s, and the key says so',
+		(_name, change, words) => {
+			const stage = windy();
+			arrive(stage, solvedWinds());
+			change(stage.store);
+			expect(stage.winds).toHaveLength(1);
+			expect(stage.keys.at(-1)).toEqual({ status: words });
+		},
+	);
+
+	it('drops the arrows when the store drops its winds, as for a new world', () => {
+		const stage = windy();
+		arrive(stage, solvedWinds());
+		stage.store.clear();
+		expect(stage.winds.at(-1)).toBeNull();
+		expect(stage.keys.at(-1)).toEqual({ status: LEGEND_EMPTY_TEXT });
+	});
+
+	it('shows the annual mean on Annual average, worked out once for each result', () => {
+		const stage = windy();
+		const solved = solvedWinds();
+		arrive(stage, solved);
+		stage.controls.onLayer('temperature');
+		stage.controls.onTemperatureView('annualMean');
+		const mean = stage.winds.at(-1);
+		expect(mean?.east).toEqual(summariseWinds(solved.winds).east);
+		expect(mean?.north).toEqual(summariseWinds(solved.winds).north);
+		stage.controls.onTemperatureView('month');
+		stage.controls.onTemperatureView('annualMean');
+		expect(stage.winds.at(-1)?.east).toBe(mean?.east);
+		expect(stage.winds.at(-1)?.north).toBe(mean?.north);
+	});
+
+	it.each(['warmest', 'coldest', 'range'] as const)(
+		'keeps the month last on screen on the %s',
+		(view) => {
+			const stage = windy();
+			const solved = solvedWinds();
+			arrive(stage, solved);
+			stage.controls.onLayer('temperature');
+			stage.controls.onMonth(3);
+			stage.controls.onTemperatureView(view);
+			expect(stage.winds.at(-1)).toEqual(monthOf(solved, 3));
+			expect(stage.winds).toHaveLength(2);
+		},
+	);
+
+	it('shows the month on screen in Terrain view, whatever summary was last chosen in Temperature view', () => {
+		const stage = windy();
+		const solved = solvedWinds();
+		arrive(stage, solved);
+		stage.controls.onLayer('temperature');
+		stage.controls.onTemperatureView('annualMean');
+		stage.controls.onLayer('terrain');
+		expect(stage.winds.at(-1)).toEqual(monthOf(solved, DEFAULT_MONTH));
+	});
+
+	it('removes the arrows and asks for no winds when turned off, and hides the key', () => {
+		const stage = windy();
+		arrive(stage, solvedWinds());
+		stage.panel.setWinds(false);
+		expect(stage.windsShowing).toEqual([true, false]);
+		expect(stage.winds.at(-1)).toBeNull();
+		expect(stage.keys.at(-1)).toBeNull();
+		stage.store.setWindsResult(solvedWinds(3), true);
+		expect(stage.winds.at(-1)).toBeNull();
+		expect(stage.winds).toHaveLength(2);
+	});
+
+	it('shows the month controls in Terrain view while on, and stops the year when turned off there with sunlight off', () => {
+		const stage = windy();
+		expect(stage.lastView()).toEqual({
+			view: { ...DEFAULT_PAGE_VIEW, winds: true },
+			playing: false,
+		});
+		stage.controls.onPlay();
+		stage.panel.setWinds(false);
+		expect(stage.timers.pending()).toBe(0);
+		expect(stage.lastView()).toEqual({
+			view: DEFAULT_PAGE_VIEW,
+			playing: false,
+		});
+	});
+
+	it('keeps the year playing in Terrain view when turned off with sunlight still on', () => {
+		const stage = windy();
+		stage.panel.setSunlight(true);
+		stage.controls.onPlay();
+		stage.panel.setWinds(false);
+		expect(stage.timers.pending()).toBe(1);
+		expect(stage.lastView()?.playing).toBe(true);
+	});
+
+	it('keeps the winds for a new world', () => {
+		const stage = windy();
+		stage.controls.onMonth(2);
+		stage.panel.newWorld(null);
+		expect(stage.lastView()?.view).toEqual({
+			...DEFAULT_PAGE_VIEW,
+			winds: true,
+		});
+		expect(stage.windsShowing).toEqual([true]);
 	});
 });

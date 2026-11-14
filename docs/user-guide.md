@@ -1,6 +1,6 @@
 # User guide
 
-Every control on the page. For how the temperature is worked out, see [Temperature](temperature.md).
+Every control on the page. For how the temperature is worked out, see [Temperature](temperature.md); for the winds, [Winds](winds.md).
 
 ## The panel
 
@@ -9,7 +9,7 @@ The panel on the right has six sections, in this order: **World, Layers, View, P
 - Each section opens and closes from its heading, by mouse or with Enter or Space.
 - On a first visit only World is open. The browser remembers which sections are open; this is a browser setting, not part of the world.
 - While Tools is closed, its heading names the tool chosen, such as `Tools · Raise`.
-- Ticking **Sunlight** opens Layers if it is closed, because that is where its month controls are. Nothing else opens or closes a section by itself.
+- Ticking **Sunlight** or **Winds** opens Layers if it is closed, because that is where their month controls are. Nothing else opens or closes a section by itself.
 - A closed section's controls are skipped by the Tab key.
 
 ## World
@@ -79,6 +79,7 @@ The Tools section chooses what the left mouse button does on the globe.
 | Sea level | −6,000 to 6,000 m in steps of 10 m | Where the sea stands. Raising it floods low ground. It is part of the world |
 | Show cell grid | On or off | Draws the outlines of the grid's cells |
 | Sunlight | On or off | Lights the globe from the sun; see [The sun](#the-sun). Not saved |
+| Winds | On or off, starting off | Draws the surface winds as arrows over the globe; see [Winds](#winds). Not saved |
 
 ## Planet
 
@@ -144,6 +145,27 @@ The star is drawn in the scene as a glowing disc.
 - **In Terrain view** the day side is evenly lit and the night side drawn at 30% brightness, with a soft edge between them.
 - **In Temperature view** the colours are left alone, since a darkened colour would read as a colder one. The edge between day and night is drawn as a thin line.
 - While Sunlight is on, the month slider and **Play** also show in Terrain view, where they move the sun through the year.
+
+## Winds
+
+**Winds**, in the View section, draws the surface winds as arrows over whichever colours the globe shows, Terrain or Temperature. The winds are worked out from the temperature, so ticking Winds asks for the temperature too, and the arrows appear once both are ready. [Winds](winds.md) explains how they are worked out and how far to trust them.
+
+- **Each arrow** points the way the wind blows and stands for the patch of the surface around it: it shows the mean wind of that patch, the winds of its cells averaged as arrows, the larger cells counting for more.
+- **Length and weight** grow with the speed, from 8 pixels just above 0.5 m/s to 26 pixels at 10 m/s, and no further for a stronger wind. A wind below 0.5 m/s is calm and has no arrow.
+- **The same size at every zoom.** The arrows keep their size on the screen. Zooming in brings more of them, closer together on the globe, in steps from about 8° apart to about 2°, so they never crowd one another.
+- **On the relief.** The arrows stand on the raised relief at every exaggeration, and fade out towards the globe's edge, so none show from the far side.
+- **The key** beside the legend shows arrows of 5 m/s and of 10 m/s or more, labelled "10+ m/s", at the size they are drawn on the globe. Under them it says "Calculating" while the winds are being worked out, "Out of date" after a change they do not yet take in, "Not calculated yet" before the first, and "Winds unavailable" if they cannot be worked out.
+
+Which winds are shown follows the Layers section:
+
+| Shown | Winds |
+|-|-|
+| Terrain, or Temperature by month | The month on screen. While Winds is on, the month slider and **Play** also show in Terrain view |
+| Annual average | The mean of the twelve months, worked out as arrows, so winds that turn round through the year, such as a monsoon's, largely cancel |
+| Warmest month, Coldest month, Seasonal range | The month last on screen |
+
+- While new winds are being worked out, the last ones stay on the globe. A new world drops them until its own are ready.
+- Clearing Winds removes the arrows and stops the winds being worked out.
 
 ## Statistics
 

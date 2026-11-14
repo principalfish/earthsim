@@ -65,16 +65,18 @@ describe('createViewPanel', () => {
 		vi.unstubAllGlobals();
 	});
 
-	const make = (sunlight?: boolean) => {
+	const make = (sunlight?: boolean, winds?: boolean) => {
 		const told: string[] = [];
 		const section = fake.createElement('div');
 		createViewPanel(section as unknown as HTMLElement, {
 			seaLevel: 0,
 			sunlight,
+			winds,
 			onExaggeration: (factor) => told.push(`exaggeration ${factor}`),
 			onSeaLevel: (metres) => told.push(`sea level ${metres}`),
 			onGridVisible: (visible) => told.push(`grid ${visible}`),
 			onSunlight: (on) => told.push(`sunlight ${on}`),
+			onWinds: (on) => told.push(`winds ${on}`),
 		});
 		const box = (id: string): FakeElement => {
 			const found = byClass(section, 'field__checkbox').find(
@@ -92,7 +94,7 @@ describe('createViewPanel', () => {
 		const { section, box } = make();
 		expect(
 			byClass(section, 'field__checkbox').map((input) => input.id),
-		).toEqual(['view-grid', 'view-sunlight']);
+		).toEqual(['view-grid', 'view-sunlight', 'view-winds']);
 		const label = byClass(section, 'field__label').find(
 			(element) => element.htmlFor === 'view-sunlight',
 		);
@@ -115,5 +117,61 @@ describe('createViewPanel', () => {
 		grid.checked = true;
 		grid.fire('change');
 		expect(told).toEqual(['sunlight true', 'sunlight false', 'grid true']);
+	});
+});
+
+describe('the Winds checkbox', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const make = (winds?: boolean) => {
+		const told: string[] = [];
+		const section = fake.createElement('div');
+		createViewPanel(section as unknown as HTMLElement, {
+			seaLevel: 0,
+			winds,
+			onExaggeration: () => {},
+			onSeaLevel: () => {},
+			onGridVisible: (visible) => told.push(`grid ${visible}`),
+			onSunlight: (on) => told.push(`sunlight ${on}`),
+			onWinds: (on) => told.push(`winds ${on}`),
+		});
+		const box = byClass(section, 'field__checkbox').find(
+			(input) => input.id === 'view-winds',
+		);
+		if (box === undefined) {
+			throw new Error('No Winds checkbox');
+		}
+		return { told, section, box };
+	};
+
+	it('comes after Sunlight, labelled Winds and cleared', () => {
+		const { section, box } = make();
+		const ids = byClass(section, 'field__checkbox').map((input) => input.id);
+		expect(ids.indexOf('view-winds')).toBe(ids.indexOf('view-sunlight') + 1);
+		const label = byClass(section, 'field__label').find(
+			(element) => element.htmlFor === 'view-winds',
+		);
+		expect(label?.textContent).toBe('Winds');
+		expect(box.checked).toBe(false);
+	});
+
+	it('starts on the setting given', () => {
+		expect(make(true).box.checked).toBe(true);
+	});
+
+	it('reports each change as the winds alone', () => {
+		const { told, box } = make();
+		box.checked = true;
+		box.fire('change');
+		box.checked = false;
+		box.fire('change');
+		expect(told).toEqual(['winds true', 'winds false']);
 	});
 });
