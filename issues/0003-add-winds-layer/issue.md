@@ -12,7 +12,7 @@ Not included: winds carrying heat (temperature is unchanged by this step), upper
 
 ## Plan
 
-_2026-11-14 · 16 of 19 pieces done (piece 6 dropped, pieces 7 and 14 split, piece 16 added) · now: piece 14b in progress_
+_2026-11-14 · 16 of 19 pieces done (piece 6 dropped, pieces 7 and 14 split, piece 16 added) · now: waiting on review of piece 14b_
 
 - [x] **1/15 Observed winds and pressure data** · `69d3619`
   The real Earth's monthly winds and sea-level pressure as two small data files, with readers that take them onto a world's cells.
@@ -47,7 +47,7 @@ _2026-11-14 · 16 of 19 pieces done (piece 6 dropped, pieces 7 and 14 split, pie
   Sea-level pressure as a third colour layer, with its legend and pointer readout.
 - [x] **14a The Earth comparison for pressure and winds** (was part of 14; split 2026-11-14) · `12103f9`
   On the untouched Earth: Pressure's Simulated, Observed and Difference, and Simulated or Observed wind arrows with error figures in the key.
-- [ ] **14b The Earth baseline for winds and pressure** (was part of 14; split 2026-11-14) · in progress
+- [ ] **14b The Earth baseline for winds and pressure** (was part of 14; split 2026-11-14) · waiting on you
   A committed record of the Earth's wind and pressure error figures, with a test that fails if a later change makes them worse.
 - [ ] **15/15 Moving streaks** · not started
   Animated streaks flowing with the wind, as a choice beside arrows.
