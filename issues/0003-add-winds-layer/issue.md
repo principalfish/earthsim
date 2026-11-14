@@ -12,7 +12,7 @@ Not included: winds carrying heat (temperature is unchanged by this step), upper
 
 ## Plan
 
-_2026-11-14 · 7 of 16 pieces done (piece 6 dropped, piece 7 split in three) · now: waiting on review of piece 9_
+_2026-11-14 · 8 of 16 pieces done (piece 6 dropped, piece 7 split in three) · now: waiting on a decision_
 
 - [x] **1/15 Observed winds and pressure data** · `69d3619`
   The real Earth's monthly winds and sea-level pressure as two small data files, with readers that take them onto a world's cells.
@@ -29,9 +29,9 @@ _2026-11-14 · 7 of 16 pieces done (piece 6 dropped, piece 7 split in three) · 
   The rules model as `solveWinds`: input checks, every world solved at 64 and refined, the annual mean, a timing script, the cube-corner smoothing fix and `docs/winds.md`.
 - [x] **8/15 Winds in the worker and the page's store** · `6edd863`
   Winds worked out in a worker after each temperature result, only while something shows them.
-- [ ] **9/15 The Winds switch and arrows on the globe** · waiting on you
+- [x] **9/15 The Winds switch and arrows on the globe** · `0a48b68`
   A Winds switch that draws arrows over the current colours, sized by speed, following the months.
-- [ ] **7b The yardstick** (was part of 7; split 2026-11-13; moved after 9: winds on the globe first) · not started
+- [ ] **7b The yardstick** (was part of 7; split 2026-11-13; moved after 9: winds on the globe first) · waiting on you
   A ninth report case, an ocean world tilted 60°, and three checks against published studies of high tilt and of fast and slow spin.
 - [ ] **7c The improvements** (was part of 7; split 2026-11-13) · not started
   Pressure bands that vary by longitude, and the prototype's known faults on the Earth, judged on all nine cases.
