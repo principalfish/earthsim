@@ -212,4 +212,160 @@ label(
 )
 
 c.showPage()
+
+# ---------------------------------------------------------------------------
+# The settings pages: every number the two models are tuned by.
+# ---------------------------------------------------------------------------
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus import Paragraph, Table, TableStyle
+
+SETTINGS_DATE = "14 November 2026"
+
+CELL = ParagraphStyle("cell", fontName="Helvetica", fontSize=8, leading=10, textColor=INK)
+NAME = ParagraphStyle("name", fontName="Courier", fontSize=7.6, leading=10, textColor=INK)
+HEADER = ParagraphStyle("header", fontName="Helvetica-Bold", fontSize=8.5, leading=11, textColor=INK)
+GROUP = ParagraphStyle("group", fontName="Helvetica-Bold", fontSize=8.5, leading=11, textColor=LOOP_EDGE)
+TUNED = ParagraphStyle("tuned", fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=FEEDBACK)
+
+EARTH = "Tuned against the Earth"
+
+# (group, [(name, value, what it does, where it comes from, tuned?)])
+WIND = [
+    ("Width of the cells", [
+        ("earthContrastK", "41 K", "The Earth's equator-to-pole temperature contrast: the yardstick other planets' contrast is measured against.", "The simulated Earth", ""),
+        ("rotationPower", "0.5", "How the cells' width follows the day length: the square-root rule.", "Published theory (Held, 2000)", ""),
+        ("contrastPower", "0.25", "How the cells' width follows the temperature contrast.", "A guess from theory", ""),
+        ("minContrastRatio", "0.25", "The least contrast taken, so cells keep a sane width on a planet with almost none.", "A guess", ""),
+        ("maxContrastRatio", "4", "The most contrast taken, so cells keep a sane width on a planet with a huge one.", "A guess", ""),
+    ]),
+    ("Where the central low sits", [
+        ("hotWindowK", "4 K", "How the warmest latitude is averaged, so the low does not jump between two warm bands.", "Started at 2", EARTH),
+        ("lowShiftGain", "2.5", "Pushes the low further from the equator than the warmest latitude. Makes up for the temperature model's weak seasons.", "1 is the plain rule", EARTH),
+        ("lowShiftFadeDeg", "20 deg", "The latitude over which that push fades away.", "A guess", ""),
+        ("edgeShiftShare", "0.5", "How far the subtropical highs follow the low off the equator.", "The observed Earth", ""),
+        ("lowLimitDeg", "70 deg", "The farthest the low may sit from the equator at the Earth's spin or faster.", "Our choice, after two papers", ""),
+        ("lowLimitFromWidthDeg", "30 deg", "The cell width up to which that limit is 70 degrees: the Earth's.", "Our choice", ""),
+        ("lowLimitToWidthDeg", "60 deg", "The cell width from which the limit is the pole: a 4-day day.", "Our choice, after a paper's slow case", ""),
+        ("lowLimitEaseShare", "0.5", "How gently the low is held short of its limit.", "A guess", ""),
+    ]),
+    ("Steep tilts", [
+        ("minSummerCellShare", "0.3", "The narrowest the tropical cell may be on the summer side of the low.", "A guess", ""),
+        ("wideSummerFromShare", "0.4", "How far out the low lies when that summer side starts to widen again.", "Set by hand", "Set against the 60-degree tilt case"),
+        ("wideSummerToShare", "0.8", "How far out the low lies when the summer side is a whole cell again.", "Set by hand", "Set against the 60-degree tilt case"),
+        ("sideContrastK", "30 K", "How much cooler a pole must be than the low for that side's bands to be at full strength.", "Started at 20", "Set against the 60-degree tilt case"),
+    ]),
+    ("Strength of the bands", [
+        ("bandAmplitudeHpa", "9 hPa", "How strong the pressure bands are, and so how fast the trades and westerlies blow.", "Started at 5", EARTH),
+        ("outerCellShare", "0.3", "The strength kept by bands far from the low; the real polar easterlies are weak.", "Started at 1", EARTH),
+        ("fullBandsReachDeg", "60 deg", "On a planet spinning faster than the Earth, how far from the low the bands keep full strength.", "Our choice", ""),
+        ("poleTaperDeg", "10 deg", "The distance from each pole over which the bands ease out.", "Started at 15", "Set by hand, not against the Earth"),
+    ]),
+    ("Highs and lows over land and sea", [
+        ("thermalHpaPerK", "3 hPa/K", "Pressure added for each degree a place is colder than its latitude. Makes up for the temperature model's weak land and sea contrasts.", "Physics suggests 0.7", EARTH),
+        ("thermalSmoothingKm", "900 km", "How far those highs and lows are smoothed.", "Started at 750", EARTH),
+        ("seaThermalShare", "0.3", "The share of that response the sea gets, against land.", "Was 1", EARTH),
+        ("warmLimitK", "6 K", "Caps how deep a hot place's low gets.", "No limit before", EARTH),
+        ("coldKneeK", "20 K", "A cold place's high grows in full up to this many degrees below its latitude.", "A guard for extreme worlds", ""),
+        ("coldLimitK", "25 K", "The most cold a high counts, however cold the place.", "A guard for extreme worlds", ""),
+        ("thermalHeightM", "2,500 m", "Fades the response over high ground, so a cold plateau is not a false high.", "No fade before", EARTH),
+    ]),
+    ("The wind from the pressure", [
+        ("seaFrictionPerS", "2.5e-5 /s", "Friction over the sea: how far the wind cuts across the pressure lines.", "Started at 3.7e-5", EARTH),
+        ("landFrictionFactor", "5", "How many times more friction land has: the wind's speed over land.", "Started at 2", EARTH),
+        ("blockingSlope", "0.005", "The slope of the ground at which mountains turn half the wind along them.", "A guess", ""),
+    ]),
+]
+
+TEMPERATURE = [
+    ("How heat moves and is stored", [
+        ("diffusivity", "0.55 W/m2/K", "How readily heat spreads between neighbouring places.", "Published (North, Cahalan and Coakley, 1981), a little below", ""),
+        ("landDiffusivity", "0.35 W/m2/K", "The same over land: lower, so continents keep more of their own seasons.", "Started at the sea's value", EARTH),
+        ("oceanHeatCapacity", "2.5e8 J/m2/K", "The heat the sea stores: a mixed layer of 60 m of sea water.", "A physical figure", ""),
+        ("landHeatCapacity", "1e7 J/m2/K", "The heat land stores: about the column of air above it alone.", "As simple seasonal models take it", ""),
+        ("seaIceHeatCapacity", "1e7 J/m2/K", "The heat sea ice stores: as land, since ice insulates the water below.", "Chosen; without it the Arctic winter is 10 K too warm", ""),
+        ("lapseRate", "6.5 K/km", "How fast it cools with height.", "The standard atmosphere", ""),
+        ("greenhouseFactor", "0.633", "How much outgoing heat the air holds back at the Earth's greenhouse strength.", "The Earth's energy budget", ""),
+    ]),
+    ("Reflected sunlight", [
+        ("albedo", "0.27", "The share of sunlight reflected, on average, by ground clear of ice.", "Set to the observed global mean", EARTH),
+        ("albedoPoleward", "0.078", "How much more is reflected towards the poles.", "Published form, tuned", EARTH),
+        ("landAlbedoExtra", "0", "Extra reflection over land. Left at zero, for tuning.", "No starting point", ""),
+        ("iceAlbedo", "0.62", "The share reflected by ice and snow.", "Published form, tuned", EARTH),
+        ("iceStartC", "0 C", "The temperature at which ice starts to come in.", "A smooth ramp, not a single temperature", ""),
+        ("iceFullC", "-10 C", "The temperature at which a place is fully ice.", "A smooth ramp, not a single temperature", ""),
+    ]),
+    ("The solver (numerical, not physical)", [
+        ("stepsPerMonth", "2", "Time steps in each month.", "Chosen by measurement", ""),
+        ("solverToleranceK", "0.005 K", "How closely each step's heat balance is solved.", "Chosen by measurement", ""),
+        ("solverMaxIterations", "200", "Stops a solve that would not converge; it normally needs 5 to 25.", "A safety limit", ""),
+        ("terrainDriftLimitK", "0.25 K", "How far the terrain may change before the temperature is solved from nothing again.", "Chosen, not derived", ""),
+        ("correctionRefineK", "1 K", "The year-end correction below which later passes are skipped.", "Chosen by measurement", ""),
+    ]),
+]
+
+COLS = [150, 72, 300, 150, 110]
+
+
+def settings_table(groups):
+    rows = [[Paragraph(h, HEADER) for h in ("Setting", "Value", "What it does", "Where it comes from", "Tuned?")]]
+    style = [
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.9, INK),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.2),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+    ]
+    for group, settings in groups:
+        rows.append([Paragraph(group, GROUP), "", "", "", ""])
+        index = len(rows) - 1
+        style.append(("SPAN", (0, index), (-1, index)))
+        style.append(("BACKGROUND", (0, index), (-1, index), LOOP_FILL))
+        # Keep a group's heading on the same page as its first setting.
+        style.append(("NOSPLIT", (0, index), (-1, index + 1)))
+        for name, value, what, source, tuned in settings:
+            rows.append([
+                Paragraph(name, NAME),
+                Paragraph(value, CELL),
+                Paragraph(what, CELL),
+                Paragraph(source, CELL),
+                Paragraph(tuned, TUNED if tuned == EARTH else CELL),
+            ])
+            style.append(("LINEBELOW", (0, len(rows) - 1), (-1, len(rows) - 1), 0.25, SIDE_EDGE))
+    table = Table(rows, colWidths=COLS, repeatRows=1)
+    table.setStyle(TableStyle(style))
+    return table
+
+
+def settings_pages(title, intro, groups):
+    """Draws a model's settings table over as many pages as it needs."""
+    table = settings_table(groups)
+    first = True
+    while table is not None:
+        top = 560
+        label(40, top, title if first else title + " (continued)", INK, 14, bold=True)
+        if first:
+            label(40, top - 15, intro, MUTED, 9)
+        available = (top - 26 if first else top - 12) - 40
+        parts = table.split(W - 60, available)
+        part = parts[0]
+        _, height = part.wrapOn(c, W - 60, available)
+        part.drawOn(c, 30, (top - 26 if first else top - 12) - height)
+        table = parts[1] if len(parts) > 1 else None
+        first = False
+        c.showPage()
+
+
+settings_pages(
+    "The wind model's settings",
+    "The 31 numbers the wind model is built on, as of " + SETTINGS_DATE
+    + " (piece 7c-1, in review). In orange: the 11 tuned by hand against the observed Earth.",
+    WIND,
+)
+settings_pages(
+    "The temperature model's settings",
+    "The 18 numbers the temperature model is built on, as of " + SETTINGS_DATE
+    + ": 13 physical and 5 for the solver. In orange: tuned against the observed Earth.",
+    TEMPERATURE,
+)
 c.save()
