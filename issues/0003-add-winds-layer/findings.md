@@ -46,3 +46,19 @@ Cost: 7 subagents · about 567,000 tokens · about 14 min
 | re-check | correctness | low | docs | verified | fixed | `docs/winds.md:154` | The search's bounds are described as "a latitude at most 90°"; they also cover two cell-width settings |
 | re-check | coverage | low | test | dropped | - | `src/core/wind/solve.test.ts:274` | The winter-winds test does not assert where the low lies — dropped: it runs on the real tilted case and would fail under the rejected rule |
 | re-check | coverage | low | test | dropped | - | `scripts/tune-winds.ts:139` | The script's wiring of bounds and held settings has no direct test — dropped: a console script whose parts are tested |
+
+## piece 7c-2 · 2026-11-14 · Bands by longitude
+Cost: 7 subagents · about 549,000 tokens · about 11 min
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | defect | verified | fixed | `src/core/wind/rules.ts:1527` | The two blend-latitude settings set the wrong way round made a step in the pressure; such a pair is now refused |
+| round | coverage | low | test | verified | fixed | `src/core/wind/rules.ts:1233` | No test set the window's width or taper |
+| round | coverage | low | test | verified | fixed | `scripts/tune/tuning.ts:192` | The swing's printout was never run with a measured swing, and the case's id was a repeated literal |
+| round | coverage | low | test | verified | fixed | `src/core/wind/rules.ts:1531` | The share of local placement was tested only at 0 and 1 |
+| round | correctness | low | docs | verified | fixed | `src/core/wind/rules.ts:1441` | "The same pressure at every longitude" was not exact; now "nearly the same, within about 0.03 hPa" |
+| round | coverage | low | test | dropped | - | `src/core/wind/rules.ts:1015` | No local low is tested at its limit — dropped: the local lows come from the same placing whose limit is already tested |
+| round | coverage | low | test | dropped | - | `src/core/wind/rules.ts:1457` | The local-bands tests use a northern continent only — dropped: nothing treats the hemispheres differently, and southern cases are tested |
+| round | coverage | low | test | dropped | - | `scripts/report/oceanBands.ts:177` | A "not measured" branch of the swing is untested — dropped: the same branches are tested through the function beneath it |
+| round | other | low | defect | noticed | open | `src/core/wind/rules.ts:1480` | Noticed by the verifier, uncertain: on a field with sharp steps in latitude the local lows run about 0.3° short of the global low even with a whole-globe window, from the interpolation between latitude bands |
+| re-check | correctness | low | defect | verified | open | `scripts/tune-winds.ts:113` | A sweep or search of either blend-latitude setting stops with an error part-way once a value crosses the other setting, instead of skipping it |
