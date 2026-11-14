@@ -70,3 +70,11 @@ No findings: the correctness, security and coverage checks each came back clean,
 | Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
 |-|-|-|-|-|-|-|-|
 | manual | user | low | docs | - | fixed | `docs/winds.md:15` | The cells' width was given as proportional to (24 hours ÷ the day length)^½, upside down against the code and the table beside it; from an earlier piece, found by the builder and fixed at the user's request |
+
+## piece 11 · 2026-11-14 · Wind under the pointer, and the unit option
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | docs | verified | fixed | `src/app/wiring.ts:344` | A sentence saying the New world dialog "hides it" had come to follow the paragraph on the wind unit, so "it" read as the unit; it now says "hides the readout", back in the readout's paragraph |
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/windKey.ts:46` | The key's speed text repeated the strip's rounding and formatting; both now use one shared `wholeSpeed` |
+| round | correctness | low | test | verified | fixed | `src/app/ui/cursorReadout.ts:180` | No test pinned a calm wind on the annual average; one now pins `Annual average calm` (the wording is put to the user) |
