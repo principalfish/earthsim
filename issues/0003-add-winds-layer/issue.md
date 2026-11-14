@@ -12,7 +12,7 @@ Not included: winds carrying heat (temperature is unchanged by this step), upper
 
 ## Plan
 
-_2026-11-14 · 9 of 17 pieces done (piece 6 dropped, piece 7 split in four) · now: piece 7c-1 in progress_
+_2026-11-14 · 9 of 17 pieces done (piece 6 dropped, piece 7 split in four) · now: waiting on a decision (piece 7c-1)_
 
 - [x] **1/15 Observed winds and pressure data** · `69d3619`
   The real Earth's monthly winds and sea-level pressure as two small data files, with readers that take them onto a world's cells.
@@ -33,7 +33,7 @@ _2026-11-14 · 9 of 17 pieces done (piece 6 dropped, piece 7 split in four) · n
   A Winds switch that draws arrows over the current colours, sized by speed, following the months.
 - [x] **7b The yardstick** (was part of 7; split 2026-11-13; moved after 9: winds on the globe first) · `92b5e6d`
   A ninth report case, an ocean world tilted 60°, and three checks against published studies of high tilt and of fast and slow spin.
-- [ ] **7c-1 The tuning script and the small fixes** (was part of 7c; split 2026-11-14) · in progress
+- [ ] **7c-1 The tuning script and the small fixes** (was part of 7c; split 2026-11-14) · waiting on you
   A script that sweeps and searches the model's settings, a diagnostic on observed temperatures, a cap on cold highs, the steep-tilt low held at about 70°, and stronger middle bands on fast-spinning planets.
 - [ ] **7c-2 Bands by longitude, and the tuning** (was part of 7c; split 2026-11-14) · not started
   Pressure bands that vary by longitude, then time-boxed tuning of the known faults on the Earth, judged on all nine cases.
