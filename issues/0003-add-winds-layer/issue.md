@@ -12,7 +12,7 @@ Not included: winds carrying heat (temperature is unchanged by this step), upper
 
 ## Plan
 
-_2026-11-14 · 11 of 18 pieces done (piece 6 dropped, piece 7 split in four, piece 16 added) · now: waiting on a decision_
+_2026-11-14 · 11 of 18 pieces done (piece 6 dropped, piece 7 split in four, piece 16 added) · now: piece 10 in progress_
 
 - [x] **1/15 Observed winds and pressure data** · `69d3619`
   The real Earth's monthly winds and sea-level pressure as two small data files, with readers that take them onto a world's cells.
@@ -37,7 +37,7 @@ _2026-11-14 · 11 of 18 pieces done (piece 6 dropped, piece 7 split in four, pie
   A script that sweeps and searches the model's settings, a diagnostic on observed temperatures, a cap on cold highs, the steep-tilt low held at about 70°, and stronger middle bands on fast-spinning planets.
 - [x] **7c-2 Bands by longitude** (was part of 7c; split 2026-11-14; tuning against the Earth moved to a later roadmap step) · `4f2912a`
   Pressure bands that vary by longitude, judged on all nine cases; the Earth's known faults are recorded, not tuned.
-- [ ] **10/15 Day length in the Planet section** · waiting on you
+- [ ] **10/15 Day length in the Planet section** · in progress
   The Day length slider, with a note when the winds are rough.
 - [ ] **11/15 Wind under the pointer, and the unit option** · not started
   Wind speed and direction in the pointer strip, in m/s, km/h or mph.
