@@ -16,6 +16,8 @@ The whole-simulator design for earth_sim and the nine-step build order, so each 
 - A biome map is a step of its own, before plate tectonics (added 2026-11-13). It is what most worldbuilders want from the tool: what grows where, not the climate fields themselves.
 - The simulation must be pauseable, with the user able to edit the map while it is paused; a run continues from the edited state. The main thread holds the editable, authoritative world and the worker computes from copies of it, which is what makes this possible.
 
+- Fine tuning against the Earth waits until every part of the climate loop is in (added 2026-11-14): "i also think we probably shouldn't spend too much time trtying to make everything fit earth perfectly until all processing pieces are in. as we could fine tune one then find a later stage changes things". Until then each step gets its model right in kind, records what it gets wrong, and keeps an Earth baseline only as a guard against getting worse. A tuning pass over the whole loop comes once heat carried by winds, ocean currents and sea ice are built (see the status table).
+
 ## Proposed, not yet confirmed
 
 ### Time
@@ -86,6 +88,7 @@ Keep this section current when a step is merged.
 | 4 Moisture, rainfall and Köppen zones | Not started | |
 | 5 Ocean currents | Not started | |
 | 6 Ice sheets and sea ice | Not started | |
+| 6b Tune the whole climate loop against the Earth | Not started; after steps 3b, 5 and 6, when every part of the loop is in | |
 | 7 Tropical storm zones | Not started | |
 | 8 Biome map | Not started | |
 | 9 Plate tectonics and time stepping | Not started | |
@@ -124,7 +127,7 @@ The user, 2026-11-14: "i think we will do a separate UI piece to bring out layer
 ### Step 3b: heat carried by winds, and the climate loop
 The first feedback into temperature, and the loop that later feedbacks (ocean currents, ice) plug into; design under "How the layers feed back into each other". Today heat spreads evenly between neighbouring cells, so west and east coasts get the same climate; winds carrying heat should give mild west coasts and cold east coasts at mid-latitudes, and set how far inland the sea's influence reaches.
 - **First job when planning it:** look at the Earth difference map region by region, to see how much of the error sits where winds would help (mid-latitude west and east coasts) and how much where they would not (the North Atlantic, sea-ice edges, high ground).
-- **Retune two wind settings afterwards:** step 3's rules model makes up for the temperature model's weak seasons and weak land and sea contrasts with `LOW_SHIFT_GAIN` (2.5, where 1 is the plain rule: it pushes the equatorial low further from the equator than the warmest latitude) and `THERMAL_HPA_PER_K` (3 hPa a kelvin, where the physics suggests about 0.7). When the temperature improves here, and again with ocean currents, both should come back towards their natural values; retune them and reset the winds baseline.
+- **Retuning waits for step 6b** (the user's decision above): note here what moves, do not chase the Earth's figures. **Two wind settings to revisit then:** step 3's rules model makes up for the temperature model's weak seasons and weak land and sea contrasts with `LOW_SHIFT_GAIN` (2.5, where 1 is the plain rule: it pushes the equatorial low further from the equator than the warmest latitude) and `THERMAL_HPA_PER_K` (3 hPa a kelvin, where the physics suggests about 0.7). When the temperature improves here, and again with ocean currents, both should come back towards their natural values; retune them and reset the winds baseline.
 - **Known costs:** the temperature solver relies on heat exchange being symmetric between neighbours, which carrying heat with the wind is not, so it needs a different method; the temperature starts to depend on day length; the worker's one-request-per-layer design becomes one climate solve.
 
 ### Step 10 (optional): a simulated atmosphere
