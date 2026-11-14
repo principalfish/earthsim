@@ -80,6 +80,7 @@ The Tools section chooses what the left mouse button does on the globe.
 | Show cell grid | On or off | Draws the outlines of the grid's cells |
 | Sunlight | On or off | Lights the globe from the sun; see [The sun](#the-sun). Not saved |
 | Winds | On or off, starting off | Draws the surface winds as arrows over the globe; see [Winds](#winds). Not saved |
+| Wind speed | m/s, km/h or mph, starting on m/s | The unit wind speeds are written in, in the strip under the pointer and the key to the arrows. It changes both at once, and does not change the arrows. Shown whether or not Winds is on. The browser remembers it, as it does the open sections; it is not saved with the world |
 
 ## Planet
 
@@ -129,7 +130,16 @@ A strip at the bottom left of the globe describes the place under the pointer:
 
 - its position, such as `27.9° N, 86.9° E`;
 - its elevation from the sea level, such as `1,234 m` on land or `3,400 m deep` at sea;
-- in Temperature view, its value in what the globe shows, such as `July 18 °C` or `Seasonal range 12 °C`, followed by "out of date" when the result on the globe is not current.
+- in Temperature view, its value in what the globe shows, such as `July 18 °C` or `Seasonal range 12 °C`, followed by "out of date" when the result on the globe is not current;
+- while Winds is on, on a line of its own, the wind there: its speed in the **Wind speed** unit, as a whole number, and the direction it blows from, one of the eight points of the compass, such as `7 m/s from the north-east`.
+
+About the wind's line:
+
+- **It is the cell's own wind,** from the same winds the arrows are drawn from, not the mean of an arrow's patch, and it is not capped at 10 m/s as the arrows are.
+- **"calm"** below 0.5 m/s, in every unit, where no arrow would be drawn.
+- **On Annual average** it is the mean wind of the year and says so: `Annual average 7 m/s from the north-east`.
+- **"out of date"** follows the wind, apart from the temperature's mark, when the winds on the globe are not current, as while new ones are being worked out.
+- There is no wind line while Winds is off, or before the first winds are ready.
 
 It works with any tool, and is hidden while the pointer is off the globe. In a narrow window it moves above the legend. Screen readers read the legend but not the strip.
 
@@ -156,7 +166,7 @@ The star is drawn in the scene as a glowing disc.
 - **Length and weight** grow with the speed, from 8 pixels just above 0.5 m/s to 26 pixels at 10 m/s, and no further for a stronger wind. A wind below 0.5 m/s is calm and has no arrow.
 - **The same size at every zoom.** The arrows keep their size on the screen. Zooming in brings more of them, closer together on the globe, in steps from about 8° apart to about 2°, so they never crowd one another.
 - **On the relief.** The arrows stand on the raised relief at every exaggeration, and fade out towards the globe's edge, so none show from the far side.
-- **The key** beside the legend shows arrows of 5 m/s and of 10 m/s or more, labelled "10+ m/s", at the size they are drawn on the globe. Under them it says "Calculating" while the winds are being worked out, "Out of date" after a change they do not yet take in, "Not calculated yet" before the first, and "Winds unavailable" if they cannot be worked out.
+- **The key** beside the legend shows arrows of 5 m/s and of 10 m/s or more, labelled "10+ m/s", at the size they are drawn on the globe. In km/h they are labelled "18 km/h" and "36+ km/h", and in mph "11 mph" and "22+ mph"; see **Wind speed** in [View](#view). Under them it says "Calculating" while the winds are being worked out, "Out of date" after a change they do not yet take in, "Not calculated yet" before the first, and "Winds unavailable" if they cannot be worked out.
 
 Which winds are shown follows the Layers section:
 
@@ -168,6 +178,7 @@ Which winds are shown follows the Layers section:
 
 - While new winds are being worked out, the last ones stay on the globe. A new world drops them until its own are ready.
 - Clearing Winds removes the arrows and stops the winds being worked out.
+- The strip under the pointer gives the wind of the place under it; see [The value under the pointer](#the-value-under-the-pointer).
 
 ## Statistics
 

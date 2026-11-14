@@ -86,6 +86,8 @@ A pure library with no DOM, Three.js or worker globals.
 | `playback.ts` | Playing through the year |
 | `storage.ts`, `autosave.ts` | The saved world in IndexedDB, export and import, and when to save |
 | `panelMemory.ts` | Which panel sections are open, remembered by the browser |
+| `preferences.ts` | The page's preferences, remembered by the browser apart from the world: the wind speed unit |
+| `windUnits.ts` | Wind speeds in m/s, km/h and mph, the eight compass points, and a wind in words |
 | `earthData.ts`, `observedData.ts` | Fetching the Earth data files when first needed |
 | `globe/` | The renderer, shaders, camera, picking, colour ramps and the wind arrows |
 | `ui/` | The panel's sections and controls, the New world dialog, the legend, the key to the wind arrows and the cursor readout |

@@ -8,7 +8,9 @@ import {
 	createFakeDocument,
 	type FakeDocument,
 	type FakeElement,
+	oneByClass,
 } from '../testing/fakeDocument';
+import type { WindUnit } from '../windUnits';
 import {
 	createViewPanel,
 	formatExaggeration,
@@ -77,6 +79,7 @@ describe('createViewPanel', () => {
 			onGridVisible: (visible) => told.push(`grid ${visible}`),
 			onSunlight: (on) => told.push(`sunlight ${on}`),
 			onWinds: (on) => told.push(`winds ${on}`),
+			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
 		});
 		const box = (id: string): FakeElement => {
 			const found = byClass(section, 'field__checkbox').find(
@@ -141,6 +144,7 @@ describe('the Winds checkbox', () => {
 			onGridVisible: (visible) => told.push(`grid ${visible}`),
 			onSunlight: (on) => told.push(`sunlight ${on}`),
 			onWinds: (on) => told.push(`winds ${on}`),
+			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
 		});
 		const box = byClass(section, 'field__checkbox').find(
 			(input) => input.id === 'view-winds',
@@ -173,5 +177,85 @@ describe('the Winds checkbox', () => {
 		box.checked = false;
 		box.fire('change');
 		expect(told).toEqual(['winds true', 'winds false']);
+	});
+});
+
+describe('the Wind speed choice', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const make = (windUnit?: WindUnit, winds?: boolean) => {
+		const told: string[] = [];
+		const section = fake.createElement('div');
+		createViewPanel(section as unknown as HTMLElement, {
+			seaLevel: 0,
+			winds,
+			windUnit,
+			onExaggeration: () => {},
+			onSeaLevel: () => {},
+			onGridVisible: () => {},
+			onSunlight: () => {},
+			onWinds: (on) => told.push(`winds ${on}`),
+			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
+		});
+		const select = oneByClass(section, 'field__select');
+		return { told, section, select };
+	};
+
+	it('comes directly under the Winds checkbox, labelled Wind speed, offering m/s, km/h and mph', () => {
+		const { section, select } = make();
+		const fields = section.children;
+		const winds = fields.findIndex((field) =>
+			byClass(field, 'field__checkbox').some(
+				(input) => input.id === 'view-winds',
+			),
+		);
+		expect(fields[winds + 1]?.children).toContain(select);
+		expect(fields).toHaveLength(winds + 2);
+		expect(select.id).toBe('view-wind-unit');
+		const label = byClass(section, 'field__label').find(
+			(element) => element.htmlFor === 'view-wind-unit',
+		);
+		expect(label?.textContent).toBe('Wind speed');
+		expect(
+			select.children.map((option) => [option.value, option.textContent]),
+		).toEqual([
+			['m/s', 'm/s'],
+			['km/h', 'km/h'],
+			['mph', 'mph'],
+		]);
+	});
+
+	it('starts on m/s, or on the unit given', () => {
+		expect(make().select.value).toBe('m/s');
+		expect(make('mph').select.value).toBe('mph');
+		expect(make('km/h').select.value).toBe('km/h');
+	});
+
+	it('shows whether or not the winds are shown', () => {
+		for (const winds of [false, true]) {
+			const { select, section } = make(undefined, winds);
+			expect(select.hidden).toBe(false);
+			expect(section.children.every((field) => field.hidden !== true)).toBe(
+				true,
+			);
+		}
+	});
+
+	it('reports each unit chosen, and the unit alone', () => {
+		const { told, select } = make();
+		select.value = 'km/h';
+		select.fire('change');
+		select.value = 'mph';
+		select.fire('change');
+		select.value = 'm/s';
+		select.fire('change');
+		expect(told).toEqual(['wind unit km/h', 'wind unit mph', 'wind unit m/s']);
 	});
 });

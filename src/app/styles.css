@@ -885,8 +885,9 @@ body {
    its size as the values change; in a window narrower than that it is as
    wide as the area allows. Each part has a line of its own and a part with
    nothing to say takes none, so the strip is two lines high in Terrain view
-   and three in Temperature view: its height changes only with what is
-   shown, not with the values. */
+   and three in Temperature view, with one more for the wind while the
+   winds are shown: its height changes only with what is shown, not with
+   the values. */
 .cursor-readout {
   display: flex;
   flex: none;
@@ -915,19 +916,22 @@ body {
    scrolls. */
 .cursor-readout__position,
 .cursor-readout__elevation,
-.cursor-readout__temperature {
+.cursor-readout__temperature,
+.cursor-readout__wind {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-/* The end of the temperature's line, after a middle dot that is hidden
-   with it. */
-.cursor-readout__status {
+/* The end of the temperature's line and of the wind's, each after a middle
+   dot that is hidden with it. */
+.cursor-readout__status,
+.cursor-readout__wind-status {
   color: var(--color-text-muted);
 }
 
-.cursor-readout__status::before {
+.cursor-readout__status::before,
+.cursor-readout__wind-status::before {
   content: " · ";
 }
 

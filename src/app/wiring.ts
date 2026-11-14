@@ -26,6 +26,7 @@ import type { SunlightStyle } from './globe/material';
 import type { Globe } from './globe/renderer';
 import { createLayerStore, type LayerStore } from './layers';
 import type { ObservedLoader } from './observedData';
+import type { Preferences } from './preferences';
 import type {
 	RefreshScheduler,
 	TemperatureScheduler,
@@ -41,7 +42,7 @@ import { applyStartup, decideStartup, type StartupRead } from './startup';
 import type { WorldStore } from './storage';
 import type { CursorReadout } from './ui/cursorReadout';
 import { createDateLine } from './ui/dateLine';
-import type { LayerPanel, ShownTemperature } from './ui/layerPanel';
+import type { LayerPanel, ShownTemperature, ShownWinds } from './ui/layerPanel';
 import {
 	FIRST_NEW_WORLD_VALUES,
 	type NewWorldDialogOptions,
@@ -67,6 +68,7 @@ import {
 	type ShortcutEvent,
 } from './undo';
 import { DEFAULT_PAGE_VIEW, type Layer, type PageView } from './view';
+import type { WindUnit } from './windUnits';
 
 /** What the page asks of its globe once the globe exists. */
 export type PageGlobe = Pick<
@@ -122,12 +124,18 @@ export type PageLayerOptions = {
 	readonly onView: (view: PageView) => void;
 	/** Gives the observed temperature on a world's grid. */
 	readonly loadObserved: ObservedLoader;
+	/** The unit the key to the wind arrows writes its speeds in at first. */
+	readonly windUnit: WindUnit;
 };
 
 /** What the cursor readout reads of the page. */
 export type PageReadoutOptions = PageStatisticsOptions & {
 	/** What the globe shows of the temperature, at the time it is asked. */
 	readonly shownTemperature: () => ShownTemperature | null;
+	/** What the globe shows of the winds, at the time it is asked. */
+	readonly shownWinds: () => ShownWinds | null;
+	/** The unit wind speeds are written in, at the time it is asked. */
+	readonly windUnit: () => WindUnit;
 };
 
 /** The parts of a page, for {@link startPage} to join. */
@@ -202,7 +210,13 @@ export type PageParts = {
 		options: PageLayerOptions,
 	) => Pick<
 		LayerPanel,
-		'newWorld' | 'setEarth' | 'setSunlight' | 'setWinds' | 'shown'
+		| 'newWorld'
+		| 'setEarth'
+		| 'setSunlight'
+		| 'setWinds'
+		| 'shown'
+		| 'shownWinds'
+		| 'setWindUnit'
 	>;
 	/**
 	 * Lays the cursor readout over the globe, hidden until the pointer is
@@ -211,6 +225,11 @@ export type PageParts = {
 	readonly createCursorReadout: (
 		options: PageReadoutOptions,
 	) => Pick<CursorReadout, 'invalidate' | 'clear'>;
+	/**
+	 * The page's preferences, remembered by the browser apart from the
+	 * world: the unit wind speeds are written in.
+	 */
+	readonly preferences: Pick<Preferences, 'windSpeedUnit' | 'setWindSpeedUnit'>;
 	/**
 	 * The panel's Layers section, already in the panel, which ticking the
 	 * Sunlight or the Winds control opens.
@@ -310,14 +329,23 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * imported or restored world leaves every section as it is.
  *
  * The cursor readout over the globe is made after the statistics, and reads
- * what the globe shows of the temperature from the layer panel. Besides
- * following the pointer, it looks again at what lies under a pointer held
- * still after each turn and zoom of the camera, each change of the terrain
- * or the sea level, each new world, each change of the view settings and
- * each change of the temperature store. Opening the New world dialog hides
- * it until the next pointer event on the canvas: a move, a press or a
- * release. Once the readout is made, the layer panel is told whether the
- * world the page opens on is the measured Earth.
+ * what the globe shows of the temperature and of the winds from the layer
+ * panel. Besides following the pointer, it looks again at what lies under
+ * a pointer held still after each turn and zoom of the camera, each change
+ * of the terrain or the sea level, each new world, each change of the view
+ * settings, the Winds control's included, each change of the store of the
+ * temperature and the winds, and each change of the wind speed unit.
+ * Opening the New world dialog hides the readout until the next pointer
+ * event on the canvas: a move, a press or a release. Once the readout is
+ * made, the layer panel is told whether the world the page opens on is the
+ * measured Earth.
+ *
+ * The unit wind speeds are written in is a preference of the browser, not
+ * part of the world: it is read once, as the page starts, and the view
+ * controls, the key to the wind arrows and the readout all start in it. A
+ * unit chosen in the view controls is remembered by the preferences, and
+ * reaches the key, through the layer panel, and the readout at once. It
+ * is never saved with the world.
  *
  * A world that replaces the one being edited reaches, in this order: the
  * sculpt controller, which ends a stroke still under way on the old world
@@ -509,8 +537,11 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			handleHistoryKey(event, edits.perform);
 		}
 	});
+	/** The unit wind speeds are written in, as last chosen. */
+	let windUnit = parts.preferences.windSpeedUnit();
 	const view = parts.createViewPanel({
 		seaLevel: state.world.seaLevel,
+		windUnit,
 		onExaggeration: globe.setExaggeration,
 		onSeaLevel: (metres) => {
 			const { world } = state;
@@ -535,6 +566,12 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			if (on) {
 				parts.layersSection.setOpen(true);
 			}
+		},
+		onWindUnit: (unit) => {
+			windUnit = unit;
+			parts.preferences.setWindSpeedUnit(unit);
+			layerPanel.setWindUnit(unit);
+			readout.invalidate();
 		},
 	});
 	const planet = parts.createPlanetPanel({
@@ -587,6 +624,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			readout.invalidate();
 		},
 		loadObserved: parts.loadObserved,
+		windUnit,
 	});
 	const statistics = parts.createStatistics({
 		currentWorld: () => state.world,
@@ -597,6 +635,8 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		currentWorld: () => state.world,
 		isStrokeActive: sculpt.isStrokeActive,
 		shownTemperature: layerPanel.shown,
+		shownWinds: layerPanel.shownWinds,
+		windUnit: () => windUnit,
 	});
 	// Told after the layer panel, which brings what the globe shows up to
 	// date first.

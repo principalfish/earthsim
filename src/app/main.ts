@@ -8,6 +8,7 @@ import { MAX_DRAWN_SEA_LEVEL_M, MIN_DRAWN_SEA_LEVEL_M } from './globe/material';
 import { createGlobe, type Globe } from './globe/renderer';
 import { loadObservedTemperature } from './observedData';
 import { createPanelMemory, reachStorage } from './panelMemory';
+import { createPreferences } from './preferences';
 import { createSculptController } from './sculpt';
 import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
 import { createCursorReadout, createReadoutStrip } from './ui/cursorReadout';
@@ -85,9 +86,12 @@ const logError = (error: unknown): void => console.error(error);
 
 const globe = createGlobeOrExplain();
 if (globe !== null) {
+	// Reached once for both: the open sections and the preferences are
+	// settings of the browser, kept apart from the saved world.
+	const browserStorage = reachStorage(() => window.localStorage);
 	const sections = createPanelSections(
 		panel,
-		createPanelMemory(reachStorage(() => window.localStorage)),
+		createPanelMemory(browserStorage),
 	);
 	const overlays = createGlobeOverlays(viewport);
 	void startPage({
@@ -163,6 +167,7 @@ if (globe !== null) {
 				globe,
 				show: createReadoutStrip(overlays.readout).show,
 			}),
+		preferences: createPreferences(browserStorage),
 		layersSection: sections.layers,
 		openNewWorldDialog,
 		loadEarth: loadEarthData,

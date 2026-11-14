@@ -1,7 +1,8 @@
 /**
  * The cursor readout: a strip over the globe's bottom-left corner saying
- * what lies under the pointer, such as `27.9° N, 86.9° E`, `8,123 m` and,
- * in Temperature view, `July −18 °C`.
+ * what lies under the pointer, such as `27.9° N, 86.9° E`, `8,123 m`, in
+ * Temperature view `July −18 °C` and, while the winds are shown,
+ * `7 m/s from the north-east`.
  *
  * The writing is in the pure functions at the top. {@link createCursorReadout}
  * follows the pointer and decides when to look again, and
@@ -23,12 +24,18 @@ import {
 	type TemperatureSource,
 	type TemperatureView,
 } from '../view';
+import {
+	DEFAULT_WIND_UNIT,
+	formatWind,
+	type WindUnit,
+	windFromDeg,
+} from '../windUnits';
 import { createElement } from './fields';
-import type { ShownTemperature } from './layerPanel';
+import type { ShownTemperature, ShownWinds } from './layerPanel';
 
 /**
- * What the readout says beside a temperature that is not the current
- * result as chosen, as the legend marks its scale out of date.
+ * What the readout says beside a temperature, or a wind, that is not the
+ * current result as chosen, as the legend marks its scale out of date.
  */
 export const READOUT_OUT_OF_DATE_TEXT = 'out of date';
 
@@ -149,6 +156,41 @@ export type ReadoutTemperature = {
 	readonly current: boolean;
 };
 
+/** The wind at the place under the pointer, from what is on screen. */
+export type ReadoutWind = {
+	/** The eastward wind at the place, in metres a second. */
+	readonly east: number;
+	/** The northward wind at the place, in metres a second. */
+	readonly north: number;
+	/** Whether it is the year's mean wind; the month's when not. */
+	readonly annualMean: boolean;
+	/** Whether the winds are the ones chosen and up to date. */
+	readonly current: boolean;
+};
+
+/**
+ * A wind as the readout writes it, such as `7 m/s from the north-east`, or
+ * `Annual average 7 m/s from the north-east` for the year's mean wind,
+ * named as the temperature is on that view; `calm` below 0.5 m/s, as
+ * {@link formatWind} writes it.
+ *
+ * @param wind - The wind.
+ * @param unit - The unit to write its speed in.
+ */
+export const formatReadoutWind = (
+	wind: ReadoutWind,
+	unit: WindUnit,
+): string => {
+	const text = formatWind(
+		Math.hypot(wind.east, wind.north),
+		windFromDeg(wind.east, wind.north),
+		unit,
+	);
+	return wind.annualMean
+		? `${TEMPERATURE_VIEW_LABELS.annualMean} ${text}`
+		: text;
+};
+
 /** What the readout says of one place. */
 export type ReadoutParts = {
 	/** Latitude of the place in degrees, north positive. */
@@ -159,6 +201,8 @@ export type ReadoutParts = {
 	readonly heightM: number;
 	/** The temperature on screen at the place, or null for none. */
 	readonly temperature: ReadoutTemperature | null;
+	/** The wind on screen at the place, or null for none. */
+	readonly wind: ReadoutWind | null;
 };
 
 /** The readout's text, part by part, as the strip shows it. */
@@ -174,15 +218,26 @@ export type ReadoutText = {
 	 * current result as chosen; null when it is, or there is none.
 	 */
 	readonly status: string | null;
+	/** Its wind, as {@link formatReadoutWind} writes it, or null. */
+	readonly wind: string | null;
+	/**
+	 * {@link READOUT_OUT_OF_DATE_TEXT} when the wind is not the current
+	 * result as chosen; null when it is, or there is none.
+	 */
+	readonly windStatus: string | null;
 };
 
 /**
  * The readout's text for one place.
  *
  * @param parts - What there is to say of the place.
+ * @param unit - The unit to write a wind's speed in; m/s when left out.
  */
-export const describeReadout = (parts: ReadoutParts): ReadoutText => {
-	const { temperature } = parts;
+export const describeReadout = (
+	parts: ReadoutParts,
+	unit: WindUnit = DEFAULT_WIND_UNIT,
+): ReadoutText => {
+	const { temperature, wind } = parts;
 	return {
 		position: formatLatLon(parts.latitudeDeg, parts.longitudeDeg),
 		elevation: formatElevation(parts.heightM),
@@ -199,6 +254,8 @@ export const describeReadout = (parts: ReadoutParts): ReadoutText => {
 			temperature === null || temperature.current
 				? null
 				: READOUT_OUT_OF_DATE_TEXT,
+		wind: wind === null ? null : formatReadoutWind(wind, unit),
+		windStatus: wind === null || wind.current ? null : READOUT_OUT_OF_DATE_TEXT,
 	};
 };
 
@@ -207,21 +264,26 @@ export const describeReadout = (parts: ReadoutParts): ReadoutText => {
  *
  * @remarks
  * The position is the direction's own, so it moves smoothly with the
- * pointer and reaches the poles. The height and the temperature are of the
- * one cell the direction falls in, with no blending of its neighbours: its
- * elevation less the world's sea level, and the field's value at it. A
- * field that is not one value per cell of the world, or whose value there
- * is not finite, gives no temperature.
+ * pointer and reaches the poles. The height, the temperature and the wind
+ * are of the one cell the direction falls in, with no blending of its
+ * neighbours: its elevation less the world's sea level, the field's value
+ * at it, and the wind there, uncapped, of the winds the globe's arrows are
+ * drawn from, not the mean of an arrow's patch. A field that is not one
+ * value per cell of the world, or whose value there is not finite, gives
+ * no temperature, and winds that are not, no wind.
  *
  * @param world - The world on show.
  * @param direction - The direction of the place, as the globe picks it.
  * @param shown - What the globe shows of the temperature, or null for
  * none.
+ * @param winds - What the globe shows of the winds, or null for none; none
+ * when left out.
  */
 export const readoutPartsAt = (
 	world: World,
 	direction: Vec3,
 	shown: ShownTemperature | null,
+	winds: ShownWinds | null = null,
 ): ReadoutParts => {
 	const grid = getGrid(world.resolution);
 	const cell = cellAt(grid, direction);
@@ -230,6 +292,12 @@ export const readoutPartsAt = (
 		shown !== null && shown.field.length === grid.cellCount
 			? (shown.field[cell] as number)
 			: Number.NaN;
+	const onGrid =
+		winds !== null &&
+		winds.field.east.length === grid.cellCount &&
+		winds.field.north.length === grid.cellCount;
+	const east = onGrid ? (winds.field.east[cell] as number) : Number.NaN;
+	const north = onGrid ? (winds.field.north[cell] as number) : Number.NaN;
 	return {
 		latitudeDeg,
 		longitudeDeg,
@@ -244,6 +312,15 @@ export const readoutPartsAt = (
 						current: shown.current,
 					}
 				: null,
+		wind:
+			winds !== null && Number.isFinite(east) && Number.isFinite(north)
+				? {
+						east,
+						north,
+						annualMean: winds.annualMean,
+						current: winds.current,
+					}
+				: null,
 	};
 };
 
@@ -255,7 +332,9 @@ const sameText = (a: ReadoutText | null, b: ReadoutText | null): boolean =>
 		a.position === b.position &&
 		a.elevation === b.elevation &&
 		a.temperature === b.temperature &&
-		a.status === b.status);
+		a.status === b.status &&
+		a.wind === b.wind &&
+		a.windStatus === b.windStatus);
 
 /** What the cursor readout follows, and where it shows what it finds. */
 export type CursorReadoutOptions = {
@@ -269,6 +348,10 @@ export type CursorReadoutOptions = {
 	readonly isStrokeActive: () => boolean;
 	/** What the globe shows of the temperature, at the time it is asked. */
 	readonly shownTemperature: () => ShownTemperature | null;
+	/** What the globe shows of the winds, at the time it is asked. */
+	readonly shownWinds: () => ShownWinds | null;
+	/** The unit wind speeds are written in, at the time it is asked. */
+	readonly windUnit: () => WindUnit;
 	/** Shows the readout's text, or hides the readout for null. */
 	readonly show: (text: ReadoutText | null) => void;
 };
@@ -278,8 +361,9 @@ export type CursorReadout = {
 	/**
 	 * Says that what lies under the pointer may have changed though the
 	 * pointer has not moved: the terrain, the sea level, the world, the
-	 * camera, or the temperature on screen. The readout looks again at the
-	 * next animation frame.
+	 * camera, the temperature or the winds on screen, or the unit wind
+	 * speeds are written in. The readout looks again at the next animation
+	 * frame.
 	 */
 	invalidate(): void;
 	/**
@@ -346,7 +430,9 @@ export const createCursorReadout = (
 							options.currentWorld(),
 							direction,
 							options.shownTemperature(),
+							options.shownWinds(),
 						),
+						options.windUnit(),
 					),
 		);
 		if (direction !== null && options.isStrokeActive()) {
@@ -426,10 +512,11 @@ export type ReadoutStrip = {
  *
  * @remarks
  * The strip holds one line for each piece of the text: the position, the
- * elevation and the temperature, in that order, each hidden while it has
- * nothing to say. The mark that the temperature is out of date is the end
- * of the temperature's line, hidden while it has nothing to say, and the
- * stylesheet puts a middle dot before it. The stylesheet lays the strip
+ * elevation, the temperature and the wind, in that order, each hidden
+ * while it has nothing to say. The mark that the temperature is out of
+ * date is the end of the temperature's line, and the mark that the wind
+ * is, the end of the wind's, each hidden while it has nothing to say; the
+ * stylesheet puts a middle dot before each. The stylesheet lays the strip
  * over the globe's bottom-left corner, beside or above the legend, out of
  * the pointer's way.
  *
@@ -451,7 +538,11 @@ export const createReadoutStrip = (container: HTMLElement): ReadoutStrip => {
 	const value = createElement('span', 'cursor-readout__value');
 	const status = createElement('span', 'cursor-readout__status');
 	temperature.append(value, status);
-	element.append(position, elevation, temperature);
+	const wind = createElement('span', 'cursor-readout__wind');
+	const windValue = createElement('span', 'cursor-readout__wind-value');
+	const windStatus = createElement('span', 'cursor-readout__wind-status');
+	wind.append(windValue, windStatus);
+	element.append(position, elevation, temperature, wind);
 	container.append(element);
 
 	const write = (part: HTMLElement, text: string | null): void => {
@@ -471,6 +562,9 @@ export const createReadoutStrip = (container: HTMLElement): ReadoutStrip => {
 			temperature.hidden = (text?.temperature ?? null) === null;
 			write(value, text?.temperature ?? null);
 			write(status, text?.status ?? null);
+			wind.hidden = (text?.wind ?? null) === null;
+			write(windValue, text?.wind ?? null);
+			write(windStatus, text?.windStatus ?? null);
 		},
 	};
 };

@@ -21,18 +21,20 @@ import {
 	oneByClass,
 } from '../testing/fakeDocument';
 import { DEFAULT_MONTH } from '../view';
+import { WIND_UNITS, type WindUnit } from '../windUnits';
 import {
 	createCursorReadout,
 	createReadoutStrip,
 	describeReadout,
 	formatElevation,
 	formatLatLon,
+	formatReadoutWind,
 	formatTemperature,
 	READOUT_OUT_OF_DATE_TEXT,
 	type ReadoutText,
 	readoutPartsAt,
 } from './cursorReadout';
-import type { ShownTemperature } from './layerPanel';
+import type { ShownTemperature, ShownWinds } from './layerPanel';
 
 describe('formatLatLon', () => {
 	it('writes each coordinate to a tenth of a degree with its letter', () => {
@@ -159,6 +161,8 @@ describe('describeReadout', () => {
 		latitudeDeg: 27.94,
 		longitudeDeg: 86.925,
 		heightM: 8123,
+		temperature: null,
+		wind: null,
 	};
 
 	it('says the position and elevation alone with no temperature', () => {
@@ -167,6 +171,8 @@ describe('describeReadout', () => {
 			elevation: '8,123 m',
 			temperature: null,
 			status: null,
+			wind: null,
+			windStatus: null,
 		});
 	});
 
@@ -187,6 +193,8 @@ describe('describeReadout', () => {
 			elevation: '8,123 m',
 			temperature: 'July −18 °C',
 			status: null,
+			wind: null,
+			windStatus: null,
 		});
 	});
 
@@ -207,6 +215,8 @@ describe('describeReadout', () => {
 			elevation: '8,123 m',
 			temperature: 'Annual average −12 °C difference',
 			status: READOUT_OUT_OF_DATE_TEXT,
+			wind: null,
+			windStatus: null,
 		});
 		expect(
 			describeReadout({
@@ -239,8 +249,117 @@ describe('describeReadout', () => {
 			elevation: '3,400 m deep',
 			temperature: 'Seasonal range 12 °C',
 			status: READOUT_OUT_OF_DATE_TEXT,
+			wind: null,
+			windStatus: null,
 		});
 		expect(READOUT_OUT_OF_DATE_TEXT).toBe('out of date');
+	});
+
+	/** A wind from the north-east at 5√2 m/s, about 7 m/s. */
+	const northEasterly = {
+		east: -5,
+		north: -5,
+		annualMean: false,
+		current: true,
+	};
+
+	it('adds the wind on its own line, in m/s when no unit is given', () => {
+		const text = describeReadout({ ...place, wind: northEasterly });
+		expect(text).toEqual({
+			position: '27.9° N, 86.9° E',
+			elevation: '8,123 m',
+			temperature: null,
+			status: null,
+			wind: '7 m/s from the north-east',
+			windStatus: null,
+		});
+	});
+
+	it('writes the wind in the unit given', () => {
+		expect(
+			describeReadout({ ...place, wind: northEasterly }, 'km/h').wind,
+		).toBe('25 km/h from the north-east');
+		expect(describeReadout({ ...place, wind: northEasterly }, 'mph').wind).toBe(
+			'16 mph from the north-east',
+		);
+	});
+
+	it('names the year’s mean wind as the temperature is named on that view', () => {
+		expect(
+			describeReadout({
+				...place,
+				wind: { ...northEasterly, annualMean: true },
+			}).wind,
+		).toBe('Annual average 7 m/s from the north-east');
+		expect(formatTemperature(14, 'annualMean', 6)).toMatch(/^Annual average /);
+	});
+
+	it('names a calm year’s mean wind as the year’s too', () => {
+		expect(
+			describeReadout({
+				...place,
+				wind: { ...northEasterly, east: 0.3, north: -0.2, annualMean: true },
+			}).wind,
+		).toBe('Annual average calm');
+	});
+
+	it.each([
+		[true, true, null, null],
+		[true, false, null, READOUT_OUT_OF_DATE_TEXT],
+		[false, true, READOUT_OUT_OF_DATE_TEXT, null],
+		[false, false, READOUT_OUT_OF_DATE_TEXT, READOUT_OUT_OF_DATE_TEXT],
+	])(
+		'marks the temperature (current %s) and the wind (current %s) out of date each on its own',
+		(temperatureCurrent, windCurrent, status, windStatus) => {
+			const text = describeReadout({
+				...place,
+				temperature: {
+					value: 18,
+					view: 'month',
+					month: 6,
+					source: 'simulated',
+					current: temperatureCurrent,
+				},
+				wind: { ...northEasterly, current: windCurrent },
+			});
+			expect(text).toMatchObject({
+				temperature: 'July 18 °C',
+				status,
+				wind: '7 m/s from the north-east',
+				windStatus,
+			});
+		},
+	);
+
+	it('reads a calm wind as calm in every unit, from below 0.5 m/s', () => {
+		for (const unit of WIND_UNITS) {
+			const calm = { ...northEasterly, east: 0.49, north: 0 };
+			expect(describeReadout({ ...place, wind: calm }, unit).wind, unit).toBe(
+				'calm',
+			);
+			const light = { ...northEasterly, east: 0.5, north: 0 };
+			expect(
+				describeReadout({ ...place, wind: light }, unit).wind,
+				unit,
+			).toMatch(/ from the west$/);
+		}
+	});
+});
+
+describe('formatReadoutWind', () => {
+	it('gives the speed and the direction the wind blows from', () => {
+		const wind = (east: number, north: number) => ({
+			east,
+			north,
+			annualMean: false,
+			current: true,
+		});
+		expect(formatReadoutWind(wind(7, 0), 'm/s')).toBe('7 m/s from the west');
+		expect(formatReadoutWind(wind(0, -10), 'km/h')).toBe(
+			'36 km/h from the north',
+		);
+		expect(formatReadoutWind(wind(0, 10), 'mph')).toBe('22 mph from the south');
+		expect(formatReadoutWind(wind(-30, 0), 'm/s')).toBe('30 m/s from the east');
 	});
 });
 
@@ -272,6 +391,12 @@ const shownOf = (
 	current: true,
 	...values,
 });
+
+/** What the globe shows of the winds, current, of a month. */
+const windsOf = (
+	field: ShownWinds['field'],
+	values: Partial<ShownWinds> = {},
+): ShownWinds => ({ field, annualMean: false, current: true, ...values });
 
 describe('readoutPartsAt', () => {
 	it('gives the direction’s own position and its cell’s height from the sea level', () => {
@@ -318,6 +443,65 @@ describe('readoutPartsAt', () => {
 			readoutPartsAt(world, direction, shownOf(field, { source: 'observed' }))
 				.temperature?.source,
 		).toBe('observed');
+	});
+
+	it('takes the wind of that cell alone, uncapped, with what the winds are', () => {
+		const world = createBlankWorld(64);
+		const { direction, cell } = placeAt(-20, 140);
+		const east = new Float32Array(world.elevation.length).fill(1);
+		const north = new Float32Array(world.elevation.length).fill(1);
+		east[cell] = 25;
+		north[cell] = -3;
+		const parts = readoutPartsAt(
+			world,
+			direction,
+			null,
+			windsOf({ east, north }, { annualMean: true, current: false }),
+		);
+		expect(parts.temperature).toBeNull();
+		expect(parts.wind).toEqual({
+			east: 25,
+			north: -3,
+			annualMean: true,
+			current: false,
+		});
+	});
+
+	it('gives no wind with no winds shown, as with Winds off', () => {
+		const world = createBlankWorld(64);
+		const { direction } = placeAt(-20, 140);
+		expect(readoutPartsAt(world, direction, null).wind).toBeNull();
+		expect(readoutPartsAt(world, direction, null, null).wind).toBeNull();
+	});
+
+	it('gives no wind for winds of another grid, or no value', () => {
+		const world = createBlankWorld(64);
+		const { direction, cell } = placeAt(-20, 140);
+		const cells = world.elevation.length;
+		const full = () => new Float32Array(cells).fill(3);
+		for (const field of [
+			{ east: new Float32Array(12), north: full() },
+			{ east: full(), north: new Float32Array(12) },
+			{ east: new Float32Array(cells + 1), north: new Float32Array(cells + 1) },
+		]) {
+			expect(
+				readoutPartsAt(world, direction, null, windsOf(field)).wind,
+			).toBeNull();
+		}
+		for (const bad of [Number.NaN, Number.POSITIVE_INFINITY]) {
+			const east = full();
+			east[cell] = bad;
+			expect(
+				readoutPartsAt(world, direction, null, windsOf({ east, north: full() }))
+					.wind,
+			).toBeNull();
+			const north = full();
+			north[cell] = bad;
+			expect(
+				readoutPartsAt(world, direction, null, windsOf({ east: full(), north }))
+					.wind,
+			).toBeNull();
+		}
 	});
 
 	it('gives no temperature for a field of another grid, or no value', () => {
@@ -384,6 +568,8 @@ type Page = {
 	world: World;
 	strokeActive: boolean;
 	shownTemperature: ShownTemperature | null;
+	shownWinds: ShownWinds | null;
+	windUnit: WindUnit;
 	/** How many times the globe was asked for the point under the pointer. */
 	picks: number;
 };
@@ -398,6 +584,8 @@ const createStage = (world: World = createBlankWorld(64)) => {
 		world,
 		strokeActive: false,
 		shownTemperature: null,
+		shownWinds: null,
+		windUnit: 'm/s',
 		picks: 0,
 	};
 	const readout = createCursorReadout({
@@ -411,6 +599,8 @@ const createStage = (world: World = createBlankWorld(64)) => {
 		currentWorld: () => page.world,
 		isStrokeActive: () => page.strokeActive,
 		shownTemperature: () => page.shownTemperature,
+		shownWinds: () => page.shownWinds,
+		windUnit: () => page.windUnit,
 		show: (text) => shows.push(text),
 	});
 	return Object.assign(page, {
@@ -467,6 +657,8 @@ describe('createCursorReadout', () => {
 				elevation: '1,234 m',
 				temperature: null,
 				status: null,
+				wind: null,
+				windStatus: null,
 			},
 		]);
 		expect(frames.pending()).toBe(0);
@@ -511,6 +703,8 @@ describe('createCursorReadout', () => {
 		expect(stage.last()).toMatchObject({
 			temperature: 'July −18 °C',
 			status: null,
+			wind: null,
+			windStatus: null,
 		});
 
 		stage.shownTemperature = shownOf(field, { current: false });
@@ -519,7 +713,101 @@ describe('createCursorReadout', () => {
 		expect(stage.last()).toMatchObject({
 			temperature: 'July −18 °C',
 			status: READOUT_OUT_OF_DATE_TEXT,
+			wind: null,
+			windStatus: null,
 		});
+	});
+
+	/** Winds from the north-east everywhere, at 5√2 m/s. */
+	const northEasterlies = (stage: ReturnType<typeof createStage>) => {
+		const cells = stage.world.elevation.length;
+		return windsOf({
+			east: new Float32Array(cells).fill(-5),
+			north: new Float32Array(cells).fill(-5),
+		});
+	};
+
+	it('adds the wind under the temperature while the globe shows winds, each with its own mark', () => {
+		const { stage, cell } = overLand();
+		const field = new Float32Array(stage.world.elevation.length);
+		field[cell] = -18.4;
+		stage.shownTemperature = shownOf(field);
+		stage.shownWinds = northEasterlies(stage);
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		expect(stage.last()).toMatchObject({
+			temperature: 'July −18 °C',
+			status: null,
+			wind: '7 m/s from the north-east',
+			windStatus: null,
+		});
+
+		stage.shownWinds = { ...northEasterlies(stage), current: false };
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		expect(stage.last()).toMatchObject({
+			temperature: 'July −18 °C',
+			status: null,
+			wind: '7 m/s from the north-east',
+			windStatus: READOUT_OUT_OF_DATE_TEXT,
+		});
+	});
+
+	it('shows the wind in Terrain view too, with no temperature', () => {
+		const { stage } = overLand();
+		stage.shownWinds = northEasterlies(stage);
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		expect(stage.last()).toMatchObject({
+			elevation: '1,234 m',
+			temperature: null,
+			wind: '7 m/s from the north-east',
+		});
+	});
+
+	it('looks again after invalidate() when the unit changes, and writes the wind in it', () => {
+		const { stage } = overLand();
+		stage.shownWinds = northEasterlies(stage);
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		stage.windUnit = 'km/h';
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		expect(stage.last()?.wind).toBe('25 km/h from the north-east');
+		stage.windUnit = 'mph';
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		expect(stage.last()?.wind).toBe('16 mph from the north-east');
+	});
+
+	it('looks again after invalidate() when the winds on screen go, as when Winds is turned off', () => {
+		const { stage } = overLand();
+		stage.shownWinds = northEasterlies(stage);
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		expect(stage.last()?.wind).not.toBeNull();
+		stage.shownWinds = null;
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		expect(stage.last()).toMatchObject({ wind: null, windStatus: null });
+	});
+
+	it('looks again after invalidate() when other winds are on screen, of a new result or the year’s mean', () => {
+		const { stage } = overLand();
+		stage.shownWinds = northEasterlies(stage);
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		const cells = stage.world.elevation.length;
+		stage.shownWinds = windsOf(
+			{
+				east: new Float32Array(cells).fill(10),
+				north: new Float32Array(cells),
+			},
+			{ annualMean: true },
+		);
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		expect(stage.last()?.wind).toBe('Annual average 10 m/s from the west');
 	});
 
 	it('has no temperature while the globe shows none, as before a result', () => {
@@ -777,12 +1065,52 @@ describe('createReadoutStrip', () => {
 			'cursor-readout__position',
 			'cursor-readout__elevation',
 			'cursor-readout__temperature',
+			'cursor-readout__wind',
 		]);
 		expect(
 			oneByClass(element, 'cursor-readout__temperature').children.map(
 				(child) => child.className,
 			),
 		).toEqual(['cursor-readout__value', 'cursor-readout__status']);
+		expect(
+			oneByClass(element, 'cursor-readout__wind').children.map(
+				(child) => child.className,
+			),
+		).toEqual(['cursor-readout__wind-value', 'cursor-readout__wind-status']);
+	});
+
+	it('shows the wind on its own line under the temperature, with its own mark', () => {
+		const { strip, part } = make();
+		const text = {
+			position: '27.9° N, 86.9° E',
+			elevation: '8,123 m',
+			temperature: 'July −18 °C',
+			status: null,
+			wind: null,
+			windStatus: null,
+		};
+		strip.show(text);
+		expect(part('wind').hidden).toBe(true);
+
+		strip.show({
+			...text,
+			wind: '7 m/s from the north-east',
+			windStatus: 'out of date',
+		});
+		expect(part('wind').hidden).toBe(false);
+		expect(part('wind-value').textContent).toBe('7 m/s from the north-east');
+		expect(part('wind-status').hidden).toBe(false);
+		expect(part('wind-status').textContent).toBe('out of date');
+		expect(part('status').hidden).toBe(true);
+		expect(part('value').textContent).toBe('July −18 °C');
+
+		strip.show({ ...text, wind: 'calm', windStatus: null });
+		expect(part('wind-value').textContent).toBe('calm');
+		expect(part('wind-status').hidden).toBe(true);
+		expect(part('wind-status').textContent).toBe('');
+
+		strip.show(text);
+		expect(part('wind').hidden).toBe(true);
 	});
 
 	it('shows each part of the text, hiding the parts with nothing to say', () => {
@@ -792,6 +1120,8 @@ describe('createReadoutStrip', () => {
 			elevation: '8,123 m',
 			temperature: null,
 			status: null,
+			wind: null,
+			windStatus: null,
 		});
 		expect(element.hidden).toBe(false);
 		expect(part('position').textContent).toBe('27.9° N, 86.9° E');
@@ -804,6 +1134,8 @@ describe('createReadoutStrip', () => {
 			elevation: '8,123 m',
 			temperature: 'July −18 °C',
 			status: 'out of date',
+			wind: null,
+			windStatus: null,
 		});
 		expect(part('temperature').hidden).toBe(false);
 		expect(part('value').textContent).toBe('July −18 °C');
@@ -821,12 +1153,16 @@ describe('createReadoutStrip', () => {
 			elevation: '8,123 m',
 			temperature: 'July −18 °C',
 			status: 'out of date',
+			wind: null,
+			windStatus: null,
 		});
 		strip.show({
 			position: '27.9° N, 86.9° E',
 			elevation: '8,123 m',
 			temperature: 'July −18 °C',
 			status: null,
+			wind: null,
+			windStatus: null,
 		});
 		expect(part('temperature').hidden).toBe(false);
 		expect(part('value').textContent).toBe('July −18 °C');

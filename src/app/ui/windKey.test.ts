@@ -35,9 +35,26 @@ describe('formatSpeed', () => {
 	it('writes the cap, and any speed above it, as the cap and more', () => {
 		expect(formatSpeed(ARROW_CAP_SPEED)).toBe(`${ARROW_CAP_SPEED}+ m/s`);
 		expect(formatSpeed(3 * ARROW_CAP_SPEED)).toBe(`${ARROW_CAP_SPEED}+ m/s`);
-		expect(formatSpeed(ARROW_CAP_SPEED - 0.5)).toBe(
-			`${ARROW_CAP_SPEED - 0.5} m/s`,
+		expect(formatSpeed(ARROW_CAP_SPEED - 0.6)).toBe(
+			`${ARROW_CAP_SPEED - 1} m/s`,
 		);
+	});
+
+	it('writes the key’s two speeds in each unit, the arrows’ own speeds converted', () => {
+		expect(WIND_KEY_SPEEDS).toEqual([5, 10]);
+		expect(WIND_KEY_SPEEDS.map((speed) => formatSpeed(speed, 'm/s'))).toEqual([
+			'5 m/s',
+			'10+ m/s',
+		]);
+		expect(WIND_KEY_SPEEDS.map((speed) => formatSpeed(speed, 'km/h'))).toEqual([
+			'18 km/h',
+			'36+ km/h',
+		]);
+		expect(WIND_KEY_SPEEDS.map((speed) => formatSpeed(speed, 'mph'))).toEqual([
+			'11 mph',
+			'22+ mph',
+		]);
+		expect(formatSpeed(3 * ARROW_CAP_SPEED, 'mph')).toBe('22+ mph');
 	});
 });
 
@@ -98,7 +115,7 @@ describe('createWindKey', () => {
 		);
 		expect(
 			byClass(element, 'wind-key__label').map((label) => label.textContent),
-		).toEqual(WIND_KEY_SPEEDS.map(formatSpeed));
+		).toEqual(WIND_KEY_SPEEDS.map((speed) => formatSpeed(speed)));
 		expect(
 			byClass(element, 'wind-key__label').map((label) => label.textContent),
 		).toEqual(['5 m/s', '10+ m/s']);
@@ -138,6 +155,25 @@ describe('createWindKey', () => {
 				String(2 * ARROW_EDGE_PX),
 			);
 		});
+	});
+
+	it('starts in the unit it is given, and writes the speeds in another when told, the arrows unchanged', () => {
+		const key = createWindKey('km/h');
+		const element = key.element as unknown as FakeElement;
+		const labels = () =>
+			byClass(element, 'wind-key__label').map((label) => label.textContent);
+		const widths = () =>
+			byClass(element, 'wind-key__row').map((row) =>
+				row.children[0]?.getAttribute('width'),
+			);
+		expect(labels()).toEqual(['18 km/h', '36+ km/h']);
+		const drawn = widths();
+		key.setUnit('mph');
+		expect(labels()).toEqual(['11 mph', '22+ mph']);
+		key.setUnit('m/s');
+		expect(labels()).toEqual(['5 m/s', '10+ m/s']);
+		expect(widths()).toEqual(drawn);
+		expect(byClass(element, 'wind-key__row')).toHaveLength(2);
 	});
 
 	it('shows the status it is given, and hides for null', () => {

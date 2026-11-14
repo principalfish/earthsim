@@ -15,6 +15,7 @@ import {
 	arrowShape,
 } from '../globe/wind';
 import type { WindsLayer } from '../layers';
+import { DEFAULT_WIND_UNIT, type WindUnit, wholeSpeed } from '../windUnits';
 import { createElement } from './fields';
 import { LEGEND_EMPTY_TEXT, LEGEND_OUT_OF_DATE_TEXT } from './legend';
 
@@ -34,13 +35,22 @@ export const WINDS_CALCULATING_TEXT = 'Calculating';
 export const WINDS_UNAVAILABLE_TEXT = 'Winds unavailable';
 
 /**
- * A speed as the key writes it, such as `5 m/s`, or `10+ m/s` at and above
- * {@link ARROW_CAP_SPEED}, every speed of which draws the same arrow.
+ * A speed as the key writes it, a whole number in a unit, such as `5 m/s`,
+ * `18 km/h` or `11 mph`; or, at and above {@link ARROW_CAP_SPEED}, every
+ * speed of which draws the same arrow, the cap and more: `10+ m/s`,
+ * `36+ km/h` or `22+ mph`.
  *
  * @param speed - The speed, in metres a second.
+ * @param unit - The unit to write it in; m/s when left out.
  */
-export const formatSpeed = (speed: number): string =>
-	speed >= ARROW_CAP_SPEED ? `${ARROW_CAP_SPEED}+ m/s` : `${speed} m/s`;
+export const formatSpeed = (
+	speed: number,
+	unit: WindUnit = DEFAULT_WIND_UNIT,
+): string => {
+	const capped = speed >= ARROW_CAP_SPEED;
+	const whole = wholeSpeed(capped ? ARROW_CAP_SPEED : speed, unit);
+	return `${whole}${capped ? '+' : ''} ${unit}`;
+};
 
 /** What the key shows at one moment. */
 export type WindKeyContent = {
@@ -81,6 +91,11 @@ export type WindKey = {
 	readonly element: HTMLElement;
 	/** Shows the content given, or hides the key for null. */
 	show(content: WindKeyContent | null): void;
+	/**
+	 * Writes the arrows' speeds in another unit. The arrows stay as they
+	 * are, drawn for the same speeds.
+	 */
+	setUnit(unit: WindUnit): void;
 };
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
@@ -127,19 +142,24 @@ const drawArrow = (shape: ArrowShape): SVGSVGElement => {
  *
  * @remarks
  * An arrow and its speed for each of {@link WIND_KEY_SPEEDS}, the arrows
- * shaped by {@link arrowShape} as those on the globe are, and under them the
+ * shaped by {@link arrowShape} as those on the globe are and their speeds
+ * written by {@link formatSpeed} in the unit given, and under them the
  * status line, a polite live region rewritten only when its words change,
  * as the legend's is, and kept in place, empty, while there is nothing to
  * say.
  *
+ * @param unit - The unit the speeds are written in at first; m/s when left
+ * out.
  * @returns The key.
  */
-export const createWindKey = (): WindKey => {
+export const createWindKey = (unit: WindUnit = DEFAULT_WIND_UNIT): WindKey => {
 	const key = createElement('div', 'wind-key');
 	key.hidden = true;
 	const caption = createElement('p', 'wind-key__caption');
 	caption.textContent = WIND_KEY_CAPTION;
 	key.append(caption);
+	/** Each arrow's label, with the speed it is drawn for. */
+	const labels: { readonly speed: number; readonly label: HTMLElement }[] = [];
 	for (const speed of WIND_KEY_SPEEDS) {
 		const shape = arrowShape(speed);
 		if (shape === null) {
@@ -147,7 +167,8 @@ export const createWindKey = (): WindKey => {
 		}
 		const row = createElement('div', 'wind-key__row');
 		const label = createElement('span', 'wind-key__label');
-		label.textContent = formatSpeed(speed);
+		label.textContent = formatSpeed(speed, unit);
+		labels.push({ speed, label });
 		row.append(drawArrow(shape) as unknown as HTMLElement, label);
 		key.append(row);
 	}
@@ -164,6 +185,11 @@ export const createWindKey = (): WindKey => {
 			const text = content.status ?? '';
 			if (status.textContent !== text) {
 				status.textContent = text;
+			}
+		},
+		setUnit: (next) => {
+			for (const { speed, label } of labels) {
+				label.textContent = formatSpeed(speed, next);
 			}
 		},
 	};

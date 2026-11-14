@@ -57,6 +57,7 @@ import {
 	type TemperatureSource,
 	type TemperatureView,
 } from '../view';
+import { DEFAULT_WIND_UNIT, type WindUnit } from '../windUnits';
 import { type ComparisonContent, createComparisonControls } from './comparison';
 import {
 	createButton,
@@ -187,6 +188,11 @@ export type LayerControlsOptions = {
 	readonly onPlay: () => void;
 	/** Called with the temperature's source when another is chosen. */
 	readonly onSource: (source: TemperatureSource) => void;
+	/**
+	 * The unit the key to the wind arrows writes its speeds in at first; m/s
+	 * when left out.
+	 */
+	readonly windUnit?: WindUnit;
 };
 
 /** The layer controls on the page. */
@@ -203,6 +209,8 @@ export type LayerControls = {
 	showView(view: PageView, playing: boolean): void;
 	/** Shows the comparison controls as given, or hides them. */
 	showComparison(content: ComparisonContent): void;
+	/** Writes the speeds of the key to the wind arrows in another unit. */
+	setWindUnit(unit: WindUnit): void;
 };
 
 /** What the layer panel joins. */
@@ -237,6 +245,11 @@ export type LayerPanelOptions = Pick<
 	 * not be loaded.
 	 */
 	readonly reportError: (error: unknown) => void;
+	/**
+	 * The unit the key to the wind arrows writes its speeds in at first; m/s
+	 * when left out.
+	 */
+	readonly windUnit?: WindUnit;
 };
 
 /** What the globe shows of the temperature, as the layer panel gave it. */
@@ -261,6 +274,28 @@ export type ShownTemperature = {
 	 * observed temperature, which is never out of date, while the store's
 	 * result is out of date, being calculated or no longer calculable; so
 	 * whenever the legend marks what it shows as not current.
+	 */
+	readonly current: boolean;
+};
+
+/** What the globe shows of the winds, as the layer panel gave it. */
+export type ShownWinds = {
+	/**
+	 * The winds the globe's arrows were last drawn from, in metres a second:
+	 * one eastward and one northward value per cell, in cell order. They
+	 * belong to the panel and must not be changed.
+	 */
+	readonly field: WindField;
+	/**
+	 * Whether they are the year's mean winds, as on the Temperature layer's
+	 * Annual average; the winds of a month when not.
+	 */
+	readonly annualMean: boolean;
+	/**
+	 * Whether they are the store's winds as chosen and up to date: false
+	 * while the globe keeps earlier winds than those chosen, and while the
+	 * store's winds are out of date, being worked out again or no longer
+	 * calculable; so whenever the key does not say they are current.
 	 */
 	readonly current: boolean;
 };
@@ -312,6 +347,20 @@ export type LayerPanel = {
 	 * colours, as in Terrain view and before there is a result.
 	 */
 	shown(): ShownTemperature | null;
+	/**
+	 * What the globe shows of the winds: exactly what its arrows were last
+	 * drawn from, as of the panel's latest update, which follows every
+	 * change of the view settings and of the store. Null while the winds are
+	 * off, and while the globe has none, as before there is a result.
+	 */
+	shownWinds(): ShownWinds | null;
+	/**
+	 * Writes the speeds of the key to the wind arrows in another unit. The
+	 * arrows on the globe are as they were.
+	 *
+	 * @param unit - The unit to write them in.
+	 */
+	setWindUnit(unit: WindUnit): void;
 };
 
 /** What the globe is given to show of the temperature, and how. */
@@ -472,7 +521,9 @@ const DIFFERENCE_SCALE: FittedScale = {
  * chosen, not again as the status changes. Turned off, the winds are told
  * they are not showing and the globe is given no winds. The key to the
  * arrows shows while the winds are shown, its line saying where the
- * store's winds stand, as {@link windKeyContent} words it.
+ * store's winds stand, as {@link windKeyContent} words it, and its speeds
+ * in the unit given, m/s when none is, or the one last set through
+ * {@link LayerPanel.setWindUnit}.
  *
  * The legend's scale, ramp, caption, ticks and words for what lies beyond
  * the ends are always those of what the globe shows: what it was last
@@ -512,6 +563,10 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	let derivedWinds: DerivedWinds | null = null;
 	/** The winds the globe was last given, or null for none. */
 	let shownWinds: WindField | null = null;
+	/** Whether {@link shownWinds} is a result's annual mean. */
+	let shownWindsMean = false;
+	/** What {@link LayerPanel.shownWinds} gives, as of the latest update. */
+	let shownWindsState: ShownWinds | null = null;
 	/**
 	 * The world's resolution while it is the measured Earth, as the page
 	 * last said; null while it is not, and the comparison is not offered.
@@ -729,12 +784,15 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		if (derivedWinds !== null && derivedWinds.solved !== result) {
 			derivedWinds = null;
 		}
+		/** The winds the globe is to show, once they are known. */
+		let target: WindField | null | undefined;
 		try {
 			let next: WindField | null = null;
 			if (windsOn && result !== null) {
 				derivedWinds ??= { solved: result };
 				next = windsTarget(derivedWinds);
 			}
+			target = next;
 			// Sent again only for other arrays: a month's are the result's
 			// own, and the mean is kept with the result.
 			if (
@@ -743,8 +801,24 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			) {
 				globe.setWinds(next);
 				shownWinds = next;
+				shownWindsMean = next !== null && next === derivedWinds?.summary;
 			}
 		} finally {
+			// Brought up to date even when the globe throws, which leaves the
+			// winds it shows, and so `shownWinds`, as they were.
+			shownWindsState =
+				windsOn && shownWinds !== null
+					? {
+							field: shownWinds,
+							annualMean: shownWindsMean,
+							current:
+								target !== undefined &&
+								target !== null &&
+								shownWinds.east === target.east &&
+								shownWinds.north === target.north &&
+								store.winds.status === 'current',
+						}
+					: null;
 			controls.showWindKey(windsOn ? windKeyContent(store.winds) : null);
 		}
 	};
@@ -914,6 +988,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 
 	const controls = options.createControls({
 		view: view(),
+		windUnit: options.windUnit ?? DEFAULT_WIND_UNIT,
 		onLayer: (next) => {
 			if (next === layer) {
 				return;
@@ -1031,6 +1106,8 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			update();
 		},
 		shown: () => shownTemperature,
+		shownWinds: () => shownWindsState,
+		setWindUnit: (unit) => controls.setWindUnit(unit),
 	};
 };
 
@@ -1065,7 +1142,7 @@ export const createLayerControls = (
 	options: LayerControlsOptions,
 ): LayerControls => {
 	const legend = createLegend();
-	const windKey = createWindKey();
+	const windKey = createWindKey(options.windUnit ?? DEFAULT_WIND_UNIT);
 
 	const temperatureControls = createElement('div', 'temperature-view');
 	const viewField = createSelectField({
@@ -1134,6 +1211,7 @@ export const createLayerControls = (
 	return {
 		showLegend: legend.show,
 		showWindKey: windKey.show,
+		setWindUnit: windKey.setUnit,
 		showView,
 		showComparison: comparison.show,
 	};

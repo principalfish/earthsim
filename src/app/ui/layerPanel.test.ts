@@ -41,6 +41,7 @@ import {
 	type PageView,
 	type TemperatureSource,
 } from '../view';
+import type { WindUnit } from '../windUnits';
 import type { ComparisonContent } from './comparison';
 import {
 	createLayerControls,
@@ -137,8 +138,13 @@ const resultOnGrid = (): TemperatureResult => {
 const tickLabels = (legend: LegendContent | null | undefined) =>
 	legend?.scale?.ticks.map((tick) => tick.label);
 
-/** The layer panel on a real store, with stand-ins for everything else. */
-const createStage = () => {
+/**
+ * The layer panel on a real store, with stand-ins for everything else.
+ *
+ * @param windUnit - The unit the key starts in; the panel's own when left
+ * out.
+ */
+const createStage = (windUnit?: WindUnit) => {
 	const errors: unknown[] = [];
 	/** What the panel reported as errors of its own. */
 	const reported: unknown[] = [];
@@ -151,6 +157,8 @@ const createStage = () => {
 	const winds: (WindField | null)[] = [];
 	/** What the key to the arrows was told to show. */
 	const keys: (WindKeyContent | null)[] = [];
+	/** Every unit the key to the arrows was told to write its speeds in. */
+	const keyUnits: WindUnit[] = [];
 	const legends: (LegendContent | null)[] = [];
 	/** What the comparison controls were told to show. */
 	const comparisons: ComparisonContent[] = [];
@@ -165,10 +173,13 @@ const createStage = () => {
 	let controls: LayerControlsOptions | undefined;
 	/** What the globe throws when next asked to show something, if anything. */
 	let failure: Error | null = null;
+	/** What the globe throws when next given winds, if anything. */
+	let windsFailure: Error | null = null;
 	/** What reporting an error throws, once it has taken the error, if anything. */
 	let reportFailure: Error | null = null;
 	const panel: LayerPanel = createLayerPanel({
 		store,
+		windUnit,
 		setTimer: timers.setTimer,
 		clearTimer: timers.clearTimer,
 		onView: (view) => told.push(view),
@@ -189,6 +200,11 @@ const createStage = () => {
 				shown.push({ field, range, ramp });
 			},
 			setWinds: (field) => {
+				if (windsFailure !== null) {
+					const thrown = windsFailure;
+					windsFailure = null;
+					throw thrown;
+				}
 				winds.push(field);
 			},
 		},
@@ -201,6 +217,7 @@ const createStage = () => {
 				showView: (view, playing) => views.push({ view, playing }),
 				showComparison: (content) => comparisons.push(content),
 				showWindKey: (content) => keys.push(content),
+				setWindUnit: (unit) => keyUnits.push(unit),
 			};
 		},
 	});
@@ -224,6 +241,7 @@ const createStage = () => {
 		windsShowing,
 		winds,
 		keys,
+		keyUnits,
 		legends,
 		comparisons,
 		views,
@@ -240,6 +258,10 @@ const createStage = () => {
 		/** Has the globe throw this the next time it is asked to show something. */
 		failNext: (error: Error): void => {
 			failure = error;
+		},
+		/** Has the globe throw this the next time it is given winds. */
+		failWindsNext: (error: Error): void => {
+			windsFailure = error;
 		},
 		/** Has the observed temperature come from this loader from now on. */
 		setLoader: (loader: ObservedLoader): void => {
@@ -2690,6 +2712,103 @@ describe('createLayerPanel, the winds', () => {
 		stage.panel.setWinds(false);
 		expect(stage.timers.pending()).toBe(1);
 		expect(stage.lastView()?.playing).toBe(true);
+	});
+
+	it('says the globe shows no winds while they are off, and none before a result', () => {
+		const stage = createStage();
+		arrive(stage, solvedWinds());
+		expect(stage.panel.shownWinds()).toBeNull();
+		const on = windy();
+		expect(on.panel.shownWinds()).toBeNull();
+	});
+
+	it('says the globe shows the very winds its arrows are drawn from, the month’s, current', () => {
+		const stage = windy();
+		const solved = solvedWinds();
+		arrive(stage, solved);
+		const shown = stage.panel.shownWinds();
+		expect(shown?.field).toBe(stage.winds.at(-1));
+		expect(shown?.field.east).toBe(solved.winds.east[DEFAULT_MONTH]);
+		expect(shown?.field.north).toBe(solved.winds.north[DEFAULT_MONTH]);
+		expect(shown?.annualMean).toBe(false);
+		expect(shown?.current).toBe(true);
+		stage.controls.onMonth(2);
+		expect(stage.panel.shownWinds()?.field.east).toBe(solved.winds.east[2]);
+	});
+
+	it('says the globe shows the year’s mean winds on Annual average, and the month’s again after', () => {
+		const stage = windy();
+		arrive(stage, solvedWinds());
+		stage.controls.onLayer('temperature');
+		stage.controls.onTemperatureView('annualMean');
+		const shown = stage.panel.shownWinds();
+		expect(shown?.field).toBe(stage.winds.at(-1));
+		expect(shown?.annualMean).toBe(true);
+		expect(shown?.current).toBe(true);
+		stage.controls.onTemperatureView('warmest');
+		expect(stage.panel.shownWinds()?.annualMean).toBe(false);
+	});
+
+	it.each([
+		['out of date', (store: LayerStore) => store.markWindsOutOfDate()],
+		['being worked out', (store: LayerStore) => store.markWindsCalculating()],
+		[
+			'no longer calculable',
+			(store: LayerStore) => store.markWindsUnavailable(),
+		],
+	])(
+		'says the winds on the globe are not current while the store’s are %s',
+		(_name, change) => {
+			const stage = windy();
+			arrive(stage, solvedWinds());
+			change(stage.store);
+			expect(stage.panel.shownWinds()?.current).toBe(false);
+		},
+	);
+
+	it('says the winds on the globe are current again once new ones arrive', () => {
+		const stage = windy();
+		arrive(stage, solvedWinds());
+		stage.store.markWindsOutOfDate();
+		const next = solvedWinds(4);
+		arrive(stage, next);
+		expect(stage.panel.shownWinds()).toMatchObject({
+			field: { east: next.winds.east[DEFAULT_MONTH] },
+			current: true,
+		});
+	});
+
+	it('says the earlier winds the globe keeps are not current when it refuses the new', () => {
+		const stage = windy();
+		const solved = solvedWinds();
+		arrive(stage, solved);
+		const failure = new Error('refused');
+		stage.failWindsNext(failure);
+		stage.store.setWindsResult(solvedWinds(4), true);
+		expect(stage.errors).toEqual([failure]);
+		const shown = stage.panel.shownWinds();
+		expect(shown?.field.east).toBe(solved.winds.east[DEFAULT_MONTH]);
+		expect(shown?.current).toBe(false);
+	});
+
+	it('says the globe shows no winds once they are turned off, or the store drops them', () => {
+		const stage = windy();
+		arrive(stage, solvedWinds());
+		stage.panel.setWinds(false);
+		expect(stage.panel.shownWinds()).toBeNull();
+		stage.panel.setWinds(true);
+		expect(stage.panel.shownWinds()).not.toBeNull();
+		stage.store.clear();
+		expect(stage.panel.shownWinds()).toBeNull();
+	});
+
+	it('starts the key in m/s, or in the unit given, and passes on a change of unit', () => {
+		expect(createStage().controls.windUnit).toBe('m/s');
+		const stage = createStage('mph');
+		expect(stage.controls.windUnit).toBe('mph');
+		stage.panel.setWindUnit('km/h');
+		expect(stage.keyUnits).toEqual(['km/h']);
+		expect(stage.winds).toEqual([]);
 	});
 
 	it('keeps the winds for a new world', () => {
