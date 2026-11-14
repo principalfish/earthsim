@@ -261,7 +261,7 @@ earth_sim is a browser planet simulator for worldbuilding: believable results an
 - [x] 7c-1. The tuning script and the small fixes
 - [x] 7c-2. Bands by longitude
 - [ ] ~~7d. The models' settings in one place, documented~~ (moved to the roadmap's step 3d on 2026-11-14; not to be built here)
-- [ ] 10. Day length in the Planet section
+- [x] 10. Day length in the Planet section
 - [ ] 11. Wind under the pointer, and the unit option
 - [ ] 12. Scalar layers made general
 - [ ] 13. The Pressure layer
