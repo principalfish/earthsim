@@ -6,6 +6,4 @@
 
 **After the verdict:** mark the two rows in `findings.md` (`accepted` or `fixed`), commit with the approved message, push, tick checkpoint 7c-2, cut this file to a pointer, save, and send the look-ahead for piece 10 (day length in the Planet section, with the steep-tilt warning).
 
-**Known fault in the tooling:** `planner.py path` fails on the PDF in the issue folder (it reads it as text); compare the outbox copies with the planner branch by hand until it is fixed.
-
 Review is one round and a light re-check per piece, recorded in `findings.md`. The Earth's known faults are recorded and not tuned in this issue (the user's decision: Earth tuning waits until every part of the climate loop is built).
