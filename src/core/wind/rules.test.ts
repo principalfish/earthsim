@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { cellAt, getGrid, latLonToDirection } from '../grid';
 import { cellLatitudes, MONTHS_PER_YEAR } from '../insolation';
 import { DEFAULT_PLANET, normalisePlanet, rotationRate } from '../planet';
+import { lapseCooling } from '../temperature';
 import { createBlankWorld, PLANET_RADIUS_KM, type World } from '../world';
 import { type ZonalMean, zonalMean } from './model';
 import {
 	AIR_DENSITY_KG_M3,
 	DEFAULT_WIND_SETTINGS,
+	LOCAL_BAND_SECTORS,
+	localBands,
 	PROFILE_BANDS,
 	REFERENCE_PRESSURE_HPA,
 	rulesPressureMonth,
@@ -682,6 +685,255 @@ describe('zonalBands', () => {
 	});
 });
 
+/** Each cell's longitude, in degrees east. */
+const longitudes = Array.from(
+	{ length: cellCount },
+	(_, cell) =>
+		(Math.atan2(
+			grid.centres[3 * cell + 1] as number,
+			grid.centres[3 * cell] as number,
+		) *
+			180) /
+		Math.PI,
+);
+
+/**
+ * A made-up sea-level temperature with a hot continent on one side:
+ * {@link zonalField} of a hottest latitude of 5°, 12 K hotter from 10°S to
+ * 45°N within 60° of longitude of the prime meridian.
+ */
+const hotContinentField = (): Float64Array =>
+	Float64Array.from(zonalField(5), (value, cell) => {
+		const latitude = latitudes[cell] as number;
+		const hot =
+			latitude > -10 &&
+			latitude < 45 &&
+			Math.abs(longitudes[cell] as number) < 60;
+		return value + (hot ? 12 : 0);
+	});
+
+describe('localBands', () => {
+	const bandsOf = (field: Float64Array, overrides = {}) =>
+		localBands(
+			grid,
+			field,
+			zonalMean(grid, field, PROFILE_BANDS),
+			DEFAULT_PLANET,
+			overrides,
+		);
+
+	it('places the low from the temperature near each longitude: further from the equator over a hot continent than over the sea on the far side', () => {
+		const bands = bandsOf(hotContinentField());
+		expect(bands.sectorLows).toHaveLength(LOCAL_BAND_SECTORS);
+		// Over the sea far from the continent the low lies about where a
+		// world of sea alone would have it, at about 11.7°N.
+		const sea = zonalBands(
+			zonalMean(grid, zonalField(5), PROFILE_BANDS),
+			DEFAULT_PLANET,
+		);
+		expect(Math.abs(bands.lowAt(180) - sea.lowLatitude)).toBeLessThan(0.5);
+		expect(bands.lowAt(0)).toBeGreaterThan(bands.lowAt(180) + 2.5);
+		// The cubic passes through each sector's low, from 180°W every 10°.
+		expect(bands.lowAt(-180)).toBeCloseTo(bands.sectorLows[0] as number, 12);
+		expect(bands.lowAt(0)).toBeCloseTo(
+			bands.sectorLows[LOCAL_BAND_SECTORS / 2] as number,
+			12,
+		);
+		expect(bands.lowAt(540)).toBeCloseTo(bands.lowAt(180), 12);
+		// The cells' width, the sides' strength and the low's limit are the
+		// whole latitude's.
+		const field = hotContinentField();
+		const whole = zonalBands(
+			zonalMean(grid, field, PROFILE_BANDS),
+			DEFAULT_PLANET,
+		);
+		for (const name of [
+			'lowLatitude',
+			'lowLimit',
+			'cellWidth',
+			'northStrength',
+			'southStrength',
+			'amplitude',
+		] as const) {
+			expect(bands.global[name], name).toBe(whole[name]);
+		}
+		expect(bands.global.offset(20)).toBe(whole.offset(20));
+	});
+
+	it('gives a temperature of the latitude alone the same low and bands at every longitude, to well under a thousandth', () => {
+		// Measured on the 64 grid: the sectors' lows lie within 3.7e-4° of
+		// the whole latitude's, and the bands' pressure within 2.1e-4 hPa,
+		// for hottest latitudes of 5°N, 8°S and 15°N. Placing each band's
+		// mean at its middle rather than at its cells' mean latitude would
+		// put the lows 0.03° apart and the winds up to 0.15 m/s.
+		for (const hottest of [5, -8, 15]) {
+			const field = Float64Array.from(zonalField(hottest));
+			const bands = bandsOf(field);
+			for (const low of bands.sectorLows) {
+				expect(Math.abs(low - bands.global.lowLatitude)).toBeLessThan(1e-3);
+			}
+			const offsets = bands.offsets();
+			let worst = 0;
+			for (let cell = 0; cell < cellCount; cell++) {
+				worst = Math.max(
+					worst,
+					Math.abs(
+						(offsets[cell] as number) -
+							bands.global.offset(latitudes[cell] as number),
+					),
+				);
+			}
+			expect(worst, `${hottest}°`).toBeLessThan(1e-3);
+		}
+	});
+
+	it('gives pressure with no step and no corner round a circle of latitude, the meridian of 180° included', () => {
+		const bands = bandsOf(hotContinentField());
+		const step = 0.1;
+		const turn = Math.round(360 / step);
+		for (const latitude of [0, 20, 35, 50, 65]) {
+			const around = Array.from({ length: turn + 1 }, (_, index) =>
+				bands.offset(latitude, -180 + index * step),
+			);
+			// Round the globe and back to where it started.
+			expect(around[turn]).toBe(around[0]);
+			const slopes = around
+				.slice(1)
+				.map((value, index) => (value - (around[index] as number)) / step);
+			const steepest = Math.max(...slopes.map(Math.abs));
+			// The bands do vary round the circle.
+			expect(steepest, `${latitude}°`).toBeGreaterThan(1e-3);
+			// The slope changes by under 3% of the steepest from one tenth of
+			// a degree to the next, the step from the last to the first
+			// included: a corner where two sectors meet would change it by a
+			// large share at once. Measured: under 1.8%.
+			for (const [index, slope] of slopes.entries()) {
+				const before = slopes.at(index - 1) as number;
+				expect(Math.abs(slope - before), `${latitude}°`).toBeLessThan(
+					0.03 * steepest,
+				);
+			}
+		}
+	});
+
+	it('blends into the one pattern round the globe towards the poles, with no step or corner in latitude, one value at each pole', () => {
+		const bands = bandsOf(hotContinentField());
+		const { localBandsFullToDeg, localBandsGlobalFromDeg } =
+			DEFAULT_WIND_SETTINGS;
+		for (const longitude of [-180, -90, 0, 45, 179.9]) {
+			for (const latitude of [70, 75, 80, 89.9, 90, -70, -85, -90]) {
+				expect(bands.offset(latitude, longitude)).toBe(
+					bands.global.offset(latitude),
+				);
+			}
+			for (const edge of [localBandsFullToDeg, localBandsGlobalFromDeg]) {
+				// No step at either end of the blend.
+				expect(
+					Math.abs(
+						bands.offset(edge + 1e-9, longitude) -
+							bands.offset(edge - 1e-9, longitude),
+					),
+				).toBeLessThan(1e-8);
+				// The slope in latitude changes across each end of the blend
+				// by no more than across the table's steps either side of it,
+				// where the bands curve as they do anywhere.
+				const slope = (from: number) =>
+					(bands.offset(from + 0.25, longitude) -
+						bands.offset(from, longitude)) /
+					0.25;
+				const change = (at: number) => slope(at) - slope(at - 0.25);
+				const nearby = Math.max(
+					...[-0.5, 0.5].map((by) => Math.abs(change(edge + by))),
+				);
+				expect(Math.abs(change(edge))).toBeLessThan(1.5 * nearby + 1e-6);
+			}
+		}
+		// Within the tropics and subtropics the bands differ by longitude.
+		expect(
+			Math.abs(bands.offset(20, 0) - bands.offset(20, 180)),
+		).toBeGreaterThan(0.1);
+	});
+
+	it('follows the land more closely in a shorter window, and comes near the whole latitude’s low in one reaching almost round the globe', () => {
+		const field = hotContinentField();
+		const sea = zonalBands(
+			zonalMean(grid, zonalField(5), PROFILE_BANDS),
+			DEFAULT_PLANET,
+		).lowLatitude;
+		const wide = bandsOf(field);
+		const narrow = bandsOf(field, { localWindowDeg: 120 });
+		// Measured: the sea alone's low lies at 11.66°N. With a window of
+		// 120° the low stays at 11.79°N from 180° to 120°E, a stretch of sea
+		// wider than the window's reach; with 180° it is 11.77°N at 180° but
+		// 14.05°N at 120°E, where the window reaches the land. Over the land,
+		// at 0°, it is 15.46°N against 15.00°N.
+		expect(Math.abs(narrow.lowAt(120) - sea)).toBeLessThan(0.2);
+		expect(Math.abs(wide.lowAt(120) - sea)).toBeGreaterThan(1);
+		expect(narrow.lowAt(0)).toBeGreaterThan(wide.lowAt(0));
+		const spread = (lows: Float64Array) =>
+			Math.max(...lows) - Math.min(...lows);
+		const whole = bandsOf(field, {
+			localWindowDeg: 350,
+			localWindowTaperShare: 0.1,
+		});
+		expect(spread(whole.sectorLows)).toBeLessThan(
+			0.25 * spread(wide.sectorLows),
+		);
+		// Measured: a spread of 0.53° against 3.68°, every sector's low
+		// within 0.72° of the whole latitude's, where the far sea's lies 3.93°
+		// from it with the window of 180°.
+		for (const low of whole.sectorLows) {
+			expect(Math.abs(low - whole.global.lowLatitude)).toBeLessThan(
+				0.25 * Math.abs(wide.lowAt(180) - wide.global.lowLatitude),
+			);
+		}
+	});
+
+	it('takes the share of the local bands as a straight blend: half of them at 0.5', () => {
+		const field = hotContinentField();
+		const none = bandsOf(field, { localBandsShare: 0 });
+		const half = bandsOf(field, { localBandsShare: 0.5 });
+		const full = bandsOf(field);
+		for (const [latitude, longitude] of [
+			[20, 0],
+			[-5, 120],
+			[50, -30],
+		] as const) {
+			expect(half.offset(latitude, longitude)).toBeCloseTo(
+				0.5 *
+					(none.offset(latitude, longitude) + full.offset(latitude, longitude)),
+				12,
+			);
+		}
+		expect(half.offset(20, 0)).not.toBeCloseTo(full.offset(20, 0), 3);
+	});
+
+	it('is the whole latitude’s bands at every place with no share of the local ones', () => {
+		const bands = bandsOf(hotContinentField(), { localBandsShare: 0 });
+		for (const [latitude, longitude] of [
+			[20, 0],
+			[-5, 120],
+			[45, -170],
+		] as const) {
+			expect(bands.offset(latitude, longitude)).toBe(
+				bands.global.offset(latitude),
+			);
+		}
+	});
+
+	it('refuses a field of the wrong length', () => {
+		const field = Float64Array.from(zonalField(0));
+		expect(() =>
+			localBands(
+				grid,
+				field.subarray(1),
+				zonalMean(grid, field, PROFILE_BANDS),
+				DEFAULT_PLANET,
+			),
+		).toThrow(RangeError);
+	});
+});
+
 describe('thermalPressure', () => {
 	it('gives a cold place a high and a hot place a low against their latitude, more on land than at sea', () => {
 		const world = continentWorld();
@@ -835,6 +1087,28 @@ describe('windSettings', () => {
 		expect(Object.isFrozen(DEFAULT_WIND_SETTINGS)).toBe(true);
 		expect(WIND_SETTING_NAMES).toEqual(Object.keys(DEFAULT_WIND_SETTINGS));
 		expect(WIND_SETTING_NAMES).toContain('lowLimitToWidthDeg');
+	});
+
+	it('refuses a blend towards the poles that ends where it starts or before, naming both settings, and takes one that ends beyond', () => {
+		for (const [full, global] of [
+			[50, 40],
+			[40, 40],
+		]) {
+			expect(() =>
+				windSettings({
+					localBandsFullToDeg: full,
+					localBandsGlobalFromDeg: global,
+				}),
+			).toThrow(/localBandsGlobalFromDeg.*localBandsFullToDeg/);
+		}
+		expect(() => windSettings({ localBandsFullToDeg: 75 })).toThrow(RangeError);
+		expect(
+			windSettings({ localBandsFullToDeg: 30, localBandsGlobalFromDeg: 31 })
+				.localBandsGlobalFromDeg,
+		).toBe(31);
+		expect(DEFAULT_WIND_SETTINGS.localBandsGlobalFromDeg).toBeGreaterThan(
+			DEFAULT_WIND_SETTINGS.localBandsFullToDeg,
+		);
 	});
 
 	it('refuses a name that is not a setting, or a value that is not a finite number', () => {
@@ -1055,6 +1329,73 @@ describe('the rules model through solveWinds', () => {
 		expect(zonal[7]).toBeCloseTo(zonal[10] as number, 6);
 		expect(areaMean(pressure)).toBeCloseTo(REFERENCE_PRESSURE_HPA, 3);
 	}, 60_000);
+
+	// Two runs of a year, each about half a second at 64 cells per face
+	// edge, more under coverage, hence the longer time allowed.
+	it('on an ocean world whose hottest latitude moves through the year keeps the same winds with the bands placed by longitude as with one pattern round the globe', () => {
+		const world = oceanWorld();
+		const months = yearOf((month) =>
+			zonalField(10 * Math.sin((2 * Math.PI * month) / MONTHS_PER_YEAR)),
+		);
+		const local = solveWinds(world, months);
+		const zonal = solveWinds(world, months, {
+			settings: { localBandsShare: 0 },
+		});
+		// Measured: at most 5.8e-4 m/s in any cell and month.
+		let worst = 0;
+		for (let month = 0; month < MONTHS_PER_YEAR; month++) {
+			for (let cell = 0; cell < cellCount; cell++) {
+				worst = Math.max(
+					worst,
+					Math.hypot(
+						(local.east[month]?.[cell] as number) -
+							(zonal.east[month]?.[cell] as number),
+						(local.north[month]?.[cell] as number) -
+							(zonal.north[month]?.[cell] as number),
+					),
+				);
+			}
+		}
+		expect(worst).toBeLessThan(0.005);
+	}, 60_000);
+
+	it('with no share of the bands placed by longitude is the model of one pattern round the globe exactly: the whole latitude’s bands and the thermal highs and lows, shifted to the reference', () => {
+		const world = continentWorld();
+		const temperature = zonalField(12);
+		for (const cell of CONTINENT) {
+			temperature[cell] = (temperature[cell] as number) + 10;
+		}
+		const cooling = lapseCooling(world);
+		const settings = { localBandsShare: 0 };
+		const seaLevel = Float64Array.from(
+			temperature,
+			(value, cell) => value + (cooling[cell] as number),
+		);
+		const profile = zonalMean(grid, seaLevel, PROFILE_BANDS);
+		const bands = zonalBands(profile, world.planet, settings);
+		const expected = thermalPressure(world, seaLevel, profile, settings);
+		let total = 0;
+		let totalArea = 0;
+		for (let cell = 0; cell < cellCount; cell++) {
+			const value =
+				(expected[cell] as number) + bands.offset(latitudes[cell] as number);
+			expected[cell] = value;
+			total += (areas[cell] as number) * value;
+			totalArea += areas[cell] as number;
+		}
+		const shift = REFERENCE_PRESSURE_HPA - total / totalArea;
+		for (let cell = 0; cell < cellCount; cell++) {
+			expected[cell] = (expected[cell] as number) + shift;
+		}
+		expect(rulesPressureMonth(world, temperature, cooling, settings)).toEqual(
+			expected,
+		);
+		// The default, with the bands placed by longitude, differs, and is
+		// still held at the reference.
+		const local = rulesPressureMonth(world, temperature, cooling);
+		expect(local).not.toEqual(expected);
+		expect(areaMean(local)).toBeCloseTo(REFERENCE_PRESSURE_HPA, 9);
+	});
 
 	// Four runs of a year, each about half a second at 64 cells per face
 	// edge, more under coverage, hence the longer time allowed.

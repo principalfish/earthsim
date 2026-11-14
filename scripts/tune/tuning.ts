@@ -25,7 +25,12 @@ import {
 	windErrorFigures,
 	zonalMean,
 } from '../../src/core/index';
-import { cases as allCases, CASE_RESOLUTION } from '../report/cases';
+import {
+	cases as allCases,
+	CASE_RESOLUTION,
+	ONE_CONTINENT_CASE_ID,
+} from '../report/cases';
+import { type OceanicSwing, oceanicSwing } from '../report/oceanBands';
 import { type BuiltCase, EARTH_CASE_ID } from '../report/page';
 import type { ReportSources } from '../report/run';
 import {
@@ -137,6 +142,11 @@ export type CasesRun = {
 	readonly earth: EarthFigures;
 	readonly cases: readonly CaseMeasures[];
 	readonly checks: ChecksSummary;
+	/**
+	 * How far the one-continent world's bands over the open ocean move from
+	 * January to July; null when that case is not among the cases.
+	 */
+	readonly oceanicSwing: OceanicSwing | null;
 };
 
 /**
@@ -180,10 +190,15 @@ export const runCases = (
 			},
 		};
 	});
+	const oneContinent = results.get(ONE_CONTINENT_CASE_ID);
 	return {
 		earth: figuresOf(tuning, results.get(EARTH_CASE_ID) as WindResult),
 		cases: measures,
 		checks: summariseChecks({ cases: tuning.cases, results }),
+		oceanicSwing:
+			oneContinent === undefined
+				? null
+				: oceanicSwing(tuning.grid, oneContinent),
 	};
 };
 

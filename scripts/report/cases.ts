@@ -57,6 +57,12 @@ export const CONTINENT_ROUNDNESS = 4;
 export const CONTINENT_ELEVATION_M = 500;
 
 /**
+ * The id of the one-continent world, whose open ocean's bands the tuning
+ * script measures.
+ */
+export const ONE_CONTINENT_CASE_ID = 'one-continent';
+
+/**
  * The steep tilt of two cases, in degrees: the Earth's and an ocean
  * world's. It lies between the 54° and the 90° of the ocean planets of
  * Ferreira, Marshall, O'Gorman and Seager, "Climate at high-obliquity"
@@ -226,7 +232,7 @@ export const cases: readonly ReportCase[] = [
 		build: () => createBlankWorld(CASE_RESOLUTION),
 	},
 	{
-		id: 'one-continent',
+		id: ONE_CONTINENT_CASE_ID,
 		title: 'A one-continent world',
 		description: `One flat continent ${CONTINENT_ELEVATION_M} m high, a fifth of the surface, from 15°S to 55°N and ${2 * CONTINENT_HALF_WIDTH_DEG}° of longitude across at ${CONTINENT_MIDDLE_LATITUDE}°N, its corners rounded, in an ocean ${OCEAN_DEPTH} m deep, with the Earth’s planet settings.`,
 		invented: true,

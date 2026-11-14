@@ -95,7 +95,7 @@ export const main = (args: readonly string[]): void => {
 	if (command.kind === 'list') {
 		say(['Run as one of:', '', ...USAGE.map((form) => `    ${form}`), '']);
 		say(
-			`\`search tuned\` searches the eleven settings tuned by hand against the observed Earth and three moved by hand for other reasons (earthContrastK, poleTaperDeg, sideContrastK): ${TUNED_SETTINGS.join(', ')}. Each search step stays within its setting's bounds: a share above 0 and at most 1, a latitude or a cells' width at most 90°, every setting above 0.`,
+			`\`search tuned\` searches the eleven settings tuned by hand against the observed Earth and three moved by hand for other reasons (earthContrastK, poleTaperDeg, sideContrastK): ${TUNED_SETTINGS.join(', ')}. Each search step stays within its setting's bounds: a share above 0 and at most 1, a latitude or a cells' width at most 90°, a width in longitude at most 360°, every setting above 0.`,
 		);
 		say();
 		say('The settings, with their values by default:');

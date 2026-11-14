@@ -14,7 +14,7 @@ import {
 	readObservedTemperatureFile,
 	readObservedWindFile,
 } from '../earth/dataFile.mjs';
-import { CASE_RESOLUTION, cases } from '../report/cases';
+import { CASE_RESOLUTION, cases, ONE_CONTINENT_CASE_ID } from '../report/cases';
 import { EARTH_CASE_ID } from '../report/page';
 import { parseCommand } from './command';
 import { search, sweep } from './search';
@@ -25,6 +25,7 @@ import {
 	runAgainText,
 	searchText,
 	sweepText,
+	swingText,
 } from './text';
 import { diagnose, earthFigures, runCases, type Tuning } from './tuning';
 
@@ -69,16 +70,22 @@ describe('markdownTable', () => {
 });
 
 describe('the tuning runs', () => {
-	// A solve of the Earth's temperature, about a second, and four runs of
+	// A solve of the Earth's temperature, about a second, and five runs of
 	// a year of winds, about half a second each, more under coverage, hence
 	// the longer time allowed.
 	it('give the Earth’s figures, its measures and the diagnostic, and print them', () => {
 		const tuning = earthOnly();
 		const figures = earthFigures(tuning, {});
 		// The figures docs/winds.md gives for the model as it stands.
-		expect(figures.windRms).toBeCloseTo(3.81, 2);
-		expect(figures.directionShare).toBeCloseTo(0.606, 3);
-		expect(figures.pressureRms).toBeCloseTo(7.11, 2);
+		expect(figures.windRms).toBeCloseTo(3.822, 3);
+		expect(figures.directionShare).toBeCloseTo(0.6091, 4);
+		expect(figures.pressureRms).toBeCloseTo(7.085, 3);
+		// With the bands one pattern round the globe, the figures of the model
+		// before they varied by longitude: 3.813 m/s, 60.60% and 7.113 hPa.
+		const zonal = earthFigures(tuning, { localBandsShare: 0 });
+		expect(zonal.windRms).toBeCloseTo(3.813, 3);
+		expect(zonal.directionShare).toBeCloseTo(0.606, 3);
+		expect(zonal.pressureRms).toBeCloseTo(7.113, 3);
 		const changed = earthFigures(tuning, { bandAmplitudeHpa: 7 });
 		expect(changed.windRms).not.toBe(figures.windRms);
 
@@ -88,9 +95,28 @@ describe('the tuning runs', () => {
 		expect(run.cases[0]?.bands).toEqual({ southern: 3, northern: 3 });
 		// The checks' cases other than the Earth are not among these.
 		expect(run.checks.lowAtTilt.unmeasured.length).toBeGreaterThan(0);
+		// Nor is the one-continent world, whose open ocean is measured.
+		expect(run.oceanicSwing).toBeNull();
 		const printed = casesText(run).join('\n');
 		expect(printed).toContain('| The Earth | 3 | 3 |');
 		expect(printed).toContain('|-|-|-|-|-|');
+		expect(printed).not.toContain('July less January');
+		// The case measured is among the report's, so the table prints when
+		// it runs; given a run with it, the cases' printout holds the table.
+		expect(cases.map(({ id }) => id)).toContain(ONE_CONTINENT_CASE_ID);
+		const places = {
+			southHigh: { value: -30 },
+			low: { value: 1 },
+			northHigh: { value: 28 },
+		};
+		const withSwing = casesText({
+			...run,
+			oceanicSwing: { january: places, july: places, change: places },
+		}).join('\n');
+		expect(withSwing).toContain('| July less January | -30.0 | 1.0 | 28.0 |');
+		expect(withSwing.indexOf('open ocean')).toBeLessThan(
+			withSwing.indexOf('Check (a)'),
+		);
 
 		const diagnostic = diagnose(tuning, readObservedTemperatureFile(), {});
 		expect(diagnostic.simulated.figures).toEqual(figures);
@@ -107,6 +133,35 @@ describe('the tuning runs', () => {
 		expect(table[1]).toBe('|-|-|-|-|');
 		expect(table.join('\n')).toContain('July: lowest pressure over');
 	}, 60_000);
+});
+
+describe('swingText', () => {
+	it('prints the open ocean’s bands in January and July and their change, saying what is not measured', () => {
+		const missing = { value: null, missing: 'not measured here' } as const;
+		const printed = swingText({
+			january: {
+				southHigh: { value: -31 },
+				low: { value: -2.04 },
+				northHigh: { value: 29 },
+			},
+			july: {
+				southHigh: { value: -27 },
+				low: { value: 4 },
+				northHigh: missing,
+			},
+			change: {
+				southHigh: { value: 4 },
+				low: { value: 6.04 },
+				northHigh: missing,
+			},
+		});
+		expect(printed[0]).toContain('131.6° to 228.4° east');
+		expect(printed).toContain('| January | -31.0 | -2.0 | 29.0 |');
+		expect(printed).toContain(
+			'| July less January | 4.0 | 6.0 | not measured here |',
+		);
+		expect(printed).toContain('|-|-|-|-|');
+	});
 });
 
 describe('sweepText and searchText', () => {

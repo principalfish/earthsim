@@ -44,12 +44,18 @@ const LATITUDE_SETTINGS: readonly WindSettingName[] = [
 	'lowLimitFromWidthDeg',
 	'lowLimitToWidthDeg',
 	'poleTaperDeg',
+	'localBandsFullToDeg',
+	'localBandsGlobalFromDeg',
 ];
+
+/** The settings whose values are degrees of longitude, at most 360. */
+const LONGITUDE_SETTINGS: readonly WindSettingName[] = ['localWindowDeg'];
 
 /**
  * The values a search may give each setting, as its meaning requires: a
  * share (a name ending in `Share`) above 0 and at most 1, a latitude or a
- * cells' width above 0 and at most 90°, and every other setting above 0.
+ * cells' width above 0 and at most 90°, a width in longitude above 0 and at
+ * most 360°, and every other setting above 0.
  */
 export const SETTING_BOUNDS: Readonly<Record<WindSettingName, SettingBounds>> =
 	Object.freeze(
@@ -60,7 +66,9 @@ export const SETTING_BOUNDS: Readonly<Record<WindSettingName, SettingBounds>> =
 					? { above: 0, atMost: 1 }
 					: LATITUDE_SETTINGS.includes(name)
 						? { above: 0, atMost: 90 }
-						: { above: 0 },
+						: LONGITUDE_SETTINGS.includes(name)
+							? { above: 0, atMost: 360 }
+							: { above: 0 },
 			]),
 		) as Record<WindSettingName, SettingBounds>,
 	);

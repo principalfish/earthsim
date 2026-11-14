@@ -97,7 +97,7 @@ describe('TUNED_SETTINGS', () => {
 });
 
 describe('SETTING_BOUNDS', () => {
-	it('bounds every setting, its default within them: shares to (0, 1], latitudes to (0°, 90°], the rest above 0', () => {
+	it('bounds every setting, its default within them: shares to (0, 1], latitudes to (0°, 90°], widths in longitude to (0°, 360°], the rest above 0', () => {
 		for (const name of WIND_SETTING_NAMES) {
 			const bounds = SETTING_BOUNDS[name];
 			expect(isWithin(DEFAULT_WIND_SETTINGS[name], bounds), name).toBe(true);
@@ -106,6 +106,8 @@ describe('SETTING_BOUNDS', () => {
 		expect(SETTING_BOUNDS.outerCellShare).toEqual({ above: 0, atMost: 1 });
 		expect(SETTING_BOUNDS.seaThermalShare.atMost).toBe(1);
 		expect(SETTING_BOUNDS.lowLimitDeg.atMost).toBe(90);
+		expect(SETTING_BOUNDS.localBandsGlobalFromDeg.atMost).toBe(90);
+		expect(SETTING_BOUNDS.localWindowDeg).toEqual({ above: 0, atMost: 360 });
 		expect(SETTING_BOUNDS.bandAmplitudeHpa.atMost).toBeUndefined();
 	});
 });

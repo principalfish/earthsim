@@ -23,6 +23,27 @@ Each month's mean temperature by latitude places a pattern of bands round the pl
 | 96 hours | 60° | 1.5 |
 | 720 hours | 90° | 1 |
 
+### Bands by longitude
+
+Placed from the temperature averaged round the whole globe, the bands would move with the largest continent's seasons everywhere: on the one-continent world (land from 15°S to 55°N, about 143° of longitude across) the subtropical highs over the open ocean on the far side moved 18° and 23° of latitude between January and July, where the observed Earth's oceanic highs move 5° to 10°. So in the tropics and subtropics the low is placed from the temperature near each longitude instead:
+
+- **Only where the low lies varies,** and with it the tropical cell's edges, which follow the low. The cells' width, each side's strength, the low's limit and the outer bands are worked out from the whole globe's temperature by latitude, as above, and so are the thermal highs and lows.
+- **The window** is 180° of longitude across: whole over its middle 90° and tapering, as the square of a cosine, to nothing at its ends. Each longitude's temperature by latitude is the whole latitude's, plus the mean within the window of each place's difference from it; the low there is placed from that as above. 120° was tried too: it moves the open ocean's bands as little and follows the land more closely, but it weakens the Earth tilted 60°'s annual mean winds in the north to under 0.5 m/s at every latitude, so its one band there is no longer counted. 180° keeps every case's bands.
+- **Between longitudes** the low is placed every 10°, and the bands' pressure between them is taken by a cubic through the four nearest, round the globe, so the pressure and its change with longitude have no step and no corner anywhere, the meridian of 180° included.
+- **Towards the poles** the local bands blend into the one pattern round the globe: in full up to 40° from the equator, falling smoothly to none at 70°. At a pole every longitude meets, so the pressure there must be one value, whichever side it is approached from. Each pattern is 0 at its own low, but patterns with lows at different latitudes are mixed between longitudes and in the blend, so the low is at nearly the same pressure everywhere, within about 0.03 hPa on the one-continent world and the Earth; the globe's mean is still held at the reference afterwards. The blend must end beyond where it starts, or the pressure would step there; the model refuses settings that would make it so.
+- **An ocean world stays zonal.** A temperature that depends on the latitude alone gives every longitude the same low, to within 4×10⁻⁴°, and the same bands, to within 2.1×10⁻⁴ hPa, on the 64 grid, for hottest latitudes of 5°N, 8°S and 15°N; with the hottest latitude moving 10° either side of the equator through the year the winds differ from those of one pattern round the globe by at most 6×10⁻⁴ m/s. That takes care: the grid's cells do not lie evenly in latitude within a band, so each band's mean is taken at its cells' mean latitude, not its middle, which would have put the lows 0.03° apart and the winds up to 0.15 m/s. The ocean world case, whose simulated temperature is itself not quite zonal on the grid, has winds within 0.093 m/s of one pattern's in every place and month, and its eastward wind lies at most 1.15 m/s from its 2° band's mean, against 1.18 m/s with one pattern.
+
+The window's width and taper, and the blend's latitudes, are this project's choices, not tuned against the observed Earth. On the one-continent world the open ocean's bands, in the mean pressure by latitude over the longitudes more than 60° from the land, now move:
+
+| | Southern high | Band low | Northern high |
+|-|-|-|-|
+| January | 32.2°S | 2.3°S | 24.6°N |
+| July | 26.8°S | 1.1°S | 31.6°N |
+| July less January, now | 5.4° | 1.2° | 7.0° |
+| July less January, one pattern round the globe | 18.2° | 29.7° | 22.8° |
+
+The band low over that ocean hardly moves: the ocean's own temperature peaks within about 3° of the equator in both months, and the ocean north of the equator is cooler than its latitude's mean in July, the land being hotter, so its thermal part holds the low south. `npm run tune:winds -- cases` prints this table for any settings; `localBandsShare=0` gives the one pattern round the globe exactly, the model as it was before.
+
 ### Thermal highs and lows
 
 A place colder than its latitude's mean carries higher pressure, and a hotter one lower:
@@ -72,9 +93,11 @@ The model's settings start from published or textbook figures where there are an
 
 | Months | RMS of the wind's difference as vectors | Mean speed difference | Direction within 45° | Mean pressure difference | RMS pressure difference |
 |-|-|-|-|-|-|
-| January | 3.76 m/s | 0.00 m/s | 64.1% | −0.44 hPa | 7.18 hPa |
-| July | 4.26 m/s | −0.20 m/s | 56.7% | −0.33 hPa | 6.84 hPa |
-| The whole year | 3.81 m/s | −0.02 m/s | 60.6% | −0.38 hPa | 7.11 hPa |
+| January | 3.79 m/s | 0.02 m/s | 63.4% | −0.44 hPa | 7.19 hPa |
+| July | 4.26 m/s | −0.13 m/s | 57.9% | −0.33 hPa | 6.78 hPa |
+| The whole year | 3.82 m/s | 0.00 m/s | 60.9% | −0.38 hPa | 7.08 hPa |
+
+With one pattern of bands round the globe, before they varied by longitude, the whole year's were 3.81 m/s, −0.02 m/s, 60.6%, −0.38 hPa and 7.11 hPa.
 
 The direction is judged only where the observed wind is at least 1 m/s, 85% of the surface over the year.
 
@@ -84,8 +107,8 @@ The direction is judged only where the observed wind is at least 1 m/s, 85% of t
 ## What it gets wrong
 
 - **The July heat low sits over Siberia, not South Asia**, and the northern subtropical high runs unbroken over North Africa and Asia in July. Both are the simulated temperature's (see below).
-- **The Asian winter high is too weak** and too far west: 1,032 hPa at 54°N 78°E over 35–70°N, 60–140°E, against an observed 1,036.5 hPa at 53°N 97°E.
-- **The monsoons.** Over 5–20°N, 60–95°E the January north-east monsoon is about 2.5 times too strong ((−7.3, −6.3) m/s east and north against an observed (−2.8, −2.9)), and the July south-west monsoon about a third of the observed ((+2.0, +1.3) against (+6.9, +3.5)).
+- **The Asian winter high is too weak** and too far west: 1,032 hPa at 55°N 77°E over 35–70°N, 60–140°E, against an observed 1,036.5 hPa at 53°N 97°E.
+- **The monsoons.** Over 5–20°N, 60–95°E the January north-east monsoon is more than twice too strong ((−7.0, −6.1) m/s east and north against an observed (−2.8, −2.9)), and the July south-west monsoon's eastward part about two thirds of the observed ((+4.5, +3.2) against (+6.9, +3.5)). With one pattern of bands round the globe it was (+2.0, +1.3): the bands placed by longitude move the low further north over hot South Asia in July.
 - **The North Pacific trades are weak:** −2 m/s against an observed −7.
 - **The hemispheres' bands are alike:** the deep trough round Antarctica is missing.
 - **Land winds cross the isobars at about 50°,** more than the observed.
@@ -102,17 +125,28 @@ The direction is judged only where the observed wind is at least 1 m/s, 85% of t
 
 | | Simulated temperature | Observed temperature | Observed |
 |-|-|-|-|
-| Wind's difference as vectors, whole year | 3.81 m/s | 4.30 m/s | |
-| Direction within 45°, whole year | 60.6% | 58.5% | |
-| Pressure difference, whole year | 7.11 hPa | 7.31 hPa | |
-| July: lowest pressure over 10–70°N, 40–140°E | 989.2 hPa at 64°N 86°E | 998.1 hPa at 29°N 47°E | 995.5 hPa at 32°N 71°E |
-| July: mean pressure over 20–35°N, 15°W–120°E | 1,013.3 hPa | 1,002.9 hPa | 1,005.2 hPa |
-| January: mean wind over 5–20°N, 60–95°E | (−7.3, −6.3) m/s | (−3.2, −2.9) m/s | (−2.8, −2.9) m/s |
-| July: mean wind over 5–20°N, 60–95°E | (+2.0, +1.3) m/s | (+2.9, +3.6) m/s | (+6.9, +3.5) m/s |
-| January: highest pressure over 35–70°N, 60–140°E | 1,032.0 hPa at 54°N 78°E | 1,030.3 hPa at 44°N 125°E | 1,036.5 hPa at 53°N 97°E |
+| Wind's difference as vectors, whole year | 3.82 m/s | 4.31 m/s | |
+| Direction within 45°, whole year | 60.9% | 59.7% | |
+| Pressure difference, whole year | 7.08 hPa | 7.17 hPa | |
+| July: lowest pressure over 10–70°N, 40–140°E | 989.4 hPa at 64°N 89°E | 998.3 hPa at 31°N 49°E | 995.5 hPa at 32°N 71°E |
+| July: mean pressure over 20–35°N, 15°W–120°E | 1,011.1 hPa | 1,003.1 hPa | 1,005.2 hPa |
+| January: mean wind over 5–20°N, 60–95°E | (−7.0, −6.1) m/s | (−3.0, −2.3) m/s | (−2.8, −2.9) m/s |
+| July: mean wind over 5–20°N, 60–95°E | (+4.5, +3.2) m/s | (+2.9, +3.6) m/s | (+6.9, +3.5) m/s |
+| January: highest pressure over 35–70°N, 60–140°E | 1,032.1 hPa at 55°N 77°E | 1,029.5 hPa at 46°N 125°E | 1,036.5 hPa at 53°N 97°E |
 
-- **The temperature's:** the July heat low over Siberia (with the observed temperature it moves to the Middle East, near the observed one over Pakistan), the unbroken northern subtropical high in July (it falls to below the observed), and the too strong winter monsoon (it comes to the observed).
-- **The wind model's:** the weak summer monsoon, whose westerly part stays well under half the observed, and the weak Asian winter high, which stays weak and moves to Manchuria.
+### The Earth's known faults
+
+These are recorded, not tuned. The model is not fitted any closer to the observed Earth until the rest of the loop it belongs to is built (heat carried by the winds, ocean currents and ice), since each of those will change the temperature the winds are worked out from, and a fit made now would have to be made again. The diagnostic above reads them:
+
+| Fault | Whose | What the observed temperature does |
+|-|-|-|
+| The July heat low over Siberia, not South Asia | The simulated temperature's | It moves to the Middle East, near the observed low over Pakistan |
+| The unbroken northern subtropical high in July | The simulated temperature's | It falls to below the observed |
+| The too strong winter (north-east) monsoon | The simulated temperature's | It comes to the observed |
+| The weak eastward part of the summer (south-west) monsoon | The wind model's own | It stays well under half the observed, +2.9 against +6.9 m/s |
+| The weak Asian winter high | The wind model's own | It stays weak, and moves to Manchuria |
+
+- **The summer monsoon** with the simulated temperature rose from (+2.0, +1.3) to (+4.5, +3.2) m/s when the bands were placed by longitude, and is now stronger than with the observed temperature; with the observed temperature it is (+2.9, +3.6) m/s either way, its eastward part well under half the observed, so that part is still the wind model's fault.
 - **The whole-year figures are worse with the observed temperature.** The model was tuned by hand against the simulated temperature, and some of its settings make up for that temperature's faults, as the low's move further from the equator does for its weak seasons.
 
 ## What it leaves out
@@ -128,15 +162,15 @@ On a world of 128 or 256 cells per face edge, the pressure is worked out on the 
 
 | World | Time for a year of the Earth's winds (in Node) | Wholly on the world's own grid |
 |-|-|-|
-| 64 | 0.54 s | 0.54 s |
-| 128 | 0.64 s | 2.8 s |
-| 256 | 0.9 s | 17 s |
+| 64 | 0.58 s | 0.58 s |
+| 128 | 0.65 s | 3.1 s |
+| 256 | 0.95 s | 16 s |
 
-Nearly all the time is the smoothing of the thermal highs and lows, which reaches 900 km, far wider than a cell of the 64 grid, so little is lost. On the Earth, given the temperature's own temperatures, over every place and month of the year, against a solve wholly on the world's own grid:
+Nearly all the time is the smoothing of the thermal highs and lows; placing the bands by longitude adds about 0.04 s a year at 64. The smoothing reaches 900 km, far wider than a cell of the 64 grid, so little is lost. On the Earth, given the temperature's own temperatures, over every place and month of the year, against a solve wholly on the world's own grid:
 
 | World | Wind, root-mean-square | Wind, worst place and month | Pressure, root-mean-square | Pressure, worst place and month |
 |-|-|-|-|-|
-| 128 | 0.05 m/s | 0.5 m/s | 0.05 hPa | 0.4 hPa |
+| 128 | 0.06 m/s | 0.5 m/s | 0.05 hPa | 0.5 hPa |
 | 256 | 0.07 m/s | 0.9 m/s | 0.06 hPa | 0.5 hPa |
 
 - **The worst places** are beside coasts and the cube's edges, where the 64 grid's pressure has a slope least like the finer grid's; the worst of all on the Earth is near the Caspian Sea's eastern shore.
@@ -151,12 +185,12 @@ The model's settings, its rough figures, are one set with values by default, eac
 `npm run tune:winds` runs the model many times with settings changed, on the wind report's nine cases, their temperatures solved once at the start (about ten seconds; a run of the Earth then takes about half a second). Run with nothing after it, it lists the settings and how to run it:
 
 - **A sweep** of one setting over a range: one row for each value tried, with the Earth's three whole-year figures (the wind's difference as vectors, the share within 45° in direction, and the pressure difference).
-- **A search** over several settings, or `tuned` for fourteen: the eleven tuned by hand against the observed Earth (the bands' strength, the thermal response and its smoothing distance, the hot window, both frictions, the low's move from the hottest latitude, the outer bands' share, the sea's share of the thermal response, the limit on warmth and the fade with height), and three moved by hand for other reasons: the Earth's contrast, set to the simulated Earth's own and not tuned; how the bands fade towards the poles, moved from 15° to 10° to keep more of the polar cell, not against the observed Earth; and the contrast a side's bands are scaled against, set against the Earth tilted 60°. It moves one setting at a time, each multiplied by 1.1 or 0.9 while that lowers the Earth's wind difference, then half the step, for three rounds by default, each step within its setting's bounds (a share above 0 and at most 1, a latitude or a cells' width at most 90°, every setting above 0); a step a bound stopped is printed. It never takes a step that worsens the direction share or the pressure difference from where it started, so it never ends worse than it started. It prints every case's band count and tropical edge, and the three checks against published studies, at the start and at the end.
+- **A search** over several settings, or `tuned` for fourteen: the eleven tuned by hand against the observed Earth (the bands' strength, the thermal response and its smoothing distance, the hot window, both frictions, the low's move from the hottest latitude, the outer bands' share, the sea's share of the thermal response, the limit on warmth and the fade with height), and three moved by hand for other reasons: the Earth's contrast, set to the simulated Earth's own and not tuned; how the bands fade towards the poles, moved from 15° to 10° to keep more of the polar cell, not against the observed Earth; and the contrast a side's bands are scaled against, set against the Earth tilted 60°. It moves one setting at a time, each multiplied by 1.1 or 0.9 while that lowers the Earth's wind difference, then half the step, for three rounds by default, each step within its setting's bounds (a share above 0 and at most 1, a latitude or a cells' width at most 90°, a width in longitude at most 360°, every setting above 0); a step a bound stopped is printed. It never takes a step that worsens the direction share or the pressure difference from where it started, so it never ends worse than it started. It prints every case's band count and tropical edge, and the three checks against published studies, at the start and at the end.
 - **The cases** for any set of settings, the same printout.
 - **The diagnostic** above.
 
-Each form takes `<setting>=<value>` arguments, which hold those settings throughout. The script proposes; it does not judge, and nothing it finds is applied by itself; the line it prints at a search's end, with the settings held and those moved in full, runs every case with the search's end exactly. A search over the tuned settings, for example, lowers the Earth's wind difference from 3.81 to 3.03 m/s mostly by weakening the thermal response and the bands, and with them the Earth's polar easterlies: its band count falls from three a hemisphere to two.
+Each form takes `<setting>=<value>` arguments, which hold those settings throughout. The script proposes; it does not judge, and nothing it finds is applied by itself; the line it prints at a search's end, with the settings held and those moved in full, runs every case with the search's end exactly. A search over the tuned settings, run before the bands varied by longitude, for example, lowered the Earth's wind difference from 3.81 to 3.03 m/s mostly by weakening the thermal response and the bands, and with them the Earth's polar easterlies: its band count fell from three a hemisphere to two.
 
 ## How it was tuned
 
-The model had thirteen rounds of hand tuning against the observed Earth and the invented worlds above. Of its 32 or so named settings, these were moved by hand: the equator-to-pole contrast it is scaled by, the bands' strength, the thermal response and its smoothing distance, how close to the hottest temperature a latitude must be to count towards the hottest latitude, both frictions, how the bands fade towards the poles, and the contrast a side's bands are scaled against (from 20 to 30 K). These were added while tuning: the sea's share of the thermal response, the limit on warmth, the fade with height, the outer cells' share, the low's move from the hottest latitude and how it fades, its move on to the pole (from 60° to 80°, since replaced by the limit at about 70° above), the widening of a squeezed summer side (from 0.4 to 0.8 cell widths), and the turning along steep ground scaled by the planet's turning and the friction together. Two of the rounds came from a look at the Earth tilted 60°: the cap of high pressure over the summer pole in January, and a narrow band at 66°N in July. Since then three rules were added that leave the Earth's winds exactly as they were: the limit on a cold place's high, the low's limit at a steep tilt, and the outer bands kept in full out to 60° from the low on a planet spinning faster than the Earth.
+The model had thirteen rounds of hand tuning against the observed Earth and the invented worlds above. Of its 32 or so named settings, these were moved by hand: the equator-to-pole contrast it is scaled by, the bands' strength, the thermal response and its smoothing distance, how close to the hottest temperature a latitude must be to count towards the hottest latitude, both frictions, how the bands fade towards the poles, and the contrast a side's bands are scaled against (from 20 to 30 K). These were added while tuning: the sea's share of the thermal response, the limit on warmth, the fade with height, the outer cells' share, the low's move from the hottest latitude and how it fades, its move on to the pole (from 60° to 80°, since replaced by the limit at about 70° above), the widening of a squeezed summer side (from 0.4 to 0.8 cell widths), and the turning along steep ground scaled by the planet's turning and the friction together. Two of the rounds came from a look at the Earth tilted 60°: the cap of high pressure over the summer pole in January, and a narrow band at 66°N in July. Since then three rules were added that leave the Earth's winds exactly as they were: the limit on a cold place's high, the low's limit at a steep tilt, and the outer bands kept in full out to 60° from the low on a planet spinning faster than the Earth. Then the bands were placed by longitude (see [Bands by longitude](#bands-by-longitude)), with settings of this project's own choosing and no retune: it moved none of the nine cases' band counts and kept the Earth's whole-year figures within 2% of what they were, the wind's difference 3.81 to 3.82 m/s, the direction within 45° 60.6% to 60.9% and the pressure difference 7.11 to 7.08 hPa.

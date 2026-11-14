@@ -4,6 +4,11 @@
  * lines of text and prints nothing.
  */
 
+import {
+	CONTINENT_HALF_WIDTH_DEG,
+	CONTINENT_MIDDLE_LONGITUDE,
+} from '../report/cases';
+import { type OceanicSwing, OPEN_OCEAN_MARGIN_DEG } from '../report/oceanBands';
 import type { Measure } from '../report/summary';
 import type { Box, Extreme, MeanWind } from './faults';
 import {
@@ -126,6 +131,32 @@ const measureText = (measure: Measure, digits: number): string =>
 
 const MONTH_NAMES = { 0: 'January', 6: 'July' } as const;
 
+/** The one-continent world's oceanic swing, as a table. */
+export const swingText = (swing: OceanicSwing): string[] => {
+	const reach = CONTINENT_HALF_WIDTH_DEG + OPEN_OCEAN_MARGIN_DEG;
+	const from = CONTINENT_MIDDLE_LONGITUDE + reach;
+	const to = CONTINENT_MIDDLE_LONGITUDE + 360 - reach;
+	return [
+		`The one-continent world's bands over the open ocean, ${valueText(from)}° to ${valueText(to)}° east (more than ${OPEN_OCEAN_MARGIN_DEG}° of longitude from the land), in the mean pressure by latitude, °N:`,
+		'',
+		...markdownTable(
+			['', 'Southern high', 'Band low', 'Northern high'],
+			(
+				[
+					['January', swing.january],
+					['July', swing.july],
+					['July less January', swing.change],
+				] as const
+			).map(([label, places]) => [
+				label,
+				measureText(places.southHigh, 1),
+				measureText(places.low, 1),
+				measureText(places.northHigh, 1),
+			]),
+		),
+	];
+};
+
 /** Every case's measures and the three checks' observations. */
 export const casesText = (run: CasesRun): string[] => {
 	const { checks } = run;
@@ -149,6 +180,7 @@ export const casesText = (run: CasesRun): string[] => {
 				measureText(shown.edges.northern, 1),
 			]),
 		),
+		...(run.oceanicSwing === null ? [] : swingText(run.oceanicSwing)),
 		'Check (a), winds at a steep tilt (mean eastward wind, m/s):',
 		'',
 		...markdownTable(
