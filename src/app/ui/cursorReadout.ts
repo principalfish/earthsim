@@ -2,7 +2,8 @@
  * The cursor readout: a strip over the globe's bottom-left corner saying
  * what lies under the pointer, such as `27.9° N, 86.9° E`, `8,123 m`, on a
  * computed layer its value, such as `July −18 °C` in Temperature view, and,
- * while the winds are shown, `7 m/s from the north-east`.
+ * while the winds are shown, `7 m/s from the north-east`, marked `observed`
+ * for the observed winds.
  *
  * The writing is in the pure functions at the top. {@link createCursorReadout}
  * follows the pointer and decides when to look again, and
@@ -24,6 +25,7 @@ import {
 	type Source,
 	SUMMARY_LABELS,
 	type Summary,
+	type WindSource,
 } from '../view';
 import {
 	DEFAULT_WIND_UNIT,
@@ -178,15 +180,23 @@ export type ReadoutWind = {
 	 * year's mean wind, and {@link SUMMARY_LABELS}' when left out.
 	 */
 	readonly annualMeanLabel?: string;
+	/** Where the winds come from; the simulation when left out. */
+	readonly source?: WindSource;
 	/** Whether the winds are the ones chosen and up to date. */
 	readonly current: boolean;
 };
+
+/** What the readout says after a wind of the observed Earth. */
+export const READOUT_OBSERVED_WIND_TEXT = 'observed';
 
 /**
  * A wind as the readout writes it, such as `7 m/s from the north-east`, or
  * `Annual average 7 m/s from the north-east` for the year's mean wind,
  * named as the layer on screen names its value on that view; `calm` below
- * 0.5 m/s, as {@link formatWind} writes it.
+ * 0.5 m/s, as {@link formatWind} writes it. An observed wind is marked so
+ * at the end, as an observed value of a layer is: `7 m/s from the west
+ * observed`, `Annual average 7 m/s from the west observed` or `calm
+ * observed`.
  *
  * @param wind - The wind.
  * @param unit - The unit to write its speed in.
@@ -200,9 +210,12 @@ export const formatReadoutWind = (
 		windFromDeg(wind.east, wind.north),
 		unit,
 	);
-	return wind.annualMean
+	const named = wind.annualMean
 		? `${wind.annualMeanLabel ?? SUMMARY_LABELS.annualMean} ${text}`
 		: text;
+	return wind.source === 'observed'
+		? `${named} ${READOUT_OBSERVED_WIND_TEXT}`
+		: named;
 };
 
 /** What the readout says of one place. */
@@ -335,6 +348,7 @@ export const readoutPartsAt = (
 						north,
 						annualMean: winds.annualMean,
 						annualMeanLabel: winds.annualMeanLabel,
+						source: winds.source,
 						current: winds.current,
 					}
 				: null,

@@ -384,6 +384,10 @@ const createStage = (
 			viewPanelOptions = options;
 			return {
 				setSeaLevel: (metres) => log.push(`viewPanel.setSeaLevel ${metres}`),
+				showWindSource: (content) =>
+					log.push(
+						`viewPanel.showWindSource ${content.offered} ${content.source}`,
+					),
 			};
 		},
 		createPlanetPanel: (options) => {
@@ -443,6 +447,8 @@ const createStage = (
 				shown: () => stage.shownTemperature,
 				shownWinds: () => stage.shownWinds,
 				setWindUnit: (unit) => log.push(`layerPanel.setWindUnit ${unit}`),
+				setWindSource: (source) =>
+					log.push(`layerPanel.setWindSource ${source}`),
 			};
 		},
 		createCursorReadout: (options) => {
@@ -464,6 +470,8 @@ const createStage = (
 		loadEarth: () => Promise.reject(new Error('The Earth is not asked for')),
 		loadObserved: () =>
 			Promise.reject(new Error('The observed temperature is not asked for')),
+		loadObservedWinds: () =>
+			Promise.reject(new Error('The observed winds are not asked for')),
 		exportWorld: (current) => {
 			log.push('exportWorld');
 			stage.exportWorld(current);
@@ -2758,7 +2766,10 @@ describe('the comparison on the measured Earth', () => {
 	/** A page on a world, with the real layer panel, in Temperature view. */
 	const createComparisonStage = async (world: World = freshEarth()) => {
 		let controls: LayerControlsOptions | undefined;
+		/** What the temperature's comparison controls were told to show. */
 		const comparisons: ComparisonContent[] = [];
+		/** What the pressure's comparison controls were told to show. */
+		const pressureComparisons: ComparisonContent[] = [];
 		const stage = await createStartedStage(world, {
 			createLayerPanel: (options) =>
 				createLayerPanel({
@@ -2777,7 +2788,10 @@ describe('the comparison on the measured Earth', () => {
 						return {
 							showLegend: () => {},
 							showView: () => {},
-							showComparison: (_layer, content) => comparisons.push(content),
+							showComparison: (layer, content) =>
+								(layer === 'pressure' ? pressureComparisons : comparisons).push(
+									content,
+								),
 							showWindKey: () => {},
 							setWindUnit: () => {},
 						};
@@ -2796,6 +2810,11 @@ describe('the comparison on the measured Earth', () => {
 			);
 		};
 		arrive();
+		/** What the view controls were last told of the winds' source. */
+		const windSource = (): string | undefined =>
+			stage.log
+				.filter((entry) => entry.startsWith('viewPanel.showWindSource'))
+				.at(-1);
 		return {
 			stage,
 			controls: chosen,
@@ -2803,6 +2822,9 @@ describe('the comparison on the measured Earth', () => {
 			offered: (): boolean => comparisons.at(-1)?.offered ?? false,
 			source: () => comparisons.at(-1)?.source,
 			shownSource: () => stage.readoutOptions.shownLayer()?.source,
+			pressureOffered: (): boolean =>
+				pressureComparisons.at(-1)?.offered ?? false,
+			windSource,
 		};
 	};
 
@@ -2849,6 +2871,39 @@ describe('the comparison on the measured Earth', () => {
 		expect(page.source()).toBe('simulated');
 		page.stage.pressKey(REDO_KEYS);
 		expect(page.offered()).toBe(false);
+	});
+
+	it('offers the Pressure sources and the Winds shown choice on the measured Earth only; a stroke removes them, the winds back on Simulated, and its undo returns them', async () => {
+		const page = await createComparisonStage();
+		page.controls.onLayer('pressure');
+		expect(page.pressureOffered()).toBe(true);
+		expect(page.windSource()).toBe('viewPanel.showWindSource true simulated');
+		page.stage.viewPanelOptions.onWindSource('observed');
+		expect(page.windSource()).toBe('viewPanel.showWindSource true observed');
+		makeStroke(page.stage);
+		expect(page.pressureOffered()).toBe(false);
+		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		page.stage.pressKey(UNDO_KEYS);
+		expect(page.pressureOffered()).toBe(true);
+		expect(page.windSource()).toBe('viewPanel.showWindSource true simulated');
+		page.stage.planetPanelOptions.onChange({
+			...DEFAULT_PLANET,
+			dayLengthHours: 30,
+		});
+		expect(page.pressureOffered()).toBe(false);
+		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		page.stage.state.replaceWorld(createBlankWorld(64));
+		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		page.stage.state.replaceWorld(freshEarth());
+		expect(page.pressureOffered()).toBe(true);
+		expect(page.windSource()).toBe('viewPanel.showWindSource true simulated');
+	});
+
+	it('offers no Winds shown choice off the measured Earth', async () => {
+		const page = await createComparisonStage(createBlankWorld(64));
+		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		page.stage.viewPanelOptions.onWindSource('observed');
+		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
 	});
 
 	it('goes after a change of sea level, and comes back with the sea level set back', async () => {

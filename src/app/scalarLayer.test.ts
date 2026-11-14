@@ -8,7 +8,7 @@ import {
 	TEMPERATURE_RAMP,
 } from './globe/ramp';
 import { createLayerStore } from './layers';
-import { loadObservedTemperature } from './observedData';
+import { loadObservedPressure, loadObservedTemperature } from './observedData';
 import {
 	DIFFERENCE_HALF_SPAN_C,
 	DIFFERENCE_TICK_STEP,
@@ -16,8 +16,12 @@ import {
 	formatWhole,
 	layerCaption,
 	loadLayerObserved,
+	meanOfMonths,
 	offersSummary,
+	PRESSURE_DIFFERENCE_HALF_SPAN_HPA,
+	PRESSURE_DIFFERENCE_TICK_STEP_HPA,
 	PRESSURE_LAYER,
+	PRESSURE_OBSERVED,
 	SCALAR_LAYER_SPECS,
 	SCALAR_LAYERS,
 	SEASONAL_RANGE_TICK_STEP,
@@ -25,6 +29,7 @@ import {
 	summaryOf,
 	TEMPERATURE_LAYER,
 	TEMPERATURE_OBSERVED,
+	windsStatus,
 	yearField,
 	yearSummaries,
 } from './scalarLayer';
@@ -140,7 +145,55 @@ describe('the pressure layer', () => {
 		expect(PRESSURE_LAYER.sunlightStyle).toBe(TEMPERATURE_LAYER.sunlightStyle);
 		expect(PRESSURE_LAYER.scheduler).toBe('winds');
 		expect(PRESSURE_LAYER.minSpan).toBe(10);
-		expect(PRESSURE_LAYER.observed).toBeNull();
+		expect(PRESSURE_LAYER.observed).toBe(PRESSURE_OBSERVED);
+	});
+
+	it('is compared with the observed pressure, its difference ±20 hPa marked every 10 in the difference colours', () => {
+		expect(PRESSURE_OBSERVED).toEqual({
+			load: loadObservedPressure,
+			loadingText: 'Loading observed pressure',
+			failedText: 'Observed pressure could not be loaded',
+			sourceName: 'pressure-source',
+			sourceLegend: 'Pressure source',
+			difference: { halfSpan: 20, ramp: DIFFERENCE_RAMP, tickStep: 10 },
+		});
+		expect(PRESSURE_OBSERVED.difference.ramp).toBe(
+			TEMPERATURE_OBSERVED.difference.ramp,
+		);
+		expect([
+			PRESSURE_DIFFERENCE_HALF_SPAN_HPA,
+			PRESSURE_DIFFERENCE_TICK_STEP_HPA,
+		]).toEqual([20, 10]);
+	});
+
+	it('words its observed and difference captions in the temperature’s pattern', () => {
+		expect(layerCaption(PRESSURE_LAYER, 'month', 6, 'simulated')).toBe(
+			'Simulated sea-level pressure in July, hPa',
+		);
+		expect(layerCaption(PRESSURE_LAYER, 'month', 6, 'observed')).toBe(
+			'Observed sea-level pressure in July, hPa',
+		);
+		expect(layerCaption(PRESSURE_LAYER, 'month', 6, 'difference')).toBe(
+			'Simulated less observed in July, hPa',
+		);
+		expect(layerCaption(PRESSURE_LAYER, 'annualMean', 6, 'observed')).toBe(
+			'Observed annual average sea-level pressure, hPa',
+		);
+		expect(layerCaption(PRESSURE_LAYER, 'annualMean', 6, 'difference')).toBe(
+			'Simulated less observed, annual average sea-level pressure, hPa',
+		);
+		// The temperature's, built the same way.
+		expect(layerCaption(TEMPERATURE_LAYER, 'month', 6, 'difference')).toBe(
+			'Simulated less observed in July, °C',
+		);
+		expect(layerCaption(TEMPERATURE_LAYER, 'annualMean', 6, 'difference')).toBe(
+			'Simulated less observed, annual average air temperature, °C',
+		);
+	});
+
+	it('loads its observed year through its own loader', () => {
+		expect(PRESSURE_LAYER.observed?.load).toBe(loadObservedPressure);
+		expect(PRESSURE_LAYER.observed?.load).not.toBe(loadObservedTemperature);
 	});
 
 	it('offers the Month and the Annual average alone, both centred in its colours', () => {
@@ -172,10 +225,10 @@ describe('the pressure layer', () => {
 
 	it('words its captions as sea-level pressure in hPa', () => {
 		expect(layerCaption(PRESSURE_LAYER, 'month', 6)).toBe(
-			'July sea-level pressure, hPa',
+			'Sea-level pressure in July, hPa',
 		);
 		expect(layerCaption(PRESSURE_LAYER, 'month', 0)).toBe(
-			'January sea-level pressure, hPa',
+			'Sea-level pressure in January, hPa',
 		);
 		expect(layerCaption(PRESSURE_LAYER, 'annualMean', 6)).toBe(
 			'Annual average sea-level pressure, hPa',
@@ -227,6 +280,30 @@ describe('the pressure layer', () => {
 		expect(PRESSURE_LAYER.read(store).status).toBe('empty');
 		store.markWindsCalculating();
 		expect(PRESSURE_LAYER.read(store).status).toBe('calculating');
+	});
+
+	it('stands as the winds stand for showing, by the rule the key to the arrows shares', () => {
+		expect(windsStatus('calculating', 'empty')).toBe('calculating');
+		expect(windsStatus('empty', 'empty')).toBe('empty');
+		expect(windsStatus('current', 'empty')).toBe('empty');
+		expect(windsStatus('calculating', 'current')).toBe('current');
+		expect(windsStatus('calculating', 'outOfDate')).toBe('outOfDate');
+		expect(windsStatus('unavailable', 'unavailable')).toBe('unavailable');
+		const store = createLayerStore(() => {});
+		store.markCalculating();
+		expect(PRESSURE_LAYER.read(store).status).toBe(
+			windsStatus(store.temperature.status, store.winds.status),
+		);
+	});
+
+	it('averages months cell by cell as the winds’ own annual mean does, to the bit', () => {
+		const solved = pressureWinds(0.3);
+		expect(meanOfMonths(solved.winds.east)).toEqual(
+			summariseWinds(solved.winds).east,
+		);
+		expect(meanOfMonths(solved.winds.pressure)).toEqual(
+			summariseWinds(solved.winds).pressure,
+		);
 	});
 
 	it('cannot be calculated once the temperature cannot, as the winds cannot', () => {

@@ -6,6 +6,7 @@ import { loadEarthData } from './earthData';
 import { attachViewInput } from './globe/input';
 import { MAX_DRAWN_SEA_LEVEL_M, MIN_DRAWN_SEA_LEVEL_M } from './globe/material';
 import { createGlobe, type Globe } from './globe/renderer';
+import { loadObservedWinds } from './observedData';
 import { createPanelMemory, reachStorage } from './panelMemory';
 import { createPreferences } from './preferences';
 import { loadLayerObserved } from './scalarLayer';
@@ -172,6 +173,7 @@ if (globe !== null) {
 		openNewWorldDialog,
 		loadEarth: loadEarthData,
 		loadObserved: loadLayerObserved,
+		loadObservedWinds,
 		exportWorld: (world) => exportWorldFile(world),
 		importWorld: importWorldFile,
 		setInert: (inert) => {

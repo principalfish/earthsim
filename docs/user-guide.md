@@ -80,6 +80,7 @@ The Tools section chooses what the left mouse button does on the globe.
 | Show cell grid | On or off | Draws the outlines of the grid's cells |
 | Sunlight | On or off | Lights the globe from the sun; see [The sun](#the-sun). Not saved |
 | Winds | On or off, starting off | Draws the surface winds as arrows over the globe; see [Winds](#winds). Not saved |
+| Winds shown | Simulated or Observed, starting on Simulated | On an untouched Earth only: whether the arrows are the simulated winds or the observed Earth's; see [Simulated or observed winds](#simulated-or-observed-winds). Hidden on any other world |
 | Wind speed | m/s, km/h or mph, starting on m/s | The unit wind speeds are written in, in the strip under the pointer and the key to the arrows. It changes both at once, and does not change the arrows. Shown whether or not Winds is on. The browser remembers it, as it does the open sections; it is not saved with the world |
 
 ## Planet
@@ -132,10 +133,13 @@ Pressure view colours the globe by the sea-level pressure of the winds' calculat
 - **Reduced to sea level.** The value is what the pressure would be at sea level at that place, so high ground does not show as low pressure: over a mountain it is the sea-level pressure there, not the thinner air at the summit.
 - **Its colours** run from teal for low pressure, through near white, to brown for high. The near white is the planet's own mean over the whole year and the whole surface, and the scale is the same for every month and for the annual average, so a colour means the same in each as the year plays. The scale is at least 10 hPa wide, and the few places beyond its ends take the end colours.
 - **Show** offers **Month** and **Annual average** only.
-- **The legend** says what is shown, such as "July sea-level pressure, hPa" or "Annual average sea-level pressure, hPa". While the winds are being worked out it says "Calculating", with no year count, and "Pressure unavailable" if they cannot be.
+- **The legend** says what is shown, such as "Sea-level pressure in July, hPa" or "Annual average sea-level pressure, hPa". While the winds are being worked out it says "Calculating", with no year count, and "Pressure unavailable" if they cannot be.
 - **The strip under the pointer** gives the pressure there, such as `July 1,018 hPa` or `Annual average 1,013 hPa`.
 - **It is worked out with the winds,** from the temperature. Choosing Pressure asks for them even while Winds is off, and the colours appear once they are ready. Winds can be shown over it.
-- **There is no Earth comparison** for it yet: on an untouched Earth it shows the simulated pressure alone.
+- **On an untouched Earth,** a second choice offers the simulated pressure, the observed one (the mean sea-level pressure of 1981 to 2010), or the difference between them, as for the temperature. The observed pressure is fetched the first time Observed or Difference is chosen; a line under the choice says "Loading observed pressure" meanwhile, and "Observed pressure could not be loaded" if it fails, when the choice goes back to Simulated and the next choice tries again.
+  - **The legend** then says where the field comes from, such as "Observed sea-level pressure in July, hPa" or "Simulated less observed in July, hPa", and gives the mean and the root-mean-square of the simulated less the observed for the month or annual average on screen, in hPa, such as `Mean +1.2 hPa · RMS 4.5 hPa`.
+  - **The difference** is drawn from −20 to +20 hPa, marked every 10, in the temperature difference's blue-to-red colours: blue where the simulated pressure is too low, red where it is too high. The scale is the same for every month and the annual average.
+  - Any edit of the Earth removes the choice and puts it back on Simulated, and undoing the edit offers it again, as for the temperature.
 
 ### The value under the pointer
 
@@ -151,6 +155,7 @@ About the wind's line:
 - **It is the cell's own wind,** from the same winds the arrows are drawn from, not the mean of an arrow's patch, and it is not capped at 10 m/s as the arrows are.
 - **"calm"** below 0.5 m/s, in every unit, where no arrow would be drawn.
 - **On Annual average** it is the mean wind of the year and says so: `Annual average 7 m/s from the north-east`.
+- **"observed"** ends the line while the arrows are the observed winds: `7 m/s from the west observed`, `Annual average 7 m/s from the west observed`, or `calm observed`. A simulated wind has no mark.
 - **"out of date"** follows the wind, apart from the temperature's mark, when the winds on the globe are not current, as while new ones are being worked out.
 - There is no wind line while Winds is off, or before the first winds are ready.
 
@@ -179,7 +184,7 @@ The star is drawn in the scene as a glowing disc.
 - **Length and weight** grow with the speed, from 8 pixels just above 0.5 m/s to 26 pixels at 10 m/s, and no further for a stronger wind. A wind below 0.5 m/s is calm and has no arrow.
 - **The same size at every zoom.** The arrows keep their size on the screen. Zooming in brings more of them, closer together on the globe, in steps from about 8° apart to about 2°, so they never crowd one another.
 - **On the relief.** The arrows stand on the raised relief at every exaggeration, and fade out towards the globe's edge, so none show from the far side.
-- **The key** beside the legend shows arrows of 5 m/s and of 10 m/s or more, labelled "10+ m/s", at the size they are drawn on the globe. In km/h they are labelled "18 km/h" and "36+ km/h", and in mph "11 mph" and "22+ mph"; see **Wind speed** in [View](#view). Under them it says "Calculating" while the winds are being worked out, "Out of date" after a change they do not yet take in, "Not calculated yet" before the first, and "Winds unavailable" if they cannot be worked out.
+- **The key** beside the legend shows arrows of 5 m/s and of 10 m/s or more, labelled "10+ m/s", at the size they are drawn on the globe. In km/h they are labelled "18 km/h" and "36+ km/h", and in mph "11 mph" and "22+ mph"; see **Wind speed** in [View](#view). Under them it says "Calculating" while the winds, or the temperature they wait for, are being worked out, "Out of date" after a change they do not yet take in, "Not calculated yet" before the first when nothing is being worked out, and "Winds unavailable" if they cannot be worked out.
 
 Which winds are shown follows the Layers section:
 
@@ -192,6 +197,26 @@ Which winds are shown follows the Layers section:
 - While new winds are being worked out, the last ones stay on the globe. A new world drops them until its own are ready.
 - Clearing Winds removes the arrows and stops the winds being worked out, unless Pressure is on screen, which needs them.
 - The strip under the pointer gives the wind of the place under it; see [The value under the pointer](#the-value-under-the-pointer).
+
+### Simulated or observed winds
+
+On an untouched Earth, **Winds shown**, under Winds in the View section, chooses whether the arrows are the simulated winds or the observed Earth's: the mean wind ten metres up for each month of 1981 to 2010, on a 1° grid taken onto the world's cells. On any other world it is hidden and the arrows are the simulated winds.
+
+- **Fetched when first chosen.** Nothing is downloaded until Observed is chosen. Meanwhile the simulated arrows stay and the key says "Loading observed winds". If the download fails the key says "Observed winds could not be loaded", the choice goes back to Simulated, and choosing Observed again tries again. Where the winds themselves stand comes first on the key's line: while they are out of date or being worked out it says that, and the line about the observed winds shows once they are current.
+- **Which month.** The observed arrows follow the month on screen, and on Annual average they are the mean of the observed year, worked out as arrows as the simulated mean is. They need the simulated winds to be ready, as the observed temperature needs the simulated one.
+- **Any edit removes the choice** and puts the arrows back on Simulated: a stroke, a change of sea level, a planet setting or a new world. Undoing the edit offers the choice again, on Simulated; the observed winds already fetched are kept.
+- **Never out of date.** While the observed arrows are shown, the key says nothing of the simulated winds being worked out again.
+
+Once the observed winds have been fetched, the key gives two lines under its arrows, whichever is shown, for as long as the world is the untouched Earth:
+
+| Line | What it means |
+|-|-|
+| Off by 3.8 m/s on average | The area-weighted root-mean-square difference between the simulated and the observed wind, as vectors, in the **Wind speed** unit to one decimal, such as `Off by 13.7 km/h on average`. It changes with the unit at once |
+| Direction right on 61% of the map | The share of the surface, where the observed wind is at least 1 m/s, on which the simulated wind points within 45° of the observed, as a whole percentage. A calm simulated wind there counts as pointing wrongly |
+
+- **The month's or the year's.** By month the figures are the month's on screen; on Annual average they are the whole year's, every cell of every month taken together.
+- **The tooltip** of each line gives its exact definition.
+- **While the simulated winds are out of date** the figures stay under the simulated arrows, describing the winds on the globe, and are left off under the observed ones, as the legend does with the temperature's figures.
 
 ## Statistics
 

@@ -20,8 +20,14 @@ import { LEGEND_EMPTY_TEXT, LEGEND_OUT_OF_DATE_TEXT } from './legend';
 import {
 	createWindKey,
 	formatSpeed,
+	formatWindDirectionRight,
+	formatWindOffBy,
+	OBSERVED_WINDS_FAILED_TEXT,
+	OBSERVED_WINDS_LOADING_TEXT,
+	WIND_DIRECTION_TITLE,
 	WIND_KEY_CAPTION,
 	WIND_KEY_SPEEDS,
+	WIND_OFF_BY_TITLE,
 	WINDS_CALCULATING_TEXT,
 	WINDS_UNAVAILABLE_TEXT,
 	windKeyContent,
@@ -187,5 +193,103 @@ describe('createWindKey', () => {
 		expect(status.textContent).toBe('');
 		key.show(null);
 		expect(element.hidden).toBe(true);
+	});
+});
+
+describe('the key’s figures', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('writes how far off the winds are to one decimal of the unit chosen', () => {
+		expect(formatWindOffBy(3.8, 'm/s')).toBe('Off by 3.8 m/s on average');
+		expect(formatWindOffBy(3.8, 'km/h')).toBe('Off by 13.7 km/h on average');
+		expect(formatWindOffBy(3.8, 'mph')).toBe('Off by 8.5 mph on average');
+		expect(formatWindOffBy(0.04, 'm/s')).toBe('Off by 0.0 m/s on average');
+		expect(formatWindOffBy(2.25, 'm/s')).toBe('Off by 2.3 m/s on average');
+	});
+
+	it('writes how much of the map the winds point right on as a whole percentage', () => {
+		expect(formatWindDirectionRight(0.61)).toBe(
+			'Direction right on 61% of the map',
+		);
+		expect(formatWindDirectionRight(0.605)).toBe(
+			'Direction right on 61% of the map',
+		);
+		expect(formatWindDirectionRight(1)).toBe(
+			'Direction right on 100% of the map',
+		);
+	});
+
+	it('words the loading and the failure of the observed winds, and the figures’ exact definitions', () => {
+		expect(OBSERVED_WINDS_LOADING_TEXT).toBe('Loading observed winds');
+		expect(OBSERVED_WINDS_FAILED_TEXT).toBe(
+			'Observed winds could not be loaded',
+		);
+		expect(WIND_OFF_BY_TITLE).toBe(
+			'The area-weighted root-mean-square difference between the simulated and the observed wind, as vectors.',
+		);
+		expect(WIND_DIRECTION_TITLE).toBe(
+			'The share of the surface, where the observed wind is at least 1 m/s, on which the simulated wind points within 45° of the observed.',
+		);
+	});
+
+	it('puts two lines under the arrows, above the status, each with its definition as its tooltip, and none while there are no figures', () => {
+		const key = createWindKey();
+		const element = key.element as unknown as FakeElement;
+		const classes = () => element.children.map((child) => child.className);
+		expect(classes()).toEqual([
+			'wind-key__caption',
+			'wind-key__row',
+			'wind-key__row',
+			'wind-key__figure',
+			'wind-key__figure',
+			'wind-key__status',
+		]);
+		const [offBy, direction] = byClass(element, 'wind-key__figure') as [
+			FakeElement,
+			FakeElement,
+		];
+		key.show({ status: null });
+		expect([offBy.hidden, direction.hidden]).toEqual([true, true]);
+		key.show({
+			status: null,
+			figures: { rmsVectorDifference: 3.8, directionShare: 0.61 },
+		});
+		expect([offBy.hidden, direction.hidden]).toEqual([false, false]);
+		expect(offBy.textContent).toBe('Off by 3.8 m/s on average');
+		expect(direction.textContent).toBe('Direction right on 61% of the map');
+		expect(offBy.title).toBe(WIND_OFF_BY_TITLE);
+		expect(direction.title).toBe(WIND_DIRECTION_TITLE);
+		key.show({
+			status: 'Out of date',
+			figures: { rmsVectorDifference: 3.8, directionShare: null },
+		});
+		expect([offBy.hidden, direction.hidden]).toEqual([false, true]);
+		key.show({ status: null });
+		expect([offBy.hidden, direction.hidden]).toEqual([true, true]);
+	});
+
+	it('writes how far off the winds are in the unit it starts in, and follows a change of it at once', () => {
+		const key = createWindKey('km/h');
+		const element = key.element as unknown as FakeElement;
+		const offBy = () => byClass(element, 'wind-key__figure')[0]?.textContent;
+		key.show({
+			status: null,
+			figures: { rmsVectorDifference: 3.8, directionShare: 0.61 },
+		});
+		expect(offBy()).toBe('Off by 13.7 km/h on average');
+		key.setUnit('mph');
+		expect(offBy()).toBe('Off by 8.5 mph on average');
+		key.setUnit('m/s');
+		expect(offBy()).toBe('Off by 3.8 m/s on average');
+		expect(byClass(element, 'wind-key__figure')[1]?.textContent).toBe(
+			'Direction right on 61% of the map',
+		);
 	});
 });

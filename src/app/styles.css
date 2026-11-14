@@ -175,6 +175,12 @@ body {
   font-size: var(--font-size-sm);
 }
 
+/* Hidden by the page, as the Winds shown choice is off the measured Earth,
+   which the display set on it would otherwise undo. */
+.field[hidden] {
+  display: none;
+}
+
 .field--check {
   grid-template-columns: auto 1fr;
   gap: var(--space-sm);
@@ -840,6 +846,16 @@ body {
 .wind-key__label {
   font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
+}
+
+/* How far the simulated winds are from the observed, on the measured
+   Earth. Each line takes the pointer, though the key does not, so that its
+   tooltip, the figure's exact definition, shows. */
+.wind-key__figure {
+  margin: 0;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
 }
 
 /* Left empty rather than hidden when there is nothing to say, as the

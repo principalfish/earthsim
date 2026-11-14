@@ -32,6 +32,7 @@ import {
 	formatLatLon,
 	formatLayerValue,
 	formatReadoutWind,
+	READOUT_OBSERVED_WIND_TEXT,
 	READOUT_OUT_OF_DATE_TEXT,
 	type ReadoutText,
 	readoutPartsAt,
@@ -311,6 +312,38 @@ describe('describeReadout', () => {
 		});
 	});
 
+	it('marks an observed wind at the end, in each form, and a simulated one not at all', () => {
+		/** A westerly of 7 m/s. */
+		const westerly = { ...northEasterly, east: 7, north: 0 };
+		expect(READOUT_OBSERVED_WIND_TEXT).toBe('observed');
+		expect(formatReadoutWind({ ...westerly, source: 'observed' }, 'm/s')).toBe(
+			'7 m/s from the west observed',
+		);
+		expect(
+			formatReadoutWind(
+				{ ...westerly, annualMean: true, source: 'observed' },
+				'm/s',
+			),
+		).toBe('Annual average 7 m/s from the west observed');
+		expect(
+			formatReadoutWind(
+				{ ...westerly, east: 0.2, north: 0.1, source: 'observed' },
+				'm/s',
+			),
+		).toBe('calm observed');
+		expect(formatReadoutWind({ ...westerly, source: 'observed' }, 'km/h')).toBe(
+			'25 km/h from the west observed',
+		);
+		expect(formatReadoutWind({ ...westerly, source: 'simulated' }, 'm/s')).toBe(
+			'7 m/s from the west',
+		);
+		expect(formatReadoutWind(westerly, 'm/s')).toBe('7 m/s from the west');
+		expect(
+			describeReadout({ ...place, wind: { ...westerly, source: 'observed' } })
+				.wind,
+		).toBe('7 m/s from the west observed');
+	});
+
 	it('writes the wind in the unit given', () => {
 		expect(
 			describeReadout({ ...place, wind: northEasterly }, 'km/h').wind,
@@ -570,6 +603,32 @@ describe('readoutPartsAt', () => {
 		expect(describeReadout(parts).wind).toBe(
 			'Yearly mean 7 m/s from the north-east',
 		);
+	});
+
+	it('says where the wind comes from, as the winds shown say', () => {
+		const world = createBlankWorld(64);
+		const { direction } = placeAt(-20, 140);
+		const cells = world.elevation.length;
+		const field = {
+			east: new Float32Array(cells).fill(7),
+			north: new Float32Array(cells),
+		};
+		const observed = readoutPartsAt(
+			world,
+			direction,
+			null,
+			windsOf(field, { source: 'observed' }),
+		);
+		expect(observed.wind?.source).toBe('observed');
+		expect(describeReadout(observed).wind).toBe('7 m/s from the west observed');
+		expect(
+			readoutPartsAt(
+				world,
+				direction,
+				null,
+				windsOf(field, { source: 'simulated' }),
+			).wind?.source,
+		).toBe('simulated');
 	});
 
 	it('gives no wind with no winds shown, as with Winds off', () => {

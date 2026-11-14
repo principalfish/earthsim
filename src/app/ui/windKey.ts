@@ -1,10 +1,17 @@
 /**
  * The key to the wind arrows, laid over the globe while the winds are
  * shown: arrows of a few speeds, drawn as those on the globe are and as
- * long as they are where they face the camera, and a line saying where the
- * winds on hand stand, in the words the temperature legend uses.
+ * long as they are where they face the camera; on the measured Earth, two
+ * lines saying how far the simulated winds are from the observed; and a
+ * line saying where the winds on hand stand, in the words the temperature
+ * legend uses.
  */
 
+import {
+	DIRECTION_MIN_SPEED_M_PER_S,
+	DIRECTION_TOLERANCE_DEG,
+	type WindErrorFigures,
+} from '../../core/index';
 import {
 	ARROW_CAP_SPEED,
 	ARROW_EDGE_COLOUR,
@@ -15,7 +22,12 @@ import {
 	arrowShape,
 } from '../globe/wind';
 import type { WindsLayer } from '../layers';
-import { DEFAULT_WIND_UNIT, type WindUnit, wholeSpeed } from '../windUnits';
+import {
+	convertSpeed,
+	DEFAULT_WIND_UNIT,
+	type WindUnit,
+	wholeSpeed,
+} from '../windUnits';
 import { createElement } from './fields';
 import { LEGEND_EMPTY_TEXT, LEGEND_OUT_OF_DATE_TEXT } from './legend';
 
@@ -52,6 +64,56 @@ export const formatSpeed = (
 	return `${whole}${capped ? '+' : ''} ${unit}`;
 };
 
+/** What the key says while the observed winds load. */
+export const OBSERVED_WINDS_LOADING_TEXT = 'Loading observed winds';
+
+/** What the key says when the observed winds could not be loaded. */
+export const OBSERVED_WINDS_FAILED_TEXT = 'Observed winds could not be loaded';
+
+/**
+ * What the tooltip of the key's line of how far off the winds are says:
+ * exactly what the figure is.
+ */
+export const WIND_OFF_BY_TITLE =
+	'The area-weighted root-mean-square difference between the simulated and the observed wind, as vectors.';
+
+/**
+ * What the tooltip of the key's line of how often the winds point right
+ * says: exactly what the figure is.
+ */
+export const WIND_DIRECTION_TITLE = `The share of the surface, where the observed wind is at least ${DIRECTION_MIN_SPEED_M_PER_S} m/s, on which the simulated wind points within ${DIRECTION_TOLERANCE_DEG}° of the observed.`;
+
+/**
+ * How far the simulated winds are off as the key writes it, such as `Off
+ * by 3.8 m/s on average`, `Off by 13.7 km/h on average` or `Off by 8.5 mph
+ * on average`: to one decimal of the unit, a half rounded upwards.
+ *
+ * @param speed - The root-mean-square vector difference, in metres a
+ * second.
+ * @param unit - The unit to write it in.
+ */
+export const formatWindOffBy = (speed: number, unit: WindUnit): string =>
+	`Off by ${(Math.round(convertSpeed(speed, unit) * 10) / 10).toFixed(1)} ${unit} on average`;
+
+/**
+ * How much of the map the simulated winds point right on as the key writes
+ * it, such as `Direction right on 61% of the map`: a whole percentage, a
+ * half rounded upwards.
+ *
+ * @param share - The share, from 0 to 1.
+ */
+export const formatWindDirectionRight = (share: number): string =>
+	`Direction right on ${Math.round(share * 100)}% of the map`;
+
+/**
+ * The figures the key gives of the simulated winds against the observed,
+ * as {@link WindErrorFigures} holds them.
+ */
+export type WindKeyFigures = Pick<
+	WindErrorFigures,
+	'rmsVectorDifference' | 'directionShare'
+>;
+
 /** What the key shows at one moment. */
 export type WindKeyContent = {
 	/**
@@ -59,18 +121,26 @@ export type WindKeyContent = {
 	 * the world as it is.
 	 */
 	readonly status: string | null;
+	/**
+	 * How far the simulated winds are from the observed, for the key's two
+	 * lines under its arrows; left out when there are none to give.
+	 */
+	readonly figures?: WindKeyFigures;
 };
 
 /**
  * What the key shows for the winds layer as it stands.
  *
- * @param layer - The winds layer, from the store.
+ * @param layer - Where the winds stand, as the store has them or as
+ * `windsStatus` words them for showing.
  * @returns No line for current winds; {@link LEGEND_OUT_OF_DATE_TEXT},
  * {@link WINDS_CALCULATING_TEXT}, {@link LEGEND_EMPTY_TEXT} or
  * {@link WINDS_UNAVAILABLE_TEXT} for the others, the arrows on hand, if
  * any, staying on the globe meanwhile.
  */
-export const windKeyContent = (layer: WindsLayer): WindKeyContent => {
+export const windKeyContent = (
+	layer: Pick<WindsLayer, 'status'>,
+): WindKeyContent => {
 	switch (layer.status) {
 		case 'current':
 			return { status: null };
@@ -92,8 +162,8 @@ export type WindKey = {
 	/** Shows the content given, or hides the key for null. */
 	show(content: WindKeyContent | null): void;
 	/**
-	 * Writes the arrows' speeds in another unit. The arrows stay as they
-	 * are, drawn for the same speeds.
+	 * Writes the arrows' speeds, and how far off the winds are, in another
+	 * unit. The arrows stay as they are, drawn for the same speeds.
 	 */
 	setUnit(unit: WindUnit): void;
 };
@@ -143,10 +213,15 @@ const drawArrow = (shape: ArrowShape): SVGSVGElement => {
  * @remarks
  * An arrow and its speed for each of {@link WIND_KEY_SPEEDS}, the arrows
  * shaped by {@link arrowShape} as those on the globe are and their speeds
- * written by {@link formatSpeed} in the unit given, and under them the
- * status line, a polite live region rewritten only when its words change,
- * as the legend's is, and kept in place, empty, while there is nothing to
- * say.
+ * written by {@link formatSpeed} in the unit given; under them, while it
+ * is given figures, a line of how far off the simulated winds are, as
+ * {@link formatWindOffBy} writes it in the same unit, and one of how much
+ * of the map they point right on, as {@link formatWindDirectionRight}
+ * writes it, the second left out when there is no share; each line's
+ * tooltip says exactly what its figure is, and neither takes any room
+ * while there are no figures. Under them all is the status line, a polite
+ * live region rewritten only when its words change, as the legend's is,
+ * and kept in place, empty, while there is nothing to say.
  *
  * @param unit - The unit the speeds are written in at first; m/s when left
  * out.
@@ -172,9 +247,31 @@ export const createWindKey = (unit: WindUnit = DEFAULT_WIND_UNIT): WindKey => {
 		row.append(drawArrow(shape) as unknown as HTMLElement, label);
 		key.append(row);
 	}
+	const offBy = createElement('p', 'wind-key__figure');
+	offBy.title = WIND_OFF_BY_TITLE;
+	offBy.hidden = true;
+	const direction = createElement('p', 'wind-key__figure');
+	direction.title = WIND_DIRECTION_TITLE;
+	direction.hidden = true;
+	key.append(offBy, direction);
 	const status = createElement('p', 'wind-key__status');
 	status.setAttribute('aria-live', 'polite');
 	key.append(status);
+	let shownUnit = unit;
+	/** The figures the key last showed, or null for none. */
+	let figures: WindKeyFigures | null = null;
+	/** Writes the figures' lines, in the unit the key writes speeds in. */
+	const writeFigures = (): void => {
+		offBy.hidden = figures === null;
+		offBy.textContent =
+			figures === null
+				? ''
+				: formatWindOffBy(figures.rmsVectorDifference, shownUnit);
+		const share = figures?.directionShare ?? null;
+		direction.hidden = share === null;
+		direction.textContent =
+			share === null ? '' : formatWindDirectionRight(share);
+	};
 	return {
 		element: key,
 		show: (content) => {
@@ -182,15 +279,19 @@ export const createWindKey = (unit: WindUnit = DEFAULT_WIND_UNIT): WindKey => {
 			if (content === null) {
 				return;
 			}
+			figures = content.figures ?? null;
+			writeFigures();
 			const text = content.status ?? '';
 			if (status.textContent !== text) {
 				status.textContent = text;
 			}
 		},
 		setUnit: (next) => {
+			shownUnit = next;
 			for (const { speed, label } of labels) {
 				label.textContent = formatSpeed(speed, next);
 			}
+			writeFigures();
 		},
 	};
 };

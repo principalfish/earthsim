@@ -6,9 +6,11 @@ import {
 	type FieldDifference,
 	getGrid,
 	type MonthlyTemperature,
+	type MonthlyWind,
 	summariseTemperature,
 	summariseWinds,
 	type TemperatureResult,
+	windErrorFigures,
 } from '../../core/index';
 import {
 	progressOf,
@@ -31,6 +33,8 @@ import {
 	layerCaption,
 	OBSERVED_FAILED_TEXT,
 	OBSERVED_LOADING_TEXT,
+	OBSERVED_PRESSURE_FAILED_TEXT,
+	OBSERVED_PRESSURE_LOADING_TEXT,
 	PRESSURE_LAYER,
 	SCALAR_LAYERS,
 	type ScalarLayerSpec,
@@ -86,7 +90,10 @@ import {
 	legendContent,
 } from './legend';
 import { createSection } from './section';
+import type { WindSourceContent } from './viewPanel';
 import {
+	OBSERVED_WINDS_FAILED_TEXT,
+	OBSERVED_WINDS_LOADING_TEXT,
 	WINDS_CALCULATING_TEXT,
 	WINDS_UNAVAILABLE_TEXT,
 	type WindKeyContent,
@@ -177,11 +184,18 @@ const createStage = (windUnit?: WindUnit) => {
 	/** Every unit the key to the arrows was told to write its speeds in. */
 	const keyUnits: WindUnit[] = [];
 	const legends: (LegendContent | null)[] = [];
-	/** What the comparison controls were told to show. */
+	/** What the temperature's comparison controls were told to show. */
 	const comparisons: ComparisonContent[] = [];
+	/** What the pressure's comparison controls were told to show. */
+	const pressureComparisons: ComparisonContent[] = [];
+	/** What the choice of the winds' source was told to show. */
+	const windSources: WindSourceContent[] = [];
 	/** The observed temperature's loader, as each test sets it. */
 	let loadObserved: ObservedLoader = () =>
 		Promise.reject(new Error('The observed temperature is not asked for'));
+	/** The observed winds' loader, as each test sets it. */
+	let loadObservedWinds: ObservedLoader<MonthlyWind> = () =>
+		Promise.reject(new Error('The observed winds are not asked for'));
 	/** What the controls were told to show: the view settings and playing. */
 	const views: { readonly view: PageView; readonly playing: boolean }[] = [];
 	/** What the panel told of the view settings. */
@@ -201,6 +215,8 @@ const createStage = (windUnit?: WindUnit) => {
 		clearTimer: timers.clearTimer,
 		onView: (view) => told.push(view),
 		loadObserved: (_layer, resolution) => loadObserved(resolution),
+		loadObservedWinds: (resolution) => loadObservedWinds(resolution),
+		onWindSource: (content) => windSources.push(content),
 		reportError: (error) => {
 			reported.push(error);
 			if (reportFailure !== null) {
@@ -232,7 +248,10 @@ const createStage = (windUnit?: WindUnit) => {
 			return {
 				showLegend: (content) => legends.push(content),
 				showView: (view, playing) => views.push({ view, playing }),
-				showComparison: (_layer, content) => comparisons.push(content),
+				showComparison: (layer, content) =>
+					(layer === 'pressure' ? pressureComparisons : comparisons).push(
+						content,
+					),
 				showWindKey: (content) => keys.push(content),
 				setWindUnit: (unit) => keyUnits.push(unit),
 			};
@@ -261,6 +280,8 @@ const createStage = (windUnit?: WindUnit) => {
 		keyUnits,
 		legends,
 		comparisons,
+		pressureComparisons,
+		windSources,
 		views,
 		told,
 		timers,
@@ -284,8 +305,18 @@ const createStage = (windUnit?: WindUnit) => {
 		setLoader: (loader: ObservedLoader): void => {
 			loadObserved = loader;
 		},
-		/** What the comparison controls were last told to show. */
+		/** What the temperature's comparison controls were last told to show. */
 		lastComparison: () => comparisons.at(-1),
+		/** What the pressure's comparison controls were last told to show. */
+		lastPressureComparison: () => pressureComparisons.at(-1),
+		/** Has the observed winds come from this loader from now on. */
+		setWindsLoader: (loader: ObservedLoader<MonthlyWind>): void => {
+			loadObservedWinds = loader;
+		},
+		/** What the choice of the winds' source was last told to show. */
+		lastWindSource: () => windSources.at(-1),
+		/** What the key to the wind arrows was last told to show. */
+		lastKey: () => keys.at(-1),
 		/** Has every report of an error throw this, once the error is taken. */
 		failReports: (error: Error): void => {
 			reportFailure = error;
@@ -1456,14 +1487,17 @@ describe('createLayerPanel, what the globe shows', () => {
 	});
 });
 
-/** A loader of the observed temperature that answers when a test says. */
-const createDeferredLoader = () => {
+/**
+ * A loader of an observed year, the temperature's unless said otherwise,
+ * that answers when a test says.
+ */
+const createDeferredLoader = <G = MonthlyTemperature>() => {
 	const calls: {
 		readonly resolution: number;
-		resolve(months: MonthlyTemperature): void;
+		resolve(months: G): void;
 		reject(error: unknown): void;
 	}[] = [];
-	const loader: ObservedLoader = (resolution) =>
+	const loader: ObservedLoader<G> = (resolution) =>
 		new Promise((resolve, reject) => {
 			calls.push({ resolution, resolve, reject });
 		});
@@ -1471,7 +1505,7 @@ const createDeferredLoader = () => {
 	const last = () => {
 		const call = calls.at(-1);
 		if (call === undefined) {
-			throw new Error('The observed temperature was not asked for');
+			throw new Error('The observed year was not asked for');
 		}
 		return call;
 	};
@@ -2180,6 +2214,10 @@ describe('createLayerControls', () => {
 			'Terrain',
 			'Temperature',
 			'Pressure',
+			// The temperature's sources, then the pressure's.
+			'Simulated',
+			'Observed',
+			'Difference',
 			'Simulated',
 			'Observed',
 			'Difference',
@@ -2187,7 +2225,9 @@ describe('createLayerControls', () => {
 		expect(byClass(section, 'legend')).toEqual([]);
 		expect(oneByClass(place, 'legend').hidden).toBe(true);
 		expect(oneByClass(section, 'temperature-view').hidden).toBe(true);
-		expect(oneByClass(section, 'comparison').hidden).toBe(true);
+		expect(
+			byClass(section, 'comparison').map((comparison) => comparison.hidden),
+		).toEqual([true, true]);
 	});
 
 	it('puts the comparison controls under the Show control, above the month, and shows them as told', () => {
@@ -2451,6 +2491,8 @@ describe('the legend over the globe', () => {
 			clearTimer: timers.clearTimer,
 			loadObserved: () =>
 				Promise.reject(new Error('The observed temperature is not asked for')),
+			loadObservedWinds: () =>
+				Promise.reject(new Error('The observed winds are not asked for')),
 			reportError: () => {},
 			globe: { setLayer: () => {}, setWinds: () => {} },
 			temperature: { setShowing: () => {} },
@@ -2860,6 +2902,384 @@ describe('createLayerPanel, the winds', () => {
 	});
 });
 
+describe('createLayerPanel, the observed winds', () => {
+	const grid = getGrid(64);
+	/** Twelve months of a field on the 64 grid, from a value of the month and cell. */
+	const monthsOf = (value: (m: number, cell: number) => number) =>
+		Array.from({ length: 12 }, (_, m) =>
+			Float32Array.from({ length: grid.cellCount }, (_, cell) =>
+				value(m, cell),
+			),
+		);
+	/** A simulated year of winds on the 64 grid, differing by cell and month. */
+	const simulatedOnGrid = (offset = 0): SolvedWinds => ({
+		winds: {
+			east: monthsOf((m, cell) => 4 + (cell % 5) + m * 0.2 + offset),
+			north: monthsOf((m, cell) => (cell % 3) - 1 - m * 0.1),
+			pressure: monthsOf(() => 1013),
+		},
+		temperature: temperatureOf(1, grid.cellCount),
+		dayLengthHours: 24,
+	});
+	/** Observed winds on the 64 grid, apart from the simulated in places. */
+	const observedOnGrid = (): MonthlyWind => ({
+		east: monthsOf((m, cell) => 6 - (cell % 7) + m * 0.1),
+		north: monthsOf((m, cell) => (cell % 4) - 1.5 + m * 0.05),
+	});
+	/** The figures the core works out for a simulated year and observed winds. */
+	const coreFigures = (solved: SolvedWinds, observed: MonthlyWind) =>
+		windErrorFigures(
+			solved.winds,
+			{ ...observed, pressure: solved.winds.pressure },
+			grid,
+		);
+	/** Has winds arrive, current, as the scheduler does. */
+	const arrive = (
+		stage: ReturnType<typeof createStage>,
+		solved: SolvedWinds,
+	): SolvedWinds => {
+		stage.store.markWindsCalculating();
+		stage.store.setWindsResult(solved, true);
+		return solved;
+	};
+	/**
+	 * A stage on the measured Earth at 64 with the winds on and a result,
+	 * and the observed winds' loader answering when a test says.
+	 */
+	const createWindsStage = () => {
+		const stage = createStage();
+		const deferred = createDeferredLoader<MonthlyWind>();
+		stage.setWindsLoader(deferred.loader);
+		stage.panel.setWinds(true);
+		stage.panel.newWorld(64);
+		const solved = arrive(stage, simulatedOnGrid());
+		const observed = observedOnGrid();
+		/** Chooses Observed and has the observed winds arrive. */
+		const observe = async (): Promise<void> => {
+			stage.panel.setWindSource('observed');
+			deferred.last().resolve(observed);
+			await settle();
+		};
+		return { stage, deferred, solved, observed, observe };
+	};
+
+	it('offers the choice only on the measured Earth, on Simulated, and fetches nothing until Observed is first chosen', () => {
+		const stage = createStage();
+		const deferred = createDeferredLoader<MonthlyWind>();
+		stage.setWindsLoader(deferred.loader);
+		stage.panel.setWinds(true);
+		arrive(stage, simulatedOnGrid());
+		stage.panel.setEarth(64);
+		expect(stage.lastWindSource()).toEqual({
+			offered: true,
+			source: 'simulated',
+		});
+		stage.controls.onLayer('temperature');
+		stage.controls.onMonth(2);
+		stage.panel.setWinds(false);
+		stage.panel.setWinds(true);
+		expect(deferred.calls).toEqual([]);
+		stage.panel.setWindSource('observed');
+		expect(deferred.calls.map((call) => call.resolution)).toEqual([64]);
+		expect(stage.lastWindSource()).toEqual({
+			offered: true,
+			source: 'observed',
+		});
+		stage.panel.setEarth(null);
+		expect(stage.lastWindSource()).toEqual({
+			offered: false,
+			source: 'simulated',
+		});
+	});
+
+	it('ignores Observed chosen while the world is not the measured Earth', () => {
+		const stage = createStage();
+		const deferred = createDeferredLoader<MonthlyWind>();
+		stage.setWindsLoader(deferred.loader);
+		stage.panel.setWinds(true);
+		stage.panel.setWindSource('observed');
+		expect(deferred.calls).toEqual([]);
+		expect(stage.lastWindSource()).toEqual({
+			offered: false,
+			source: 'simulated',
+		});
+	});
+
+	it('says on the key that the observed winds are loading, keeping the simulated arrows until they arrive', () => {
+		const { stage, solved } = createWindsStage();
+		stage.panel.setWindSource('observed');
+		expect(stage.lastKey()?.status).toBe(OBSERVED_WINDS_LOADING_TEXT);
+		expect(stage.panel.shownWinds()?.source).toBe('simulated');
+		expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
+		// Whatever is chosen meanwhile, the key says so until they arrive.
+		stage.panel.setWindSource('simulated');
+		expect(stage.lastKey()?.status).toBe(OBSERVED_WINDS_LOADING_TEXT);
+	});
+
+	it('draws the arrows from the observed winds once they arrive, the month’s, following the month', async () => {
+		const { stage, observed, observe } = createWindsStage();
+		await observe();
+		expect(stage.winds.at(-1)?.east).toBe(observed.east[DEFAULT_MONTH]);
+		expect(stage.winds.at(-1)?.north).toBe(observed.north[DEFAULT_MONTH]);
+		expect(stage.panel.shownWinds()).toMatchObject({
+			annualMean: false,
+			source: 'observed',
+			current: true,
+		});
+		expect(stage.lastKey()?.status).toBeNull();
+		stage.controls.onMonth(0);
+		expect(stage.winds.at(-1)?.east).toBe(observed.east[0]);
+	});
+
+	it('draws the observed winds’ year mean on the annual average, worked out once, as the simulated mean is', async () => {
+		const { stage, solved, observed, observe } = createWindsStage();
+		await observe();
+		stage.controls.onLayer('temperature');
+		stage.controls.onSummary('temperature', 'annualMean');
+		const mean = stage.winds.at(-1);
+		const expected = summariseWinds({
+			...observed,
+			pressure: solved.winds.pressure,
+		});
+		expect(mean?.east).toEqual(expected.east);
+		expect(mean?.north).toEqual(expected.north);
+		expect(stage.panel.shownWinds()).toMatchObject({
+			annualMean: true,
+			annualMeanLabel: 'Annual average',
+			source: 'observed',
+		});
+		stage.controls.onSummary('temperature', 'month');
+		stage.controls.onSummary('temperature', 'annualMean');
+		expect(stage.winds.at(-1)?.east).toBe(mean?.east);
+		// The simulated mean again, once Simulated is chosen.
+		stage.panel.setWindSource('simulated');
+		expect(stage.winds.at(-1)?.east).toEqual(summariseWinds(solved.winds).east);
+		expect(stage.panel.shownWinds()?.source).toBe('simulated');
+	});
+
+	it('draws the simulated arrows again when Simulated is chosen, fetching nothing more', async () => {
+		const { stage, deferred, solved, observed, observe } = createWindsStage();
+		await observe();
+		stage.panel.setWindSource('simulated');
+		expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
+		expect(stage.panel.shownWinds()?.source).toBe('simulated');
+		stage.panel.setWindSource('observed');
+		expect(stage.winds.at(-1)?.east).toBe(observed.east[DEFAULT_MONTH]);
+		expect(deferred.calls).toHaveLength(1);
+	});
+
+	it('says where the winds stand before anything about the observed winds, loading or failed', async () => {
+		const { stage, deferred } = createWindsStage();
+		// While the observed winds load, winds that are out of date or being
+		// worked out again say so.
+		stage.panel.setWindSource('observed');
+		expect(stage.lastKey()?.status).toBe(OBSERVED_WINDS_LOADING_TEXT);
+		stage.store.markOutOfDate();
+		expect(stage.lastKey()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
+		stage.store.markWindsCalculating();
+		expect(stage.lastKey()?.status).toBe(WINDS_CALCULATING_TEXT);
+		// So they do once the load has failed, and the failure shows again
+		// when they are current.
+		deferred.last().reject(new Error('offline'));
+		await settle();
+		expect(stage.lastKey()?.status).toBe(WINDS_CALCULATING_TEXT);
+		arrive(stage, simulatedOnGrid());
+		expect(stage.lastKey()?.status).toBe(OBSERVED_WINDS_FAILED_TEXT);
+		stage.store.markOutOfDate();
+		expect(stage.lastKey()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
+	});
+
+	it('goes back to Simulated when the observed winds cannot be loaded, the key saying so, and fetches again at the next choice', async () => {
+		const { stage, deferred, solved } = createWindsStage();
+		stage.panel.setWindSource('observed');
+		const error = new Error('offline');
+		deferred.last().reject(error);
+		await settle();
+		expect(stage.reported).toEqual([error]);
+		expect(stage.lastKey()?.status).toBe(OBSERVED_WINDS_FAILED_TEXT);
+		expect(stage.lastWindSource()).toEqual({
+			offered: true,
+			source: 'simulated',
+		});
+		expect(stage.panel.shownWinds()?.source).toBe('simulated');
+		expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
+		expect(stage.lastKey()?.figures).toBeUndefined();
+		stage.panel.setWindSource('observed');
+		expect(deferred.calls).toHaveLength(2);
+		expect(stage.lastKey()?.status).toBe(OBSERVED_WINDS_LOADING_TEXT);
+	});
+
+	it.each([
+		['a new world', (panel: LayerPanel) => panel.newWorld(64)],
+		[
+			'the world stopped being the measured Earth',
+			(panel: LayerPanel) => panel.setEarth(null),
+		],
+		[
+			'the world stopped and started being the measured Earth',
+			(panel: LayerPanel) => {
+				panel.setEarth(null);
+				panel.setEarth(64);
+			},
+		],
+	])(
+		'sets aside the observed winds that arrive after %s',
+		async (_, change) => {
+			for (const outcome of ['arrives', 'fails'] as const) {
+				const { stage, deferred, observed } = createWindsStage();
+				stage.panel.setWindSource('observed');
+				change(stage.panel);
+				const sent = stage.winds.length;
+				const sources = stage.windSources.length;
+				const keys = stage.keys.length;
+				if (outcome === 'arrives') {
+					deferred.last().resolve(observed);
+				} else {
+					deferred.last().reject(new Error('late'));
+				}
+				await settle();
+				expect(stage.winds, outcome).toHaveLength(sent);
+				expect(stage.windSources, outcome).toHaveLength(sources);
+				expect(stage.keys, outcome).toHaveLength(keys);
+				expect(stage.reported, outcome).toEqual([]);
+				expect(stage.lastWindSource()?.source, outcome).toBe('simulated');
+				expect(stage.panel.shownWinds()?.source ?? 'simulated', outcome).toBe(
+					'simulated',
+				);
+			}
+		},
+	);
+
+	it('goes back to Simulated when the world stops being the measured Earth, keeping the observed winds for the same grid', async () => {
+		const { stage, deferred, solved, observed, observe } = createWindsStage();
+		await observe();
+		stage.panel.setEarth(null);
+		expect(stage.lastWindSource()).toEqual({
+			offered: false,
+			source: 'simulated',
+		});
+		expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
+		expect(stage.lastKey()?.figures).toBeUndefined();
+		stage.panel.setEarth(64);
+		expect(stage.lastWindSource()).toEqual({
+			offered: true,
+			source: 'simulated',
+		});
+		expect(stage.lastKey()?.figures).toBeDefined();
+		stage.panel.setWindSource('observed');
+		expect(deferred.calls).toHaveLength(1);
+		expect(stage.winds.at(-1)?.east).toBe(observed.east[DEFAULT_MONTH]);
+	});
+
+	it('forgets the observed winds and the choice for a new world', async () => {
+		const { stage, deferred, solved, observe } = createWindsStage();
+		await observe();
+		stage.panel.newWorld(64);
+		expect(stage.lastWindSource()).toEqual({
+			offered: true,
+			source: 'simulated',
+		});
+		arrive(stage, solved);
+		expect(stage.lastKey()?.figures).toBeUndefined();
+		stage.panel.setWindSource('observed');
+		expect(deferred.calls).toHaveLength(2);
+	});
+
+	it('gives the key the month’s figures of windErrorFigures once the observed winds are fetched, for both sources, worked out once', async () => {
+		const { stage, solved, observed, observe } = createWindsStage();
+		expect(stage.lastKey()?.figures).toBeUndefined();
+		await observe();
+		const figures = coreFigures(solved, observed);
+		expect(stage.lastKey()?.figures).toEqual(figures.months[DEFAULT_MONTH]);
+		const kept = stage.lastKey()?.figures;
+		stage.panel.setWindSource('simulated');
+		expect(stage.lastKey()?.figures).toBe(kept);
+		expect(stage.lastKey()?.status).toBeNull();
+		stage.controls.onMonth(1);
+		expect(stage.lastKey()?.figures).toEqual(figures.months[1]);
+		// The figures the key writes are the ones the brief names.
+		expect(kept?.rmsVectorDifference).toBeGreaterThan(0);
+		expect(kept?.directionShare).not.toBeNull();
+	});
+
+	it('gives the key the year’s figures on the annual average, and the month’s on another summary', async () => {
+		const { stage, solved, observed, observe } = createWindsStage();
+		await observe();
+		const figures = coreFigures(solved, observed);
+		stage.controls.onLayer('temperature');
+		stage.controls.onSummary('temperature', 'annualMean');
+		expect(stage.lastKey()?.figures).toEqual(figures.year);
+		stage.controls.onSummary('temperature', 'warmest');
+		expect(stage.lastKey()?.figures).toEqual(figures.months[DEFAULT_MONTH]);
+	});
+
+	it('works the figures out again for each new result', async () => {
+		const { stage, observed, observe } = createWindsStage();
+		await observe();
+		const next = arrive(stage, simulatedOnGrid(2));
+		expect(stage.lastKey()?.figures).toEqual(
+			coreFigures(next, observed).months[DEFAULT_MONTH],
+		);
+	});
+
+	it('keeps the figures under the simulated winds while they are out of date, and leaves them off under the observed, as the legend does', async () => {
+		const { stage, observe } = createWindsStage();
+		await observe();
+		stage.store.markWindsOutOfDate();
+		// Under the observed winds, which are never out of date.
+		expect(stage.lastKey()?.figures).toBeUndefined();
+		expect(stage.lastKey()?.status).toBeNull();
+		expect(stage.panel.shownWinds()?.current).toBe(true);
+		stage.panel.setWindSource('simulated');
+		expect(stage.lastKey()?.figures).toBeDefined();
+		expect(stage.lastKey()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
+		expect(stage.panel.shownWinds()?.current).toBe(false);
+		stage.store.markWindsCalculating();
+		expect(stage.lastKey()?.figures).toBeDefined();
+		expect(stage.lastKey()?.status).toBe(WINDS_CALCULATING_TEXT);
+	});
+
+	it('gives no figures off the measured Earth, nor without a simulated result', async () => {
+		const { stage, observe } = createWindsStage();
+		await observe();
+		stage.store.clear();
+		expect(stage.lastKey()?.figures).toBeUndefined();
+		expect(stage.winds.at(-1)).toBeNull();
+		const elsewhere = createStage();
+		elsewhere.panel.setWinds(true);
+		arrive(elsewhere, simulatedOnGrid());
+		expect(elsewhere.lastKey()).toEqual({ status: null });
+	});
+});
+
+describe('createLayerPanel, the key’s wording', () => {
+	it('says Calculating while the temperature the winds wait for is worked out, and Not calculated yet only when nothing is under way', () => {
+		const stage = createStage();
+		stage.panel.setWinds(true);
+		expect(stage.lastKey()).toEqual({ status: LEGEND_EMPTY_TEXT });
+		stage.store.markCalculating();
+		expect(stage.store.winds.status).toBe('empty');
+		expect(stage.lastKey()).toEqual({ status: WINDS_CALCULATING_TEXT });
+		stage.store.markFailed();
+		expect(stage.lastKey()).toEqual({ status: LEGEND_EMPTY_TEXT });
+		stage.store.markCalculating();
+		stage.store.setResult(temperatureOf(1), true);
+		// A temperature and no winds asked for yet: nothing is under way.
+		expect(stage.lastKey()).toEqual({ status: LEGEND_EMPTY_TEXT });
+		stage.store.markWindsCalculating();
+		expect(stage.lastKey()).toEqual({ status: WINDS_CALCULATING_TEXT });
+	});
+
+	it('words its line as the pressure’s legend does, by the same rule', () => {
+		const stage = createStage();
+		stage.panel.setWinds(true);
+		stage.controls.onLayer('pressure');
+		stage.store.markCalculating();
+		expect(stage.lastKey()?.status).toBe(WINDS_CALCULATING_TEXT);
+		expect(stage.lastLegend()?.status).toBe(LEGEND_CALCULATING_TEXT);
+	});
+});
+
 describe('createLayerPanel, another layer described', () => {
 	/** The view settings with the made-up layer's own, as the panel keeps them. */
 	const twoLayerView = (view: Partial<PageView> = {}): PageView => ({
@@ -2897,6 +3317,8 @@ describe('createLayerPanel, another layer described', () => {
 				asked.push(layer.id);
 				return Promise.reject(new Error('No observed year is asked for'));
 			},
+			loadObservedWinds: () =>
+				Promise.reject(new Error('The observed winds are not asked for')),
 			reportError: () => {},
 			globe: {
 				setLayer: (field, range, ramp) => {
@@ -3243,7 +3665,7 @@ describe('createLayerPanel, the pressure', () => {
 		expect(((last?.range?.min ?? 0) + (last?.range?.max ?? 0)) / 2).toBe(1016);
 		const legend = stage.lastLegend();
 		expect(legend?.status).toBeNull();
-		expect(legend?.scale?.caption).toBe('July sea-level pressure, hPa');
+		expect(legend?.scale?.caption).toBe('Sea-level pressure in July, hPa');
 		expect(legend?.scale?.gradient).toBe(rampGradient(PRESSURE_RAMP));
 		expect(tickLabels(legend)).toContain('1,010');
 		expect(stage.panel.shown()).toEqual({
@@ -3258,7 +3680,7 @@ describe('createLayerPanel, the pressure', () => {
 		expect(stage.shown.at(-1)?.field).toBe(solved.winds.pressure[0]);
 		expect(stage.shown.at(-1)?.range).toEqual(last?.range);
 		expect(stage.lastLegend()?.scale?.caption).toBe(
-			'January sea-level pressure, hPa',
+			'Sea-level pressure in January, hPa',
 		);
 	});
 
@@ -3306,31 +3728,172 @@ describe('createLayerPanel, the pressure', () => {
 		});
 	});
 
-	it('offers no comparison for it, on the measured Earth or elsewhere', async () => {
+	/**
+	 * A year of winds and pressure on the 64 grid, its pressure differing
+	 * from cell to cell and month to month about 1,013 hPa.
+	 */
+	const pressureOnGrid = (): SolvedWinds => {
+		const { cellCount } = getGrid(64);
+		const months = Array.from({ length: 12 }, (_, m) => m);
+		const field = (value: (cell: number) => number) =>
+			Float32Array.from({ length: cellCount }, (_, cell) => value(cell));
+		return {
+			winds: {
+				east: months.map(() => field(() => 1)),
+				north: months.map(() => field(() => 0)),
+				pressure: months.map((m) =>
+					field((cell) => 1005 + (cell % 17) + m * 0.5),
+				),
+			},
+			temperature: temperatureOf(1, cellCount),
+			dayLengthHours: 24,
+		};
+	};
+	/** An observed pressure below the simulated by an amount of each cell's. */
+	const observedPressureFor = (solved: SolvedWinds): Float32Array[] =>
+		solved.winds.pressure.map((month, m) =>
+			month.map((value, cell) => value - 2 - (cell % 3) - m * 0.1),
+		);
+	/** A stage in Pressure view on the measured Earth at 64, with a result. */
+	const createPressureEarthStage = () => {
 		const stage = createStage();
-		const asked: number[] = [];
-		stage.setLoader((resolution) => {
-			asked.push(resolution);
-			return Promise.reject(new Error('No observed pressure'));
+		const deferred = createDeferredLoader();
+		stage.setLoader(deferred.loader);
+		stage.controls.onLayer('pressure');
+		stage.panel.newWorld(64);
+		const solved = arriveWinds(stage, pressureOnGrid());
+		const observed = observedPressureFor(solved);
+		return { stage, deferred, solved, observed };
+	};
+
+	it('is compared with the observed pressure on the measured Earth: Simulated, Observed and Difference', async () => {
+		const { stage, deferred, solved, observed } = createPressureEarthStage();
+		const grid = getGrid(64);
+		expect(stage.lastPressureComparison()).toEqual({
+			offered: true,
+			source: 'simulated',
+			message: null,
 		});
-		for (const earth of [null, 64] as const) {
-			stage.panel.setEarth(earth);
-			stage.controls.onLayer('pressure');
-			arriveWinds(stage);
-			expect(stage.lastComparison()?.offered).toBe(false);
-			stage.controls.onSource('pressure', 'observed');
-			stage.controls.onSource('pressure', 'difference');
-			await settle();
-			expect(asked).toEqual([]);
-			expect(stage.told.at(-1)?.sources.pressure).toBe('simulated');
-			expect(stage.panel.shown()?.source).toBe('simulated');
-			expect(stage.lastLegend()?.scale?.caption).toBe(
-				'July sea-level pressure, hPa',
-			);
-			expect(stage.lastLegend()?.scale?.figures).toBeNull();
-		}
-		stage.controls.onLayer('temperature');
-		expect(stage.lastComparison()?.offered).toBe(true);
+		expect(stage.lastLegend()?.scale?.caption).toBe(
+			'Simulated sea-level pressure in July, hPa',
+		);
+		stage.controls.onSource('pressure', 'observed');
+		expect(deferred.calls.map((call) => call.resolution)).toEqual([64]);
+		expect(stage.lastPressureComparison()).toEqual({
+			offered: true,
+			source: 'observed',
+			message: OBSERVED_PRESSURE_LOADING_TEXT,
+		});
+		expect(stage.panel.shown()?.source).toBe('simulated');
+		deferred.last().resolve(observed);
+		await settle();
+		expect(stage.lastPressureComparison()?.message).toBeNull();
+		expect(stage.shown.at(-1)?.field).toBe(observed[DEFAULT_MONTH]);
+		expect(stage.shown.at(-1)?.ramp).toBe(PRESSURE_RAMP);
+		expect(stage.panel.shown()?.source).toBe('observed');
+		const legend = stage.lastLegend();
+		expect(legend?.scale?.caption).toBe(
+			'Observed sea-level pressure in July, hPa',
+		);
+		// The figures, in hPa, of the simulated month against the observed.
+		const figures = compareField(
+			solved.winds.pressure[DEFAULT_MONTH] as Float32Array,
+			observed[DEFAULT_MONTH] as Float32Array,
+			grid,
+		);
+		expect(legend?.scale?.figures).toBe(formatFigures(figures, 'hPa'));
+		expect(legend?.scale?.figures).toMatch(
+			/^Mean \+\d\.\d hPa · RMS \d\.\d hPa$/,
+		);
+
+		stage.controls.onSource('pressure', 'difference');
+		const difference = stage.shown.at(-1);
+		expect([...(difference?.field ?? [])]).toEqual([
+			...differenceField(
+				solved.winds.pressure[DEFAULT_MONTH] as Float32Array,
+				observed[DEFAULT_MONTH] as Float32Array,
+			),
+		]);
+		expect(difference?.range).toEqual({ min: -20, max: 20 });
+		expect(difference?.ramp).toBe(DIFFERENCE_RAMP);
+		const shownDifference = stage.lastLegend();
+		expect(shownDifference?.scale?.caption).toBe(
+			'Simulated less observed in July, hPa',
+		);
+		expect(tickLabels(shownDifference)).toEqual([
+			'−20',
+			'−10',
+			'0',
+			'10',
+			'20',
+		]);
+		expect(shownDifference?.scale?.below).toBe('−20 and below');
+		expect(shownDifference?.scale?.above).toBe('20 and above');
+		expect(shownDifference?.scale?.figures).toBe(formatFigures(figures, 'hPa'));
+		stage.controls.onSummary('pressure', 'annualMean');
+		expect(stage.lastLegend()?.scale?.caption).toBe(
+			'Simulated less observed, annual average sea-level pressure, hPa',
+		);
+		expect(stage.shown.at(-1)?.range).toEqual({ min: -20, max: 20 });
+		expect(deferred.calls).toHaveLength(1);
+		// The temperature's choice is its own.
+		expect(stage.told.at(-1)?.sources).toEqual({
+			temperature: 'simulated',
+			pressure: 'difference',
+		});
+	});
+
+	it('goes back to Simulated when the observed pressure cannot be loaded, and asks again at the next choice', async () => {
+		const { stage, deferred } = createPressureEarthStage();
+		stage.controls.onSource('pressure', 'difference');
+		const error = new Error('offline');
+		deferred.last().reject(error);
+		await settle();
+		expect(stage.reported).toEqual([error]);
+		expect(stage.lastPressureComparison()).toEqual({
+			offered: true,
+			source: 'simulated',
+			message: OBSERVED_PRESSURE_FAILED_TEXT,
+		});
+		expect(stage.told.at(-1)?.sources.pressure).toBe('simulated');
+		expect(stage.panel.shown()?.source).toBe('simulated');
+		stage.controls.onSource('pressure', 'observed');
+		expect(deferred.calls).toHaveLength(2);
+		expect(stage.lastPressureComparison()?.message).toBe(
+			OBSERVED_PRESSURE_LOADING_TEXT,
+		);
+	});
+
+	it('offers its sources only on the measured Earth, and offers them again on Simulated when it is again', async () => {
+		const { stage, deferred, observed } = createPressureEarthStage();
+		stage.controls.onSource('pressure', 'observed');
+		deferred.last().resolve(observed);
+		await settle();
+		expect(stage.panel.shown()?.source).toBe('observed');
+		stage.panel.setEarth(null);
+		expect(stage.lastPressureComparison()).toEqual({
+			offered: false,
+			source: 'simulated',
+			message: null,
+		});
+		expect(stage.panel.shown()?.source).toBe('simulated');
+		expect(stage.lastLegend()?.scale?.caption).toBe(
+			'Sea-level pressure in July, hPa',
+		);
+		expect(stage.lastLegend()?.scale?.figures).toBeNull();
+		stage.panel.setEarth(64);
+		expect(stage.lastPressureComparison()).toEqual({
+			offered: true,
+			source: 'simulated',
+			message: null,
+		});
+		// The observed pressure is kept for the same grid.
+		stage.controls.onSource('pressure', 'observed');
+		expect(deferred.calls).toHaveLength(1);
+		expect(stage.panel.shown()?.source).toBe('observed');
+		// Off its own view, the choice is hidden.
+		stage.controls.onLayer('terrain');
+		expect(stage.lastPressureComparison()?.offered).toBe(false);
 	});
 
 	it('has the winds over it follow the month, and the year’s mean on its Annual average', () => {
@@ -3424,15 +3987,30 @@ describe('createLayerControls, the pressure', () => {
 		expect(chosen).toEqual(['pressure']);
 	});
 
-	it('gives it a Show control of its own, of the Month and the Annual average, and no comparison', () => {
+	it('gives it a Show control of its own, of the Month and the Annual average, and its own comparison', () => {
 		const { controls, section, chosen } = make();
 		const box = oneByClass(section, 'temperature-view');
 		expect(box.children.map((child) => child.className)).toEqual([
 			'field temperature-view__show',
 			'comparison',
 			'field temperature-view__show',
+			'comparison',
 			'month-controls',
 		]);
+		const sources = byClass(section, 'segmented__input').filter(
+			(input) => input.name === 'pressure-source',
+		);
+		expect(sources.map((input) => input.value)).toEqual([
+			'simulated',
+			'observed',
+			'difference',
+		]);
+		expect(
+			byClass(section, 'u-visually-hidden').map((legend) => legend.textContent),
+		).toContain('Pressure source');
+		fake.pick(sources[2] as FakeElement);
+		expect(chosen).toEqual(['pressure difference']);
+		chosen.length = 0;
 		const select = byClass(section, 'field__select').find(
 			(element) => element.id === 'pressure-view',
 		) as FakeElement;

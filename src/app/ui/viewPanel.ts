@@ -1,7 +1,8 @@
 /**
  * The view controls: how much relief is exaggerated, where the sea level
  * is, whether the cell grid is drawn, whether the globe is lit by the sun,
- * whether the winds are shown and the unit their speeds are written in.
+ * whether the winds are shown, on the measured Earth whether they are the
+ * simulated or the observed, and the unit their speeds are written in.
  */
 
 import {
@@ -11,6 +12,12 @@ import {
 	MIN_DRAWN_SEA_LEVEL_M,
 	MIN_EXAGGERATION,
 } from '../globe/material';
+import {
+	DEFAULT_WIND_SOURCE,
+	SOURCE_LABELS,
+	WIND_SOURCES,
+	type WindSource,
+} from '../view';
 import { DEFAULT_WIND_UNIT, WIND_UNITS, type WindUnit } from '../windUnits';
 import {
 	createCheckField,
@@ -21,6 +28,17 @@ import {
 
 /** The step between sea levels the slider can be set to, in metres. */
 export const SEA_LEVEL_SLIDER_STEP_M = 10;
+
+/** What the choice of where the wind arrows come from shows at one moment. */
+export type WindSourceContent = {
+	/**
+	 * Whether the choice is offered, as on the measured Earth; while it is
+	 * not, it is hidden and takes no room.
+	 */
+	readonly offered: boolean;
+	/** The source shown as chosen. */
+	readonly source: WindSource;
+};
 
 /** What the view panel starts with and whom it tells about changes. */
 export type ViewPanelOptions = {
@@ -48,6 +66,8 @@ export type ViewPanelOptions = {
 	readonly onWinds: (on: boolean) => void;
 	/** Called with the unit when another is chosen for wind speeds. */
 	readonly onWindUnit: (unit: WindUnit) => void;
+	/** Called with the source when another is chosen for the wind arrows. */
+	readonly onWindSource: (source: WindSource) => void;
 };
 
 /** The view controls on the page. */
@@ -62,7 +82,16 @@ export type ViewPanel = {
 	 * {@link SEA_LEVEL_SLIDER_STEP_M} within the drawn range.
 	 */
 	setSeaLevel(metres: number): void;
+	/**
+	 * Shows or hides the choice of where the wind arrows come from, and
+	 * shows the source chosen, as when the choice is set back to Simulated.
+	 * `onWindSource` is not called.
+	 */
+	showWindSource(content: WindSourceContent): void;
 };
+
+/** The id of the Winds shown drop-down's select. */
+const WIND_SOURCE_ID = 'view-wind-source';
 
 /**
  * A relief exaggeration as the panel shows it, such as `40×`.
@@ -87,8 +116,10 @@ export const formatMetres = (metres: number): string => {
  * Adds the view controls to the View section of the side panel.
  *
  * @remarks
- * The Wind speed choice is a drop-down, labelled so, directly under the
- * Winds checkbox and shown whether or not the winds are.
+ * Directly under the Winds checkbox is the Winds shown choice, a
+ * drop-down of Simulated and Observed, hidden until it is offered and
+ * starting on Simulated; under it, the Wind speed choice is a drop-down,
+ * labelled so, shown whether or not the winds are.
  *
  * @param body - The section's body, to add the controls to, after what it
  * holds.
@@ -112,6 +143,19 @@ export const createViewPanel = (
 		...seaLevelScale(options.seaLevel),
 		onInput: options.onSeaLevel,
 	});
+
+	const windSource = createSelectField({
+		id: WIND_SOURCE_ID,
+		label: 'Winds shown',
+		choices: WIND_SOURCES.map((source) => ({
+			value: source,
+			label: SOURCE_LABELS[source],
+		})),
+		value: DEFAULT_WIND_SOURCE,
+		onChange: options.onWindSource,
+	});
+	windSource.hidden = true;
+	const windSourceSelect = windSource.children[1] as HTMLSelectElement;
 
 	body.append(
 		createRangeField({
@@ -143,6 +187,7 @@ export const createViewPanel = (
 			checked: options.winds ?? false,
 			onChange: options.onWinds,
 		}),
+		windSource,
 		createSelectField({
 			id: 'view-wind-unit',
 			label: 'Wind speed',
@@ -153,5 +198,9 @@ export const createViewPanel = (
 	);
 	return {
 		setSeaLevel: (metres) => seaLevel.setScale(seaLevelScale(metres)),
+		showWindSource: (content) => {
+			windSource.hidden = !content.offered;
+			windSourceSelect.value = content.source;
+		},
 	};
 };

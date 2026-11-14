@@ -1,18 +1,34 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readObservedTemperatureFile } from '../../scripts/earth/dataFile.mjs';
 import {
+	readObservedPressureFile,
+	readObservedTemperatureFile,
+	readObservedWindFile,
+} from '../../scripts/earth/dataFile.mjs';
+import {
+	decodeObservedPressure,
 	decodeObservedTemperature,
+	decodeObservedWind,
 	getGrid,
 	OBSERVED_BYTES,
+	OBSERVED_PRESSURE_BYTES,
+	OBSERVED_WIND_BYTES,
+	observedPressure,
 	observedTemperature,
+	observedWind,
 } from '../core/index';
 import type { EarthResponse } from './earthData';
 import {
 	createObservedLoader,
+	loadObservedPressure,
 	loadObservedTemperature,
+	loadObservedWinds,
 	OBSERVED_DATA_PATH,
 	OBSERVED_FETCH_TIMEOUT_MS,
+	OBSERVED_PRESSURE_FILE,
+	OBSERVED_PRESSURE_PATH,
 	OBSERVED_TEMPERATURE_FILE,
+	OBSERVED_WIND_FILE,
+	OBSERVED_WIND_PATH,
 } from './observedData';
 
 const URL_OF_DATA = '/somewhere/data/earth-temperature-1deg.bin';
@@ -236,4 +252,95 @@ describe('loadObservedTemperature', () => {
 		expect(await loadObservedTemperature(64)).toBe(months);
 		expect(requests).toHaveLength(1);
 	});
+});
+
+describe('the observed pressure and winds files', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('read the pressure and the winds as the core reads them, onto the grid asked for', () => {
+		const pressure = readObservedPressureFile();
+		const wind = readObservedWindFile();
+		expect(OBSERVED_PRESSURE_FILE.name).toBe('pressure');
+		expect(OBSERVED_WIND_FILE.name).toBe('wind');
+		expect(
+			OBSERVED_PRESSURE_FILE.onGrid(
+				OBSERVED_PRESSURE_FILE.decode(pressure),
+				64,
+			),
+		).toEqual(observedPressure(decodeObservedPressure(pressure), 64));
+		expect(
+			OBSERVED_WIND_FILE.onGrid(OBSERVED_WIND_FILE.decode(wind), 64),
+		).toEqual(observedWind(decodeObservedWind(wind), 64));
+		expect(() =>
+			OBSERVED_PRESSURE_FILE.decode(
+				new Uint8Array(OBSERVED_PRESSURE_BYTES - 1),
+			),
+		).toThrow(RangeError);
+		expect(() =>
+			OBSERVED_WIND_FILE.decode(new Uint8Array(OBSERVED_WIND_BYTES - 1)),
+		).toThrow(RangeError);
+	});
+
+	it('gives the winds on a grid through the general loader, and names them when the fetch fails', async () => {
+		const wind = readObservedWindFile();
+		const { urls, fetchFile } = fetchGiving(
+			() => respond(new ArrayBuffer(0), 404),
+			() => respond(wind.buffer as ArrayBuffer),
+		);
+		const load = createObservedLoader({
+			fetchFile,
+			url: '/somewhere/data/earth-wind-1deg.bin',
+			file: OBSERVED_WIND_FILE,
+		});
+		await expect(load(64)).rejects.toThrow(
+			'The observed wind could not be fetched: the server answered 404',
+		);
+		const winds = await load(64);
+		expect(winds).toEqual(observedWind(decodeObservedWind(wind), 64));
+		expect(winds.east).toHaveLength(12);
+		expect(winds.east[0]).toHaveLength(getGrid(64).cellCount);
+		expect(await load(64)).toBe(winds);
+		expect(urls).toHaveLength(2);
+	});
+
+	it.each([
+		[
+			'pressure',
+			() => loadObservedPressure(64),
+			OBSERVED_PRESSURE_PATH,
+			'data/earth-pressure-1deg.bin',
+			readObservedPressureFile,
+			(bytes: Uint8Array) =>
+				observedPressure(decodeObservedPressure(bytes), 64),
+		],
+		[
+			'winds',
+			() => loadObservedWinds(64),
+			OBSERVED_WIND_PATH,
+			'data/earth-wind-1deg.bin',
+			readObservedWindFile,
+			(bytes: Uint8Array) => observedWind(decodeObservedWind(bytes), 64),
+		],
+	] as const)(
+		'fetches the observed %s from beside the page, with a time limit, and keeps it',
+		async (_name, load, path, expectedPath, read, onGrid) => {
+			const file = read();
+			const requests: [unknown, RequestInit | undefined][] = [];
+			vi.stubGlobal('fetch', (input: unknown, init?: RequestInit) => {
+				requests.push([input, init]);
+				return respond(file.buffer as ArrayBuffer);
+			});
+			const loaded = await load();
+			expect(path).toBe(expectedPath);
+			expect(requests).toHaveLength(1);
+			const [input, init] = requests[0] as [unknown, RequestInit | undefined];
+			expect(input).toBe(`${import.meta.env.BASE_URL}${expectedPath}`);
+			expect(init?.signal).toBeInstanceOf(AbortSignal);
+			expect(loaded).toEqual(onGrid(file));
+			expect(await load()).toBe(loaded);
+			expect(requests).toHaveLength(1);
+		},
+	);
 });

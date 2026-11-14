@@ -8,7 +8,6 @@ import {
 	createFakeDocument,
 	type FakeDocument,
 	type FakeElement,
-	oneByClass,
 } from '../testing/fakeDocument';
 import type { WindUnit } from '../windUnits';
 import {
@@ -80,6 +79,7 @@ describe('createViewPanel', () => {
 			onSunlight: (on) => told.push(`sunlight ${on}`),
 			onWinds: (on) => told.push(`winds ${on}`),
 			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
+			onWindSource: (source) => told.push(`wind source ${source}`),
 		});
 		const box = (id: string): FakeElement => {
 			const found = byClass(section, 'field__checkbox').find(
@@ -145,6 +145,7 @@ describe('the Winds checkbox', () => {
 			onSunlight: (on) => told.push(`sunlight ${on}`),
 			onWinds: (on) => told.push(`winds ${on}`),
 			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
+			onWindSource: (source) => told.push(`wind source ${source}`),
 		});
 		const box = byClass(section, 'field__checkbox').find(
 			(input) => input.id === 'view-winds',
@@ -203,12 +204,15 @@ describe('the Wind speed choice', () => {
 			onSunlight: () => {},
 			onWinds: (on) => told.push(`winds ${on}`),
 			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
+			onWindSource: (source) => told.push(`wind source ${source}`),
 		});
-		const select = oneByClass(section, 'field__select');
+		const select = byClass(section, 'field__select').find(
+			(element) => element.id === 'view-wind-unit',
+		) as FakeElement;
 		return { told, section, select };
 	};
 
-	it('comes directly under the Winds checkbox, labelled Wind speed, offering m/s, km/h and mph', () => {
+	it('comes directly under the Winds shown choice, under the Winds checkbox, labelled Wind speed, offering m/s, km/h and mph', () => {
 		const { section, select } = make();
 		const fields = section.children;
 		const winds = fields.findIndex((field) =>
@@ -216,8 +220,11 @@ describe('the Wind speed choice', () => {
 				(input) => input.id === 'view-winds',
 			),
 		);
-		expect(fields[winds + 1]?.children).toContain(select);
-		expect(fields).toHaveLength(winds + 2);
+		expect(
+			byClass(fields[winds + 1] as FakeElement, 'field__select')[0]?.id,
+		).toBe('view-wind-source');
+		expect(fields[winds + 2]?.children).toContain(select);
+		expect(fields).toHaveLength(winds + 3);
 		expect(select.id).toBe('view-wind-unit');
 		const label = byClass(section, 'field__label').find(
 			(element) => element.htmlFor === 'view-wind-unit',
@@ -242,9 +249,16 @@ describe('the Wind speed choice', () => {
 		for (const winds of [false, true]) {
 			const { select, section } = make(undefined, winds);
 			expect(select.hidden).toBe(false);
-			expect(section.children.every((field) => field.hidden !== true)).toBe(
-				true,
-			);
+			// Every field but the Winds shown choice, which is hidden until
+			// it is offered.
+			expect(
+				section.children
+					.filter(
+						(field) =>
+							byClass(field, 'field__select')[0]?.id !== 'view-wind-source',
+					)
+					.every((field) => field.hidden !== true),
+			).toBe(true);
 		}
 	});
 
@@ -257,5 +271,86 @@ describe('the Wind speed choice', () => {
 		select.value = 'm/s';
 		select.fire('change');
 		expect(told).toEqual(['wind unit km/h', 'wind unit mph', 'wind unit m/s']);
+	});
+});
+
+describe('the Winds shown choice', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const make = () => {
+		const told: string[] = [];
+		const section = fake.createElement('div');
+		const panel = createViewPanel(section as unknown as HTMLElement, {
+			seaLevel: 0,
+			onExaggeration: () => {},
+			onSeaLevel: () => {},
+			onGridVisible: () => {},
+			onSunlight: () => {},
+			onWinds: (on) => told.push(`winds ${on}`),
+			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
+			onWindSource: (source) => told.push(`wind source ${source}`),
+		});
+		const select = byClass(section, 'field__select').find(
+			(element) => element.id === 'view-wind-source',
+		) as FakeElement;
+		const field = section.children.find((child) =>
+			child.children.includes(select),
+		) as FakeElement;
+		return { told, section, select, field, panel };
+	};
+
+	it('comes directly under the Winds checkbox, above Wind speed, offering Simulated and Observed', () => {
+		const { section, select } = make();
+		const fields = section.children;
+		const winds = fields.findIndex((field) =>
+			byClass(field, 'field__checkbox').some(
+				(input) => input.id === 'view-winds',
+			),
+		);
+		expect(fields[winds + 1]?.children).toContain(select);
+		expect(
+			byClass(fields[winds + 2] as FakeElement, 'field__select')[0]?.id,
+		).toBe('view-wind-unit');
+		const label = byClass(section, 'field__label').find(
+			(element) => element.htmlFor === 'view-wind-source',
+		);
+		expect(label?.textContent).toBe('Winds shown');
+		expect(
+			select.children.map((option) => [option.value, option.textContent]),
+		).toEqual([
+			['simulated', 'Simulated'],
+			['observed', 'Observed'],
+		]);
+	});
+
+	it('starts hidden, on Simulated, and is shown, hidden and set as told, telling nothing', () => {
+		const { told, select, field, panel } = make();
+		expect(field.hidden).toBe(true);
+		expect(select.value).toBe('simulated');
+		panel.showWindSource({ offered: true, source: 'simulated' });
+		expect(field.hidden).toBe(false);
+		panel.showWindSource({ offered: true, source: 'observed' });
+		expect(select.value).toBe('observed');
+		panel.showWindSource({ offered: false, source: 'simulated' });
+		expect(field.hidden).toBe(true);
+		expect(select.value).toBe('simulated');
+		expect(told).toEqual([]);
+	});
+
+	it('reports each source chosen, and the source alone', () => {
+		const { told, select, panel } = make();
+		panel.showWindSource({ offered: true, source: 'simulated' });
+		select.value = 'observed';
+		select.fire('change');
+		select.value = 'simulated';
+		select.fire('change');
+		expect(told).toEqual(['wind source observed', 'wind source simulated']);
 	});
 });

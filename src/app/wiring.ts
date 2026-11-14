@@ -10,6 +10,7 @@
 
 import {
 	isMeasuredEarth,
+	type MonthlyWind,
 	normaliseSeaLevel,
 	type Resolution,
 	sunColour,
@@ -25,6 +26,7 @@ import type { RotateButton, ViewInput } from './globe/input';
 import type { SunlightStyle } from './globe/material';
 import type { Globe } from './globe/renderer';
 import { createLayerStore, type LayerStore } from './layers';
+import type { ObservedLoader } from './observedData';
 import type { Preferences } from './preferences';
 import type {
 	RefreshScheduler,
@@ -54,7 +56,11 @@ import {
 import type { PlanetPanel, PlanetPanelOptions } from './ui/planetPanel';
 import type { Section } from './ui/section';
 import type { ToolPanel, ToolPanelOptions } from './ui/toolPanel';
-import type { ViewPanel, ViewPanelOptions } from './ui/viewPanel';
+import type {
+	ViewPanel,
+	ViewPanelOptions,
+	WindSourceContent,
+} from './ui/viewPanel';
 import {
 	describeWorld,
 	EXPORT_FAILED_MESSAGE,
@@ -124,6 +130,13 @@ export type PageLayerOptions = {
 	readonly onView: (view: PageView) => void;
 	/** Gives a layer's observed year on a world's grid. */
 	readonly loadObserved: ScalarObservedLoader;
+	/** Gives the observed winds on a world's grid. */
+	readonly loadObservedWinds: ObservedLoader<MonthlyWind>;
+	/**
+	 * Called with whether the choice of where the wind arrows come from is
+	 * offered and which is chosen, for the view controls to show.
+	 */
+	readonly onWindSource: (content: WindSourceContent) => void;
 	/** The unit the key to the wind arrows writes its speeds in at first. */
 	readonly windUnit: WindUnit;
 };
@@ -177,7 +190,7 @@ export type PageParts = {
 	/** Adds the view controls to the panel. */
 	readonly createViewPanel: (
 		options: ViewPanelOptions,
-	) => Pick<ViewPanel, 'setSeaLevel'>;
+	) => Pick<ViewPanel, 'setSeaLevel' | 'showWindSource'>;
 	/** Adds the planet controls to the panel. */
 	readonly createPlanetPanel: (
 		options: PlanetPanelOptions,
@@ -217,6 +230,7 @@ export type PageParts = {
 		| 'shown'
 		| 'shownWinds'
 		| 'setWindUnit'
+		| 'setWindSource'
 	>;
 	/**
 	 * Lays the cursor readout over the globe, hidden until the pointer is
@@ -244,6 +258,11 @@ export type PageParts = {
 	 * the temperature's, for the comparison on the measured Earth.
 	 */
 	readonly loadObserved: ScalarObservedLoader;
+	/**
+	 * Gives the Earth's observed winds on a world's grid, for the wind
+	 * arrows on the measured Earth.
+	 */
+	readonly loadObservedWinds: ObservedLoader<MonthlyWind>;
 	/** Offers a world to the user as a file; may throw. */
 	readonly exportWorld: (world: World) => void;
 	/** Reads a file as a world, trusting nothing about it. */
@@ -347,6 +366,12 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * unit chosen in the view controls is remembered by the preferences, and
  * reaches the key, through the layer panel, and the readout at once. It
  * is never saved with the world.
+ *
+ * The view controls' choice of where the wind arrows come from goes to the
+ * layer panel, which decides when it is offered, on the measured Earth, and
+ * tells the view controls so, with the source it has, each time it shows
+ * the view settings; its change of the arrows reaches the readout as any
+ * change of the view settings does.
  *
  * A world that replaces the one being edited reaches, in this order: the
  * sculpt controller, which ends a stroke still under way on the old world
@@ -574,6 +599,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			layerPanel.setWindUnit(unit);
 			readout.invalidate();
 		},
+		onWindSource: (source) => layerPanel.setWindSource(source),
 	});
 	const planet = parts.createPlanetPanel({
 		planet: state.world.planet,
@@ -625,6 +651,8 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			readout.invalidate();
 		},
 		loadObserved: parts.loadObserved,
+		loadObservedWinds: parts.loadObservedWinds,
+		onWindSource: view.showWindSource,
 		windUnit,
 	});
 	const statistics = parts.createStatistics({

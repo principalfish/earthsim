@@ -95,6 +95,24 @@ export const SOURCE_LABELS: Readonly<Record<Source, string>> = {
 	difference: 'Difference',
 };
 
+/**
+ * Where the wind arrows can come from, in the order they are offered: the
+ * simulation, or the observed Earth, which only the measured Earth offers.
+ */
+export const WIND_SOURCES = [
+	'simulated',
+	'observed',
+] as const satisfies readonly Source[];
+
+/** Where the wind arrows come from: the simulated winds or the observed. */
+export type WindSource = (typeof WIND_SOURCES)[number];
+
+/**
+ * Where the wind arrows come from when the page opens, for a new world and
+ * whenever the world stops being the measured Earth.
+ */
+export const DEFAULT_WIND_SOURCE: WindSource = 'simulated';
+
 /** The months of the year, January first, as the page names them. */
 export { MONTH_NAMES } from '../core/index';
 

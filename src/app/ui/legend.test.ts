@@ -750,7 +750,7 @@ describe('legendContent for the pressure', () => {
 	const source = {
 		range: { min: 996, max: 1030 },
 		ramp: PRESSURE_RAMP,
-		caption: 'July sea-level pressure, hPa',
+		caption: 'Sea-level pressure in July, hPa',
 		beyond: { below: true, above: true },
 	};
 	const reading = (status: TemperatureLayer['status']) => ({
@@ -766,7 +766,7 @@ describe('legendContent for the pressure', () => {
 			true,
 		);
 		expect(status).toBeNull();
-		expect(scale?.caption).toBe('July sea-level pressure, hPa');
+		expect(scale?.caption).toBe('Sea-level pressure in July, hPa');
 		expect(scale?.gradient).toBe(rampGradient(PRESSURE_RAMP));
 		expect(scale?.ticks.map((tick) => tick.label)).toEqual([
 			'1,000',

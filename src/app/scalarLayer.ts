@@ -24,7 +24,11 @@ import {
 	TEMPERATURE_RAMP,
 } from './globe/ramp';
 import type { LayerStatus, LayerStore } from './layers';
-import { loadObservedTemperature, type ObservedLoader } from './observedData';
+import {
+	loadObservedPressure,
+	loadObservedTemperature,
+	type ObservedLoader,
+} from './observedData';
 import {
 	cellWeights,
 	type FittedScale,
@@ -404,6 +408,43 @@ export const PRESSURE_NOT_SHOWN_TEXT = 'Pressure could not be shown';
 export const MIN_PRESSURE_SPAN_HPA = 10;
 
 /**
+ * How far the pressure difference's scale reaches either side of zero, in
+ * hectopascals: the same for every month and the annual average.
+ */
+export const PRESSURE_DIFFERENCE_HALF_SPAN_HPA = 20;
+
+/** The step, in hectopascals, the pressure difference's legend is marked at. */
+export const PRESSURE_DIFFERENCE_TICK_STEP_HPA = 10;
+
+/** What the comparison's line says while the observed pressure loads. */
+export const OBSERVED_PRESSURE_LOADING_TEXT = 'Loading observed pressure';
+
+/** What the comparison's line says when the observed pressure failed. */
+export const OBSERVED_PRESSURE_FAILED_TEXT =
+	'Observed pressure could not be loaded';
+
+/**
+ * The pressure's comparison with the observed Earth: its observed year
+ * from `OBSERVED_PRESSURE_PATH`, and its difference drawn from
+ * −{@link PRESSURE_DIFFERENCE_HALF_SPAN_HPA} to
+ * {@link PRESSURE_DIFFERENCE_HALF_SPAN_HPA} hectopascals, marked every
+ * {@link PRESSURE_DIFFERENCE_TICK_STEP_HPA}, in the temperature
+ * difference's colours.
+ */
+export const PRESSURE_OBSERVED: ObservedComparison = {
+	load: loadObservedPressure,
+	loadingText: OBSERVED_PRESSURE_LOADING_TEXT,
+	failedText: OBSERVED_PRESSURE_FAILED_TEXT,
+	sourceName: 'pressure-source',
+	sourceLegend: 'Pressure source',
+	difference: {
+		halfSpan: PRESSURE_DIFFERENCE_HALF_SPAN_HPA,
+		ramp: DIFFERENCE_RAMP,
+		tickStep: PRESSURE_DIFFERENCE_TICK_STEP_HPA,
+	},
+};
+
+/**
  * The mean of every value of some fields, each weighted by its cell's
  * weight, as the planet's mean over a year is by area.
  */
@@ -427,8 +468,10 @@ const weightedMeanOf = (
  * The mean of some months cell by cell, as a new field: the annual average
  * of a year's twelve. The total is kept in double precision and divided
  * once, as the winds' own annual mean is, so the two agree to the bit.
+ *
+ * @param months - The months, each one value per cell. Not changed.
  */
-const meanOfMonths = (months: readonly Float32Array[]): Float32Array => {
+export const meanOfMonths = (months: readonly Float32Array[]): Float32Array => {
 	const mean = new Float32Array(months[0]?.length ?? 0);
 	for (let cell = 0; cell < mean.length; cell++) {
 		let total = 0;
@@ -450,19 +493,21 @@ const CENTRED_ON_YEAR_MEAN: ScaleFit = {
 };
 
 /**
- * Where the pressure stands, from where the temperature and the winds do.
+ * Where the winds and the pressure stand for showing, from where the
+ * temperature and the winds do: what the pressure's legend and the key to
+ * the wind arrows say.
  *
  * @remarks
  * The winds are worked out from the temperature, and are not asked for
  * until there is one. So while there are no winds at all and the
- * temperature is being worked out, the pressure is being worked out too,
- * since the winds follow it. Otherwise it stands where the winds do; the
- * store itself makes the winds unavailable when the temperature is.
+ * temperature is being worked out, the winds are being worked out too,
+ * since they follow it. Otherwise they stand where the store's winds do;
+ * the store itself makes the winds unavailable when the temperature is.
  *
  * @param temperature - Where the temperature stands.
  * @param winds - Where the winds stand.
  */
-const pressureStatus = (
+export const windsStatus = (
 	temperature: LayerStatus,
 	winds: LayerStatus,
 ): LayerStatus =>
@@ -479,13 +524,13 @@ const pressureStatus = (
  * the near white of the middle is that mean; the far tails are clipped as
  * the centred fit clips them, and the scale is at least
  * {@link MIN_PRESSURE_SPAN_HPA} wide. Values and ticks are whole numbers,
- * such as `1,018`. It has no observed year to compare with. It is read
- * from the store's winds, whose calculation tells nothing of its progress,
- * and is calculated by the winds, so choosing it asks for them; before the
+ * such as `1,018`. On the measured Earth it is compared with the observed
+ * sea-level pressure, as {@link PRESSURE_OBSERVED} says. It is read from
+ * the store's winds, whose calculation tells nothing of its progress, and
+ * is calculated by the winds, so choosing it asks for them; before the
  * first winds it is being calculated while the temperature the winds wait
- * for is. Over it,
- * sunlight is shown as the line between day and night, as over the
- * temperature.
+ * for is, as {@link windsStatus} says. Over it, sunlight is shown as the
+ * line between day and night, as over the temperature.
  */
 export const PRESSURE_LAYER: ScalarLayerSpec = {
 	id: 'pressure',
@@ -500,7 +545,7 @@ export const PRESSURE_LAYER: ScalarLayerSpec = {
 		{
 			id: 'month',
 			label: SUMMARY_LABELS.month,
-			subject: (month) => `${MONTH_NAMES[month]} sea-level pressure`,
+			subject: (month) => `sea-level pressure in ${MONTH_NAMES[month]}`,
 			comparedSubject: (month) => ` in ${MONTH_NAMES[month]}`,
 			ramp: PRESSURE_RAMP,
 			scale: CENTRED_ON_YEAR_MEAN,
@@ -516,9 +561,9 @@ export const PRESSURE_LAYER: ScalarLayerSpec = {
 	],
 	summarise: (months) => ({ annualMean: meanOfMonths(months) }),
 	minSpan: MIN_PRESSURE_SPAN_HPA,
-	observed: null,
+	observed: PRESSURE_OBSERVED,
 	read: ({ temperature, winds }) => ({
-		status: pressureStatus(temperature.status, winds.status),
+		status: windsStatus(temperature.status, winds.status),
 		result: winds.result,
 		months: winds.result?.winds.pressure ?? null,
 		progress: null,
