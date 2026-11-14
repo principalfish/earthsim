@@ -92,14 +92,16 @@ The Planet section sets the planet and its star. The settings are saved with the
 | Star mass | 0.1 to 10 × the Sun's | A heavier star shortens the year at the same distance. It does not change the sunlight, but a shorter year gives each season less time to warm or cool the planet |
 | Orbit distance | 0.3 to 3 AU | Sunlight falls with the square of the distance, and the year lengthens farther out |
 | Greenhouse strength | 0 to 3 × Earth's | How strongly the air holds in heat. At 0 there is no greenhouse effect |
+| Day length | 3 hours to 30 days (Earth 24 hours) | How fast the planet turns, which sets how many bands of wind there are and how wide; see [Winds](winds.md). Changing it recalculates the winds only, not the temperature |
 
 Under the sliders:
 
 - **Sunlight:** what the planet receives compared with the Earth, such as `86% of Earth's` or `2.50 × Earth's`.
 - **Year:** the length of the year, such as `365 days` or `3.2 years`.
 - **A warning** when the settings leave the planet far colder or far hotter than the Earth. The temperature model is calibrated on the Earth and its results are rough far from it; see [Temperature](temperature.md#how-far-to-trust-it).
+- **A second warning, for the winds,** when the day is shorter than 6 hours or longer than 4 days, or the tilt is above 54°. The wind model is calibrated on the Earth and its winds are rough there; see [Winds](winds.md#how-far-to-trust-it). It shows whether or not Winds is on.
 
-**Reset to Earth** puts all five settings back at once. Planet changes are not part of undo.
+**Reset to Earth** puts all six settings back at once. Planet changes are not part of undo. On the Earth, any change of a setting removes the Earth comparison, any day length but 24 hours included, and putting it back brings the comparison back.
 
 ## Layers
 

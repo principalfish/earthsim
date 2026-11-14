@@ -224,27 +224,48 @@ export const TRUSTED_DAY_MIN_HOURS = 6;
  */
 export const TRUSTED_DAY_MAX_HOURS = 96;
 
-/** Which way a planet's day lies outside the band the winds are trusted for. */
-export type WindRoughSide = 'fast' | 'slow';
+/**
+ * The steepest axial tilt, in degrees, that the winds are trusted for. This
+ * tilt itself is trusted.
+ *
+ * @remarks
+ * A judgement rather than a measurement: about the tilt above which the
+ * poles get more sunlight over the year than the equator, unlike the Earth
+ * the model is calibrated on.
+ */
+export const TRUSTED_TILT_MAX_DEG = 54;
 
 /**
- * Whether the winds for a planet are rough because of the length of its
- * day, and on which side.
+ * One reason the winds for a planet are rough: its day is too short
+ * (`'fast'`), too long (`'slow'`), or its axis is tilted too steeply
+ * (`'tilt'`).
+ */
+export type WindRoughReason = 'fast' | 'slow' | 'tilt';
+
+/**
+ * Every reason the winds for a planet are rough.
  *
  * @param planet - The planet's settings.
- * @returns `'fast'` for a planet that turns too fast, its day shorter than
- * {@link TRUSTED_DAY_MIN_HOURS}; `'slow'` for one that turns too slowly, its
- * day longer than {@link TRUSTED_DAY_MAX_HOURS}; and null within the band,
- * both ends included.
+ * @returns The reasons that apply, in this order: `'fast'` for a planet
+ * that turns too fast, its day shorter than {@link TRUSTED_DAY_MIN_HOURS},
+ * or `'slow'` for one that turns too slowly, its day longer than
+ * {@link TRUSTED_DAY_MAX_HOURS}; then `'tilt'` for an axial tilt above
+ * {@link TRUSTED_TILT_MAX_DEG}. Empty for a planet the winds are trusted
+ * for, the ends of each band included.
  */
-export const windTrustNote = (planet: PlanetSettings): WindRoughSide | null => {
+export const windTrustNote = (
+	planet: PlanetSettings,
+): readonly WindRoughReason[] => {
+	const reasons: WindRoughReason[] = [];
 	if (planet.dayLengthHours < TRUSTED_DAY_MIN_HOURS) {
-		return 'fast';
+		reasons.push('fast');
+	} else if (planet.dayLengthHours > TRUSTED_DAY_MAX_HOURS) {
+		reasons.push('slow');
 	}
-	if (planet.dayLengthHours > TRUSTED_DAY_MAX_HOURS) {
-		return 'slow';
+	if (planet.axialTiltDeg > TRUSTED_TILT_MAX_DEG) {
+		reasons.push('tilt');
 	}
-	return null;
+	return reasons;
 };
 
 /**

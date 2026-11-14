@@ -1032,6 +1032,21 @@ describe('the planet controls', () => {
 		expect(stage.log).not.toContain('temperature.refresh');
 	});
 
+	it('put the day back to 24 hours with Earth’s settings, asking for the winds and not the temperature', async () => {
+		const stage = await createStartedStage();
+		stage.planetPanelOptions.onChange({
+			...DEFAULT_PLANET,
+			dayLengthHours: 30,
+		});
+		stage.log.length = 0;
+
+		stage.planetPanelOptions.onChange({ ...DEFAULT_PLANET });
+		expect(stage.state.world.planet).toEqual(DEFAULT_PLANET);
+		expect(stage.state.world.planet.dayLengthHours).toBe(24);
+		expect(stage.log).toContain('winds.refresh');
+		expect(stage.log).not.toContain('temperature.refresh');
+	});
+
 	it('reach nothing with the settings the world already has', async () => {
 		const stage = await createStartedStage();
 		stage.planetPanelOptions.onChange({ ...DEFAULT_PLANET });
@@ -2620,6 +2635,25 @@ describe('the comparison on the measured Earth', () => {
 		expect(page.offered()).toBe(true);
 		expect(page.source()).toBe('simulated');
 	});
+
+	it.each([3, 23.9, 24.1, 30, 720])(
+		'goes for a day of %s hours, and comes back at 24',
+		async (dayLengthHours) => {
+			const page = await createObservingStage();
+			page.stage.planetPanelOptions.onChange({
+				...DEFAULT_PLANET,
+				dayLengthHours,
+			});
+			expect(page.offered()).toBe(false);
+			expect(page.shownSource()).toBe('simulated');
+			page.stage.planetPanelOptions.onChange({
+				...DEFAULT_PLANET,
+				dayLengthHours: 24,
+			});
+			expect(page.offered()).toBe(true);
+			expect(page.source()).toBe('simulated');
+		},
+	);
 
 	it('goes for a new world that is not the measured Earth, and comes for one that is', async () => {
 		const page = await createObservingStage();

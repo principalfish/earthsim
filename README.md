@@ -7,7 +7,7 @@ It is a static site with no server and no account. The world is saved in the bro
 ## What works today
 
 - **A globe you can sculpt.** Start from a blank ocean, generated continents or the real Earth, then raise, lower and smooth the terrain and move the sea level, with undo and redo.
-- **Planet settings.** Axial tilt, the star's brightness and mass, the orbit's distance and the greenhouse strength.
+- **Planet settings.** Axial tilt, the star's brightness and mass, the orbit's distance, the greenhouse strength and the length of the day.
 - **A temperature layer.** Air temperature for each month, or the year's average, warmest month, coldest month and seasonal range, recalculated after every change.
 - **The sun.** Drawn in the scene, with an optional day and night side on the globe.
 - **Earth comparison.** On the Earth, the simulated temperature beside the observed one, and the difference.

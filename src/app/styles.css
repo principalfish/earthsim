@@ -588,7 +588,10 @@ body {
   text-align: end;
 }
 
-/* The note carries its own margin, so its region takes no room while empty. */
+/*
+ * Each note carries its own margin, so its region takes no room while empty,
+ * and two notes shown together stand apart.
+ */
 .planet-readout__note {
   margin: 0;
   margin-block-start: var(--space-sm);

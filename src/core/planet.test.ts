@@ -15,6 +15,7 @@ import {
 	TEMPERATURE_SETTINGS,
 	TRUSTED_DAY_MAX_HOURS,
 	TRUSTED_DAY_MIN_HOURS,
+	TRUSTED_TILT_MAX_DEG,
 	TRUSTED_WARMTH_MAX,
 	TRUSTED_WARMTH_MIN,
 	temperaturePlanet,
@@ -407,21 +408,40 @@ describe('rotationRate', () => {
 describe('windTrustNote', () => {
 	const day = (hours: number): PlanetSettings =>
 		planetWith({ dayLengthHours: hours });
+	const tilt = (degrees: number): PlanetSettings =>
+		planetWith({ axialTiltDeg: degrees });
 
 	it('trusts the band from 6 to 96 hours, both ends included', () => {
 		expect(TRUSTED_DAY_MIN_HOURS).toBe(6);
 		expect(TRUSTED_DAY_MAX_HOURS).toBe(96);
-		expect(windTrustNote(day(6))).toBeNull();
-		expect(windTrustNote(day(24))).toBeNull();
-		expect(windTrustNote(day(96))).toBeNull();
-		expect(windTrustNote(DEFAULT_PLANET)).toBeNull();
+		expect(windTrustNote(day(6))).toEqual([]);
+		expect(windTrustNote(day(24))).toEqual([]);
+		expect(windTrustNote(day(96))).toEqual([]);
+		expect(windTrustNote(DEFAULT_PLANET)).toEqual([]);
 	});
 
 	it('is rough on the fast side below the band, and the slow above', () => {
-		expect(windTrustNote(day(5.9))).toBe('fast');
-		expect(windTrustNote(day(3))).toBe('fast');
-		expect(windTrustNote(day(96.1))).toBe('slow');
-		expect(windTrustNote(day(720))).toBe('slow');
+		expect(windTrustNote(day(5.9))).toEqual(['fast']);
+		expect(windTrustNote(day(3))).toEqual(['fast']);
+		expect(windTrustNote(day(96.1))).toEqual(['slow']);
+		expect(windTrustNote(day(720))).toEqual(['slow']);
+	});
+
+	it('trusts a tilt up to 54°, that tilt included, and not above', () => {
+		expect(TRUSTED_TILT_MAX_DEG).toBe(54);
+		expect(windTrustNote(tilt(0))).toEqual([]);
+		expect(windTrustNote(tilt(54))).toEqual([]);
+		expect(windTrustNote(tilt(54.01))).toEqual(['tilt']);
+		expect(windTrustNote(tilt(90))).toEqual(['tilt']);
+	});
+
+	it('gives the spin and the tilt together, the spin first', () => {
+		expect(
+			windTrustNote(planetWith({ dayLengthHours: 3, axialTiltDeg: 60 })),
+		).toEqual(['fast', 'tilt']);
+		expect(
+			windTrustNote(planetWith({ dayLengthHours: 720, axialTiltDeg: 90 })),
+		).toEqual(['slow', 'tilt']);
 	});
 });
 

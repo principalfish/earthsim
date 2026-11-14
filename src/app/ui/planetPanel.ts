@@ -1,7 +1,8 @@
 /**
  * The planet controls: the tilt of the planet's axis, the brightness and
- * mass of its star, the radius of its orbit and the strength of its
- * greenhouse effect, with the sunlight and year that follow from them.
+ * mass of its star, the radius of its orbit, the strength of its
+ * greenhouse effect and the length of its day, with the sunlight and year
+ * that follow from them and notes on when the models' results are rough.
  */
 
 import {
@@ -13,7 +14,12 @@ import {
 	type PlanetSettings,
 	type RoughSide,
 	sunlightRelativeToEarth,
+	TRUSTED_DAY_MAX_HOURS,
+	TRUSTED_DAY_MIN_HOURS,
+	TRUSTED_TILT_MAX_DEG,
 	trustNote,
+	type WindRoughReason,
+	windTrustNote,
 	yearLengthDays,
 } from '../../core/index';
 import { createButton, createElement, createRangeField } from './fields';
@@ -214,6 +220,34 @@ export const formatAu = (au: number): string => `${au.toPrecision(3)} AU`;
 export const formatGreenhouse = (strength: number): string =>
 	`${strength.toFixed(2)} × Earth`;
 
+/** The fewest hours a day length is written in days rather than hours. */
+const DAY_LENGTH_DAYS_FROM_HOURS = 48;
+
+/** The number of hours in a day, for a day length written in days. */
+const HOURS_PER_DAY = 24;
+
+/** A value to three significant figures, with trailing zeros dropped. */
+const threeFigures = (value: number): number => Number(value.toPrecision(3));
+
+/**
+ * A day length as the panel shows it, to three significant figures with
+ * trailing zeros dropped: in hours while it rounds to under two days, such
+ * as `3.08 hours`, `10 hours`, `24.7 hours` or `47 hours`, and otherwise in
+ * days, such as `2 days`, `16.3 days` or `30 days`.
+ *
+ * @remarks
+ * The unit is chosen from the value as rounded, so 47.99 hours, which
+ * rounds to 48.0, is written `2 days`.
+ *
+ * @param hours - The day length in hours, from 3 to 720.
+ */
+export const formatDayLength = (hours: number): string => {
+	const rounded = threeFigures(hours);
+	return rounded < DAY_LENGTH_DAYS_FROM_HOURS
+		? `${rounded} hours`
+		: `${threeFigures(hours / HOURS_PER_DAY)} days`;
+};
+
 /** The planet's sliders, in the order the panel shows them. */
 export const PLANET_SLIDERS: readonly PlanetSlider[] = Object.freeze([
 	{
@@ -272,6 +306,18 @@ export const PLANET_SLIDERS: readonly PlanetSlider[] = Object.freeze([
 		format: formatGreenhouse,
 		// Its values are written as multiples of Earth's.
 		earthSuffix: '',
+	},
+	{
+		setting: 'dayLengthHours',
+		id: 'planet-day-length',
+		label: 'Day length',
+		scale: logSliderScale(
+			PLANET_LIMITS.dayLengthHours,
+			200,
+			DEFAULT_PLANET.dayLengthHours,
+		),
+		format: formatDayLength,
+		earthSuffix: EARTH_SUFFIX,
 	},
 ]);
 
@@ -341,6 +387,34 @@ export const roughNoteFor = (planet: PlanetSettings): string | null => {
 	return side === null ? null : ROUGH_NOTE_TEXT[side];
 };
 
+/** What the winds' note says of each reason they are rough. */
+const WIND_ROUGH_REASON_TEXT: Readonly<Record<WindRoughReason, string>> =
+	Object.freeze({
+		fast: `a day shorter than ${formatDayLength(TRUSTED_DAY_MIN_HOURS)}`,
+		slow: `a day longer than ${formatDayLength(TRUSTED_DAY_MAX_HOURS)}`,
+		tilt: `a tilt above ${formatTilt(TRUSTED_TILT_MAX_DEG)}`,
+	});
+
+/**
+ * What the panel says of how rough the winds are for a planet, naming
+ * every reason from {@link windTrustNote}, such as "The wind model is
+ * calibrated on the Earth, so its winds are rough for a planet with a day
+ * shorter than 6 hours and a tilt above 54°."
+ *
+ * @param planet - The planet's settings.
+ * @returns The note, or null for a planet the winds are trusted for.
+ */
+export const windRoughNoteFor = (planet: PlanetSettings): string | null => {
+	const reasons = windTrustNote(planet);
+	if (reasons.length === 0) {
+		return null;
+	}
+	const named = reasons
+		.map((reason) => WIND_ROUGH_REASON_TEXT[reason])
+		.join(' and ');
+	return `The wind model is calibrated on the Earth, so its winds are rough for a planet with ${named}.`;
+};
+
 /** The text on the button that puts Earth's settings back. */
 export const RESET_PLANET_LABEL = 'Reset to Earth';
 
@@ -378,12 +452,14 @@ export type PlanetPanel = {
  * change of the settings.
  *
  * Under the sliders, the sunlight the planet receives and the length of
- * its year follow the settings. Under those, a note says when the model's
- * results are rough, from {@link trustNote}. The note is in a polite live
- * region, written only when the side it is on changes, so a screen reader
- * announces it once as it appears rather than at every movement of a
- * slider. It takes no room while there is none: it comes and goes below
- * the sliders, so a slider being dragged does not move.
+ * its year follow the settings. Under those, a note says when the
+ * temperature model's results are rough, from {@link trustNote}, and under
+ * it a second note says when the winds are rough, from
+ * {@link windTrustNote}, whether or not any layer is shown. Each note is in
+ * its own polite live region, written only when its text changes, so a
+ * screen reader announces it once as it appears or changes rather than at
+ * every movement of a slider. Each takes no room while there is none: they
+ * come and go below the sliders, so a slider being dragged does not move.
  *
  * The button that puts Earth's settings back is always usable. Pressed on
  * Earth's settings, it passes them on again.
@@ -414,29 +490,41 @@ export const createPlanetPanel = (
 	const sunlight = addLine('Sunlight');
 	const year = addLine('Year');
 
-	const noteRegion = createElement('div', 'planet-readout__note-region');
-	noteRegion.setAttribute('aria-live', 'polite');
-	const note = createElement('p', 'planet-readout__note');
-	readout.append(lines, noteRegion);
-	let noteShown: string | null = null;
+	/**
+	 * Adds a note in its own polite live region to the readout, and gives
+	 * what shows a text in it, or takes it away for null.
+	 */
+	const addNote = (): ((text: string | null) => void) => {
+		const region = createElement('div', 'planet-readout__note-region');
+		region.setAttribute('aria-live', 'polite');
+		const note = createElement('p', 'planet-readout__note');
+		readout.append(region);
+		let shown: string | null = null;
+		return (text) => {
+			// Written only when it changes: the same words set again would be
+			// announced again.
+			if (text === shown) {
+				return;
+			}
+			shown = text;
+			if (text === null) {
+				region.replaceChildren();
+			} else {
+				note.textContent = text;
+				region.replaceChildren(note);
+			}
+		};
+	};
+	readout.append(lines);
+	const showRoughNote = addNote();
+	const showWindNote = addNote();
 
-	/** Shows what follows from the settings: the two lines and the note. */
+	/** Shows what follows from the settings: the two lines and the notes. */
 	const showDerived = (planet: PlanetSettings): void => {
 		sunlight.textContent = formatSunlight(sunlightRelativeToEarth(planet));
 		year.textContent = formatYear(yearLengthDays(planet));
-		const text = roughNoteFor(planet);
-		// Written only when it changes: the same words set again would be
-		// announced again.
-		if (text === noteShown) {
-			return;
-		}
-		noteShown = text;
-		if (text === null) {
-			noteRegion.replaceChildren();
-		} else {
-			note.textContent = text;
-			noteRegion.replaceChildren(note);
-		}
+		showRoughNote(roughNoteFor(planet));
+		showWindNote(windRoughNoteFor(planet));
 	};
 
 	/** Takes settings from the panel's own controls, and passes them on. */
