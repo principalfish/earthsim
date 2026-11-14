@@ -9,4 +9,4 @@ Cost: 8 subagents · about 471,000 tokens (one cut-off run unknown) · about 13 
 | round | correctness | low | cleanup | verified | fixed | `src/app/globe/wind.ts:521` | `glslFloat` and `glslColour` were copies of those in `material.ts` |
 | round | correctness | low | docs | verified | fixed | `src/app/styles.css:849` | The `.globe-overlays` comment left out the key; doc comments in `layerPanel.ts` ran past the wrap width |
 | round | correctness | low | docs | verified | fixed | `src/app/ui/windKey.ts:21` | The key's top arrow is drawn at the cap but was labelled a plain "10 m/s" |
-| re-check | correctness | low | docs | verified | open | `src/app/ui/layerPanel.ts:453` | A doc comment left ragged by the rewrap ("It stops when" alone on its line) |
+| re-check | correctness | low | docs | verified | accepted | `src/app/ui/layerPanel.ts:453` | A doc comment left ragged by the rewrap ("It stops when" alone on its line) |

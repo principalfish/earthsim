@@ -236,7 +236,7 @@ earth_sim is a browser planet simulator for worldbuilding: believable results an
 - [ ] ~~6. Prototype: a simulated atmosphere, and the choice~~ (dropped 2026-11-13; not to be built)
 - [x] 7a. The wind model made real
 - [x] 8. Winds in the worker and the page's store
-- [ ] 9. The Winds switch and arrows on the globe
+- [x] 9. The Winds switch and arrows on the globe
 - [ ] 7b. The yardstick: a ninth case and three literature checks
 - [ ] 7c. The improvements: bands by longitude, and the known faults
 - [ ] 10. Day length in the Planet section
@@ -357,3 +357,5 @@ Scripted browser checks keep their browser profiles in the session's scratch fol
 - 2026-11-14, piece 9, deviations: the arrows have no `setMonth` or `setVisible` (the page owns the month and the annual mean, so it passes the field, or null to hide). Files beyond the plan's list: `src/app/main.ts` (hands the overlays to the layer controls), `src/app/testing/fakeDocument.ts` (`createElementNS`, for the key's SVG), `src/app/ui/dateLine.test.ts`, `docs/development.md` (the layout table). Changed-lines coverage 98%, 24 lines uncovered, each with a reason the coverage check accepted: the renderer (needs a graphics card; never tested), `setViewport` and `dispose` (thin calls on Three.js objects), the browser's entry file, a key speed that cannot be below the calm threshold, and lines from earlier pieces.
 
 - 2026-11-14, piece 9, looked at in a browser by the builder (headless Edge driven over its debugging port from a script, the builder's own dev server on port 5199, the profile in the scratch folder): the Earth over Terrain and Temperature in January and July (trades, westerlies and the monsoon's reversal plain), zoomed out, default and close, exaggeration 1×, 40× and 100× with the Tibetan plateau at the globe's edge (no arrow showing through from behind a ridge), a generated world, and Winds off (the screenshot byte-identical to before it was ticked). Seen and left for the user's manual review: zoomed right in the arrows are sparse (2° is the finest spacing); the key's dark arrows on its dark backing read mostly as outlines; the key's backing is see-through, so an arrow beneath shows through it; below about 560 px of globe height arrows can touch when zoomed right out. Sculpting with Winds on was not tried by the builder.
+
+- 2026-11-14, piece 9, manual review and approval: the user tried it and approved it as it is ("ok looks good", then "Tried it, approve as is"). Accepted, not to be fixed in this piece: the low docs finding at `src/app/ui/layerPanel.ts:453` (a doc comment left ragged by a rewrap). Seen and accepted as they are: the spacing stays 8° to 2° (sparse arrows when zoomed right in); the key's dark arrows on its dark backing; the key's see-through backing; arrows that can touch when zoomed right out in a window under about 560 px of globe height.
