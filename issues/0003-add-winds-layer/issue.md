@@ -35,8 +35,8 @@ _2026-11-14 · 9 of 18 pieces done (piece 6 dropped, piece 7 split in four, piec
   A ninth report case, an ocean world tilted 60°, and three checks against published studies of high tilt and of fast and slow spin.
 - [ ] **7c-1 The tuning script and the small fixes** (was part of 7c; split 2026-11-14) · in progress
   A script that sweeps and searches the model's settings, a diagnostic on observed temperatures, a cap on cold highs, the steep-tilt low held at about 70°, and stronger middle bands on fast-spinning planets.
-- [ ] **7c-2 Bands by longitude, and the tuning** (was part of 7c; split 2026-11-14) · not started
-  Pressure bands that vary by longitude, then time-boxed tuning of the known faults on the Earth, judged on all nine cases.
+- [ ] **7c-2 Bands by longitude** (was part of 7c; split 2026-11-14; tuning against the Earth moved to a later roadmap step) · not started
+  Pressure bands that vary by longitude, judged on all nine cases; the Earth's known faults are recorded, not tuned.
 - [ ] **10/15 Day length in the Planet section** · not started
   The Day length slider, with a note when the winds are rough.
 - [ ] **11/15 Wind under the pointer, and the unit option** · not started
