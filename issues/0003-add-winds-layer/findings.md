@@ -69,3 +69,4 @@ No findings: the correctness, security and coverage checks each came back clean,
 
 | Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
 |-|-|-|-|-|-|-|-|
+| manual | user | low | docs | - | fixed | `docs/winds.md:15` | The cells' width was given as proportional to (24 hours ÷ the day length)^½, upside down against the code and the table beside it; from an earlier piece, found by the builder and fixed at the user's request |
