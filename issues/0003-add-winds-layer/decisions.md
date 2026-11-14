@@ -30,7 +30,7 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - The builder runs as issue 0002's did: the builder session on the planner chat's model, implementation subagents on Opus, not on Sonnet as the models guide's experiment says. The user: "Same as last time" (2026-11-13)
 
 - Piece 2 replaces piece 1's private east/north helper with the shared one. The user: "Yes, replace it" (2026-11-13)
-- The builder's analysis loop stops once a round finds nothing above low severity, for the rest of this issue. The user: "Yes, stop at low only" (2026-11-13)
+- The builder's analysis loop stops once a round finds nothing above low severity, for the rest of this issue. The user: "Yes, stop at low only" (2026-11-13) **Superseded 2026-11-14:** see the one-round line below.
 - Day length is one full turn of the planet: the spin rate is one turn per day length, not corrected for the year, so a change of star or orbit never changes the winds (Earth's spin comes out 0.3% slow). The user: "One full turn (Recommended)" (2026-11-13)
 - Piece 3 does day length in the core and the worker protocol only; the page side of "day length alone never re-solves the temperature" goes with the slider in piece 10. The user: "With the slider, piece 10 (Recommended)" (2026-11-13)
 - The wind report works out every case on the 64 grid; solve times at 64, 128 and 256 are measured on the Earth only. The user: "64 for all cases (Recommended)" (2026-11-13)
@@ -51,6 +51,7 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - Piece 7c builds a tuning script (`npm run tune:winds`) that sweeps and searches the model's settings and prints the Earth's error figures; it proposes values and does not judge: a value is kept only if the other cases stay right in kind and the literature checks hold, to guard against overfitting to the Earth. The user: "yes definitely construct a script for 7c" (2026-11-13)
 - The page side of "day length alone never re-solves the temperature" is done in piece 8, not piece 10 (this replaces the earlier "With the slider, piece 10"): a day-length change alone goes to the winds only. The user: "Do it in piece 8 (Recommended)" (2026-11-13)
 - An overtaken wind solve is left to finish and its answer ignored, keeping the worker and its grid tables. The user: "Let it finish, ignore it (Recommended)" (2026-11-13)
+- From piece 8's current round onward, review follows the framework's one-round rule: one round of checks and the verifier, every verified finding fixed, one light re-check by the checks that raised findings; anything the re-check verifies is not fixed but comes to the user at the review pause with the options. This replaces "stop at low only" and the user's "iterate as long as you need" for this issue. The user: "Yes, one round" (2026-11-14)
 - The flaky observed-temperature test gets a timeout in piece 2. The user: "Yes, fold it in" (2026-11-13)
 
 - Piece 2 adds a direct Laplacian operator, accurate at the cube's seams. The user: "A: add it now" (2026-11-13)
