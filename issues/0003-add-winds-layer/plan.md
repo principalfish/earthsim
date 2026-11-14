@@ -234,6 +234,16 @@ earth_sim is a browser planet simulator for worldbuilding: believable results an
     - Tests: a trail's step follows the wind at its position and is longer in stronger wind; a trail that leaves the sphere's near side or ages out is replaced; the loop starts only for streaks and stops for arrows, for Winds off and for a hidden page; the count is capped; with a made-up frame clock the trails are deterministic.
     - Manual review: `npm run dev`; the Earth; Streaks over Terrain, Temperature and Pressure; play the months; zoom; sculpt while streaks run; on the finest grid; watch that the fan or battery load stops when Streaks is off.
 
+16. The climate process diagram in the docs (added 2026-11-14; the last piece)
+    - Model: claude-sonnet-5-5 (mechanical: two files copied in and three lines of docs).
+    - Files: `docs/climate-process.pdf` (new), `scripts/docs/climate-process.py` (new), `docs/development.md` (a row for the script and how to run it), `README.md` (a row in its table of docs).
+    - What: The one-page diagram of how the climate is worked out once the biome map is built (the inputs, the loop of temperature, pressure, winds, ocean currents and sea ice with its feedbacks into the temperature, what is worked out from the settled state, the layers, and what steps through time outside the loop), added to the repo's docs **as a PDF with the Python script that draws it**, as the user chose ("PDF plus the Python script (Recommended)"; "The winds branch, later"; "include it at the end of this process"). The planner drew it on 2026-11-14; the script and the PDF as the user saw them are in the planning record at `/home/philiph/workspace/earth_sim/.planner/issues/0003-add-winds-layer/climate-process-diagram.py` and `climate-process-diagram.pdf` (read them from there; they are not in the outbox copy). Copy the script in, make the date a value set at the top, and bring its two status lines up to what is true when this piece is built ("Built today" then names step 3 as done: temperature, pressure and winds, worked out once in that order, with no feedback; "Planned, not built" lists the later steps); change nothing else in the drawing. The script needs Python 3 and the `reportlab` library, which this project does not otherwise use: `docs/development.md` gives the commands to run it in a throwaway environment outside the repository (`python3 -m venv <dir>`, `<dir>/bin/pip install reportlab`, `<dir>/bin/python scripts/docs/climate-process.py docs/climate-process.pdf`), and says the diagram is a design for later steps, to be redrawn when a step changes it. Nothing is added to `package.json`.
+    - Functions: none in the app; the script's drawing helpers.
+    - Depends on: 15.
+    - Acceptance: the documented commands rewrite `docs/climate-process.pdf` as one landscape page with the same drawing as the planning record's copy, apart from the date and the two status lines; `npm run check`, `npm run typecheck`, `npm test` and `npm run build` are unaffected.
+    - Tests: none. The script is Python, outside the project's test runner and linter, and draws one fixed page; it is checked by running it and by reading the page (one page; the names of the boxes present in its text).
+    - Manual review: open `docs/climate-process.pdf` from the builder's worktree (the planner sends the file).
+
 ## Checkpoints
 
 - [x] 1. Observed winds and pressure data
@@ -254,6 +264,7 @@ earth_sim is a browser planet simulator for worldbuilding: believable results an
 - [ ] 13. The Pressure layer
 - [ ] 14. Earth comparison and baseline for winds and pressure
 - [ ] 15. Moving streaks
+- [ ] 16. The climate process diagram in the docs
 
 ## Verification
 
@@ -388,3 +399,4 @@ Scripted browser checks keep their browser profiles in the session's scratch fol
 - 2026-11-14, piece 7c-1: the low's poleward limit follows the day length, about 70° at the Earth's spin and reaching the pole for a slow spinner, as a trial with the fixed 70° as the fallback (the user: "lets try the cap that follows day length"). Guendelman and Kaspi's result is known here only from a search summary; the builder is to look it up and state how it was read.
 - 2026-11-14, piece 7c-1: Guendelman and Kaspi read by the builder in the paper's own text (arXiv version 1). The low's limit reaches the pole at the model's 4-day cell width, 60°, matching the paper's quarter-rate case (the user: "From a 4-day day (Recommended)"). The planner's earlier wording, that the paper found the branch short of the pole even at perpetual solstice, was wrong: that is Faulk et al. (2017), not read and not cited.
 - 2026-11-14, piece 7c-1: the outer bands take the narrower rule (the user: "The narrower rule (Recommended)"), after the builder measured that weakening only the last band made the tilted Earth's winter winds as strong as its summer's or stronger.
+- 2026-11-14, plan revised by the planner: piece 16 added at the end, the climate process diagram as a PDF in `docs/` with the Python script that draws it, on the user's "add to the docs folder in the repo - it may need to be regenerated somewhere", "PDF plus the Python script (Recommended)", "The winds branch, later" and "include it at the end of this process".
