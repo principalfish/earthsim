@@ -69,6 +69,7 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - Piece 7c is split in two: 7c-1 the tuning script and the small fixes, 7c-2 bands by longitude and the tuning. The user: "Two pieces (Recommended)" (2026-11-14)
 - At a steep tilt the low is held at about 70°, with no forced high beyond it, instead of reaching the summer pole (this changes the 60° maps approved in piece 5; before and after to be shown). The user: "Hold it at about 70° (Recommended)" (2026-11-14)
 - The low's poleward limit follows the day length: about 70° at the Earth's spin or faster, moving to the pole as the model's cell width grows to 90°; a trial, with the fixed 70° as the fallback. The user: "lets try the cap that follows day length" (2026-11-14)
+- Refined after the builder read Guendelman and Kaspi in its own text: the low's limit reaches the pole at the cell width the model has at a 4-day day (60°), not 90°, matching the paper's quarter-rate case. The user: "From a 4-day day (Recommended)" (2026-11-14)
 - Only the band nearest the pole is weakened, not every band beyond the second, so a fast-spinning planet's middle bands show. The user: "Weaken only the last band (Recommended)" (2026-11-14)
 - The tuning search lowers the Earth's wind difference and may not worsen the direction share or the pressure difference; trades between figures come to the user. The user: "Wind difference first (Recommended)" (2026-11-14)
 - The flaky observed-temperature test gets a timeout in piece 2. The user: "Yes, fold it in" (2026-11-13)
