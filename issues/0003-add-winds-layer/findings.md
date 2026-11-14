@@ -94,3 +94,9 @@ No findings: the correctness, security and coverage checks each came back clean,
 | round | correctness | medium | defect | verified | fixed | `src/app/scalarLayer.ts:497` | Choosing Pressure before there was a temperature (a fresh page, a new world) left the legend on "Not calculated yet" through the temperature's solve, since the winds are not asked for until there is one; it now says "Calculating" while the temperature the winds wait for is being worked out |
 | round | correctness | low | defect | dropped | - | `src/app/scalarLayer.ts:410` | The scale's centre takes in values that are not numbers, where the fit skips them — dropped: the winds' solve refuses a temperature that is not finite, so the pressure never holds such a value |
 | round | other | low | docs | noticed | accepted | `docs/user-guide.md` | Noticed by the verifier: the strip's example `Annual average 1,013 hPa` is the user's stated wording, where the Earth's own mean in the model is 1,011 hPa; it reads only as an example |
+
+## piece 14a · 2026-11-14 · The Earth comparison for pressure and winds
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | defect | verified | fixed | `src/app/ui/layerPanel.ts:970` | The key has one status line, and the line about the observed winds (loading, or could not be loaded) took it ahead of where the winds themselves stand, so after a failed fetch the key could not say "Calculating", "Out of date" or "Winds unavailable"; the winds' own status now comes first |
