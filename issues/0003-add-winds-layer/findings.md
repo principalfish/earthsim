@@ -86,3 +86,11 @@ No findings: the correctness, security and coverage checks each came back clean,
 | round | correctness | low | defect | verified | fixed | `src/app/ui/layerPanel.ts:789` | Latent, not reachable with one layer: if the globe refused a second layer's first field, the legend wrote the first layer's scale with the second's tick format and unit; the scale is now written by the layer the shown field belongs to |
 | round | correctness | low | cleanup | verified | fixed | `src/app/ui/cursorReadout.ts:197` | The wind line's annual-mean prefix always used the shared label, where a layer may name that summary its own way; it now takes the label of the layer on screen |
 | round | coverage | low | test | dropped | - | `src/app/testing/scalarLayerFixtures.ts:89` | A wording function of the made-up test layer is never called — dropped: it is wording data in a test fixture, and the same path is tested for the month summary |
+
+## piece 13 · 2026-11-14 · The Pressure layer
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | medium | defect | verified | fixed | `src/app/scalarLayer.ts:497` | Choosing Pressure before there was a temperature (a fresh page, a new world) left the legend on "Not calculated yet" through the temperature's solve, since the winds are not asked for until there is one; it now says "Calculating" while the temperature the winds wait for is being worked out |
+| round | correctness | low | defect | dropped | - | `src/app/scalarLayer.ts:410` | The scale's centre takes in values that are not numbers, where the fit skips them — dropped: the winds' solve refuses a temperature that is not finite, so the pressure never holds such a value |
+| round | other | low | docs | noticed | open | `docs/user-guide.md` | Noticed by the verifier: the strip's example `Annual average 1,013 hPa` is the user's stated wording, where the Earth's own mean in the model is 1,011 hPa; it reads only as an example |
