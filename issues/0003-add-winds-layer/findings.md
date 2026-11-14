@@ -78,3 +78,11 @@ No findings: the correctness, security and coverage checks each came back clean,
 | round | correctness | low | docs | verified | fixed | `src/app/wiring.ts:344` | A sentence saying the New world dialog "hides it" had come to follow the paragraph on the wind unit, so "it" read as the unit; it now says "hides the readout", back in the readout's paragraph |
 | round | correctness | low | cleanup | verified | fixed | `src/app/ui/windKey.ts:46` | The key's speed text repeated the strip's rounding and formatting; both now use one shared `wholeSpeed` |
 | round | correctness | low | test | verified | fixed | `src/app/ui/cursorReadout.ts:180` | No test pinned a calm wind on the annual average; one now pins `Annual average calm` (the wording is put to the user) |
+
+## piece 12 · 2026-11-14 · Scalar layers made general
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | defect | verified | fixed | `src/app/ui/layerPanel.ts:789` | Latent, not reachable with one layer: if the globe refused a second layer's first field, the legend wrote the first layer's scale with the second's tick format and unit; the scale is now written by the layer the shown field belongs to |
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/cursorReadout.ts:197` | The wind line's annual-mean prefix always used the shared label, where a layer may name that summary its own way; it now takes the label of the layer on screen |
+| round | coverage | low | test | dropped | - | `src/app/testing/scalarLayerFixtures.ts:89` | A wording function of the made-up test layer is never called — dropped: it is wording data in a test fixture, and the same path is tested for the month summary |
