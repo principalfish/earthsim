@@ -57,6 +57,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - A stored `earth_sim.panel.layers` entry is left in storage and never read (the builder's recommended option; no user decision asked). (2026-11-15)
 - Piece 3 starts. The user: "Start it" (2026-11-15)
 
+- Piece 3 approved after the user tried it. The user: "Tried it, approve" (2026-11-15)
+
 ## Open
 - None.
 
