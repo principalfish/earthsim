@@ -210,3 +210,14 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - Review: one round, four verified findings (one cleanup, three docs), all fixed; the light re-check confirmed them and raised three docs-wording findings in `docs/user-guide.md` (161, 185, 262), verified; the user approved the piece and had them fixed ("Tried it, fix all"), with a docs light re-check of those three edits. In `findings.md`.
 - Browser look (headless Edge, own server on 5183, stopped): wide and narrow windows behaved as the Acceptance says; the wind key's "Loading observed winds" line was not caught, since "Calculating" comes first by design.
 - Committed as `996d82c` and pushed on the user's approval: "Tried it, fix all".
+
+### Piece 3 (2026-11-15)
+
+- Built on claude-opus-5-5. Go-ahead "Start it"; letters over a real slider ("Letters over a slider"); a stored `earth_sim.panel.layers` entry is left unread.
+- The timeline is a page part of its own (`PageParts.createTimeline`). Its `showView` takes `(view, playing)` and the layer panel's `onView` passes whether the year is playing, since `PageView` has no playing state. The layer panel keeps the playback (`createPlayback`) and gained `setMonth` and `togglePlaying`. `createLayerControls` stays, building only the legend and the key. `fields.ts` gained `thumbCentre`, shared by the slider's mark and the letters, and lost `quietValue`.
+- The year's button is named "Play the year" / "Pause the year", so it does not share a name with the page's Pause button to come.
+- The main view's info row now gives way in an area too short for everything, so the timeline always keeps its row; what the info region holds rises over the globe instead. At 800x420 the pointer strip then draws over the top bar (it takes no pointer); the one info box comes next.
+- Uncovered changed lines, reasons accepted by the coverage check: `src/app/main.ts` (the `createTimeline` part and `createLayerControls`'s new argument), the entry point's assembly; `src/app/ui/topBar.ts:83`, piece 2's unreachable guard. The arrow keys are the range input's own, not simulated in tests; the browser look confirmed them.
+- Coverage once failed on a timeout in `scripts/tune/tuning.test.ts` (untouched) while the machine was loaded; rerun alone it passed.
+- Review: one round, five verified findings (one medium layout defect, one naming, three tidying), all fixed; light re-check by correctness. In `findings.md`.
+

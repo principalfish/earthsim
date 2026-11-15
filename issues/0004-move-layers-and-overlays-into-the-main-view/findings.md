@@ -34,3 +34,18 @@
 | re-check | correctness | - | - | dropped | - | `docs/temperature.md:87` | "If Temperature has been left" is exact only for leaving for Pressure — dropped: accurate about the failure; going to Terrain resets through a separate, documented rule |
 | manual | user | low | docs | - | fixed | `docs/user-guide.md` | The user chose to fix the three standing re-check findings: "Tried it, fix all" |
 | re-check | docs | - | - | - | - | `docs/user-guide.md:161` | Light re-check of the three user-guide edits: clean |
+
+## piece 3 · 2026-11-15 · The month timeline, and the Layers section removed
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | medium | defect | verified | fixed | `src/app/styles.css:864` | In a short narrow window (800x420) the info region's stacked blocks pushed the timeline below the window, so the month could not be reached; the info row now gives way and the timeline keeps its row |
+| round | correctness | low | defect | verified | fixed | `src/app/ui/timeline.ts:15` | The year's button was named "Pause" while playing, the name the whole page's Pause button will have; now "Play the year" and "Pause the year" |
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/fields.ts:41` | `quietValue` had no caller left after the old month slider went |
+| round | correctness | low | cleanup | verified | fixed | `src/app/wiring.ts:367` | Two edited doc-comment lines (here and `layerPanel.ts:666`) were not rewrapped |
+| round | correctness | low | docs | verified | fixed | `src/app/ui/layerPanel.test.ts:2501` | Stale wording: "shows the month controls", and "chosen in the Layers section" in `wiring.test.ts:1476` |
+| round | correctness | - | - | dropped | - | `src/app/ui/layerPanel.ts:1157` | `announce` now tells the view before the comparison — dropped: nothing there throws in practice, and nothing relies on the order |
+| round | docs | - | - | dropped | - | `docs/user-guide.md:11` | The Layers row of the tiles table does not mention the timeline — dropped: the table lists tiles, and the timeline has its own section |
+| round | docs | - | - | dropped | - | `docs/user-guide.md:139` | The "Layers" heading could be read as the removed section — dropped: the check said leave it; the intro names the tiles |
+| round | coverage | - | - | dropped | - | `src/app/ui/timeline.test.ts` | Optionally rename the arrow-key test to say the keys are the slider's own — dropped: optional, the test judged adequate |
+| re-check | correctness | - | - | - | - | `src/app/styles.css:864` | Light re-check of the five fixes: clean |
