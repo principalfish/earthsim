@@ -1,15 +1,16 @@
 /**
  * What the globe is coloured by, Terrain or a layer of one computed value
- * per cell, such as Temperature, as the dock over the globe chooses it, and
- * the Layers section: for such a layer, which month or summary of the year
- * is shown, with a slider and a play button for the month, and, on the
- * measured Earth for a layer compared with the observed one, whether it is
- * the simulated value, the observed one or the difference; the slider and
- * the play button in Terrain view too while the globe is lit by the sun or
- * shows the winds; and the legend and the key to the wind arrows, which are
- * laid over the globe rather than in the section. On the measured Earth the
- * wind arrows can be the observed winds rather than the simulated, and the
- * key then says how far apart the two are.
+ * per cell, such as Temperature, as the dock over the globe chooses it;
+ * for such a layer, which month or summary of the year is shown, as the
+ * top bar's Show choice chooses it; on the measured Earth, where the layer
+ * and the winds come from, as the top bar's one comparison control chooses
+ * it: the simulated values, the observed ones or, for the layer, the
+ * difference; and the Layers section: a slider and a play button for the
+ * month, for a layer's Month view, and in Terrain view too while the globe
+ * is lit by the sun or shows the winds; and the legend and the key to the
+ * wind arrows, which are laid over the globe rather than in the section.
+ * Once the observed winds are on hand, the key also says how far the
+ * simulated winds are from them.
  *
  * Each computed layer is shown as its description, a
  * {@link ScalarLayerSpec}, says: its views of the year, their colours and
@@ -20,7 +21,9 @@
  * {@link createLayerControls} is the section's controls, the legend and the
  * key on the page, which only show what they are told and pass on what is
  * chosen; the layer is chosen on the dock, and told to the panel by
- * {@link LayerPanel.setLayer}.
+ * {@link LayerPanel.setLayer}, and the view of its year and the source on
+ * the top bar, told by {@link LayerPanel.setSummary} and
+ * {@link LayerPanel.setSource}.
  */
 
 import {
@@ -68,21 +71,18 @@ import {
 	DEFAULT_WIND_SOURCE,
 	type Layer,
 	MONTH_NAMES,
+	offeredSources,
 	offersMonth,
 	type PageView,
 	type ScalarLayerId,
 	type Source,
 	type Summary,
 	type WindSource,
+	windSourceFor,
 } from '../view';
 import { DEFAULT_WIND_UNIT, type WindUnit } from '../windUnits';
-import { type ComparisonContent, createComparisonControls } from './comparison';
-import {
-	createButton,
-	createElement,
-	createRangeField,
-	createSelectField,
-} from './fields';
+import type { ComparisonContent } from './comparison';
+import { createButton, createElement, createRangeField } from './fields';
 import {
 	createLegend,
 	type FittedScale,
@@ -91,7 +91,6 @@ import {
 	legendContent,
 } from './legend';
 import type { MainView } from './mainView';
-import type { WindSourceContent } from './viewPanel';
 import {
 	createWindKey,
 	OBSERVED_WINDS_FAILED_TEXT,
@@ -102,18 +101,12 @@ import {
 
 /** What the layer controls start with and whom they tell of a choice. */
 export type LayerControlsOptions = {
-	/** The computed layers offered, in the order the dock lists them. */
-	readonly layers: readonly ScalarLayerSpec[];
 	/** The view settings shown at first, with the year not playing. */
 	readonly view: PageView;
-	/** Called with a layer and the view of its year chosen for it. */
-	readonly onSummary: (layer: ScalarLayerId, summary: Summary) => void;
 	/** Called with the month whenever the month slider moves. */
 	readonly onMonth: (month: number) => void;
 	/** Called when the play button is pressed, to play or to stop. */
 	readonly onPlay: () => void;
-	/** Called with a layer and the source chosen for it. */
-	readonly onSource: (layer: ScalarLayerId, source: Source) => void;
 	/**
 	 * The unit the key to the wind arrows writes its speeds in at first; m/s
 	 * when left out.
@@ -133,16 +126,10 @@ export type LayerControls = {
 	/** Shows the key to the wind arrows, or hides it for null. */
 	showWindKey(content: WindKeyContent | null): void;
 	/**
-	 * Shows the view settings: the controls of the layer on screen, the
-	 * month controls where {@link offersMonth} says, the month on the slider
-	 * and whether the year is playing.
+	 * Shows the view settings: the month controls where {@link offersMonth}
+	 * says, the month on the slider and whether the year is playing.
 	 */
 	showView(view: PageView, playing: boolean): void;
-	/**
-	 * Shows a layer's comparison controls as given, or hides them; a layer
-	 * with no comparison has none to show.
-	 */
-	showComparison(layer: ScalarLayerId, content: ComparisonContent): void;
 	/** Writes the speeds of the key to the wind arrows in another unit. */
 	setWindUnit(unit: WindUnit): void;
 	/**
@@ -185,19 +172,21 @@ export type LayerPanelOptions = Pick<
 	readonly onView?: (view: PageView) => void;
 	/**
 	 * Gives a layer's observed year on a world's grid; asked the first time
-	 * Observed or Difference is chosen for the layer on a world.
+	 * it is needed on a world: when Observed or Difference is chosen with
+	 * the layer on screen, or the layer is chosen with either on.
 	 */
 	readonly loadObserved: ScalarObservedLoader;
 	/**
-	 * Gives the observed winds on a world's grid; asked the first time
-	 * Observed is chosen for the wind arrows on a world.
+	 * Gives the observed winds on a world's grid; asked the first time they
+	 * are needed on a world: when Observed or Difference is chosen with the
+	 * winds shown, or the winds are shown with either on.
 	 */
 	readonly loadObservedWinds: ObservedLoader<MonthlyWind>;
 	/**
-	 * Called with whether the choice of where the wind arrows come from is
-	 * offered and which is chosen, whenever the view settings are shown.
+	 * Called with what the comparison control offers, the source chosen and
+	 * the line under it, whenever the view settings are shown.
 	 */
-	readonly onWindSource?: (content: WindSourceContent) => void;
+	readonly onComparison?: (content: ComparisonContent) => void;
 	/**
 	 * Told of an error with no control operated to hand it back to: one
 	 * thrown while the year plays and moves on by itself, or after an
@@ -284,9 +273,9 @@ export type ShownWinds = {
 export type LayerPanel = {
 	/**
 	 * Takes a new world: stops the year playing, puts {@link DEFAULT_MONTH}
-	 * on screen, every layer's source back to {@link DEFAULT_SOURCE} and the
-	 * winds' to {@link DEFAULT_WIND_SOURCE}, and forgets the observed years,
-	 * the observed winds and the comparisons of the world before.
+	 * on screen and the source back to {@link DEFAULT_SOURCE}, and forgets
+	 * the observed years, the observed winds and the comparisons of the
+	 * world before.
 	 * The layer, each layer's view of the year, the sunlight and the winds
 	 * are kept.
 	 *
@@ -305,12 +294,33 @@ export type LayerPanel = {
 	/**
 	 * Takes the layer the globe is to be coloured by, as the dock chose it,
 	 * and tells what calculates each layer whether it is showing. A layer
-	 * that does not offer the month stops the year playing. The layer on
-	 * screen already changes nothing.
+	 * that does not offer the month stops the year playing. A source the
+	 * new view does not offer goes back to Simulated; one it does is kept,
+	 * and what it needs of the new layer is asked for. The layer on screen
+	 * already changes nothing.
 	 *
 	 * @param layer - The layer chosen.
 	 */
 	setLayer(layer: Layer): void;
+	/**
+	 * Takes the view of its year chosen for a computed layer, as the top
+	 * bar's Show choice chose it; one the layer does not offer, or the one
+	 * it has, changes nothing. A view that does not offer the month stops
+	 * the year playing.
+	 *
+	 * @param layer - The layer it is chosen for.
+	 * @param summary - The view of its year chosen.
+	 */
+	setSummary(layer: ScalarLayerId, summary: Summary): void;
+	/**
+	 * Takes where the layer on screen and the winds are to come from, as the
+	 * top bar's comparison control chose it, and asks for what it needs
+	 * that is not on hand; ignored, the control put back, while the source
+	 * is not offered.
+	 *
+	 * @param source - The source chosen.
+	 */
+	setSource(source: Source): void;
 	/**
 	 * Takes whether the globe is lit by the sun, as the dock sets it. Turned
 	 * on in Terrain view, the month controls show there; turned off there,
@@ -325,7 +335,9 @@ export type LayerPanel = {
 	 * tells what calculates them. Turned on in Terrain view, the month
 	 * controls show there, as for sunlight; turned off there with sunlight
 	 * off too, they are hidden again and the year stops playing. Turned
-	 * off, the arrows leave the globe.
+	 * off, the arrows leave the globe, and a source no longer offered goes
+	 * back to Simulated; turned on with Observed or Difference chosen, the
+	 * observed winds are asked for if they are not on hand.
 	 *
 	 * @param on - Whether the winds are shown.
 	 */
@@ -359,14 +371,6 @@ export type LayerPanel = {
 	 * @param style - How the winds are drawn.
 	 */
 	setWindStyle(style: WindStyle): void;
-	/**
-	 * Takes where the wind arrows are to come from, as the view controls
-	 * chose it; ignored, the controls put back, while the world is not the
-	 * measured Earth.
-	 *
-	 * @param source - The source chosen.
-	 */
-	setWindSource(source: WindSource): void;
 };
 
 /** What the globe is given to show of a layer, and how. */
@@ -424,10 +428,8 @@ type ObservedWinds = {
 	mean?: WindField;
 };
 
-/** Where the wind arrows come from, as the panel keeps it. */
-type WindSourceState = ObservedRequest & {
-	/** The source chosen. */
-	source: WindSource;
+/** The observed winds as the panel asks for them and keeps them. */
+type ObservedWindsState = ObservedRequest & {
 	/** The observed winds, once they have arrived for this world. */
 	observed: ObservedWinds | null;
 };
@@ -443,8 +445,6 @@ type LayerState = ObservedRequest & {
 	readonly spec: ScalarLayerSpec;
 	/** What of its year it shows, kept while another layer is on screen. */
 	summary: Summary;
-	/** Where it comes from, kept while another layer is on screen. */
-	source: Source;
 	/**
 	 * What has been worked out from its latest result, dropped with it so
 	 * that a result the store no longer holds is not held on to here.
@@ -495,7 +495,8 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * world and a new result keep the layer and each layer's view of its year,
  * and a result keeps the month; {@link LayerPanel.newWorld} is how a new
  * world puts July back on screen. Each layer keeps its own view of the
- * year and its own source while another is on screen.
+ * year while another is on screen; the source is one for every layer and
+ * the winds, and is kept from one layer to another while it is offered.
  *
  * On a computed layer, the globe shows the latest result in the store, as
  * the layer's description reads it: the month on screen or a summary of
@@ -525,19 +526,31 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * hidden.
  *
  * While the world is the measured Earth, as the page says through
- * {@link LayerPanel.newWorld} and {@link LayerPanel.setEarth}, a layer with
- * an observed year offers the comparison: its source, Simulated, Observed
- * or Difference, simulated less observed. Once the world stops being the
- * measured Earth every source goes back to Simulated and the choice is
- * hidden; when it is the measured Earth again, the choice comes back, on
- * Simulated. A layer's observed year is asked for the first time Observed
- * or Difference is chosen for it on a world, and kept for that world; the
- * globe goes on showing the simulated year until it arrives, and the
- * comparison's line says the layer's words for its loading. If it cannot
- * be loaded, the line says the layer's words for that, the source goes
- * back to Simulated, and the next choice of Observed or Difference asks
- * again. What arrives after the world was replaced, or after it stopped or
- * started being the measured Earth, is set aside. Like the result's fields,
+ * {@link LayerPanel.newWorld} and {@link LayerPanel.setEarth}, the
+ * comparison control offers where the layer on screen and the winds come
+ * from, one source for both, as {@link offeredSources} says: Simulated,
+ * Observed or Difference, simulated less observed, while a layer with an
+ * observed year is on screen; Simulated or Observed while the winds are
+ * shown with no such layer, as in Terrain view; and nothing otherwise. A
+ * change of the view that takes the source chosen off the offer, as
+ * Terrain does Difference, or Terrain with the winds off any source, puts
+ * it back on Simulated; one that leaves it offered keeps it, from one
+ * compared layer to another and from such a layer to Terrain with the
+ * winds on Observed. Once the world stops being the measured Earth the
+ * source goes back to Simulated and nothing is offered; when it is the
+ * measured Earth again, the control comes back, on Simulated.
+ *
+ * On Observed or Difference, the observed year of the layer on screen is
+ * asked for the first time it is needed on a world: when either is
+ * chosen, or a layer is chosen while either is on. It is kept for that
+ * world; the globe goes on showing the simulated year until it arrives,
+ * and the comparison's line says the layer's words for its loading. If it
+ * cannot be loaded, the line says the layer's words for that and the next
+ * time it is needed asks again; the source goes back to Simulated if the
+ * layer is still on screen. A choice of source clears the line, except
+ * while what it speaks of is still on its way. What arrives after the
+ * world was replaced, or after it stopped or started being the measured
+ * Earth, is set aside. Like the result's fields,
  * the observed year's summaries, the differences and the error figures are
  * each worked out once when first needed, the differences and figures
  * with each result and dropped with it, so that each field is one array
@@ -592,25 +605,25 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * given, m/s when none is, or the one last set through
  * {@link LayerPanel.setWindUnit}.
  *
- * While the world is the measured Earth, the arrows can be the observed
- * winds instead, as chosen through {@link LayerPanel.setWindSource} and
- * told back through `onWindSource` with whether the choice is offered,
- * whenever the view settings are shown. The source is put back on
- * Simulated, and the choice is not offered, exactly when a layer's source
- * is: whenever the world stops being the measured Earth, and for a new
- * world. The observed winds are asked of `loadObservedWinds` the first
- * time Observed is chosen on a world, never before, and kept for that
- * world, as a layer's observed year is, by the same epochs: the key's line
- * says {@link OBSERVED_WINDS_LOADING_TEXT} until they arrive, the
- * simulated arrows staying meanwhile; if they cannot be loaded, it says
- * {@link OBSERVED_WINDS_FAILED_TEXT}, the source goes back to Simulated,
- * and the next choice of Observed asks again; and what arrives after a new
- * world, or after the world stopped or started being the measured Earth,
- * is set aside. Observed and arrived, the arrows are drawn from them as
- * from a result: the month's, or on the annual average their mean over the
- * year, worked out once as the result's is; like the result's, they need
- * a result to be shown. They are never out of date, so under them the
- * key's line says nothing of the store's winds.
+ * While the world is the measured Earth, the arrows follow the source, as
+ * {@link windSourceFor} says: the observed winds on Observed, and the
+ * simulated on Simulated and on Difference. The observed winds are asked
+ * of `loadObservedWinds` the first time they are needed on a world, never
+ * before: when Observed or Difference is chosen while the winds are shown,
+ * or the winds are shown while either is on; on Difference they give the
+ * key its figures. They are kept for that world, as a layer's observed
+ * year is, by the same epochs: the key's line says
+ * {@link OBSERVED_WINDS_LOADING_TEXT} until they arrive, the simulated
+ * arrows staying meanwhile; if they cannot be loaded, it says
+ * {@link OBSERVED_WINDS_FAILED_TEXT}, the source goes back to Simulated if
+ * the winds are still shown, and the next time they are needed asks
+ * again; and what arrives after a new world, or after the world stopped or
+ * started being the measured Earth, is set aside. Observed and arrived,
+ * the arrows are drawn from them as from a result: the month's, or on the
+ * annual average their mean over the year, worked out once as the
+ * result's is; like the result's, they need a result to be shown. They
+ * are never out of date, so under them the key's line says nothing of the
+ * store's winds.
  *
  * From the time the observed winds have arrived, while the world is the
  * measured Earth and there is a winds result, the key also gives how far
@@ -644,8 +657,8 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  *
  * @param options - The store, the layers, the globe, the temperature, the
  * winds, the controls, the timers the year plays by, the observed years'
- * and the observed winds' loaders, whom to tell of the view, of the choice
- * of the winds' source and of an error with no control to hand it back to.
+ * and the observed winds' loaders, whom to tell of the view, of the
+ * comparison and of an error with no control to hand it back to.
  * @returns The panel.
  */
 export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
@@ -654,7 +667,6 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		(spec) => ({
 			spec,
 			summary: DEFAULT_SUMMARY,
-			source: DEFAULT_SOURCE,
 			derived: null,
 			observed: null,
 			loading: false,
@@ -664,6 +676,8 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	let layer: Layer = DEFAULT_PAGE_VIEW.layer;
 	let sunlight = DEFAULT_PAGE_VIEW.sunlight;
 	let windsOn = DEFAULT_PAGE_VIEW.winds;
+	/** Where the layer on screen and the winds come from. */
+	let source = DEFAULT_PAGE_VIEW.source;
 	/** Whether the temperature was last told it is showing. */
 	let temperatureTold = false;
 	/** Whether the winds were last told they are showing. */
@@ -685,9 +699,8 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	let shownWindsSource: WindSource = DEFAULT_WIND_SOURCE;
 	/** What {@link LayerPanel.shownWinds} gives, as of the latest update. */
 	let shownWindsState: ShownWinds | null = null;
-	/** Where the wind arrows come from, and the observed winds. */
-	const windSource: WindSourceState = {
-		source: DEFAULT_WIND_SOURCE,
+	/** The observed winds, as asked for and kept. */
+	const observedWinds: ObservedWindsState = {
 		observed: null,
 		loading: false,
 		message: null,
@@ -770,7 +783,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		const { spec, summary } = state;
 		const year = comparedWith(state, from);
 		// Until the observed year is there, the simulated is shown.
-		const showing: Source = year === null ? 'simulated' : state.source;
+		const showing: Source = year === null ? 'simulated' : source;
 		const view = summaryOf(spec, summary);
 		const key: YearFieldKey = summary === 'month' ? playback.month : summary;
 		const on = (
@@ -839,7 +852,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	 * Null when there are none.
 	 */
 	const observedWindsFor = (from: DerivedWinds): ObservedWinds | null => {
-		const year = windSource.observed;
+		const year = observedWinds.observed;
 		if (
 			earth === null ||
 			year === null ||
@@ -927,7 +940,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 				derivedWinds ??= { solved: result };
 				const year = observedWindsFor(derivedWinds);
 				// Until the observed winds are there, the simulated are shown.
-				if (year !== null && windSource.source === 'observed') {
+				if (year !== null && windSourceFor(source) === 'observed') {
 					nextSource = 'observed';
 				}
 				next = windsTarget(
@@ -948,7 +961,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 				shownWindsMean =
 					next !== null &&
 					(next === derivedWinds?.summary ||
-						next === windSource.observed?.mean);
+						next === observedWinds.observed?.mean);
 				shownWindsSource = nextSource;
 			}
 			// Reached only with the winds on the globe as chosen, so the mean
@@ -998,7 +1011,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 							// Where the winds themselves stand comes first: the line
 							// about the observed winds, loading or failed, shows only
 							// while there is nothing else to say.
-							status: status ?? windSource.message,
+							status: status ?? observedWinds.message,
 							...(shownFigures === null ? {} : { figures: shownFigures }),
 						}
 					: null,
@@ -1115,26 +1128,34 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	const view = (): PageView => ({
 		layer,
 		summaries: byLayer((state) => state.summary),
-		sources: byLayer((state) => state.source),
+		source,
 		month: playback.month,
 		sunlight,
 		winds: windsOn,
 	});
-	/** Shows the view settings and the comparisons, and tells of them. */
+	/** The sources the comparison control offers for the view and world. */
+	const offered = (): readonly Source[] =>
+		offeredSources(
+			earth !== null,
+			(onScreen()?.spec.observed ?? null) !== null,
+			windsOn,
+		);
+
+	/** Puts the source back on Simulated if it is no longer offered. */
+	const keepSourceOffered = (): void => {
+		if (!offered().includes(source)) {
+			source = DEFAULT_SOURCE;
+		}
+	};
+
+	/** Shows the view settings and the comparison, and tells of them. */
 	const announce = (): void => {
 		controls.showView(view(), playback.playing);
-		for (const state of states) {
-			if (state.spec.observed !== null) {
-				controls.showComparison(state.spec.id, {
-					offered: layer === state.spec.id && earth !== null,
-					source: state.source,
-					message: state.message,
-				});
-			}
-		}
-		options.onWindSource?.({
-			offered: earth !== null,
-			source: windSource.source,
+		options.onComparison?.({
+			offered: offered(),
+			source,
+			// The winds' lines are the key's own.
+			message: onScreen()?.message ?? null,
 		});
 		options.onView?.(view());
 	};
@@ -1164,7 +1185,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	 */
 	const newEpoch = (): void => {
 		epoch++;
-		for (const request of [...states, windSource]) {
+		for (const request of [...states, observedWinds]) {
 			request.loading = false;
 			request.message = null;
 		}
@@ -1223,23 +1244,55 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		);
 	};
 
-	/** Asks for a layer's observed year, unless it is already asked for. */
-	const requestObservedYear = (
-		state: LayerState,
-		comparison: ObservedComparison,
-		resolution: Resolution,
-	): void =>
-		requestObserved(
-			state,
-			comparison,
-			() => options.loadObserved(state.spec, resolution),
-			(months) => {
-				state.observed = { resolution, months };
-			},
-			() => {
-				state.source = DEFAULT_SOURCE;
-			},
-		);
+	/**
+	 * Asks for what the source needs and is not on hand for this world,
+	 * unless it is already asked for: on Observed or Difference, the
+	 * observed year of the layer on screen, and while the winds are shown
+	 * the observed winds. A failure puts the source back on Simulated while
+	 * what failed is still on screen.
+	 */
+	const requestNeeded = (): void => {
+		if (earth === null || source === 'simulated') {
+			return;
+		}
+		const resolution = earth;
+		const state = onScreen();
+		const comparison = state?.spec.observed ?? null;
+		if (
+			state !== null &&
+			comparison !== null &&
+			state.observed?.resolution !== resolution
+		) {
+			requestObserved(
+				state,
+				comparison,
+				() => options.loadObserved(state.spec, resolution),
+				(months) => {
+					state.observed = { resolution, months };
+				},
+				() => {
+					if (onScreen() === state) {
+						source = DEFAULT_SOURCE;
+					}
+				},
+			);
+		}
+		if (windsOn && observedWinds.observed?.resolution !== resolution) {
+			requestObserved(
+				observedWinds,
+				OBSERVED_WINDS_TEXTS,
+				() => options.loadObservedWinds(resolution),
+				(winds) => {
+					observedWinds.observed = { resolution, winds };
+				},
+				() => {
+					if (windsOn) {
+						source = DEFAULT_SOURCE;
+					}
+				},
+			);
+		}
+	};
 
 	const playback = createPlayback({
 		month: DEFAULT_PAGE_VIEW.month,
@@ -1263,26 +1316,9 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	});
 
 	const controls = options.createControls({
-		layers: states.map((state) => state.spec),
 		view: view(),
 		windUnit: options.windUnit ?? DEFAULT_WIND_UNIT,
 		windStyle: options.windStyle ?? DEFAULT_WIND_STYLE,
-		onSummary: (id, next) => {
-			const state = stateOf(id);
-			if (
-				state === undefined ||
-				next === state.summary ||
-				!offersSummary(state.spec, next)
-			) {
-				return;
-			}
-			state.summary = next;
-			if (!offersMonth(view())) {
-				playback.pause();
-			}
-			announce();
-			update();
-		},
 		onMonth: (next) => {
 			if (next === playback.month) {
 				return;
@@ -1298,30 +1334,6 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 				playback.play();
 			}
 		},
-		onSource: (id, next) => {
-			const state = stateOf(id);
-			if (state === undefined || next === state.source) {
-				return;
-			}
-			const comparison = state.spec.observed;
-			if (earth === null || comparison === null) {
-				// Not offered: the controls are put back as they were.
-				announce();
-				return;
-			}
-			state.source = next;
-			if (
-				next !== 'simulated' &&
-				(state.observed === null || state.observed.resolution !== earth)
-			) {
-				requestObservedYear(state, comparison, earth);
-			}
-			// While the observed year is on its way the line says so, whatever
-			// is chosen meanwhile; otherwise a choice clears it.
-			state.message = state.loading ? comparison.loadingText : null;
-			announce();
-			update();
-		},
 	});
 	store.addListener(update);
 	update();
@@ -1332,23 +1344,19 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			const changed =
 				playback.month !== DEFAULT_MONTH ||
 				earth !== next ||
+				source !== DEFAULT_SOURCE ||
 				states.some(
-					(state) =>
-						state.source !== DEFAULT_SOURCE ||
-						state.observed !== null ||
-						state.message !== null,
+					(state) => state.observed !== null || state.message !== null,
 				) ||
-				windSource.source !== DEFAULT_WIND_SOURCE ||
-				windSource.observed !== null ||
-				windSource.message !== null;
+				observedWinds.observed !== null ||
+				observedWinds.message !== null;
 			newEpoch();
 			earth = next;
 			for (const state of states) {
 				state.observed = null;
-				state.source = DEFAULT_SOURCE;
 			}
-			windSource.observed = null;
-			windSource.source = DEFAULT_WIND_SOURCE;
+			observedWinds.observed = null;
+			source = DEFAULT_SOURCE;
 			if (!changed) {
 				return;
 			}
@@ -1364,7 +1372,46 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			if (!offersMonth(view())) {
 				playback.pause();
 			}
+			keepSourceOffered();
+			requestNeeded();
 			tellShowing();
+			announce();
+			update();
+		},
+		setSummary: (id, next) => {
+			const state = stateOf(id);
+			if (
+				state === undefined ||
+				next === state.summary ||
+				!offersSummary(state.spec, next)
+			) {
+				return;
+			}
+			state.summary = next;
+			if (!offersMonth(view())) {
+				playback.pause();
+			}
+			announce();
+			update();
+		},
+		setSource: (next) => {
+			if (next === source) {
+				return;
+			}
+			if (!offered().includes(next)) {
+				// Not offered: the control is put back as it was.
+				announce();
+				return;
+			}
+			source = next;
+			// A choice clears what was said of the observed data, but while
+			// any of it is on its way the line says so.
+			for (const request of [...states, observedWinds]) {
+				if (!request.loading) {
+					request.message = null;
+				}
+			}
+			requestNeeded();
 			announce();
 			update();
 		},
@@ -1386,6 +1433,8 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			if (!offersMonth(view())) {
 				playback.pause();
 			}
+			keepSourceOffered();
+			requestNeeded();
 			tellShowing();
 			announce();
 			update();
@@ -1396,10 +1445,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			}
 			newEpoch();
 			earth = next;
-			for (const state of states) {
-				state.source = DEFAULT_SOURCE;
-			}
-			windSource.source = DEFAULT_WIND_SOURCE;
+			source = DEFAULT_SOURCE;
 			announce();
 			update();
 		},
@@ -1407,70 +1453,22 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		shownWinds: () => shownWindsState,
 		setWindUnit: (unit) => controls.setWindUnit(unit),
 		setWindStyle: (style) => controls.setWindStyle(style),
-		setWindSource: (next) => {
-			if (next === windSource.source) {
-				return;
-			}
-			if (earth === null) {
-				// Not offered: the controls are put back as they were.
-				announce();
-				return;
-			}
-			windSource.source = next;
-			if (
-				next === 'observed' &&
-				(windSource.observed === null ||
-					windSource.observed.resolution !== earth)
-			) {
-				const resolution = earth;
-				requestObserved(
-					windSource,
-					OBSERVED_WINDS_TEXTS,
-					() => options.loadObservedWinds(resolution),
-					(winds) => {
-						windSource.observed = { resolution, winds };
-					},
-					() => {
-						windSource.source = DEFAULT_WIND_SOURCE;
-					},
-				);
-			}
-			// While the observed winds are on their way the key says so,
-			// whatever is chosen meanwhile; otherwise a choice clears it.
-			windSource.message = windSource.loading
-				? OBSERVED_WINDS_LOADING_TEXT
-				: null;
-			announce();
-			update();
-		},
 	};
 };
-
-/**
- * The class of the box in the Layers section that holds the computed
- * layers' own controls and the month controls: named for the temperature,
- * the first such layer, as the stylesheet styles it.
- */
-const LAYER_CONTROLS_CLASS = 'temperature-view';
 
 /** The id of the month slider, which every layer and Terrain share. */
 const MONTH_SLIDER_ID = 'temperature-month';
 
 /**
- * Adds the layer controls to the Layers section of the side panel, the
- * computed layers' view controls, and the legend and the key to the wind
- * arrows to their places over the globe.
+ * Adds the layer controls to the Layers section of the side panel, and the
+ * legend and the key to the wind arrows to their places over the globe.
  *
  * @remarks
- * Each computed layer's controls show only while it is on screen: a
- * drop-down of the views of its year it offers, with the id its
- * description gives; and under it, for a layer with an observed year, the
- * comparison controls of {@link createComparisonControls}, hidden unless
- * they are offered. Under them all, for the Month view, a slider from
- * January to December, which a screen reader hears by the month's name,
- * and a play button. The slider and the button show in Terrain view too
- * while the globe is lit by the sun or shows the winds, on their own. The
- * button is a toggle whose pressed state says whether the year is playing.
+ * In the section, for the Month view, a slider from January to December,
+ * which a screen reader hears by the month's name, and a play button. They
+ * show in Terrain view too while the globe is lit by the sun or shows the
+ * winds. The button is a toggle whose pressed state says whether the year
+ * is playing.
  *
  * The legend and the key to the wind arrows are shown and hidden only as
  * they are told, whether the Layers section is open or closed.
@@ -1479,8 +1477,8 @@ const MONTH_SLIDER_ID = 'temperature-month';
  * holds.
  * @param places - Where the legend and the key go, over the globe, each
  * after what its place holds.
- * @param options - The layers offered, the starting view settings and whom
- * to tell of a choice.
+ * @param options - The starting view settings and whom to tell of a
+ * choice.
  * @returns The controls, with the legend and the key hidden.
  */
 export const createLayerControls = (
@@ -1493,28 +1491,6 @@ export const createLayerControls = (
 		options.windUnit ?? DEFAULT_WIND_UNIT,
 		options.windStyle ?? DEFAULT_WIND_STYLE,
 	);
-
-	const layerControls = createElement('div', LAYER_CONTROLS_CLASS);
-	const own = options.layers.map((layer) => {
-		const show = createSelectField({
-			id: layer.summaryControlId,
-			label: 'Show',
-			choices: layer.summaries.map(({ id, label }) => ({ value: id, label })),
-			value: options.view.summaries[layer.id],
-			onChange: (summary) => options.onSummary(layer.id, summary),
-		});
-		show.classList.add(`${LAYER_CONTROLS_CLASS}__show`);
-		layerControls.append(show);
-		const comparison =
-			layer.observed === null
-				? null
-				: createComparisonControls(layerControls, {
-						observed: layer.observed,
-						source: options.view.sources[layer.id],
-						onSource: (source) => options.onSource(layer.id, source),
-					});
-		return { layer, show, comparison };
-	});
 
 	const monthControls = createElement('div', 'month-controls');
 	const month = createRangeField({
@@ -1537,22 +1513,15 @@ export const createLayerControls = (
 	});
 	play.classList.add('button--compact');
 	monthControls.append(month.element, play);
-	layerControls.append(monthControls);
 
 	const showView = (view: PageView, playing: boolean): void => {
-		const monthShown = offersMonth(view);
-		const layerShown = own.some(({ layer }) => layer.id === view.layer);
-		layerControls.hidden = !layerShown && !monthShown;
-		for (const { layer, show } of own) {
-			show.hidden = layer.id !== view.layer;
-		}
-		monthControls.hidden = !monthShown;
+		monthControls.hidden = !offersMonth(view);
 		month.setValue(view.month);
 		play.setAttribute('aria-pressed', String(playing));
 	};
 	showView(options.view, false);
 
-	body.append(layerControls);
+	body.append(monthControls);
 	places.legend.append(legend.element);
 	places.windKey.append(windKey.element);
 	return {
@@ -1561,7 +1530,5 @@ export const createLayerControls = (
 		setWindUnit: windKey.setUnit,
 		setWindStyle: windKey.setStyle,
 		showView,
-		showComparison: (layer, content) =>
-			own.find((each) => each.layer.id === layer)?.comparison?.show(content),
 	};
 };

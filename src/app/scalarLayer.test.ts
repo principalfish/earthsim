@@ -98,8 +98,6 @@ describe('the temperature layer', () => {
 			load: loadObservedTemperature,
 			loadingText: 'Loading observed temperature',
 			failedText: 'Observed temperature could not be loaded',
-			sourceName: 'temperature-source',
-			sourceLegend: 'Temperature source',
 			difference: { halfSpan: 20, ramp: DIFFERENCE_RAMP, tickStep: 10 },
 		});
 		expect([DIFFERENCE_HALF_SPAN_C, DIFFERENCE_TICK_STEP]).toEqual([20, 10]);
@@ -153,8 +151,6 @@ describe('the pressure layer', () => {
 			load: loadObservedPressure,
 			loadingText: 'Loading observed pressure',
 			failedText: 'Observed pressure could not be loaded',
-			sourceName: 'pressure-source',
-			sourceLegend: 'Pressure source',
 			difference: { halfSpan: 20, ramp: DIFFERENCE_RAMP, tickStep: 10 },
 		});
 		expect(PRESSURE_OBSERVED.difference.ramp).toBe(

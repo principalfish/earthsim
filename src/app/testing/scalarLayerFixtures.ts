@@ -2,7 +2,7 @@
  * A made-up layer of one value per cell for tests, described as the page
  * describes the temperature but differing from it in everything a
  * description holds: a test that shows it shows that the legend, the
- * readout, the comparison controls and the layer panel follow the
+ * readout, the top bar and the layer panel follow the
  * description and know nothing of the temperature.
  *
  * It is shaped like a sea-level pressure: its months come from the store's

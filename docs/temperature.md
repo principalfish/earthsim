@@ -72,7 +72,7 @@ Until the first result arrives, the globe keeps the height colours.
 
 ## Earth comparison
 
-On the **measured Earth**, Temperature view adds a choice of where the temperature comes from.
+On the **measured Earth**, the comparison control in the top bar over the globe chooses where the temperature comes from. It is one control for the layer on screen and the winds; see the [user guide](user-guide.md#simulated-observed-or-difference).
 
 | Source | What it shows |
 |-|-|
@@ -84,6 +84,6 @@ On the **measured Earth**, Temperature view adds a choice of where the temperatu
 - **Simulated and observed share one scale** once Observed or Difference has been chosen, so a colour means the same temperature in both.
 - **The difference has a fixed scale** from −20 to +20 °C: blue where the simulation is colder, near white where the two agree, red where it is warmer.
 - **Error figures** show under the legend, for the month or summary on screen: the mean difference and the root-mean-square difference, such as `Mean −0.1 °C · RMS 3.9 °C`.
-- The observed temperature is fetched the first time it is needed. If that fails, the view goes back to Simulated and the next choice tries again.
+- The observed temperature is fetched the first time it is needed: when Observed or Difference is chosen in Temperature view, or Temperature is chosen while either is on. If that fails while Temperature is on screen, the view goes back to Simulated and the next choice tries again; if Temperature has been left meanwhile, the choice is kept and the fetch is tried again on coming back to it.
 
 The model's constants were tuned against the observed Earth when it was built, and were not tuned again for this comparison. The Earth's error figures are kept as a baseline for later steps, such as winds and ocean currents, to improve on; see [Development](development.md#the-earth-temperature-baseline).

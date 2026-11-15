@@ -1,7 +1,7 @@
 /**
  * The layers that colour the globe by one computed value per cell, each as
  * a description: everything the layer panel, the legend, the cursor
- * readout, the comparison controls, the date line and the globe's lighting
+ * readout, the top bar's Show choice, the date line and the globe's lighting
  * need to know of a layer to show it. Each takes a description as data, so
  * that another such layer is added by describing it.
  *
@@ -133,8 +133,8 @@ export type DifferenceScale = {
 
 /**
  * The comparison a layer offers with the observed Earth: what loads the
- * observed year, what the page says of it, the names of its controls and
- * how the difference is drawn.
+ * observed year, what the page says of it and how the difference is
+ * drawn.
  */
 export type ObservedComparison = {
 	/** Loads the observed year on a world's grid from its file. */
@@ -143,10 +143,6 @@ export type ObservedComparison = {
 	readonly loadingText: string;
 	/** What the comparison's line says when it could not be loaded. */
 	readonly failedText: string;
-	/** The name of the choice of source, its radio buttons' group. */
-	readonly sourceName: string;
-	/** What a screen reader names the choice of source by. */
-	readonly sourceLegend: string;
 	/** How the difference is drawn. */
 	readonly difference: DifferenceScale;
 };
@@ -323,8 +319,6 @@ export const TEMPERATURE_OBSERVED: ObservedComparison = {
 	load: loadObservedTemperature,
 	loadingText: OBSERVED_LOADING_TEXT,
 	failedText: OBSERVED_FAILED_TEXT,
-	sourceName: 'temperature-source',
-	sourceLegend: 'Temperature source',
 	difference: {
 		halfSpan: DIFFERENCE_HALF_SPAN_C,
 		ramp: DIFFERENCE_RAMP,
@@ -435,8 +429,6 @@ export const PRESSURE_OBSERVED: ObservedComparison = {
 	load: loadObservedPressure,
 	loadingText: OBSERVED_PRESSURE_LOADING_TEXT,
 	failedText: OBSERVED_PRESSURE_FAILED_TEXT,
-	sourceName: 'pressure-source',
-	sourceLegend: 'Pressure source',
 	difference: {
 		halfSpan: PRESSURE_DIFFERENCE_HALF_SPAN_HPA,
 		ramp: DIFFERENCE_RAMP,

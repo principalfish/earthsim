@@ -62,6 +62,7 @@ import {
 import { createPanelSections, PANEL_SECTIONS } from './ui/panelSections';
 import type { PlanetPanelOptions } from './ui/planetPanel';
 import type { ToolPanelOptions } from './ui/toolPanel';
+import type { TopBarOptions } from './ui/topBar';
 import type { ViewPanelOptions } from './ui/viewPanel';
 import {
 	describeWorld,
@@ -115,6 +116,11 @@ type Stage = {
 	readonly dockOptions: LayerDockOptions;
 	/** Every view the stand-in for the dock was told to show, in order. */
 	readonly dockViews: PageView[];
+	readonly topBarOptions: TopBarOptions;
+	/** Every view the stand-in for the top bar was told to show, in order. */
+	readonly topBarViews: PageView[];
+	/** What the stand-in for the top bar's comparison was told, in order. */
+	readonly comparisons: ComparisonContent[];
 	readonly planetPanelOptions: PlanetPanelOptions;
 	readonly statisticsOptions: PageStatisticsOptions;
 	readonly temperatureOptions: PageTemperatureOptions;
@@ -218,6 +224,9 @@ const createStage = (
 	let viewPanelOptions: ViewPanelOptions | undefined;
 	let dockOptions: LayerDockOptions | undefined;
 	const dockViews: PageView[] = [];
+	let topBarOptions: TopBarOptions | undefined;
+	const topBarViews: PageView[] = [];
+	const comparisons: ComparisonContent[] = [];
 	let planetPanelOptions: PlanetPanelOptions | undefined;
 	let statisticsOptions: PageStatisticsOptions | undefined;
 	let temperatureOptions: PageTemperatureOptions | undefined;
@@ -264,6 +273,11 @@ const createStage = (
 			return required(dockOptions, 'dock');
 		},
 		dockViews,
+		get topBarOptions() {
+			return required(topBarOptions, 'top bar');
+		},
+		topBarViews,
+		comparisons,
 		get planetPanelOptions() {
 			return required(planetPanelOptions, 'planet panel');
 		},
@@ -414,16 +428,21 @@ const createStage = (
 			viewPanelOptions = options;
 			return {
 				setSeaLevel: (metres) => log.push(`viewPanel.setSeaLevel ${metres}`),
-				showWindSource: (content) =>
-					log.push(
-						`viewPanel.showWindSource ${content.offered} ${content.source}`,
-					),
 			};
 		},
 		createLayerDock: (options) => {
 			log.push('createLayerDock');
 			dockOptions = options;
 			return { showView: (view) => dockViews.push(view) };
+		},
+		createTopBar: (options) => {
+			log.push('createTopBar');
+			topBarOptions = options;
+			return {
+				showView: (view) => topBarViews.push(view),
+				// Recorded apart from the log, which the other tests read whole.
+				showComparison: (content) => comparisons.push(content),
+			};
 		},
 		createPlanetPanel: (options) => {
 			log.push(`createPlanetPanel ${describePlanet(options.planet)}`);
@@ -479,14 +498,15 @@ const createStage = (
 				newWorld: (earth) => log.push(`layerPanel.newWorld ${earth}`),
 				setEarth: (earth) => log.push(`layerPanel.setEarth ${earth}`),
 				setLayer: (layer) => log.push(`layerPanel.setLayer ${layer}`),
+				setSummary: (layer, summary) =>
+					log.push(`layerPanel.setSummary ${layer} ${summary}`),
+				setSource: (source) => log.push(`layerPanel.setSource ${source}`),
 				setSunlight: (on) => log.push(`layerPanel.setSunlight ${on}`),
 				setWinds: (on) => log.push(`layerPanel.setWinds ${on}`),
 				shown: () => stage.shownTemperature,
 				shownWinds: () => stage.shownWinds,
 				setWindUnit: (unit) => log.push(`layerPanel.setWindUnit ${unit}`),
 				setWindStyle: (style) => log.push(`layerPanel.setWindStyle ${style}`),
-				setWindSource: (source) =>
-					log.push(`layerPanel.setWindSource ${source}`),
 			};
 		},
 		createCursorReadout: (options) => {
@@ -585,6 +605,7 @@ describe('startPage', () => {
 			'createToolPanel',
 			`createViewPanel ${DEFAULT_SEA_LEVEL_M}`,
 			'createLayerDock',
+			'createTopBar',
 			`createPlanetPanel ${EARTH}`,
 			'createTemperature',
 			'createWinds',
@@ -1062,6 +1083,37 @@ describe('what changes the terrain or the sea level', () => {
 		stage.layerOptions.onView(view);
 		expect(stage.dockViews).toEqual([view]);
 	});
+
+	it('the top bar starts on the page’s starting view', async () => {
+		const stage = await createStartedStage();
+		expect(stage.topBarOptions.view).toEqual(DEFAULT_PAGE_VIEW);
+		expect(stage.topBarOptions.layers).toBeUndefined();
+	});
+
+	it('the view of the year and the source chosen on the top bar reach the layer panel alone', async () => {
+		const stage = await createStartedStage();
+		stage.topBarOptions.onSummary('pressure', 'annualMean');
+		stage.topBarOptions.onSource('observed');
+		expect(stage.log).toEqual([
+			'layerPanel.setSummary pressure annualMean',
+			'layerPanel.setSource observed',
+		]);
+		expect(stage.sectionCalls).toEqual([]);
+	});
+
+	it('the top bar is shown each view and each comparison the layer panel tells of', async () => {
+		const stage = await createStartedStage();
+		const view: PageView = { ...DEFAULT_PAGE_VIEW, layer: 'temperature' };
+		stage.layerOptions.onView(view);
+		expect(stage.topBarViews).toEqual([view]);
+		const content: ComparisonContent = {
+			offered: ['simulated', 'observed'],
+			source: 'observed',
+			message: null,
+		};
+		stage.layerOptions.onComparison(content);
+		expect(stage.comparisons).toEqual([content]);
+	});
 });
 
 describe('a change of the planet settings', () => {
@@ -1468,7 +1520,6 @@ describe('the temperature, on its worker', () => {
 						return {
 							showLegend: () => {},
 							showView: () => {},
-							showComparison: () => {},
 							showWindKey: () => {},
 							setWindUnit: () => {},
 							setWindStyle: () => {},
@@ -1966,7 +2017,7 @@ describe('the cursor readout', () => {
 		stage.layerOptions.onView({
 			layer: 'temperature',
 			summaries: { temperature: 'month', pressure: 'month' },
-			sources: { temperature: 'simulated', pressure: 'simulated' },
+			source: 'simulated',
 			month: 3,
 			sunlight: false,
 			winds: false,
@@ -2011,7 +2062,6 @@ describe('the cursor readout', () => {
 						return {
 							showLegend: () => {},
 							showView: () => {},
-							showComparison: () => {},
 							showWindKey: () => {},
 							setWindUnit: () => {},
 							setWindStyle: () => {},
@@ -2043,7 +2093,7 @@ describe('the date line', () => {
 		stage.layerOptions.onView({
 			layer: 'temperature',
 			summaries: { temperature: 'month', pressure: 'month' },
-			sources: { temperature: 'simulated', pressure: 'simulated' },
+			source: 'simulated',
 			month: 6,
 			sunlight: false,
 			winds: false,
@@ -2051,7 +2101,7 @@ describe('the date line', () => {
 		stage.layerOptions.onView({
 			layer: 'temperature',
 			summaries: { temperature: 'month', pressure: 'month' },
-			sources: { temperature: 'simulated', pressure: 'simulated' },
+			source: 'simulated',
 			month: 7,
 			sunlight: false,
 			winds: false,
@@ -2059,7 +2109,7 @@ describe('the date line', () => {
 		stage.layerOptions.onView({
 			layer: 'temperature',
 			summaries: { temperature: 'annualMean', pressure: 'month' },
-			sources: { temperature: 'simulated', pressure: 'simulated' },
+			source: 'simulated',
 			month: 7,
 			sunlight: false,
 			winds: false,
@@ -2067,7 +2117,7 @@ describe('the date line', () => {
 		stage.layerOptions.onView({
 			layer: 'terrain',
 			summaries: { temperature: 'annualMean', pressure: 'month' },
-			sources: { temperature: 'simulated', pressure: 'simulated' },
+			source: 'simulated',
 			month: 7,
 			sunlight: false,
 			winds: false,
@@ -2116,7 +2166,6 @@ describe('the month on screen', () => {
 						return {
 							showLegend: () => {},
 							showView: (view) => views.push(view),
-							showComparison: () => {},
 							showWindKey: () => {},
 							setWindUnit: () => {},
 							setWindStyle: () => {},
@@ -2144,15 +2193,15 @@ describe('the month on screen', () => {
 
 	it('goes back to July for a new world, which the date line says', async () => {
 		const { page, controls, views } = await createMonthStage();
-		controls.onSummary('temperature', 'warmest');
-		controls.onSummary('temperature', 'month');
+		page.stage.topBarOptions.onSummary('temperature', 'warmest');
+		page.stage.topBarOptions.onSummary('temperature', 'month');
 		controls.onMonth(2);
 		page.stage.log.length = 0;
 		page.stage.state.replaceWorld(createBlankWorld(64));
 		expect(views.at(-1)).toEqual({
 			layer: 'temperature',
 			summaries: { temperature: 'month', pressure: 'month' },
-			sources: { temperature: 'simulated', pressure: 'simulated' },
+			source: 'simulated',
 			month: DEFAULT_MONTH,
 			sunlight: false,
 			winds: false,
@@ -2188,7 +2237,6 @@ const createSunStage = async (world?: World) => {
 					return {
 						showLegend: () => {},
 						showView: (view) => views.push(view),
-						showComparison: () => {},
 						showWindKey: () => {},
 						setWindUnit: () => {},
 						setWindStyle: () => {},
@@ -2226,7 +2274,7 @@ describe('the sun', () => {
 		const view: PageView = {
 			layer: 'temperature',
 			summaries: { temperature: 'month', pressure: 'month' },
-			sources: { temperature: 'simulated', pressure: 'simulated' },
+			source: 'simulated',
 			month: 3,
 			sunlight: false,
 			winds: false,
@@ -2274,7 +2322,7 @@ describe('the sun', () => {
 		const { stage, controls } = await createSunStage();
 		stage.dockOptions.onLayer('temperature');
 		controls.onMonth(1);
-		controls.onSummary('temperature', 'coldest');
+		stage.topBarOptions.onSummary('temperature', 'coldest');
 		stage.dockOptions.onLayer('terrain');
 		stage.suns.length = 0;
 		const planet: PlanetSettings = { ...DEFAULT_PLANET, axialTiltDeg: 60 };
@@ -2513,7 +2561,6 @@ const createWindUnitStage = async (
 					return {
 						showLegend: () => {},
 						showView: () => {},
-						showComparison: () => {},
 						showWindKey: () => {},
 						setWindUnit: (unit) => keyUnits.push(unit),
 						setWindStyle: (style) => keyStyles.push(style),
@@ -2753,12 +2800,12 @@ describe('the cursor readout, of the winds', () => {
 	});
 
 	it('looks again when the view changes, to the year’s mean winds and back', async () => {
-		const { stage, controls, arriveWinds } = await createWindUnitStage();
+		const { stage, arriveWinds } = await createWindUnitStage();
 		stage.dockOptions.onWinds(true);
 		arriveWinds(4);
 		stage.dockOptions.onLayer('temperature');
 		stage.readoutCalls.length = 0;
-		controls.onSummary('temperature', 'annualMean');
+		stage.topBarOptions.onSummary('temperature', 'annualMean');
 		expect(stage.readoutCalls).toContain('invalidate');
 		expect(stage.readoutOptions.shownWinds()?.annualMean).toBe(true);
 		stage.readoutCalls.length = 0;
@@ -2845,7 +2892,6 @@ describe('the Sunlight control', () => {
 						return {
 							showLegend: () => {},
 							showView: (view) => views.push(view),
-							showComparison: () => {},
 							showWindKey: () => {},
 							setWindUnit: () => {},
 							setWindStyle: () => {},
@@ -2986,41 +3032,34 @@ describe('the comparison on the measured Earth', () => {
 
 	/** A page on a world, with the real layer panel, in Temperature view. */
 	const createComparisonStage = async (world: World = freshEarth()) => {
-		let controls: LayerControlsOptions | undefined;
-		/** What the temperature's comparison controls were told to show. */
-		const comparisons: ComparisonContent[] = [];
-		/** What the pressure's comparison controls were told to show. */
-		const pressureComparisons: ComparisonContent[] = [];
+		/** Twelve months of zeros on a world's grid. */
+		const zeros = (resolution: number) =>
+			Array.from(
+				{ length: 12 },
+				() => new Float32Array(6 * resolution * resolution),
+			);
 		const stage = await createStartedStage(world, {
 			createLayerPanel: (options) =>
 				createLayerPanel({
 					...options,
-					loadObserved: async (_layer, resolution) =>
-						Array.from(
-							{ length: 12 },
-							() => new Float32Array(6 * resolution * resolution),
-						),
+					loadObserved: async (_layer, resolution) => zeros(resolution),
+					loadObservedWinds: async (resolution) => ({
+						east: zeros(resolution),
+						north: zeros(resolution),
+					}),
 					globe: { setLayer: () => {}, setWinds: () => {} },
 					setTimer: () => 0,
 					clearTimer: () => {},
 					reportError: () => {},
-					createControls: (made) => {
-						controls = made;
-						return {
-							showLegend: () => {},
-							showView: () => {},
-							showComparison: (layer, content) =>
-								(layer === 'pressure' ? pressureComparisons : comparisons).push(
-									content,
-								),
-							showWindKey: () => {},
-							setWindUnit: () => {},
-							setWindStyle: () => {},
-						};
-					},
+					createControls: () => ({
+						showLegend: () => {},
+						showView: () => {},
+						showWindKey: () => {},
+						setWindUnit: () => {},
+						setWindStyle: () => {},
+					}),
 				}),
 		});
-		const chosen = required(controls, 'layer controls');
 		stage.dockOptions.onLayer('temperature');
 		/** Has a current result for the world on show arrive. */
 		const arrive = (): void => {
@@ -3032,36 +3071,53 @@ describe('the comparison on the measured Earth', () => {
 			);
 		};
 		arrive();
-		/** What the view controls were last told of the winds' source. */
-		const windSource = (): string | undefined =>
-			stage.log
-				.filter((entry) => entry.startsWith('viewPanel.showWindSource'))
-				.at(-1);
+		/** Has a current winds result for the world on show arrive. */
+		const arriveWinds = (): void => {
+			const { store } = stage.layerOptions;
+			const cells = stage.state.world.elevation.length;
+			store.markWindsCalculating();
+			store.setWindsResult(
+				{
+					winds: {
+						east: zeros(64),
+						north: zeros(64),
+						pressure: Array.from({ length: 12 }, () =>
+							new Float32Array(cells).fill(1013),
+						),
+					},
+					temperature: temperatureOf(1, cells),
+					dayLengthHours: 24,
+				},
+				true,
+			);
+		};
 		return {
 			stage,
-			controls: chosen,
 			arrive,
-			offered: (): boolean => comparisons.at(-1)?.offered ?? false,
-			source: () => comparisons.at(-1)?.source,
+			arriveWinds,
+			/** Whether the comparison control is offered, as last told. */
+			offered: (): boolean =>
+				(stage.comparisons.at(-1)?.offered.length ?? 0) > 0,
+			/** What the comparison control offers, as last told. */
+			choices: () => stage.comparisons.at(-1)?.offered,
+			source: () => stage.comparisons.at(-1)?.source,
 			shownSource: () => stage.readoutOptions.shownLayer()?.source,
-			pressureOffered: (): boolean =>
-				pressureComparisons.at(-1)?.offered ?? false,
-			windSource,
+			shownWindsSource: () => stage.readoutOptions.shownWinds()?.source,
 		};
 	};
 
 	/** A page on the measured Earth showing the observed temperature. */
 	const createObservingStage = async () => {
 		const page = await createComparisonStage();
-		page.controls.onSource('temperature', 'observed');
+		page.stage.topBarOptions.onSource('observed');
 		await settle();
 		expect(page.shownSource()).toBe('observed');
 		return page;
 	};
 
-	it('is offered for the Earth the page opens on, in Temperature view only', async () => {
+	it('is offered for the Earth the page opens on, in Temperature view, and not on Terrain with the winds off', async () => {
 		const page = await createComparisonStage();
-		expect(page.offered()).toBe(true);
+		expect(page.choices()).toEqual(['simulated', 'observed', 'difference']);
 		expect(page.source()).toBe('simulated');
 		page.stage.dockOptions.onLayer('terrain');
 		expect(page.offered()).toBe(false);
@@ -3095,37 +3151,65 @@ describe('the comparison on the measured Earth', () => {
 		expect(page.offered()).toBe(false);
 	});
 
-	it('offers the Pressure sources and the Winds shown choice on the measured Earth only; a stroke removes them, the winds back on Simulated, and its undo returns them', async () => {
+	it('offers all three on Pressure and Simulated or Observed for the winds on Terrain, on the measured Earth only; a stroke removes it, everything back on Simulated, and its undo offers it again on Simulated', async () => {
 		const page = await createComparisonStage();
+		page.stage.dockOptions.onWinds(true);
+		page.arriveWinds();
 		page.stage.dockOptions.onLayer('pressure');
-		expect(page.pressureOffered()).toBe(true);
-		expect(page.windSource()).toBe('viewPanel.showWindSource true simulated');
-		page.stage.viewPanelOptions.onWindSource('observed');
-		expect(page.windSource()).toBe('viewPanel.showWindSource true observed');
+		expect(page.choices()).toEqual(['simulated', 'observed', 'difference']);
+		page.stage.dockOptions.onLayer('terrain');
+		expect(page.choices()).toEqual(['simulated', 'observed']);
+		page.stage.topBarOptions.onSource('observed');
+		await settle();
+		expect(page.source()).toBe('observed');
+		expect(page.shownWindsSource()).toBe('observed');
 		makeStroke(page.stage);
-		expect(page.pressureOffered()).toBe(false);
-		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		expect(page.offered()).toBe(false);
+		expect(page.source()).toBe('simulated');
+		expect(page.shownWindsSource()).toBe('simulated');
 		page.stage.pressKey(UNDO_KEYS);
-		expect(page.pressureOffered()).toBe(true);
-		expect(page.windSource()).toBe('viewPanel.showWindSource true simulated');
+		expect(page.choices()).toEqual(['simulated', 'observed']);
+		expect(page.source()).toBe('simulated');
 		page.stage.planetPanelOptions.onChange({
 			...DEFAULT_PLANET,
 			dayLengthHours: 30,
 		});
-		expect(page.pressureOffered()).toBe(false);
-		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		expect(page.offered()).toBe(false);
 		page.stage.state.replaceWorld(createBlankWorld(64));
-		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		expect(page.offered()).toBe(false);
 		page.stage.state.replaceWorld(freshEarth());
-		expect(page.pressureOffered()).toBe(true);
-		expect(page.windSource()).toBe('viewPanel.showWindSource true simulated');
+		expect(page.choices()).toEqual(['simulated', 'observed']);
+		expect(page.source()).toBe('simulated');
 	});
 
-	it('offers no Winds shown choice off the measured Earth', async () => {
+	it('shows the observed temperature and the observed winds together on Observed, and goes back to Simulated for both after a stroke', async () => {
+		const page = await createComparisonStage();
+		page.stage.dockOptions.onWinds(true);
+		page.arriveWinds();
+		page.stage.topBarOptions.onSource('observed');
+		await settle();
+		expect(page.shownSource()).toBe('observed');
+		expect(page.shownWindsSource()).toBe('observed');
+		page.stage.topBarOptions.onSource('difference');
+		expect(page.shownSource()).toBe('difference');
+		expect(page.shownWindsSource()).toBe('simulated');
+		makeStroke(page.stage);
+		expect(page.offered()).toBe(false);
+		expect(page.shownSource()).toBe('simulated');
+		expect(page.shownWindsSource()).toBe('simulated');
+		page.stage.pressKey(UNDO_KEYS);
+		expect(page.offered()).toBe(true);
+		expect(page.source()).toBe('simulated');
+	});
+
+	it('offers no comparison off the measured Earth, for the winds either', async () => {
 		const page = await createComparisonStage(createBlankWorld(64));
-		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
-		page.stage.viewPanelOptions.onWindSource('observed');
-		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		page.stage.dockOptions.onWinds(true);
+		page.stage.dockOptions.onLayer('terrain');
+		expect(page.offered()).toBe(false);
+		page.stage.topBarOptions.onSource('observed');
+		expect(page.offered()).toBe(false);
+		expect(page.source()).toBe('simulated');
 	});
 
 	it('goes after a change of sea level, and comes back with the sea level set back', async () => {

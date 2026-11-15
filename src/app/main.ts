@@ -21,6 +21,7 @@ import { createPanelSections } from './ui/panelSections';
 import { createPlanetPanel } from './ui/planetPanel';
 import { createStatsPanel } from './ui/statsPanel';
 import { createToolPanel } from './ui/toolPanel';
+import { createTopBar } from './ui/topBar';
 import { createViewPanel, SEA_LEVEL_SLIDER_STEP_M } from './ui/viewPanel';
 import { createWorldPanel } from './ui/worldPanel';
 import { startPage } from './wiring';
@@ -129,6 +130,11 @@ if (globe !== null) {
 			const dock = createLayerDock(options);
 			mainView.dock.append(dock.element);
 			return dock;
+		},
+		createTopBar: (options) => {
+			const bar = createTopBar(options);
+			mainView.topBar.append(bar.element);
+			return bar;
 		},
 		createPlanetPanel: (options) =>
 			createPlanetPanel(sections.planet.body, options),

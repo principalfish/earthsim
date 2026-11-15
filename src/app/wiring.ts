@@ -43,6 +43,7 @@ import {
 } from './sculpt';
 import { applyStartup, decideStartup, type StartupRead } from './startup';
 import type { WorldStore } from './storage';
+import type { ComparisonContent } from './ui/comparison';
 import type { CursorReadout } from './ui/cursorReadout';
 import { createDateLine } from './ui/dateLine';
 import type { LayerDock, LayerDockOptions } from './ui/layerDock';
@@ -58,11 +59,8 @@ import {
 import type { PlanetPanel, PlanetPanelOptions } from './ui/planetPanel';
 import type { Section } from './ui/section';
 import type { ToolPanel, ToolPanelOptions } from './ui/toolPanel';
-import type {
-	ViewPanel,
-	ViewPanelOptions,
-	WindSourceContent,
-} from './ui/viewPanel';
+import type { TopBar, TopBarOptions } from './ui/topBar';
+import type { ViewPanel, ViewPanelOptions } from './ui/viewPanel';
 import {
 	describeWorld,
 	EXPORT_FAILED_MESSAGE,
@@ -118,7 +116,12 @@ export type PageTemperatureOptions = PageStatisticsOptions & {
 	readonly store: LayerStore;
 };
 
-/** What the Layers section shows, and what it switches on and off. */
+/**
+ * What the layer panel is given: where the results are kept, what
+ * calculates them, the observed data and whom to tell of the view and the
+ * comparison. The dock's tiles and the top bar choose what is shown; the
+ * Layers section holds the month slider and Play.
+ */
 export type PageLayerOptions = {
 	/** Where the temperature is kept: the store the temperature writes. */
 	readonly store: LayerStore;
@@ -138,10 +141,10 @@ export type PageLayerOptions = {
 	/** Gives the observed winds on a world's grid. */
 	readonly loadObservedWinds: ObservedLoader<MonthlyWind>;
 	/**
-	 * Called with whether the choice of where the wind arrows come from is
-	 * offered and which is chosen, for the view controls to show.
+	 * Called with what the comparison control offers, the source chosen and
+	 * the line under it, for the top bar to show.
 	 */
-	readonly onWindSource: (content: WindSourceContent) => void;
+	readonly onComparison: (content: ComparisonContent) => void;
 	/** The unit the key to the wind arrows writes its speeds in at first. */
 	readonly windUnit: WindUnit;
 	/** How the winds are drawn at first, which the key to them follows. */
@@ -197,7 +200,7 @@ export type PageParts = {
 	/** Adds the view controls to the panel. */
 	readonly createViewPanel: (
 		options: ViewPanelOptions,
-	) => Pick<ViewPanel, 'setSeaLevel' | 'showWindSource'>;
+	) => Pick<ViewPanel, 'setSeaLevel'>;
 	/**
 	 * Lays the dock over the globe, whose tiles choose the layer and switch
 	 * the winds, the sunlight and the cell grid.
@@ -205,6 +208,14 @@ export type PageParts = {
 	readonly createLayerDock: (
 		options: LayerDockOptions,
 	) => Pick<LayerDock, 'showView'>;
+	/**
+	 * Lays the top bar over the globe, beside the dock, whose controls
+	 * choose the view of the year of the layer on screen and, on the
+	 * measured Earth, where the layer and the winds come from.
+	 */
+	readonly createTopBar: (
+		options: TopBarOptions,
+	) => Pick<TopBar, 'showView' | 'showComparison'>;
 	/** Adds the planet controls to the panel. */
 	readonly createPlanetPanel: (
 		options: PlanetPanelOptions,
@@ -233,8 +244,9 @@ export type PageParts = {
 	/**
 	 * Adds the layer controls to the panel, which hold the view settings:
 	 * what the globe is coloured by, as the dock chooses it, and so whether
-	 * the temperature is showing, and what of each computed layer's year it
-	 * shows. It starts on {@link DEFAULT_PAGE_VIEW}.
+	 * the temperature is showing, what of each computed layer's year it
+	 * shows and where the layer and the winds come from, as the top bar
+	 * chooses them. It starts on {@link DEFAULT_PAGE_VIEW}.
 	 */
 	readonly createLayerPanel: (
 		options: PageLayerOptions,
@@ -243,13 +255,14 @@ export type PageParts = {
 		| 'newWorld'
 		| 'setEarth'
 		| 'setLayer'
+		| 'setSummary'
+		| 'setSource'
 		| 'setSunlight'
 		| 'setWinds'
 		| 'shown'
 		| 'shownWinds'
 		| 'setWindUnit'
 		| 'setWindStyle'
-		| 'setWindSource'
 	>;
 	/**
 	 * Lays the cursor readout over the globe, hidden until the pointer is
@@ -636,7 +649,6 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			layerPanel.setWindUnit(unit);
 			readout.invalidate();
 		},
-		onWindSource: (source) => layerPanel.setWindSource(source),
 	});
 	const dock = parts.createLayerDock({
 		view: DEFAULT_PAGE_VIEW,
@@ -655,6 +667,11 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			}
 		},
 		onGrid: globe.setGridVisible,
+	});
+	const topBar = parts.createTopBar({
+		view: DEFAULT_PAGE_VIEW,
+		onSummary: (id, summary) => layerPanel.setSummary(id, summary),
+		onSource: (source) => layerPanel.setSource(source),
 	});
 	const planet = parts.createPlanetPanel({
 		planet: state.world.planet,
@@ -697,6 +714,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		},
 		onView: (next) => {
 			dock.showView(next);
+			topBar.showView(next);
 			date.setView(next);
 			layer = next.layer;
 			lightGlobe(next.sunlight);
@@ -708,7 +726,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		},
 		loadObserved: parts.loadObserved,
 		loadObservedWinds: parts.loadObservedWinds,
-		onWindSource: view.showWindSource,
+		onComparison: topBar.showComparison,
 		windUnit,
 		windStyle,
 	});

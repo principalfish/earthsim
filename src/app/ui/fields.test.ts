@@ -118,6 +118,36 @@ describe('createSegmentedChoice', () => {
 		fake.pick(inputs[1] as FakeElement);
 		expect(chosen).toEqual(['pear']);
 	});
+
+	it('offers every segment at first, and only those it is told to offer after', () => {
+		const { choice, chosen } = make();
+		const picker = choice.element as unknown as FakeElement;
+		const options = byClass(picker, 'segmented__option');
+		const inputs = byClass(picker, 'segmented__input');
+		const state = () =>
+			options.map((option, index) => [option.hidden, inputs[index]?.disabled]);
+		expect(state()).toEqual([
+			[false, false],
+			[false, false],
+		]);
+		choice.setOffered(['apple']);
+		expect(state()).toEqual([
+			[false, false],
+			[true, true],
+		]);
+		choice.setOffered(['apple', 'pear']);
+		expect(state()).toEqual([
+			[false, false],
+			[false, false],
+		]);
+		choice.setOffered([]);
+		expect(state()).toEqual([
+			[true, true],
+			[true, true],
+		]);
+		// Offering is not choosing.
+		expect(chosen).toEqual([]);
+	});
 });
 
 describe('createRangeField', () => {

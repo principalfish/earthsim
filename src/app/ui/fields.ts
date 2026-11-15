@@ -329,6 +329,12 @@ export type SegmentedChoice<T extends string> = {
 	 * the picker does not offer leaves no segment chosen.
 	 */
 	setValue(value: T): void;
+	/**
+	 * Offers only the values given, of those it was built with: the other
+	 * segments are hidden and disabled, so neither a click nor the arrow
+	 * keys reach them. Every segment is offered until this is called.
+	 */
+	setOffered(values: readonly T[]): void;
 };
 
 /**
@@ -350,7 +356,11 @@ export const createSegmentedChoice = <T extends string>(
 	const legend = createElement('legend', 'u-visually-hidden');
 	legend.textContent = options.legend;
 	const row = createElement('div', 'segmented__options');
-	const inputs: { readonly value: T; readonly input: HTMLInputElement }[] = [];
+	const inputs: {
+		readonly value: T;
+		readonly option: HTMLLabelElement;
+		readonly input: HTMLInputElement;
+	}[] = [];
 
 	for (const choice of options.choices) {
 		const option = createElement('label', 'segmented__option');
@@ -365,7 +375,7 @@ export const createSegmentedChoice = <T extends string>(
 				options.onChange(choice.value);
 			}
 		});
-		inputs.push({ value: choice.value, input });
+		inputs.push({ value: choice.value, option, input });
 
 		const label = createElement('span', 'segmented__label');
 		label.textContent = choice.label;
@@ -380,6 +390,13 @@ export const createSegmentedChoice = <T extends string>(
 		setValue: (value) => {
 			for (const entry of inputs) {
 				entry.input.checked = entry.value === value;
+			}
+		},
+		setOffered: (values) => {
+			for (const entry of inputs) {
+				const offered = values.includes(entry.value);
+				entry.option.hidden = !offered;
+				entry.input.disabled = !offered;
 			}
 		},
 	};

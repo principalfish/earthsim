@@ -19,6 +19,14 @@ A column of tiles down the left edge of the globe chooses what it shows. Each ti
 - In a window too short for all the tiles the column scrolls: turn the mouse wheel over a tile, or move to a tile with the keyboard.
 - The globe can still be turned and sculpted anywhere beside the tiles.
 
+## The top bar
+
+Along the top of the globe, beside the tiles:
+
+- **Show**, while Temperature or Pressure is on screen: what of that layer's year is on the globe; see [Layers](#layers). It is hidden on Terrain.
+- **Simulated, Observed, Difference**, on an untouched Earth: where the layer on screen and the winds come from, one choice for both; see [Simulated, observed or difference](#simulated-observed-or-difference).
+- In a narrow window the two take a line each.
+
 ## The panel
 
 The panel on the right has six sections, in this order: **World, Layers, View, Planet, Tools, Statistics**.
@@ -95,7 +103,6 @@ The Tools section chooses what the left mouse button does on the globe.
 | Relief exaggeration | 1× to 100×, starting at 40× | How much taller than true scale the land is drawn. Only the drawing changes |
 | Sea level | −6,000 to 6,000 m in steps of 10 m | Where the sea stands. Raising it floods low ground. It is part of the world |
 | Winds drawn as | Arrows or Streaks, starting on Arrows | Whether the winds are drawn as arrows that stand still or as streaks carried along by the wind; see [Arrows or streaks](#arrows-or-streaks). Shown whether or not Winds is on. The browser remembers it, as it does the wind speed unit; it is not saved with the world |
-| Winds shown | Simulated or Observed, starting on Simulated | On an untouched Earth only: whether the arrows are the simulated winds or the observed Earth's; see [Simulated or observed winds](#simulated-or-observed-winds). Hidden on any other world |
 | Wind speed | m/s, km/h or mph, starting on m/s | The unit wind speeds are written in, in the strip under the pointer and the key to the arrows. It changes both at once, and does not change the arrows. Shown whether or not Winds is on. The browser remembers it, as it does the open sections; it is not saved with the world |
 
 ## Planet
@@ -122,13 +129,13 @@ Under the sliders:
 
 ## Layers
 
-The **Layers** tiles over the globe choose what it is coloured by; the Layers section holds what goes with a layer.
+The **Layers** tiles over the globe choose what it is coloured by, and the top bar holds the layer's **Show** choice and, on an untouched Earth, the comparison. The Layers section holds the month slider and **Play**.
 
 - **Terrain:** the height colours the page opens on.
 - **Temperature:** the near-surface air temperature. The relief is still raised and shaded, and the coastline is drawn as a thin line.
 - **Pressure:** the sea-level pressure, in hPa; see [Pressure](#pressure). The relief and the coastline are drawn as in Temperature view.
 
-In Temperature view, **Show** chooses what of the year is on the globe:
+In Temperature view, **Show**, in the top bar, chooses what of the year is on the globe:
 
 | Show | What it is |
 |-|-|
@@ -138,8 +145,8 @@ In Temperature view, **Show** chooses what of the year is on the globe:
 | Seasonal range | How far each place's warmest month is above its coldest |
 
 - **The legend** sits over the bottom-right corner of the globe and says what is shown, such as "Air temperature in July, °C". While a new result is being worked out it says "Calculating" with a progress bar.
-- **On an untouched Earth,** a second choice offers the simulated temperature, the observed one, or the difference between them. See [Temperature](temperature.md#earth-comparison).
-- The layer, the view and the month are not saved. A new world goes back to July. Each layer keeps its own **Show** while another is on screen.
+- **On an untouched Earth,** the comparison in the top bar offers the simulated temperature, the observed one, or the difference between them; see [Simulated, observed or difference](#simulated-observed-or-difference) and [Temperature](temperature.md#earth-comparison).
+- The layer, the view, the month and the comparison's choice are not saved. A new world goes back to July and to Simulated. Each layer keeps its own **Show** while another is on screen.
 
 ### Pressure
 
@@ -151,10 +158,32 @@ Pressure view colours the globe by the sea-level pressure of the winds' calculat
 - **The legend** says what is shown, such as "Sea-level pressure in July, hPa" or "Annual average sea-level pressure, hPa". While the winds are being worked out it says "Calculating", with no year count, and "Pressure unavailable" if they cannot be.
 - **The strip under the pointer** gives the pressure there, such as `July 1,018 hPa` or `Annual average 1,013 hPa`.
 - **It is worked out with the winds,** from the temperature. Choosing Pressure asks for them even while Winds is off, and the colours appear once they are ready. Winds can be shown over it.
-- **On an untouched Earth,** a second choice offers the simulated pressure, the observed one (the mean sea-level pressure of 1981 to 2010), or the difference between them, as for the temperature. The observed pressure is fetched the first time Observed or Difference is chosen; a line under the choice says "Loading observed pressure" meanwhile, and "Observed pressure could not be loaded" if it fails, when the choice goes back to Simulated and the next choice tries again.
+- **On an untouched Earth,** the comparison in the top bar offers the simulated pressure, the observed one (the mean sea-level pressure of 1981 to 2010), or the difference between them, as for the temperature. The observed pressure is fetched the first time it is needed: when Observed or Difference is chosen on Pressure, or Pressure is chosen while either is on. A line under the choice says "Loading observed pressure" meanwhile, and "Observed pressure could not be loaded" if it fails. The choice then goes back to Simulated when Pressure is still on screen, and the next choice tries again; if Pressure has been left, the choice is kept and the fetch is tried again on coming back to it.
   - **The legend** then says where the field comes from, such as "Observed sea-level pressure in July, hPa" or "Simulated less observed in July, hPa", and gives the mean and the root-mean-square of the simulated less the observed for the month or annual average on screen, in hPa, such as `Mean +1.2 hPa · RMS 4.5 hPa`.
   - **The difference** is drawn from −20 to +20 hPa, marked every 10, in the temperature difference's blue-to-red colours: blue where the simulated pressure is too low, red where it is too high. The scale is the same for every month and the annual average.
   - Any edit of the Earth removes the choice and puts it back on Simulated, and undoing the edit offers it again, as for the temperature.
+
+### Simulated, observed or difference
+
+On an untouched Earth, one control in the top bar chooses where both the layer on screen and the winds come from. What it offers depends on what is on screen:
+
+| On screen | Offered |
+|-|-|
+| Temperature or Pressure, with Winds on or off | Simulated, Observed, Difference |
+| Terrain with Winds on | Simulated, Observed |
+| Terrain with Winds off | Nothing: the control is hidden |
+
+| Choice | The layer | The winds |
+|-|-|-|
+| Simulated | Simulated | Simulated |
+| Observed | Observed | Observed |
+| Difference | The simulated less the observed | Simulated |
+
+- **It starts on Simulated,** and on any world but the untouched Earth there is no control and everything is simulated. The choice is not saved.
+- **Kept from layer to layer.** Going from Temperature to Pressure, or back, keeps Observed or Difference. The new layer's observed data is fetched then, if it has not been already: the simulated layer shows meanwhile, with its loading line under the control, and if it cannot be fetched the line says so and the choice goes back to Simulated. A fetch that fails after its layer has been left keeps the choice, and is tried again on coming back to that layer.
+- **Going to Terrain** on Difference puts the choice back on Simulated, as it does on Observed with Winds off; on Observed with Winds on it stays, and the arrows stay observed.
+- **Fetched when first needed.** Choosing Observed or Difference fetches the layer's observed data and, while Winds is on, the observed winds; switching Winds on while either is chosen fetches the winds then. If either cannot be fetched while what it is for is still on screen (the layer, or Winds on), the choice goes back to Simulated and its line says so: the layer's under the control, the winds' on the key.
+- **Any edit removes the control** and puts everything back on Simulated: a stroke, a change of sea level, a planet setting or a new world. Undoing the edit offers it again, on Simulated.
 
 ### The value under the pointer
 
@@ -201,7 +230,7 @@ The **Winds** tile draws the surface winds as arrows, or as streaks (see [Arrows
 - **On the relief.** The arrows stand on the raised relief at every exaggeration, and fade out towards the globe's edge, so none show from the far side.
 - **The key** beside the legend shows arrows of 5 m/s and of 10 m/s or more, labelled "10+ m/s", at the size they are drawn on the globe. In km/h they are labelled "18 km/h" and "36+ km/h", and in mph "11 mph" and "22+ mph"; see **Wind speed** in [View](#view). Under them it says "Calculating" while the winds, or the temperature they wait for, are being worked out, "Out of date" after a change they do not yet take in, "Not calculated yet" before the first when nothing is being worked out, and "Winds unavailable" if they cannot be worked out.
 
-Which winds are shown follows the Layers section:
+Which winds are shown follows the layer's **Show**:
 
 | Shown | Winds |
 |-|-|
@@ -228,11 +257,11 @@ Which winds are shown follows the Layers section:
 
 ### Simulated or observed winds
 
-On an untouched Earth, **Winds shown**, in the View section, chooses whether the arrows are the simulated winds or the observed Earth's: the mean wind ten metres up for each month of 1981 to 2010, on a 1° grid taken onto the world's cells. On any other world it is hidden and the arrows are the simulated winds.
+On an untouched Earth, the comparison in the top bar also chooses whether the arrows are the simulated winds or the observed Earth's: the mean wind ten metres up for each month of 1981 to 2010, on a 1° grid taken onto the world's cells. Observed shows the observed winds; Simulated and Difference show the simulated ones. On Terrain with Winds on it offers Simulated and Observed; see [Simulated, observed or difference](#simulated-observed-or-difference). On any other world there is no control and the arrows are the simulated winds.
 
-- **Fetched when first chosen.** Nothing is downloaded until Observed is chosen. Meanwhile the simulated arrows stay and the key says "Loading observed winds". If the download fails the key says "Observed winds could not be loaded", the choice goes back to Simulated, and choosing Observed again tries again. Where the winds themselves stand comes first on the key's line: while they are out of date or being worked out it says that, and the line about the observed winds shows once they are current.
+- **Fetched when first needed.** Nothing is downloaded until Observed or Difference is chosen with Winds on, or Winds is switched on while either is chosen. Meanwhile the simulated arrows stay and the key says "Loading observed winds". If the download fails the key says "Observed winds could not be loaded", the choice goes back to Simulated, for the layer too, while Winds is still on, and choosing Observed again tries again. Where the winds themselves stand comes first on the key's line: while they are out of date or being worked out it says that, and the line about the observed winds shows once they are current.
 - **Which month.** The observed arrows follow the month on screen, and on Annual average they are the mean of the observed year, worked out as arrows as the simulated mean is. They need the simulated winds to be ready, as the observed temperature needs the simulated one.
-- **Any edit removes the choice** and puts the arrows back on Simulated: a stroke, a change of sea level, a planet setting or a new world. Undoing the edit offers the choice again, on Simulated; the observed winds already fetched are kept.
+- **Any edit removes the choice** and puts the arrows back on Simulated, with the layer: a stroke, a change of sea level, a planet setting or a new world. Undoing the edit offers the choice again, on Simulated; the observed winds already fetched are kept.
 - **Never out of date.** While the observed arrows are shown, the key says nothing of the simulated winds being worked out again.
 
 Once the observed winds have been fetched, the key gives two lines under its arrows, whichever is shown, for as long as the world is the untouched Earth:

@@ -1,9 +1,10 @@
 /**
  * The view controls: how much relief is exaggerated, where the sea level
- * is, whether the winds are drawn as arrows or as streaks, on the measured
- * Earth whether they are the simulated or the observed, and the unit their
- * speeds are written in. Whether the cell grid is drawn, the globe is lit
- * by the sun and the winds are shown is chosen on the dock over the globe.
+ * is, whether the winds are drawn as arrows or as streaks, and the unit
+ * their speeds are written in. Whether the cell grid is drawn, the globe
+ * is lit by the sun and the winds are shown is chosen on the dock over the
+ * globe, and on the measured Earth whether the winds are the simulated or
+ * the observed on the top bar.
  */
 
 import {
@@ -19,28 +20,11 @@ import {
 	WIND_STYLES,
 	type WindStyle,
 } from '../globe/windMotion';
-import {
-	DEFAULT_WIND_SOURCE,
-	SOURCE_LABELS,
-	WIND_SOURCES,
-	type WindSource,
-} from '../view';
 import { DEFAULT_WIND_UNIT, WIND_UNITS, type WindUnit } from '../windUnits';
 import { createRangeField, createSelectField, type RangeScale } from './fields';
 
 /** The step between sea levels the slider can be set to, in metres. */
 export const SEA_LEVEL_SLIDER_STEP_M = 10;
-
-/** What the choice of where the wind arrows come from shows at one moment. */
-export type WindSourceContent = {
-	/**
-	 * Whether the choice is offered, as on the measured Earth; while it is
-	 * not, it is hidden and takes no room.
-	 */
-	readonly offered: boolean;
-	/** The source shown as chosen. */
-	readonly source: WindSource;
-};
 
 /** What the view panel starts with and whom it tells about changes. */
 export type ViewPanelOptions = {
@@ -60,8 +44,6 @@ export type ViewPanelOptions = {
 	readonly onWindStyle: (style: WindStyle) => void;
 	/** Called with the unit when another is chosen for wind speeds. */
 	readonly onWindUnit: (unit: WindUnit) => void;
-	/** Called with the source when another is chosen for the wind arrows. */
-	readonly onWindSource: (source: WindSource) => void;
 };
 
 /** The view controls on the page. */
@@ -76,16 +58,7 @@ export type ViewPanel = {
 	 * {@link SEA_LEVEL_SLIDER_STEP_M} within the drawn range.
 	 */
 	setSeaLevel(metres: number): void;
-	/**
-	 * Shows or hides the choice of where the wind arrows come from, and
-	 * shows the source chosen, as when the choice is set back to Simulated.
-	 * `onWindSource` is not called.
-	 */
-	showWindSource(content: WindSourceContent): void;
 };
-
-/** The id of the Winds shown drop-down's select. */
-const WIND_SOURCE_ID = 'view-wind-source';
 
 /**
  * A relief exaggeration as the panel shows it, such as `40×`.
@@ -111,11 +84,8 @@ export const formatMetres = (metres: number): string => {
  *
  * @remarks
  * Under the sliders is the Winds drawn as choice, a drop-down of Arrows
- * and Streaks, shown whether or not the winds are;
- * under it the Winds shown choice, a drop-down of Simulated and Observed,
- * hidden until it is offered and starting on Simulated; and under that the
- * Wind speed choice, a drop-down labelled so, shown whether or not the
- * winds are.
+ * and Streaks, and under it the Wind speed choice, a drop-down labelled
+ * so, both shown whether or not the winds are.
  *
  * @param body - The section's body, to add the controls to, after what it
  * holds.
@@ -140,19 +110,6 @@ export const createViewPanel = (
 		onInput: options.onSeaLevel,
 	});
 
-	const windSource = createSelectField({
-		id: WIND_SOURCE_ID,
-		label: 'Winds shown',
-		choices: WIND_SOURCES.map((source) => ({
-			value: source,
-			label: SOURCE_LABELS[source],
-		})),
-		value: DEFAULT_WIND_SOURCE,
-		onChange: options.onWindSource,
-	});
-	windSource.hidden = true;
-	const windSourceSelect = windSource.children[1] as HTMLSelectElement;
-
 	body.append(
 		createRangeField({
 			id: 'view-exaggeration',
@@ -175,7 +132,6 @@ export const createViewPanel = (
 			value: options.windStyle ?? DEFAULT_WIND_STYLE,
 			onChange: options.onWindStyle,
 		}),
-		windSource,
 		createSelectField({
 			id: 'view-wind-unit',
 			label: 'Wind speed',
@@ -186,9 +142,5 @@ export const createViewPanel = (
 	);
 	return {
 		setSeaLevel: (metres) => seaLevel.setScale(seaLevelScale(metres)),
-		showWindSource: (content) => {
-			windSource.hidden = !content.offered;
-			windSourceSelect.value = content.source;
-		},
 	};
 };

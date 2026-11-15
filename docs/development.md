@@ -107,7 +107,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `workerService.ts` | The statistics, temperature and winds services, each on its own worker |
 | `layers.ts` | The computed layers the page holds, the temperature and the winds worked out from it, and whether each is current |
 | `view.ts` | What the globe shows: the layer, each computed layer's part of the year and source, the month, the sunlight and the winds |
-| `scalarLayer.ts` | Each layer of one computed value per cell described as data, the temperature and the sea-level pressure the two offered: its name, unit, how its values are written, its legend wording, its views of the year with their colours and scale fitting, its comparison with the observed Earth and where in the layer store its months come from; the layer panel, legend, cursor readout, comparison controls, date line and lighting take a description rather than naming the temperature |
+| `scalarLayer.ts` | Each layer of one computed value per cell described as data, the temperature and the sea-level pressure the two offered: its name, unit, how its values are written, its legend wording, its views of the year with their colours and scale fitting, its comparison with the observed Earth and where in the layer store its months come from; the layer panel, legend, cursor readout, top bar, date line and lighting take a description rather than naming the temperature |
 | `playback.ts` | Playing through the year |
 | `storage.ts`, `autosave.ts` | The saved world in IndexedDB, export and import, and when to save |
 | `panelMemory.ts` | Which panel sections are open, remembered by the browser |
@@ -115,7 +115,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `windUnits.ts` | Wind speeds in m/s, km/h and mph, the eight compass points, and a wind in words |
 | `earthData.ts`, `observedData.ts` | Fetching the Earth data files when first needed, the observed years through a description of their file |
 | `globe/` | The renderer, shaders, camera, picking, colour ramps, the wind arrows and the wind streaks (`streaks.ts`: the trails moved along the wind, and their ribbons), when the globe is drawn (`frameLoop.ts`: on demand, or at every frame while animating) and the rule for when the streaks move (`windMotion.ts`) |
-| `ui/` | The regions laid over the globe (`mainView.ts`), the dock of tiles there that choose the layer and switch the overlays (`layerDock.ts`), the icons drawn for the page (`icons.ts`), the panel's sections and controls, the New world dialog, the legend, the key to the wind arrows and the cursor readout |
+| `ui/` | The regions laid over the globe (`mainView.ts`), the dock of tiles there that choose the layer and switch the overlays (`layerDock.ts`), the top bar beside it with the layer's Show choice and the one comparison control (`topBar.ts`, `comparison.ts`), the icons drawn for the page (`icons.ts`), the panel's sections and controls, the New world dialog, the legend, the key to the wind arrows and the cursor readout |
 | `styles.css` | The page's styles |
 | `testing/` | Stand-ins for the canvas, document, storage, timers and animation frames, and a made-up layer description, which only the tests use |
 

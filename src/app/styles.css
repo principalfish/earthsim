@@ -179,8 +179,8 @@ body {
   font-size: var(--font-size-sm);
 }
 
-/* Hidden by the page, as the Winds shown choice is off the measured Earth,
-   which the display set on it would otherwise undo. */
+/* Hidden by the page, as a Show choice is while its layer is not on
+   screen, which the display set on it would otherwise undo. */
 .field[hidden] {
   display: none;
 }
@@ -409,6 +409,12 @@ body {
 
 .segmented__option + .segmented__option {
   border-inline-start: 1px solid var(--color-border);
+}
+
+/* A segment not offered is hidden, which the display set on it would
+   otherwise undo; the row closes up without it. */
+.segmented__option[hidden] {
+  display: none;
 }
 
 /* Kept in the page, unseen, so that it still takes focus and the keys. */
@@ -649,11 +655,6 @@ body {
   line-height: 1.4;
 }
 
-.temperature-view {
-  display: grid;
-  gap: var(--space-md);
-}
-
 /* The slider takes the row, with the play button at its end, level with
    the slider rather than its label. */
 .month-controls {
@@ -663,8 +664,8 @@ body {
   align-items: end;
 }
 
-/* The choice of where the temperature comes from, with a line under it for
-   what the page has to say of it. */
+/* The choice of where the layer on screen and the winds come from, with a
+   line under it for what the page has to say of the observed data. */
 .comparison {
   display: grid;
 }
@@ -684,8 +685,6 @@ body {
 }
 
 /* Hidden by the page, which the display set on them would otherwise undo. */
-.temperature-view[hidden],
-.temperature-view__show[hidden],
 .month-controls[hidden],
 .comparison[hidden] {
   display: none;
@@ -925,6 +924,7 @@ body {
 
 .main-view__top-bar {
   grid-area: top-bar;
+  min-width: 0;
 }
 
 .main-view__corner {
@@ -1044,6 +1044,45 @@ body {
     overflow: hidden;
     white-space: nowrap;
     clip-path: inset(50%);
+  }
+}
+
+/* The top bar's controls side by side, each on the backing the legend has
+   and taking the pointer, though the bar does not: the Show choice, its
+   label beside its drop-down, then the comparison, its line under its
+   segments. When they do not fit side by side the comparison goes under
+   the Show choice. */
+.top-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: flex-start;
+}
+
+.top-bar[hidden] {
+  display: none;
+}
+
+.top-bar__show,
+.top-bar .comparison {
+  padding: var(--space-xs);
+  background: var(--color-overlay-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  pointer-events: auto;
+}
+
+.top-bar__show {
+  grid-auto-flow: column;
+  gap: var(--space-sm);
+  align-items: center;
+  padding-inline-start: var(--space-sm);
+}
+
+/* In a narrow globe's area the two controls take a line each. */
+@container viewport (width < 560px) {
+  .top-bar {
+    flex-direction: column;
   }
 }
 
