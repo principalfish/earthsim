@@ -65,6 +65,9 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - The info box has no winds block: the key's sample arrows ("5 m/s", "10+ m/s"), its "Surface wind" caption and the streaks line ("Faster, longer streaks are stronger winds") go, since arrows and streaks explain themselves and the pointer block gives the wind's speed. The user: "lets get rid of the wind part of the pop up box - its clear what arrows and streaks mean and ther aw speed is visible lower down so that info box i sireelvant" (2026-11-15)
 - The comparison's two wind lines ("Off by … on average", "Direction right on …% of the map") stay, shown only on the untouched Earth while Winds is on, as two plain lines in the box under the legend's figures, with their tooltips. The winds' status and the observed winds' loading and failure lines go on the one status line, as planned. The user: "Keep them as two lines" (2026-11-15)
 
+- The legend drops its end labels ("−35 and below", "30 and above", and the same on Pressure and every other legend): the colour bar and its ticks stay, and values beyond the ends still take the end colours. The user: "remove -35 and below and 30 and above from this. its out of place and not necessary" (2026-11-15). This reverses issue 0002's legend ends.
+- The two wind comparison lines become one, prefixed "Wind:", on one line in the box: "Wind: off by 9.5 mph · 58% correct direction" (the planner's wording from the user's suggestion; "on average" dropped to fit; the tooltip keeps each figure's full definition). The user: "the wind data needs to be prefixed by Wind: and fit on one line. maybe just say 58% correct direction" (2026-11-15)
+
 ## Open
 - None.
 
