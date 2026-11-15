@@ -90,3 +90,4 @@
 - 2026-11-15 12:50 · move-layers-and-overlays-into-the-main-view (0004) · tracking session local_add73007-806b-4a2a-bdab-70cd7e365620
 - 2026-11-15 12:52 · move-layers-and-overlays-into-the-main-view (0004) · branch = claude/move-layers-and-overlays-into-the-main-view-d898bd
 - 2026-11-15 12:52 · move-layers-and-overlays-into-the-main-view (0004) · planned → building
+- 2026-11-15 13:45 · move-layers-and-overlays-into-the-main-view (0004) · PR #8

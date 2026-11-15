@@ -9,7 +9,7 @@
   "gh_issue": 7,
   "build_model": "claude-opus-5-5",
   "created": "2026-11-15 12:12",
-  "updated": "2026-11-15 12:52",
+  "updated": "2026-11-15 13:45",
   "done": null,
   "local": [
     {
@@ -28,5 +28,6 @@
       "name": "claude/move-layers-and-overlays-into-the-main-view-d898bd",
       "added": "2026-11-15 12:52"
     }
-  ]
+  ],
+  "pr": 8
 }
