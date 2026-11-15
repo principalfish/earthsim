@@ -59,6 +59,9 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 3 approved after the user tried it. The user: "Tried it, approve" (2026-11-15)
 
+- In a window too short for the one info box, the top bar and the corner are drawn above the info region, so no control is ever covered; the box's top tucks under the top bar and its top line may be hidden. The user: "Box tucks under top bar" (2026-11-15)
+- Piece 4 starts. The user: "Start it" (2026-11-15)
+
 ## Open
 - None.
 
