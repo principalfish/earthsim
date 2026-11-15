@@ -23,11 +23,11 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Whether the winds are drawn as arrows or streaks is a setting in the settings section too, and it starts on Streaks (it starts on Arrows today). The user: "winds shown as should be nio setting too - defaulting to streaks" (2026-11-15; read as "in settings", and as the Arrows or Streaks choice, since Streaks is one of its two values)
 
-- Layout A: icon tiles always visible down the left edge of the globe's area, the colour layers as one choice and the overlays (Winds, Sunlight, Grid) as toggles below; in a narrow window the labels drop and only the icons stay. Chosen from three drawn mock-ups (A left edge, B along the top, C one tile and a tray). The user: "A, left edge (Recommended)" (2026-11-15)
+- Layout A (mock-ups and the script that draws them: `investigations/2026-11-15-layer-controls-mockups/`): icon tiles always visible down the left edge of the globe's area, the colour layers as one choice and the overlays (Winds, Sunlight, Grid) as toggles below; in a narrow window the labels drop and only the icons stay. Chosen from three drawn mock-ups (A left edge, B along the top, C one tile and a tray). The user: "A, left edge (Recommended)" (2026-11-15)
 - As drawn in the chosen mock-up, and not objected to: Show and the Earth comparison sit beside the layer tiles at the top when Temperature or Pressure is on; Pause is in the top-right corner; the one info box is bottom-right; the month timeline with Play runs along the bottom; the side panel keeps World, View (relief and sea level), Planet, Tools and Statistics, gains Settings and loses Layers. To confirm with the full ledger.
 - Settings is a section of the side panel, opening and closing like the others. The user: "A side-panel section" (2026-11-15)
 - The icons are drawn for the project as small SVGs kept in the repo, with no icon library. The user: "Drawn for the project" (2026-11-15)
-- Local `main` was fast-forwarded to `origin/main` (the merged winds, 302d9d3) on the user's word: "Yes, fast-forward it" (2026-11-15)
+- Local `main` is level with `origin/main` (the merged winds, 302d9d3): the user said "Yes, fast-forward it", and it was already there (2026-11-15)
 
 ## Open
 - Automatic calculation: where the Pause button sits and what it shows; whether pausing is remembered; what happens when the page opens.
