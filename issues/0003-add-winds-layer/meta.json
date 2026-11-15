@@ -22,12 +22,14 @@
     {
       "kind": "worktree",
       "name": "/home/philiph/workspace/earth_sim/.claude/worktrees/add-winds-layer-991a60",
-      "added": "2026-11-13 09:28"
+      "added": "2026-11-13 09:28",
+      "removed": "2026-11-15 12:00"
     },
     {
       "kind": "branch",
       "name": "claude/add-winds-layer-991a60",
-      "added": "2026-11-13 09:28"
+      "added": "2026-11-13 09:28",
+      "removed": "2026-11-15 12:00"
     }
   ],
   "pr": 6

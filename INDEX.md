@@ -10,7 +10,7 @@ _None._
 
 - 0001 [Add globe, cubed-sphere grid and elevation sculpting](issues/0001-add-globe-cubed-sphere-grid-and-elevation-sculpting/) · build · branch `claude/add-globe-cubed-sphere-grid-and-elevation-sculptin-9672e9` · gh #1 · PR #2 · 1 review · done 2026-11-11 16:29
 - 0002 [Add seasonal temperature layer and planet controls](issues/0002-add-seasonal-temperature-layer-and-planet-controls/) · build · branch `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa` · gh #3 · PR #4 · 1 review · done 2026-11-13 07:35
-- 0003 [Add winds, air pressure and day length](issues/0003-add-winds-layer/) · build · branch `claude/add-winds-layer-991a60` · gh #5 · PR #6 · 1 review · 2 local leftovers (`cleanup`) · done 2026-11-15 12:00
+- 0003 [Add winds, air pressure and day length](issues/0003-add-winds-layer/) · build · branch `claude/add-winds-layer-991a60` · gh #5 · PR #6 · 1 review · done 2026-11-15 12:00
 
 ## Quick builds (latest 1 of 1; [all](quick-builds.md))
 
