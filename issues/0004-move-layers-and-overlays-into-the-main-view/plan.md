@@ -198,3 +198,11 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - Review: one round (correctness, security, coverage, docs), four verified findings, all comment wording or tidying, all fixed; the light re-check (correctness, docs) was clean. In `findings.md`.
 - The scripted browser look drove headless Edge from WSL with its profile in the session's scratch folder; there the page said "Autosave unavailable" and logged two `UnknownError: Internal error` lines, most likely the browser's storage failing on a profile kept on a `\\wsl.localhost` path; not checked against `main`.
 - Committed as `6278b72` and pushed to `origin/claude/move-layers-and-overlays-into-the-main-view-d898bd` on the user's approval: "Tried it, approve, scroll".
+
+### Piece 2 (2026-11-15), in progress: stopped at a usage limit before the review round
+
+- Built on claude-opus-5-5, uncommitted in the worktree (24 files; new `src/app/ui/topBar.ts` and its test, marked with `git add -N`). Go-ahead "Start it"; the source is kept across compared layers ("Keep the choice").
+- Done: lint, typecheck, 107 test files and 3334 tests, build, both baselines unchanged; changed-lines coverage 96% against `origin/main`, the 9 uncovered lines all in `src/app/main.ts` (128-132, 134-137, the entry point's assembly); a headless-browser run-through at 1500x900 and 800x700, which behaved as the piece's Acceptance says.
+- Not done: the review round (correctness, security, coverage, docs), the verifier, fixes and re-check, `findings.md`, the review request. Resume at Flow step 4.
+- Deviations to report at the review request: the layer panel gained `setSummary`; `src/app/scalarLayer.ts` (`sourceName` and `sourceLegend` removed as dead), `src/app/ui/fields.ts` (`SegmentedChoice.setOffered`) and `src/app/testing/scalarLayerFixtures.ts` changed though not in the piece's Files; `docs/temperature.md`, `docs/winds.md` and `docs/development.md` corrected too; a fetch that fails for a layer no longer on screen keeps the source and is asked for again on return; `LayerControlsOptions` lost `layers`, `onSummary` and `onSource`.
+- The commit message must follow the conventional-commits form now in `git.md` (re-read it before committing): `feat(move-layers-and-overlays-into-the-main-view): piece 2/11 — <summary>`.
