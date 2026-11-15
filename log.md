@@ -83,3 +83,4 @@
 - 2026-11-15 12:00 · add-winds-layer (0003) · merged → done
 - 2026-11-15 12:00 · add-winds-layer (0003) · session local_861b5031-c368-4a88-b7a4-71e71ea962f6 removed
 - 2026-11-15 12:00 · add-winds-layer (0003) · cleanup: removed worktree /home/philiph/workspace/earth_sim/.claude/worktrees/add-winds-layer-991a60, branch claude/add-winds-layer-991a60
+- 2026-11-15 12:12 · move-layers-and-overlays-into-the-main-view (0004) · created (build): Move layers and overlays into the main view

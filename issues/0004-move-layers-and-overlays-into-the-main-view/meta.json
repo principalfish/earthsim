@@ -1,0 +1,14 @@
+{
+  "id": 4,
+  "slug": "move-layers-and-overlays-into-the-main-view",
+  "title": "Move layers and overlays into the main view",
+  "mode": "build",
+  "state": "investigating",
+  "branch": "move-layers-and-overlays-into-the-main-view",
+  "base": "main",
+  "gh_issue": null,
+  "build_model": null,
+  "created": "2026-11-15 12:12",
+  "updated": "2026-11-15 12:12",
+  "done": null
+}
