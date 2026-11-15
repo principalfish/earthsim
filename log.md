@@ -85,3 +85,5 @@
 - 2026-11-15 12:00 · add-winds-layer (0003) · cleanup: removed worktree /home/philiph/workspace/earth_sim/.claude/worktrees/add-winds-layer-991a60, branch claude/add-winds-layer-991a60
 - 2026-11-15 12:12 · move-layers-and-overlays-into-the-main-view (0004) · created (build): Move layers and overlays into the main view
 - 2026-11-15 12:37 · move-layers-and-overlays-into-the-main-view (0004) · GitHub issue #7
+- 2026-11-15 12:44 · move-layers-and-overlays-into-the-main-view (0004) · investigating → planned
+- 2026-11-15 12:44 · move-layers-and-overlays-into-the-main-view (0004) · build_model = claude-opus-5-5
