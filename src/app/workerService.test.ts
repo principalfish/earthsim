@@ -597,13 +597,12 @@ describe('createTemperatureService', () => {
 		expect(temperature.workers.started).toHaveLength(1);
 		expect(temperature.workers.posted()).toHaveLength(0);
 
-		// The world of the moment the request is made, not of the change, of
-		// the switching on or of the start.
-		temperature.scheduler.setShowing(true);
+		// The world of the moment the request is made, which is the switching
+		// on, not of the change or of the start.
 		const world = blank();
 		world.elevation[0] = 1234;
 		temperature.setWorld(world);
-		temperature.wait();
+		temperature.scheduler.setShowing(true);
 		expect(temperature.workers.posted()).toEqual([
 			{ id: 1, kind: 'temperature', world, start: undefined },
 		]);

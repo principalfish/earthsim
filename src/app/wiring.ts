@@ -210,7 +210,10 @@ export type PageParts = {
 	/** Starts whatever computes the temperature, not yet showing. */
 	readonly createTemperature: (
 		options: PageTemperatureOptions,
-	) => Pick<TemperatureScheduler, 'refresh' | 'reset' | 'setShowing'>;
+	) => Pick<
+		TemperatureScheduler,
+		'refresh' | 'refreshNow' | 'reset' | 'setShowing'
+	>;
 	/**
 	 * Starts whatever computes the winds from the temperature, not yet
 	 * showing, on the store the temperature writes.
@@ -401,14 +404,15 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * sculpt controller, which ends a stroke still under way on the old world
  * and then has the history forget that world; the globe; the sea-level
  * control; the planet controls, which show the world's settings without
- * passing them on; the world's description; the statistics and then the
- * temperature, each first reset and then asked for again; the layer panel,
- * which stops the year playing, puts July back on screen and is told
- * whether the world is the measured Earth; the date line;
- * the panel's message, which is taken back; and the autosave. The winds
- * are reset just after the temperature, and asked for again by its next
- * result if they are showing. An edit of the world, which is no new world,
- * keeps the month on screen.
+ * passing them on; the world's description; the statistics, reset and
+ * then asked for again; the temperature and then the winds, each reset;
+ * the layer panel, which stops the year playing, puts July back on screen
+ * and is told whether the world is the measured Earth; the date line; the
+ * panel's message, which is taken back; the autosave; and last the
+ * temperature again, asked for at once if it is showing, with no wait,
+ * once every part before it is on the new world. The winds are asked for
+ * again by the temperature's next result if they are showing. An edit of
+ * the world, which is no new world, keeps the month on screen.
  *
  * A committed stroke, an undo, a redo and the sea-level control each ask
  * for the statistics and the temperature again, tell the layer panel
@@ -724,9 +728,8 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	state.addListener(statistics.reset);
 	state.addListener(statistics.refresh);
 	// The temperature on hand is the old world's, and is not where the new
-	// world's solve starts from.
+	// world's solve starts from. It is asked for again below, last.
 	state.addListener(temperature.reset);
-	state.addListener(temperature.refresh);
 	// So are the winds on hand and any on their way; the new world's
 	// temperature asks for its winds when it comes.
 	state.addListener(winds.reset);
@@ -750,6 +753,11 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// The autosave takes no note of this until it is started, which is
 	// after the world brought back when the page opens is in place.
 	state.addListener(autosave.markChanged);
+	// The new world's temperature is asked for last, once every part above
+	// is on the new world, and at once: a new world is whole when it
+	// arrives, with no run of changes to wait out, and a wait would leave
+	// the layers reading as not calculated until it ended.
+	state.addListener(temperature.refreshNow);
 	/**
 	 * The planet settings as the planet listener last saw them, to tell a
 	 * change of the day length alone from one the temperature depends on.

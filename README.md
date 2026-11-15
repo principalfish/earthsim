@@ -51,7 +51,7 @@ Open the address Vite prints. The first visit shows the New world dialog; press 
 | `npm run check` | Lint and check formatting with Biome |
 | `npm run typecheck` | Type-check every part of the source |
 
-The data and timing scripts are listed in [Development](docs/development.md).
+The other scripts (data, baselines, timing, the wind report and tuning) are listed in [Development](docs/development.md).
 
 ## Data credits
 

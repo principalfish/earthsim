@@ -30,10 +30,8 @@ import {
 	type MonthlyTemperature,
 	type MonthlyWind,
 	type Resolution,
-	summariseWinds,
 	type WindComparison,
 	type WindErrorFigures,
-	type WindSummary,
 	windErrorFigures,
 } from '../../core/index';
 import { type ColourRamp, centredRange } from '../globe/ramp';
@@ -461,7 +459,7 @@ type LayerState = ObservedRequest & {
  */
 type DerivedWinds = {
 	readonly solved: SolvedWinds;
-	summary?: WindSummary;
+	summary?: WindField;
 	against?: ObservedWinds;
 	comparison?: WindComparison;
 };
@@ -575,11 +573,11 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * as arrows over whatever colours it shows: in Terrain view and in the
  * Month view the winds of the month on screen, following the year as it
  * plays; while the layer on screen shows its annual average, their annual
- * mean, worked out by {@link summariseWinds} once for each result, when
- * first shown; and on any other summary the month last on screen. Winds
- * that are out of date or being worked out again stay on the globe until
- * the next arrive; until there is a result there are none, and when the
- * store drops its result, as for a new world, they go. A field is sent to
+ * mean, worked out once for each result, when first shown; and on any
+ * other summary the month last on screen. Winds that are out of date or
+ * being worked out again stay on the globe until the next arrive; until
+ * there is a result there are none, and when the store drops its result,
+ * as for a new world, they go. A field is sent to
  * the globe when it arrives or another month or the annual mean is chosen,
  * not again as the status changes. Turned off, the winds are told they are
  * not showing, unless the layer on screen is one they calculate, and the
@@ -895,7 +893,10 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 				};
 				return observed.mean;
 			}
-			from.summary ??= summariseWinds(from.solved.winds);
+			from.summary ??= {
+				east: meanOfMonths(from.solved.winds.east),
+				north: meanOfMonths(from.solved.winds.north),
+			};
 			return from.summary;
 		}
 		const year = observed?.winds ?? from.solved.winds;

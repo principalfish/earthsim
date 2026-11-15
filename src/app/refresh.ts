@@ -363,6 +363,15 @@ export type TemperatureScheduler = {
 	 */
 	refresh(): void;
 	/**
+	 * Says that the world has changed, as `refresh` does, and asks at once
+	 * rather than after the debounce time: for a change that is whole when
+	 * it is made, as a new world is, with no run of changes to wait out. A
+	 * wait under way is cancelled; if a stroke is under way, it waits as
+	 * `refresh` does instead. While the temperature is not showing, nothing
+	 * is asked for.
+	 */
+	refreshNow(): void;
+	/**
 	 * Says that the world has been replaced by another. The result on hand
 	 * describes a world that is gone and is dropped, as is the answer to any
 	 * request already made; the store is left `empty` until the next
@@ -371,9 +380,10 @@ export type TemperatureScheduler = {
 	reset(): void;
 	/**
 	 * Says whether the temperature is showing. Switched on, it is asked for
-	 * if the result on hand is out of date or there is none, after the
-	 * debounce time as for a change; switched off, a request waiting to be
-	 * made is cancelled. Saying what is already so does nothing.
+	 * if the result on hand is out of date or there is none: at once, with
+	 * no debounce time, unless a stroke is under way, which it waits for as
+	 * a change does. Switched off, a request waiting to be made is
+	 * cancelled. Saying what is already so does nothing.
 	 */
 	setShowing(showing: boolean): void;
 	/**
@@ -397,7 +407,9 @@ export type TemperatureScheduler = {
  * A change made while the temperature is not showing asks for nothing: a
  * solve can take seconds, and nobody is looking. The result on hand is
  * marked out of date instead, and the temperature is asked for once when
- * it is switched on again. Switching it off while a solve is under way
+ * it is switched on again, with no wait: switching on is one change, not
+ * a run of them, and a wait would leave the temperature reading as not
+ * calculated until it ended. Switching it off while a solve is under way
  * leaves that solve to finish, since its work is already paid for: its
  * result is kept, as current if nothing has changed since it was asked
  * for and as out of date if something has.
@@ -475,6 +487,13 @@ export const createTemperatureScheduler = <H>(
 				scheduler.refresh();
 			}
 		},
+		refreshNow: () => {
+			stale = true;
+			store.markOutOfDate();
+			if (showing) {
+				scheduler.refreshNow();
+			}
+		},
 		reset: () => {
 			stale = true;
 			store.clear();
@@ -488,7 +507,7 @@ export const createTemperatureScheduler = <H>(
 			if (!showing) {
 				scheduler.cancel();
 			} else if (stale) {
-				scheduler.refresh();
+				scheduler.refreshNow();
 			}
 		},
 		markUnavailable: scheduler.markUnavailable,
@@ -555,12 +574,12 @@ export type WindsScheduler = {
 	/**
 	 * Says whether the winds are showing. Switched on, they are asked for if
 	 * there are none for the current temperature and day length, on hand or
-	 * on their way, after the debounce time as for a change, or when the
-	 * temperature they need arrives; winds on hand that are marked out of
-	 * date but were worked out from the current temperature and day length,
-	 * as after a change since undone, are marked current instead. Switched
-	 * off, a request waiting to be made is cancelled. Saying what is already
-	 * so does nothing.
+	 * on their way: at once if the temperature is current, and otherwise
+	 * when the temperature they need arrives. Winds on hand that are marked
+	 * out of date but were worked out from the current temperature and day
+	 * length, as after a change since undone, are marked current instead.
+	 * Switched off, a request waiting to be made is cancelled. Saying what
+	 * is already so does nothing.
 	 *
 	 * @remarks
 	 * The winds are worked out from the temperature, which this does not
@@ -590,9 +609,10 @@ const NOTHING_ASKED = { superseded: true } as const;
  * current, with no wait: the temperature has already waited for the
  * changes to stop. A change of the day length, which the temperature does
  * not depend on, asks after the debounce time instead, as a change does
- * for the temperature. Nothing is asked for while the temperature on hand
- * is not current, as after an edit until its next result: that result asks
- * when it comes.
+ * for the temperature. Switching the winds on with a current temperature
+ * asks at once too: it is one change, not a run of them. Nothing is asked
+ * for while the temperature on hand is not current, as after an edit until
+ * its next result: that result asks when it comes.
  *
  * Each result is kept with the temperature result and the day length it
  * was worked out from ({@link SolvedWinds}). It is kept as current only if,
@@ -704,6 +724,22 @@ export const createWindsScheduler = <H>(
 		onUnavailable: store.markWindsUnavailable,
 	});
 
+	/**
+	 * Asks for the winds on their being switched on. With a current
+	 * temperature it asks at once: switching on is one change, with no run
+	 * of changes to wait out, and a wait would leave the winds reading as
+	 * not calculated until it ended. Without one it waits as a change does,
+	 * and the request made then asks for nothing unless the temperature has
+	 * come meanwhile, whose arrival asks in any case.
+	 */
+	const askOnShowing = (): void => {
+		if (currentTemperature() === null) {
+			scheduler.refresh();
+		} else {
+			scheduler.refreshNow();
+		}
+	};
+
 	store.addListener(() => {
 		const temperature = currentTemperature();
 		if (temperature === null || temperature === seen) {
@@ -742,7 +778,7 @@ export const createWindsScheduler = <H>(
 			const { status, result } = store.winds;
 			if (status === 'calculating' && awaiting) {
 				if (askedFor === null || !isCurrent(askedFor)) {
-					scheduler.refresh();
+					askOnShowing();
 				}
 				// Otherwise the answer on its way is for things as they are.
 				return;
@@ -754,7 +790,7 @@ export const createWindsScheduler = <H>(
 				store.setWindsResult(result, true);
 				return;
 			}
-			scheduler.refresh();
+			askOnShowing();
 		},
 		markUnavailable: scheduler.markUnavailable,
 	};

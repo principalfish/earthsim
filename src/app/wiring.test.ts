@@ -437,6 +437,7 @@ const createStage = (
 			}
 			return {
 				refresh: () => log.push('temperature.refresh'),
+				refreshNow: () => log.push('temperature.refreshNow'),
 				reset: () => log.push('temperature.reset'),
 				setShowing: (showing) => log.push(`temperature.setShowing ${showing}`),
 			};
@@ -680,12 +681,14 @@ describe('a world replacement', () => {
 			'statistics.reset',
 			'statistics.refresh',
 			'temperature.reset',
-			'temperature.refresh',
 			'winds.reset',
 			'layerPanel.newWorld null',
 			'globe.setSun',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
+			// Asked for last, and at once, once every part is on the new
+			// world.
+			'temperature.refreshNow',
 		]);
 	});
 
@@ -745,13 +748,13 @@ describe('the start of the page', () => {
 			'statistics.reset',
 			'statistics.refresh',
 			'temperature.reset',
-			'temperature.refresh',
 			'winds.reset',
 			'layerPanel.newWorld null',
 			'globe.setSun',
 			'worldPanel.setDate 2.4 million years',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
+			'temperature.refreshNow',
 			'worldPanel.setAutosaveState saved',
 			'autosave.start',
 		]);
@@ -1137,9 +1140,10 @@ describe('the planet controls', () => {
 		expect(
 			stage.log.filter((entry) => entry === 'autosave.markChanged'),
 		).toHaveLength(1);
+		// Asked for once, as for any new world, and not again for its planet.
 		expect(
-			stage.log.filter((entry) => entry === 'temperature.refresh'),
-		).toHaveLength(1);
+			stage.log.filter((entry) => entry.startsWith('temperature.refresh')),
+		).toEqual(['temperature.refreshNow']);
 	});
 
 	it('show Earth’s settings for a new world', async () => {
@@ -1516,7 +1520,7 @@ describe('the temperature, on its worker', () => {
 		expect(page.posted().length - before).toBe(1);
 	});
 
-	it('marks the store empty, then calculating, when the world is replaced', async () => {
+	it('marks the store empty, then calculating at once, when the world is replaced', async () => {
 		const page = await createWorkerStage();
 		await page.wait();
 		const worker = page.workers.at(-1) as FakeWorker;
@@ -1535,14 +1539,51 @@ describe('the temperature, on its worker', () => {
 		// Told apart from the world it replaces.
 		const next = createBlankWorld(64);
 		next.elevation[0] = 4321;
+		const before = page.posted().length;
 		page.stage.state.replaceWorld(next);
-		expect(store.temperature).toMatchObject({ status: 'empty', result: null });
-		await page.wait();
+		// With no wait: the new world never reads as not calculated once
+		// the page has taken it in.
+		expect(store.temperature).toMatchObject({
+			status: 'calculating',
+			result: null,
+		});
 		expect(statuses).toEqual(['empty', 'calculating']);
+		expect(page.posted()).toHaveLength(before + 1);
+		await page.wait();
+		expect(page.posted()).toHaveLength(before + 1);
 		const newest = page.posted().at(-1) as SimRequest<'temperature'>;
 		expect(newest.world).toEqual(next);
 		expect(newest.world.elevation[0]).toBe(4321);
 		expect(newest.start).toBeUndefined();
+	});
+
+	it('ends with one current result, the last world’s, when the world is replaced twice in a row', async () => {
+		const page = await createWorkerStage();
+		await page.wait();
+		const { store } = page.stage.temperatureOptions;
+		const before = page.posted().length;
+
+		page.stage.state.replaceWorld(createBlankWorld(64));
+		const last = createBlankWorld(64);
+		last.elevation[0] = 4321;
+		page.stage.state.replaceWorld(last);
+		expect(page.posted()).toHaveLength(before + 2);
+		const newest = page.posted().at(-1) as SimRequest<'temperature'>;
+		expect(newest.world.elevation[0]).toBe(4321);
+
+		(page.workers.at(-1) as FakeWorker).respond({
+			id: newest.id,
+			kind: 'temperature',
+			ok: true,
+			result: temperatureOf(2),
+		});
+		await settle();
+		expect(store.temperature).toMatchObject({
+			status: 'current',
+			result: temperatureOf(2),
+		});
+		await page.wait();
+		expect(page.posted()).toHaveLength(before + 2);
 	});
 
 	it('waits out a stroke under way and is asked for once after it', async () => {
