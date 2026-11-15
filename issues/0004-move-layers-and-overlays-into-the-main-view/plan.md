@@ -184,3 +184,17 @@ After every piece, from the builder's worktree:
 No test reads the stylesheet, so layout is proven by the browser look and the user's manual reviews; behaviour, wording, accessible names and what is shown when are proven by unit tests on each component. Scripted browser checks keep their browser profiles in the session's scratch folder, never the Windows temp folder. The user's own dev server on port 5176 runs from the main checkout and is left alone; a builder that needs one starts its own on another port.
 
 ## Notes
+
+### Piece 1 (2026-11-15)
+
+- Built on claude-opus-5-5. The dock is a page part of its own (`PageParts.createLayerDock`), wired in `startPage`; the layer panel gained `setLayer` (the old picker's handler, unchanged) and `LayerControlsOptions.onLayer` went. The layer panel's `onView` also shows the dock the view.
+- The layer tiles are buttons with the radio role in a radio group named by its "Layers" heading, one tab stop, moved through with the arrow keys; the overlay tiles are buttons with `aria-pressed` in a group named "Overlays". The headings are plain text, not `h2`: the page's only `h1` is in the side panel, after the dock in the page's order.
+- The dock holds the grid tile's on/off state itself (off at first), since nothing else holds it; piece 6 will give it a stored start.
+- `src/app/testing/fakeDocument.ts` changed too (not in the piece's Files): its events can carry a key and its elements have `tabIndex`, for the dock's keyboard tests.
+- `createCheckField` in `ui/fields.ts` is no longer used on the page; kept, with its tests, for the Settings pieces to use or remove.
+- The old Layer picker's tests became dock tests; the View section's Winds, Sunlight and grid checkbox tests were replaced by the dock's and the wiring's.
+- In a window shorter than about 465 px the dock is clipped at the bottom, with no scrolling (wide: six 63 px tiles and two headings, 449 px). Not in the plan; raised at the review request.
+- Uncovered changed lines, reason accepted by the coverage check: `src/app/main.ts:98,128-131,168` — the page's entry point, which assembles the real canvas, renderer and DOM parts and has no test file; the six lines make the main view, put the dock in its region and hand the main view's places to `createLayerControls`, each of which is tested on its own.
+- Review: one round (correctness, security, coverage, docs), four verified findings, all comment wording or tidying, all fixed; the light re-check (correctness, docs) was clean. In `findings.md`.
+- The scripted browser look drove headless Edge from WSL with its profile in the session's scratch folder; there the page said "Autosave unavailable" and logged two `UnknownError: Internal error` lines, most likely the browser's storage failing on a profile kept on a `\\wsl.localhost` path; not checked against `main`.
+
