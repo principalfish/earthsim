@@ -45,6 +45,10 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 1 approved after the user tried it, with the dock made to scroll when the window is too short for it (the builder's option b, over leaving it clipped or dropping to icons). The user: "Tried it, approve, scroll" (2026-11-15)
 
+- The one comparison source is kept across compared layers: going from Temperature on Observed or Difference to Pressure (or back) keeps that choice, and the new layer's observed data is fetched at the switch. The user: "Keep the choice" (2026-11-15)
+- Piece 2 starts. The user: "Start it" (2026-11-15)
+- Commits follow the conventional-commit format of `git.md` as changed on 2026-11-15 13:40 (`feat(<slug>): piece <n>/<total> — <summary>`) from piece 2 on; piece 1's commit (6278b72), pushed four minutes after the change, keeps the older form. The PR is titled `feat: move layers and overlays into the main view`.
+
 ## Open
 - None.
 
