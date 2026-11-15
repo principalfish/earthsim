@@ -16,12 +16,17 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
   - The legend, the wind key and the rest of what describes the globe become one box, showing what applies to what is visible.
   - A settings section sets the units: all metric or all imperial, with an override.
 
+- After every change to the world, everything is worked out, whatever is on screen: the temperature, then the pressure and winds. A Pause button stops the solving while sculpting and catches up when released. The user: "Everything, with a pause" (2026-11-15)
+- The value under the pointer joins the one box, with the legend, the wind key and the calculating status. The user: "Join the one box" (2026-11-15)
+- Units (all metric or all imperial, with overrides) are built in this issue, as its last pieces, not as an issue of their own. The user: "In this issue" (2026-11-15)
+- The user wants pictures of the candidate layouts, at desktop and narrow widths, before choosing the shape of the layer controls. The user: "Show me pictures first" (2026-11-15)
+
 ## Open
 - The shape of the layer controls: always-visible icon tiles, or one tile that opens a tray as Google Maps does; and where.
 - The month controls' place: the user leans to the bottom ("maybe at the bottom"). Where the Show choice and the Earth comparison sit beside them.
-- Automatic calculation: whether the winds and pressure are always worked out with the temperature or only when shown; whether there is a pause control; what happens while sculpting and when the page opens.
-- The one box: whether the value under the pointer joins it or stays a strip of its own; where the calculating status goes.
-- Units: which quantities (temperature, pressure, wind speed, heights and depths, distances, areas); what imperial means for each; where the override is; whether sliders and the Planet section follow; whether it is part of this issue or its own.
+- Automatic calculation: where the Pause button sits and what it shows; whether pausing is remembered; what happens when the page opens.
+- The one box: where it sits, and how it lays out the legend, the key, the status and the pointer's values.
+- Units: which quantities (temperature, pressure, wind speed, heights and depths, distances, areas); what imperial means for each; where the override is; whether sliders and the Planet section follow.
 - Where the settings section lives: a section of the side panel, or a button in the main view.
 - Winds' own options (Arrows or Streaks; Simulated or Observed) and where they go.
 - What is left of the Layers and View sections in the side panel.
