@@ -49,3 +49,13 @@
 | round | docs | - | - | dropped | - | `docs/user-guide.md:139` | The "Layers" heading could be read as the removed section — dropped: the check said leave it; the intro names the tiles |
 | round | coverage | - | - | dropped | - | `src/app/ui/timeline.test.ts` | Optionally rename the arrow-key test to say the keys are the slider's own — dropped: optional, the test judged adequate |
 | re-check | correctness | - | - | - | - | `src/app/styles.css:864` | Light re-check of the five fixes: clean |
+
+## piece 4 · 2026-11-15 · One info box
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | cleanup | verified | open | `src/app/main.ts:183` | The `?? DEFAULT_WIND_UNIT` and `?? DEFAULT_WIND_STYLE` fallbacks never run, since the layer panel always fills both in; `InfoBoxOptions` is used only by a test |
+| round | correctness | - | - | dropped | - | `src/app/ui/infoBox.ts:187` | The box decides it is empty from two blocks' own `hidden` but a flag for the read-out — dropped: same conditions, no effect on behaviour |
+| round | correctness | - | - | dropped | - | `src/app/ui/infoBox.ts:70` | On Terrain with Winds on a temperature solve shows "Calculating" with no bar — dropped: as before this change, and the next piece rewrites this case |
+| round | docs | - | - | dropped | - | `src/app/ui/layerPanel.ts:1174` | "The winds' lines are the key's own" — dropped: the check said it is still true |
+| manual | user | - | defect | - | open | the info box | The user asked to take the winds block out of the box and keep the two wind comparison lines: "lets get rid of the wind part of the pop up box"; "Keep them as two lines" |
