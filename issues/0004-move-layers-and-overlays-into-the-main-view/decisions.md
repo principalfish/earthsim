@@ -21,6 +21,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - Units (all metric or all imperial, with overrides) are built in this issue, as its last pieces, not as an issue of their own. The user: "In this issue" (2026-11-15)
 - The user wants pictures of the candidate layouts, at desktop and narrow widths, before choosing the shape of the layer controls. The user: "Show me pictures first" (2026-11-15)
 
+- Whether the winds are drawn as arrows or streaks is a setting in the settings section too, and it starts on Streaks (it starts on Arrows today). The user: "winds shown as should be nio setting too - defaulting to streaks" (2026-11-15; read as "in settings", and as the Arrows or Streaks choice, since Streaks is one of its two values)
+
 ## Open
 - The shape of the layer controls: always-visible icon tiles, or one tile that opens a tray as Google Maps does; and where.
 - The month controls' place: the user leans to the bottom ("maybe at the bottom"). Where the Show choice and the Earth comparison sit beside them.
@@ -28,7 +30,7 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - The one box: where it sits, and how it lays out the legend, the key, the status and the pointer's values.
 - Units: which quantities (temperature, pressure, wind speed, heights and depths, distances, areas); what imperial means for each; where the override is; whether sliders and the Planet section follow.
 - Where the settings section lives: a section of the side panel, or a button in the main view.
-- Winds' own options (Arrows or Streaks; Simulated or Observed) and where they go.
+- Where Winds' Simulated or Observed choice goes (on the untouched Earth only).
 - What is left of the Layers and View sections in the side panel.
 - The icons: drawn for the project, or from an icon library (a new dependency).
 - Narrow windows.
