@@ -57,7 +57,7 @@ import {
 	worldFromChoice,
 } from './ui/newWorldDialog';
 import type { PlanetPanel, PlanetPanelOptions } from './ui/planetPanel';
-import type { Section } from './ui/section';
+import type { Timeline, TimelineOptions } from './ui/timeline';
 import type { ToolPanel, ToolPanelOptions } from './ui/toolPanel';
 import type { TopBar, TopBarOptions } from './ui/topBar';
 import type { ViewPanel, ViewPanelOptions } from './ui/viewPanel';
@@ -119,8 +119,8 @@ export type PageTemperatureOptions = PageStatisticsOptions & {
 /**
  * What the layer panel is given: where the results are kept, what
  * calculates them, the observed data and whom to tell of the view and the
- * comparison. The dock's tiles and the top bar choose what is shown; the
- * Layers section holds the month slider and Play.
+ * comparison. The dock's tiles and the top bar choose what is shown, and
+ * the timeline the month on screen and whether the year plays.
  */
 export type PageLayerOptions = {
 	/** Where the temperature is kept: the store the temperature writes. */
@@ -134,8 +134,11 @@ export type PageLayerOptions = {
 	 * released.
 	 */
 	readonly winds: Pick<WindsScheduler, 'setShowing'>;
-	/** Called with the view settings whenever any of them changes. */
-	readonly onView: (view: PageView) => void;
+	/**
+	 * Called with the view settings, and whether the year is playing,
+	 * whenever any of them changes.
+	 */
+	readonly onView: (view: PageView, playing: boolean) => void;
 	/** Gives a layer's observed year on a world's grid. */
 	readonly loadObserved: ScalarObservedLoader;
 	/** Gives the observed winds on a world's grid. */
@@ -216,6 +219,14 @@ export type PageParts = {
 	readonly createTopBar: (
 		options: TopBarOptions,
 	) => Pick<TopBar, 'showView' | 'showComparison'>;
+	/**
+	 * Lays the timeline over the globe, along the bottom beside the dock,
+	 * whose slider chooses the month on screen and whose button plays the
+	 * year.
+	 */
+	readonly createTimeline: (
+		options: TimelineOptions,
+	) => Pick<Timeline, 'showView'>;
 	/** Adds the planet controls to the panel. */
 	readonly createPlanetPanel: (
 		options: PlanetPanelOptions,
@@ -246,7 +257,8 @@ export type PageParts = {
 	 * what the globe is coloured by, as the dock chooses it, and so whether
 	 * the temperature is showing, what of each computed layer's year it
 	 * shows and where the layer and the winds come from, as the top bar
-	 * chooses them. It starts on {@link DEFAULT_PAGE_VIEW}.
+	 * chooses them, and the month on screen and whether the year plays, as
+	 * the timeline chooses them. It starts on {@link DEFAULT_PAGE_VIEW}.
 	 */
 	readonly createLayerPanel: (
 		options: PageLayerOptions,
@@ -259,6 +271,8 @@ export type PageParts = {
 		| 'setSource'
 		| 'setSunlight'
 		| 'setWinds'
+		| 'setMonth'
+		| 'togglePlaying'
 		| 'shown'
 		| 'shownWinds'
 		| 'setWindUnit'
@@ -280,11 +294,6 @@ export type PageParts = {
 		Preferences,
 		'windSpeedUnit' | 'setWindSpeedUnit' | 'windStyle' | 'setWindStyle'
 	>;
-	/**
-	 * The panel's Layers section, already in the panel, which switching the
-	 * sunlight or the winds on from the dock opens.
-	 */
-	readonly layersSection: Pick<Section, 'setOpen'>;
 	/** Opens the dialog that starts a new world. */
 	readonly openNewWorldDialog: (options: NewWorldDialogOptions) => void;
 	/** Gives the Earth's elevation data, for a world that starts as Earth. */
@@ -351,15 +360,16 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * The panel's sections are in place before the page starts, in the order
  * the panel shows them, so the parts that fill them can be made in an
  * order of their own: the world controls, the tools, the view controls,
- * the dock over the globe, the planet controls, the layers and then the
- * statistics. The dock is shown each change of the view settings the
- * layer panel reports, and holds the cell grid's state itself, which goes
- * straight to the globe. The dock and the layer panel are given no list
- * of layers, so both offer every layer in `SCALAR_LAYERS`. The temperature
- * and then the winds, which have nothing of their own in the panel, are
- * made just before the layers, which switch them on and off. The page
- * opens on the height colours with neither showing, so nothing asks for
- * the temperature until it is chosen.
+ * the dock, the top bar and the timeline over the globe, the planet
+ * controls, the layers and then the statistics. The dock, the top bar and
+ * the timeline are shown each change of the view settings the layer panel
+ * reports, the timeline with whether the year is playing; the dock holds
+ * the cell grid's state itself, which goes straight to the globe. The dock
+ * and the layer panel are given no list of layers, so both offer every
+ * layer in `SCALAR_LAYERS`. The temperature and then the winds, which have
+ * nothing of their own in the panel, are made just before the layers,
+ * which switch them on and off. The page opens on the height colours with
+ * neither showing, so nothing asks for the temperature until it is chosen.
  *
  * The temperature is needed while the Temperature layer is chosen or the
  * winds are showing, and is told it is showing while either is so: the
@@ -367,7 +377,7 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * temperature asks for the temperature, and its result then asks for the
  * winds. The layer panel is handed the switch for the winds, and flips it
  * as the dock's Winds tile is pressed and released: the tile tells the
- * layer panel, which shows the winds on the globe, and the month controls in
+ * layer panel, which shows the winds on the globe, and offers the month in
  * Terrain view, while it is on; a new world keeps it.
  *
  * The date line under the world's description is written as soon as the
@@ -377,21 +387,20 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * The globe is given the sun, its direction, drawn size and colour for the
  * month on screen and the world's planet, once as it first shows the world
  * and once each time either changes: when the month on screen moves on, by
- * the slider or as the year plays, when the planet settings change, and
+ * the timeline or as the year plays, when the planet settings change, and
  * for each new world, once whether or not the new world moves the month
  * back to July. On a summary of the year the month stays as it was last on
  * screen, and so does the sun. The dock's Sunlight tile turns the globe's
- * sunlight on and off, and tells the layer panel, which shows the month
- * controls in Terrain view while it is on; a new world keeps it. While it
+ * sunlight on and off, and tells the layer panel, which offers the month in
+ * Terrain view while it is on; a new world keeps it. While it
  * is on, the globe's night side is darkened when Terrain view is chosen,
  * and when Temperature view is chosen the line between day and night is
  * drawn instead, whether or not there is a temperature on the globe yet.
  * The globe is told how it is lit once for each change of that, by the
- * Sunlight tile or by a change of layer. Switching the sunlight or the
- * winds on from the dock also opens the Layers section, where the month
- * controls are, if it is closed; switching either off leaves the section
- * as it is. Nothing else the page does opens or closes a section: a new,
- * imported or restored world leaves every section as it is.
+ * Sunlight tile or by a change of layer. Nothing the page does opens or
+ * closes a section of the side panel: switching the sunlight or the winds
+ * on or off, and a new, imported or restored world, leave every section as
+ * it is.
  *
  * The cursor readout over the globe is made after the statistics, and reads
  * what the globe shows of the temperature and of the winds from the layer
@@ -653,18 +662,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	const dock = parts.createLayerDock({
 		view: DEFAULT_PAGE_VIEW,
 		onLayer: (next) => layerPanel.setLayer(next),
-		onWinds: (on) => {
-			layerPanel.setWinds(on);
-			if (on) {
-				parts.layersSection.setOpen(true);
-			}
-		},
+		onWinds: (on) => layerPanel.setWinds(on),
 		onSunlight: (on) => {
 			lightGlobe(on);
 			layerPanel.setSunlight(on);
-			if (on) {
-				parts.layersSection.setOpen(true);
-			}
 		},
 		onGrid: globe.setGridVisible,
 	});
@@ -672,6 +673,11 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		view: DEFAULT_PAGE_VIEW,
 		onSummary: (id, summary) => layerPanel.setSummary(id, summary),
 		onSource: (source) => layerPanel.setSource(source),
+	});
+	const timeline = parts.createTimeline({
+		view: DEFAULT_PAGE_VIEW,
+		onMonth: (next) => layerPanel.setMonth(next),
+		onPlay: () => layerPanel.togglePlaying(),
 	});
 	const planet = parts.createPlanetPanel({
 		planet: state.world.planet,
@@ -712,9 +718,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 				needTemperature();
 			},
 		},
-		onView: (next) => {
+		onView: (next, playing) => {
 			dock.showView(next);
 			topBar.showView(next);
+			timeline.showView(next, playing);
 			date.setView(next);
 			layer = next.layer;
 			lightGlobe(next.sunlight);

@@ -501,19 +501,6 @@ body {
   color: var(--color-bg);
 }
 
-/* A toggle that is on, such as the play button while the year plays. */
-.button[aria-pressed="true"] {
-  font-weight: 600;
-  color: var(--color-bg);
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-}
-
-.button[aria-pressed="true"]:enabled:hover {
-  background: var(--color-accent-strong);
-  border-color: var(--color-accent-strong);
-}
-
 .dialog {
   width: min(100% - 2 * var(--space-md), var(--dialog-width));
   max-height: calc(100dvh - 2 * var(--space-md));
@@ -655,15 +642,6 @@ body {
   line-height: 1.4;
 }
 
-/* The slider takes the row, with the play button at its end, level with
-   the slider rather than its label. */
-.month-controls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-sm);
-  align-items: end;
-}
-
 /* The choice of where the layer on screen and the winds come from, with a
    line under it for what the page has to say of the observed data. */
 .comparison {
@@ -684,8 +662,7 @@ body {
   margin-top: var(--space-xs);
 }
 
-/* Hidden by the page, which the display set on them would otherwise undo. */
-.month-controls[hidden],
+/* Hidden by the page, which the display set on it would otherwise undo. */
 .comparison[hidden] {
   display: none;
 }
@@ -882,12 +859,15 @@ body {
    beside it, with the corner at its right end; the info region at the
    bottom right, as wide as the area beside the dock; and the timeline
    under it along the bottom. A region with nothing in it takes no room.
-   Neither the regions nor the space between them take the pointer, which
-   passes through to the globe; only the controls in them take it. */
+   The timeline always keeps its row: in an area too short for all of them,
+   the info region's row gives way, and what it holds rises over the globe
+   above it rather than pushing the timeline out of view. Neither the
+   regions nor the space between them take the pointer, which passes
+   through to the globe; only the controls in them take it. */
 .main-view {
   grid-area: 1 / 1;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, auto) auto;
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
     "dock top-bar corner"
@@ -949,10 +929,12 @@ body {
   align-self: end;
   gap: var(--space-sm);
   min-width: 0;
+  min-height: 0;
 }
 
 .main-view__timeline {
   grid-area: timeline;
+  min-width: 0;
 }
 
 /* A place that draws no box, so what it holds is laid out by the row. */
@@ -1084,6 +1066,101 @@ body {
   .top-bar {
     flex-direction: column;
   }
+}
+
+/* The timeline along the bottom of the globe's area, beside the dock and
+   under the info region, a small gap from it, on the backing the legend
+   has: the play button, then the month slider with the months' first
+   letters standing over its track. The box takes no pointer, so the globe
+   can be turned and sculpted through its gaps; the button, the letters and
+   the slider take it. */
+.timeline {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-sm);
+  align-items: center;
+  margin-block-start: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-overlay-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* Hidden by the page, which the display set on it would otherwise undo. */
+.timeline[hidden] {
+  display: none;
+}
+
+/* An icon alone, outlined as the page's buttons are. */
+.timeline__play {
+  display: grid;
+  place-items: center;
+  padding: var(--space-xs);
+  color: var(--color-text);
+  cursor: pointer;
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  pointer-events: auto;
+}
+
+.timeline__play:hover {
+  background: var(--color-border);
+}
+
+.timeline__play:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.timeline__track {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+/* One line of letters, each placed by the page where the middle of the
+   slider's thumb stands at its month, and centred there; the month on
+   screen is boxed and tinted in the accent colour, as a chosen tile is. A
+   letter is as wide as an `M`, so that neighbours keep apart down to a
+   track of about 18em. */
+.timeline__months {
+  position: relative;
+  height: calc(1.4em + 2px);
+  font-size: var(--font-size-sm);
+}
+
+.timeline__month {
+  position: absolute;
+  inset-block-start: 0;
+  min-inline-size: 1.5em;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  translate: -50% 0;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.timeline__month:hover {
+  color: var(--color-text);
+}
+
+.timeline__month.is-chosen {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-accent) 25%, var(--color-bg));
+  border-color: var(--color-accent);
+}
+
+.timeline__slider {
+  width: 100%;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--color-accent);
+  pointer-events: auto;
 }
 
 /* What lies under the pointer, against the left edge of the info region.

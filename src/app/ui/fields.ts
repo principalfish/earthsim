@@ -34,12 +34,6 @@ export type RangeFieldOptions = RangeScale & {
 	/** Called with the new value whenever the slider moves. */
 	readonly onInput: (value: number) => void;
 	/**
-	 * Whether a screen reader is kept from reading out the value beside the
-	 * label each time it changes, for a slider moved often by the page
-	 * itself; false when left out. The slider still says its value.
-	 */
-	readonly quietValue?: boolean;
-	/**
 	 * A value marked on the track, under the slider, which stays marked
 	 * through a change of scale; none when left out.
 	 */
@@ -144,6 +138,18 @@ export const rangeFraction = (
 	max: number,
 ): number => (value - min) / (max - min);
 
+/**
+ * Where the middle of a slider's thumb stands at a point along its range,
+ * as a CSS length from the start of the track: the thumb's middle travels
+ * the track less the thumb's width, `--range-thumb-size`, so it is half
+ * that width in from either end.
+ *
+ * @param fraction - How far along the range the point lies, from 0 at its
+ * lowest to 1 at its highest, as {@link rangeFraction} gives it.
+ */
+export const thumbCentre = (fraction: number): string =>
+	`calc(var(--range-thumb-size) / 2 + (100% - var(--range-thumb-size)) * ${fraction})`;
+
 /** Class a field carries while its control cannot be used. */
 const DISABLED_CLASS = 'is-disabled';
 
@@ -170,8 +176,7 @@ export const createElement = <K extends keyof HTMLElementTagNameMap>(
  * The value as written is also what a screen reader says of the slider, so
  * that it hears "July" or "30%" rather than the bare number. The value
  * beside the label is an `<output>`, which a screen reader reads out
- * whenever it changes unless `quietValue` is set, when it is marked
- * `aria-live="off"`.
+ * whenever it changes.
  *
  * A mark, if there is one, is a short line under the track, centred where
  * the middle of the slider's thumb stands at the value marked. It is
@@ -191,9 +196,6 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 
 	const output = createElement('output', 'field__value');
 	output.htmlFor.add(options.id);
-	if (options.quietValue === true) {
-		output.setAttribute('aria-live', 'off');
-	}
 
 	const input = createElement('input', 'field__range');
 	input.id = options.id;
@@ -226,9 +228,7 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 		mark.title = title;
 		mark.setAttribute('aria-hidden', 'true');
 		placeMark = (min, max) => {
-			// The thumb's middle travels the track less the thumb's width.
-			const fraction = rangeFraction(marked, min, max);
-			mark.style.left = `calc(var(--range-thumb-size) / 2 + (100% - var(--range-thumb-size)) * ${fraction})`;
+			mark.style.left = thumbCentre(rangeFraction(marked, min, max));
 		};
 		placeMark(options.min, options.max);
 		track.append(input, mark);

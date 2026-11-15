@@ -5,12 +5,12 @@
  * top bar's Show choice chooses it; on the measured Earth, where the layer
  * and the winds come from, as the top bar's one comparison control chooses
  * it: the simulated values, the observed ones or, for the layer, the
- * difference; and the Layers section: a slider and a play button for the
- * month, for a layer's Month view, and in Terrain view too while the globe
- * is lit by the sun or shows the winds; and the legend and the key to the
- * wind arrows, which are laid over the globe rather than in the section.
- * Once the observed winds are on hand, the key also says how far the
- * simulated winds are from them.
+ * difference; the month on screen, and whether the year plays through it,
+ * for a layer's Month view, and in Terrain view too while the globe is lit
+ * by the sun or shows the winds, as the timeline chooses them; and the
+ * legend and the key to the wind arrows, laid over the globe. Once the
+ * observed winds are on hand, the key also says how far the simulated
+ * winds are from them.
  *
  * Each computed layer is shown as its description, a
  * {@link ScalarLayerSpec}, says: its views of the year, their colours and
@@ -18,12 +18,13 @@
  * what the globe, the legend and the key show, from the view settings and
  * the layer store, and switches each layer's calculation on and off with
  * the layer and the winds' with the dock's Winds tile.
- * {@link createLayerControls} is the section's controls, the legend and the
- * key on the page, which only show what they are told and pass on what is
- * chosen; the layer is chosen on the dock, and told to the panel by
- * {@link LayerPanel.setLayer}, and the view of its year and the source on
- * the top bar, told by {@link LayerPanel.setSummary} and
- * {@link LayerPanel.setSource}.
+ * {@link createLayerControls} is the legend and the key on the page, which
+ * only show what they are told; the layer is chosen on the dock, and told
+ * to the panel by {@link LayerPanel.setLayer}, the view of its year and
+ * the source on the top bar, told by {@link LayerPanel.setSummary} and
+ * {@link LayerPanel.setSource}, and the month and whether the year plays
+ * on the timeline, told by {@link LayerPanel.setMonth} and
+ * {@link LayerPanel.togglePlaying}.
  */
 
 import {
@@ -70,7 +71,6 @@ import {
 	DEFAULT_SUMMARY,
 	DEFAULT_WIND_SOURCE,
 	type Layer,
-	MONTH_NAMES,
 	offeredSources,
 	offersMonth,
 	type PageView,
@@ -82,7 +82,6 @@ import {
 } from '../view';
 import { DEFAULT_WIND_UNIT, type WindUnit } from '../windUnits';
 import type { ComparisonContent } from './comparison';
-import { createButton, createElement, createRangeField } from './fields';
 import {
 	createLegend,
 	type FittedScale,
@@ -99,14 +98,8 @@ import {
 	windKeyContent,
 } from './windKey';
 
-/** What the layer controls start with and whom they tell of a choice. */
+/** What the layer controls start with. */
 export type LayerControlsOptions = {
-	/** The view settings shown at first, with the year not playing. */
-	readonly view: PageView;
-	/** Called with the month whenever the month slider moves. */
-	readonly onMonth: (month: number) => void;
-	/** Called when the play button is pressed, to play or to stop. */
-	readonly onPlay: () => void;
 	/**
 	 * The unit the key to the wind arrows writes its speeds in at first; m/s
 	 * when left out.
@@ -125,11 +118,6 @@ export type LayerControls = {
 	showLegend(content: LegendContent | null): void;
 	/** Shows the key to the wind arrows, or hides it for null. */
 	showWindKey(content: WindKeyContent | null): void;
-	/**
-	 * Shows the view settings: the month controls where {@link offersMonth}
-	 * says, the month on the slider and whether the year is playing.
-	 */
-	showView(view: PageView, playing: boolean): void;
 	/** Writes the speeds of the key to the wind arrows in another unit. */
 	setWindUnit(unit: WindUnit): void;
 	/**
@@ -166,10 +154,13 @@ export type LayerPanelOptions = Pick<
 	 * dock's Winds tile is on, or a layer they calculate is on screen.
 	 */
 	readonly winds: Pick<WindsScheduler, 'setShowing'>;
-	/** Adds the controls to the page. */
+	/** Adds the legend and the key to the wind arrows to the page. */
 	readonly createControls: (options: LayerControlsOptions) => LayerControls;
-	/** Called with the view settings whenever any of them changes. */
-	readonly onView?: (view: PageView) => void;
+	/**
+	 * Called with the view settings, and whether the year is playing,
+	 * whenever any of them changes.
+	 */
+	readonly onView?: (view: PageView, playing: boolean) => void;
 	/**
 	 * Gives a layer's observed year on a world's grid; asked the first time
 	 * it is needed on a world: when Observed or Difference is chosen with
@@ -323,18 +314,18 @@ export type LayerPanel = {
 	setSource(source: Source): void;
 	/**
 	 * Takes whether the globe is lit by the sun, as the dock sets it. Turned
-	 * on in Terrain view, the month controls show there; turned off there,
-	 * they are hidden again and the year stops playing. On a computed layer
-	 * the controls are as they were either way.
+	 * on in Terrain view, the month is offered there; turned off there, it
+	 * is no longer offered and the year stops playing. On a computed layer
+	 * the month is offered as it was either way.
 	 *
 	 * @param on - Whether the globe is lit by the sun.
 	 */
 	setSunlight(on: boolean): void;
 	/**
 	 * Takes whether the winds are shown, as the dock sets it, and
-	 * tells what calculates them. Turned on in Terrain view, the month
-	 * controls show there, as for sunlight; turned off there with sunlight
-	 * off too, they are hidden again and the year stops playing. Turned
+	 * tells what calculates them. Turned on in Terrain view, the month is
+	 * offered there, as for sunlight; turned off there with sunlight off
+	 * too, it is no longer offered and the year stops playing. Turned
 	 * off, the arrows leave the globe, and a source no longer offered goes
 	 * back to Simulated; turned on with Observed or Difference chosen, the
 	 * observed winds are asked for if they are not on hand.
@@ -342,6 +333,21 @@ export type LayerPanel = {
 	 * @param on - Whether the winds are shown.
 	 */
 	setWinds(on: boolean): void;
+	/**
+	 * Puts a month on screen, as the timeline chose it; the month on screen
+	 * already changes nothing. While the year plays it carries on from
+	 * there, a whole step after the choice.
+	 *
+	 * @param month - The month, from January at 0 to December at 11.
+	 * @throws What the globe throws for the month's field, after the view
+	 * settings have been told of the month.
+	 */
+	setMonth(month: number): void;
+	/**
+	 * Plays the year from the month on screen, as the timeline's play
+	 * button asks, or stops it on that month if it is playing.
+	 */
+	togglePlaying(): void;
 	/**
 	 * What the globe shows of a computed layer: exactly what it was last
 	 * given, as of the panel's latest update, which follows every change of
@@ -574,14 +580,14 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * there is one, the globe shows the height colours.
  *
  * In the Month view, and in Terrain view while the globe is lit by the sun
- * or shows the winds, the play button plays the year, a month a second and
- * from December back to January. A move of the slider while it plays is
- * where it carries on from: each move restarts the wait of a whole second.
- * It stops when pressed again, on a new world, and whenever a change of the
- * view hides the month controls, as {@link offersMonth} decides: another
- * view of the year, Terrain without sunlight or winds, sunlight or the
- * winds turned off in Terrain view with the other off, or a summary chosen
- * on the way back to a computed layer.
+ * or shows the winds, {@link LayerPanel.togglePlaying} plays the year, a
+ * month a second and from December back to January. A month chosen while
+ * it plays is where it carries on from: each choice restarts the wait of a
+ * whole second. It stops when toggled again, on a new world, and whenever
+ * a change of the view stops offering the month, as {@link offersMonth}
+ * decides: another view of the year, Terrain without sunlight or winds,
+ * sunlight or the winds turned off in Terrain view with the other off, or
+ * a summary chosen on the way back to a computed layer.
  *
  * While the winds are shown, as the page says through
  * {@link LayerPanel.setWinds}, the winds are told they are showing, which
@@ -656,9 +662,10 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * `reportError` too.
  *
  * @param options - The store, the layers, the globe, the temperature, the
- * winds, the controls, the timers the year plays by, the observed years'
- * and the observed winds' loaders, whom to tell of the view, of the
- * comparison and of an error with no control to hand it back to.
+ * winds, the legend and the key, the timers the year plays by, the
+ * observed years' and the observed winds' loaders, whom to tell of the
+ * view, of the comparison and of an error with no control to hand it back
+ * to.
  * @returns The panel.
  */
 export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
@@ -1148,16 +1155,15 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		}
 	};
 
-	/** Shows the view settings and the comparison, and tells of them. */
+	/** Tells of the view settings, playing and the comparison. */
 	const announce = (): void => {
-		controls.showView(view(), playback.playing);
+		options.onView?.(view(), playback.playing);
 		options.onComparison?.({
 			offered: offered(),
 			source,
 			// The winds' lines are the key's own.
 			message: onScreen()?.message ?? null,
 		});
-		options.onView?.(view());
 	};
 
 	/**
@@ -1299,14 +1305,14 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		setTimer: options.setTimer,
 		clearTimer: options.clearTimer,
 		onMonth: () => {
-			// The controls first, so that the slider is on the month even if
-			// the globe refuses it.
+			// Told first, so that the timeline is on the month even if the
+			// globe refuses it.
 			announce();
 			try {
 				update();
 			} catch (error) {
 				// Nothing calls this but the timer, which would lose the error.
-				// Stopped first, so the controls show the year not playing even
+				// Stopped first, so the timeline shows the year not playing even
 				// if the report throws.
 				playback.pause();
 				options.reportError(error);
@@ -1316,24 +1322,8 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	});
 
 	const controls = options.createControls({
-		view: view(),
 		windUnit: options.windUnit ?? DEFAULT_WIND_UNIT,
 		windStyle: options.windStyle ?? DEFAULT_WIND_STYLE,
-		onMonth: (next) => {
-			if (next === playback.month) {
-				return;
-			}
-			playback.setMonth(next);
-			announce();
-			update();
-		},
-		onPlay: () => {
-			if (playback.playing) {
-				playback.pause();
-			} else {
-				playback.play();
-			}
-		},
 	});
 	store.addListener(update);
 	update();
@@ -1449,6 +1439,21 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			announce();
 			update();
 		},
+		setMonth: (next) => {
+			if (next === playback.month) {
+				return;
+			}
+			playback.setMonth(next);
+			announce();
+			update();
+		},
+		togglePlaying: () => {
+			if (playback.playing) {
+				playback.pause();
+			} else {
+				playback.play();
+			}
+		},
 		shown: () => shownLayer,
 		shownWinds: () => shownWindsState,
 		setWindUnit: (unit) => controls.setWindUnit(unit),
@@ -1456,33 +1461,17 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	};
 };
 
-/** The id of the month slider, which every layer and Terrain share. */
-const MONTH_SLIDER_ID = 'temperature-month';
-
 /**
- * Adds the layer controls to the Layers section of the side panel, and the
- * legend and the key to the wind arrows to their places over the globe.
+ * Adds the legend and the key to the wind arrows to their places over the
+ * globe.
  *
- * @remarks
- * In the section, for the Month view, a slider from January to December,
- * which a screen reader hears by the month's name, and a play button. They
- * show in Terrain view too while the globe is lit by the sun or shows the
- * winds. The button is a toggle whose pressed state says whether the year
- * is playing.
- *
- * The legend and the key to the wind arrows are shown and hidden only as
- * they are told, whether the Layers section is open or closed.
- *
- * @param body - The section's body, to add the controls to, after what it
- * holds.
- * @param places - Where the legend and the key go, over the globe, each
- * after what its place holds.
- * @param options - The starting view settings and whom to tell of a
- * choice.
+ * @param places - Where the legend and the key go, each after what its
+ * place holds.
+ * @param options - How the key writes the winds' speeds and draws them at
+ * first.
  * @returns The controls, with the legend and the key hidden.
  */
 export const createLayerControls = (
-	body: HTMLElement,
 	places: Pick<MainView, 'legend' | 'windKey'>,
 	options: LayerControlsOptions,
 ): LayerControls => {
@@ -1491,37 +1480,6 @@ export const createLayerControls = (
 		options.windUnit ?? DEFAULT_WIND_UNIT,
 		options.windStyle ?? DEFAULT_WIND_STYLE,
 	);
-
-	const monthControls = createElement('div', 'month-controls');
-	const month = createRangeField({
-		id: MONTH_SLIDER_ID,
-		label: 'Month',
-		min: 0,
-		max: MONTH_NAMES.length - 1,
-		step: 1,
-		value: options.view.month,
-		format: (value) => MONTH_NAMES[value] ?? '',
-		onInput: options.onMonth,
-		// Moved every second while the year plays; the slider itself says
-		// the month.
-		quietValue: true,
-	});
-	const play = createButton({
-		label: 'Play',
-		title: 'Play through the year, a month a second',
-		onClick: options.onPlay,
-	});
-	play.classList.add('button--compact');
-	monthControls.append(month.element, play);
-
-	const showView = (view: PageView, playing: boolean): void => {
-		monthControls.hidden = !offersMonth(view);
-		month.setValue(view.month);
-		play.setAttribute('aria-pressed', String(playing));
-	};
-	showView(options.view, false);
-
-	body.append(monthControls);
 	places.legend.append(legend.element);
 	places.windKey.append(windKey.element);
 	return {
@@ -1529,6 +1487,5 @@ export const createLayerControls = (
 		showWindKey: windKey.show,
 		setWindUnit: windKey.setUnit,
 		setWindStyle: windKey.setStyle,
-		showView,
 	};
 };

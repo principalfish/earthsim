@@ -27,14 +27,23 @@ Along the top of the globe, beside the tiles:
 - **Simulated, Observed, Difference**, on an untouched Earth: where the layer on screen and the winds come from, one choice for both; see [Simulated, observed or difference](#simulated-observed-or-difference).
 - In a narrow window the two take a line each.
 
+## The timeline
+
+Along the bottom of the globe, beside the tiles, while what is shown depends on the month: Temperature or Pressure on **Month**, or Sunlight or Winds on. Otherwise it is hidden.
+
+- **Play** steps through the year, a month a second, from December round to January; while it plays the button shows **Pause**, which stops it on the month shown. It stops by itself on a new world, and when what is shown no longer depends on the month.
+- **The month** is a slider under the twelve months' first letters, with the month shown boxed; July to start with. Drag the slider or click a letter to pick a month. Picking one while the year plays carries on from there.
+- From the keyboard, Tab reaches **Play**, which a screen reader calls "Play the year" (or "Pause the year" while it plays), and then the slider, which the arrow keys move a month at a time; a screen reader hears the month's name.
+- The globe can still be turned and sculpted between the timeline's controls.
+
 ## The panel
 
-The panel on the right has six sections, in this order: **World, Layers, View, Planet, Tools, Statistics**.
+The panel on the right has five sections, in this order: **World, View, Planet, Tools, Statistics**.
 
 - Each section opens and closes from its heading, by mouse or with Enter or Space.
 - On a first visit only World is open. The browser remembers which sections are open; this is a browser setting, not part of the world.
 - While Tools is closed, its heading names the tool chosen, such as `Tools · Raise`.
-- Switching **Sunlight** or **Winds** on opens Layers if it is closed, because that is where their month controls are. Nothing else opens or closes a section by itself.
+- No section opens or closes by itself: switching **Sunlight** or **Winds** on leaves the panel as it is.
 - A closed section's controls are skipped by the Tab key.
 
 ## World
@@ -129,7 +138,7 @@ Under the sliders:
 
 ## Layers
 
-The **Layers** tiles over the globe choose what it is coloured by, and the top bar holds the layer's **Show** choice and, on an untouched Earth, the comparison. The Layers section holds the month slider and **Play**.
+The **Layers** tiles over the globe choose what it is coloured by, and the top bar holds the layer's **Show** choice and, on an untouched Earth, the comparison. The month and **Play** are on the [timeline](#the-timeline).
 
 - **Terrain:** the height colours the page opens on.
 - **Temperature:** the near-surface air temperature. The relief is still raised and shaded, and the coastline is drawn as a thin line.
@@ -139,7 +148,7 @@ In Temperature view, **Show**, in the top bar, chooses what of the year is on th
 
 | Show | What it is |
 |-|-|
-| Month | One month, July to start with. A slider picks the month; **Play** steps through the year, a month a second |
+| Month | One month, July to start with, picked or played on the [timeline](#the-timeline) |
 | Annual average | The mean of the twelve months |
 | Warmest month, Coldest month | Each place's own warmest or coldest month, which need not be the same month everywhere |
 | Seasonal range | How far each place's warmest month is above its coldest |
@@ -218,7 +227,7 @@ The **Sunlight** tile lights the globe from the sun:
 
 - **In Terrain view** the day side is evenly lit and the night side drawn at 30% brightness, with a soft edge between them.
 - **In Temperature and Pressure view** the colours are left alone, since a darkened colour would read as another value. The edge between day and night is drawn as a thin line.
-- While Sunlight is on, the month slider and **Play** also show in Terrain view, where they move the sun through the year.
+- While Sunlight is on, the [timeline](#the-timeline) also shows in Terrain view, where it moves the sun through the year.
 
 ## Winds
 
@@ -234,7 +243,7 @@ Which winds are shown follows the layer's **Show**:
 
 | Shown | Winds |
 |-|-|
-| Terrain, or Temperature or Pressure by month | The month on screen. While Winds is on, the month slider and **Play** also show in Terrain view |
+| Terrain, or Temperature or Pressure by month | The month on screen. While Winds is on, the [timeline](#the-timeline) also shows in Terrain view |
 | Annual average | The mean of the twelve months, worked out as arrows, so winds that turn round through the year, such as a monsoon's, largely cancel |
 | Warmest month, Coldest month, Seasonal range | The month last on screen |
 

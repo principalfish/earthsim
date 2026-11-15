@@ -13,6 +13,7 @@ import {
 	createSelectField,
 	type RangeMark,
 	rangeFraction,
+	thumbCentre,
 } from './fields';
 
 describe('createSegmentedPicker', () => {
@@ -160,7 +161,7 @@ describe('createRangeField', () => {
 		vi.unstubAllGlobals();
 	});
 
-	const make = (quietValue?: boolean, mark?: RangeMark) => {
+	const make = (mark?: RangeMark) => {
 		const moved: number[] = [];
 		const field = createRangeField({
 			id: 'speed',
@@ -171,7 +172,6 @@ describe('createRangeField', () => {
 			value: 3,
 			format: (value) => `${value} km/h`,
 			onInput: (value) => moved.push(value),
-			quietValue,
 			mark,
 		});
 		const root = field.element as unknown as FakeElement;
@@ -207,17 +207,8 @@ describe('createRangeField', () => {
 		expect(moved).toEqual([]);
 	});
 
-	it('leaves its value to be read out as it changes unless kept quiet', () => {
+	it('leaves its value to be read out as it changes', () => {
 		expect(make().output.getAttribute('aria-live')).toBeNull();
-		expect(make(false).output.getAttribute('aria-live')).toBeNull();
-	});
-
-	it('keeps its value from being read out when asked, still writing it', () => {
-		const { field, input, output } = make(true);
-		expect(output.getAttribute('aria-live')).toBe('off');
-		field.setValue(5);
-		expect(output.textContent).toBe('5 km/h');
-		expect(input.getAttribute('aria-valuetext')).toBe('5 km/h');
 	});
 
 	it('writes other words for a value when given them, until it is moved', () => {
@@ -241,7 +232,7 @@ describe('createRangeField', () => {
 	});
 
 	it('marks a value under the track, where the middle of the thumb stands at it', () => {
-		const { field, input } = make(false, { value: 2.5, title: 'Walking' });
+		const { field, input } = make({ value: 2.5, title: 'Walking' });
 		const root = field.element as unknown as FakeElement;
 		const track = oneByClass(root, 'field__track');
 		const mark = oneByClass(root, 'field__mark');
@@ -253,7 +244,7 @@ describe('createRangeField', () => {
 	});
 
 	it('keeps its mark from screen readers, which hear the value', () => {
-		const { field } = make(false, { value: 2.5, title: 'Walking' });
+		const { field } = make({ value: 2.5, title: 'Walking' });
 		const mark = oneByClass(
 			field.element as unknown as FakeElement,
 			'field__mark',
@@ -262,7 +253,7 @@ describe('createRangeField', () => {
 	});
 
 	it('keeps the value marked through a change of scale', () => {
-		const { field } = make(false, { value: 2.5, title: 'Walking' });
+		const { field } = make({ value: 2.5, title: 'Walking' });
 		field.setScale({
 			min: 0,
 			max: 5,
@@ -283,6 +274,17 @@ describe('rangeFraction', () => {
 		expect(rangeFraction(-5, -5, 15)).toBe(0);
 		expect(rangeFraction(0, -5, 15)).toBe(0.25);
 		expect(rangeFraction(15, -5, 15)).toBe(1);
+	});
+});
+
+describe('thumbCentre', () => {
+	it('is half a thumb in from either end, and the track less a thumb between', () => {
+		expect(thumbCentre(0)).toBe(
+			'calc(var(--range-thumb-size) / 2 + (100% - var(--range-thumb-size)) * 0)',
+		);
+		expect(thumbCentre(1)).toBe(
+			'calc(var(--range-thumb-size) / 2 + (100% - var(--range-thumb-size)) * 1)',
+		);
 	});
 });
 

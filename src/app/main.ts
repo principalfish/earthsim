@@ -20,6 +20,7 @@ import { openNewWorldDialog } from './ui/newWorldDialog';
 import { createPanelSections } from './ui/panelSections';
 import { createPlanetPanel } from './ui/planetPanel';
 import { createStatsPanel } from './ui/statsPanel';
+import { createTimeline } from './ui/timeline';
 import { createToolPanel } from './ui/toolPanel';
 import { createTopBar } from './ui/topBar';
 import { createViewPanel, SEA_LEVEL_SLIDER_STEP_M } from './ui/viewPanel';
@@ -136,6 +137,11 @@ if (globe !== null) {
 			mainView.topBar.append(bar.element);
 			return bar;
 		},
+		createTimeline: (options) => {
+			const timeline = createTimeline(options);
+			mainView.timeline.append(timeline.element);
+			return timeline;
+		},
 		createPlanetPanel: (options) =>
 			createPlanetPanel(sections.planet.body, options),
 		createStatistics: (options) =>
@@ -170,8 +176,7 @@ if (globe !== null) {
 				setTimer,
 				clearTimer,
 				reportError: logError,
-				createControls: (controls) =>
-					createLayerControls(sections.layers.body, mainView, controls),
+				createControls: (controls) => createLayerControls(mainView, controls),
 			}),
 		createCursorReadout: (options) =>
 			createCursorReadout({
@@ -181,7 +186,6 @@ if (globe !== null) {
 				show: createReadoutStrip(mainView.readout).show,
 			}),
 		preferences: createPreferences(browserStorage),
-		layersSection: sections.layers,
 		openNewWorldDialog,
 		loadEarth: loadEarthData,
 		loadObserved: loadLayerObserved,
