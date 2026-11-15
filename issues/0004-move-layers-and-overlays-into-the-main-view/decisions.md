@@ -49,6 +49,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - Piece 2 starts. The user: "Start it" (2026-11-15)
 - Commits follow the conventional-commit format of `git.md` as changed on 2026-11-15 13:40 (`feat(<slug>): piece <n>/<total> — <summary>`) from piece 2 on; piece 1's commit (6278b72), pushed four minutes after the change, keeps the older form. The PR is titled `feat: move layers and overlays into the main view`.
 
+- The builder session runs on Opus (`claude-opus-5-5`) from its next turn; it had inherited Fable (`claude-fable-5-2`) from this chat's model when started. The user: "downgrade the builder to opus" (2026-11-15)
+
 ## Open
 - None.
 
