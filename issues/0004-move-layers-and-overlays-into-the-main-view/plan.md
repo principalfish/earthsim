@@ -159,7 +159,7 @@ Rejected:
 
 - [x] 1. The main-view regions, the icons, and the layer and overlay tiles
 - [x] 2. Show and one comparison control at the top
-- [ ] 3. The month timeline, and the Layers section removed
+- [x] 3. The month timeline, and the Layers section removed
 - [ ] 4. One info box
 - [ ] 5. Everything worked out after every change, with Pause
 - [ ] 6. The browser remembers the view
@@ -220,4 +220,4 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - Uncovered changed lines, reasons accepted by the coverage check: `src/app/main.ts` (the `createTimeline` part and `createLayerControls`'s new argument), the entry point's assembly; `src/app/ui/topBar.ts:83`, piece 2's unreachable guard. The arrow keys are the range input's own, not simulated in tests; the browser look confirmed them.
 - Coverage once failed on a timeout in `scripts/tune/tuning.test.ts` (untouched) while the machine was loaded; rerun alone it passed.
 - Review: one round, five verified findings (one medium layout defect, one naming, three tidying), all fixed; light re-check by correctness. In `findings.md`.
-
+- Committed as `f91b134` and pushed on the user's approval: "Tried it, approve".
