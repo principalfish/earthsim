@@ -16,7 +16,8 @@
       "kind": "session",
       "name": "local_861b5031-c368-4a88-b7a4-71e71ea962f6",
       "added": "2026-11-13 09:17",
-      "note": "builder: add-winds-layer"
+      "note": "builder: add-winds-layer",
+      "removed": "2026-11-15 12:00"
     },
     {
       "kind": "worktree",
