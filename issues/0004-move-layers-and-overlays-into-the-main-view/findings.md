@@ -54,8 +54,18 @@
 
 | Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
 |-|-|-|-|-|-|-|-|
-| round | correctness | low | cleanup | verified | open | `src/app/main.ts:183` | The `?? DEFAULT_WIND_UNIT` and `?? DEFAULT_WIND_STYLE` fallbacks never run, since the layer panel always fills both in; `InfoBoxOptions` is used only by a test |
+| round | correctness | low | cleanup | verified | fixed | `src/app/main.ts:183` | The `?? DEFAULT_WIND_UNIT` and `?? DEFAULT_WIND_STYLE` fallbacks never run, since the layer panel always fills both in; `InfoBoxOptions` is used only by a test |
 | round | correctness | - | - | dropped | - | `src/app/ui/infoBox.ts:187` | The box decides it is empty from two blocks' own `hidden` but a flag for the read-out — dropped: same conditions, no effect on behaviour |
 | round | correctness | - | - | dropped | - | `src/app/ui/infoBox.ts:70` | On Terrain with Winds on a temperature solve shows "Calculating" with no bar — dropped: as before this change, and the next piece rewrites this case |
 | round | docs | - | - | dropped | - | `src/app/ui/layerPanel.ts:1174` | "The winds' lines are the key's own" — dropped: the check said it is still true |
-| manual | user | - | defect | - | open | the info box | The user asked to take the winds block out of the box and keep the two wind comparison lines: "lets get rid of the wind part of the pop up box"; "Keep them as two lines" |
+| manual | user | - | defect | - | fixed | the info box | The user asked to take the winds block out of the box and keep the two wind comparison lines: "lets get rid of the wind part of the pop up box"; "Keep them as two lines" |
+| manual | user | - | defect | - | fixed | the legend | The user asked to drop the legend's end labels: "remove -35 and below and 30 and above from this" |
+| manual | user | - | defect | - | fixed | the info box | The user asked for one "Wind:" line ("the wind data needs to be prefixed by Wind: and fit on one line"), then for no wind figures at all and a two-line pointer block ("actually remove the wind correct % / direction"; "all of these can be concatted into 1 or 2 lines") |
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/cursorReadout.ts:518` | The class `cursor-readout__temperature` had no stylesheet rule left and named the temperature on every layer; its comment was stale |
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/layerPanel.ts:170` | `ShownLayer.summary` and `ShownLayer.month` had no reader once the pointer's line dropped them |
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/layerPanel.ts:448` | Ragged doc paragraphs after the edits |
+| round | correctness | low | cleanup | verified | fixed | `src/app/styles.css:678` | Two comment blocks not rewrapped |
+| round | security | - | - | dropped | - | `src/app/windUnits.ts:94` | A NaN bearing would read "undefined" — dropped: the function requires a finite bearing, and NaN would come only from a broken wind field, outside this change |
+| round | docs | - | - | dropped | - | `src/app/ui/windKey.ts` | The `windKey` names still say "key" — dropped: optional; the comments say what they do now; a rename is a later cleanup |
+| re-check | correctness | low | test | verified | open | `src/app/ui/cursorReadout.test.ts:904` | Two `it.each` cases still set the removed `month` and `summary` fields, so they now test only what the 'the result' case does |
+| re-check | correctness | - | - | noticed | - | `src/app/ui/cursorReadout.ts:96` | Doc comments still mention the month or summary the field may be; still true, no change needed |
