@@ -157,7 +157,7 @@ Rejected:
 
 ## Checkpoints
 
-- [ ] 1. The main-view regions, the icons, and the layer and overlay tiles
+- [x] 1. The main-view regions, the icons, and the layer and overlay tiles
 - [ ] 2. Show and one comparison control at the top
 - [ ] 3. The month timeline, and the Layers section removed
 - [ ] 4. One info box
@@ -193,8 +193,8 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - `src/app/testing/fakeDocument.ts` changed too (not in the piece's Files): its events can carry a key and its elements have `tabIndex`, for the dock's keyboard tests.
 - `createCheckField` in `ui/fields.ts` is no longer used on the page; kept, with its tests, for the Settings pieces to use or remove.
 - The old Layer picker's tests became dock tests; the View section's Winds, Sunlight and grid checkbox tests were replaced by the dock's and the wiring's.
-- In a window shorter than about 465 px the dock is clipped at the bottom, with no scrolling (wide: six 63 px tiles and two headings, 449 px). Not in the plan; raised at the review request.
+- In a window shorter than about 465 px the dock was clipped at the bottom. Raised at the review request; the user approved the piece and chose scrolling: "Tried it, approve, scroll". The dock (`.main-view__dock`) now scrolls when the area is too short: the wheel over a tile and keyboard focus bring hidden tiles into view; its scrollbar is thin, shows only how far it is scrolled (the dock takes no pointer, so it cannot be dragged), and the room kept for it starts the regions beside the dock about 10 px further right in every window. A wheel over a heading or a gap between tiles still goes to the globe. The change had its own review round (correctness, security, coverage, docs): two comment findings verified and fixed, two dropped.
 - Uncovered changed lines, reason accepted by the coverage check: `src/app/main.ts:98,128-131,168` — the page's entry point, which assembles the real canvas, renderer and DOM parts and has no test file; the six lines make the main view, put the dock in its region and hand the main view's places to `createLayerControls`, each of which is tested on its own.
 - Review: one round (correctness, security, coverage, docs), four verified findings, all comment wording or tidying, all fixed; the light re-check (correctness, docs) was clean. In `findings.md`.
 - The scripted browser look drove headless Edge from WSL with its profile in the session's scratch folder; there the page said "Autosave unavailable" and logged two `UnknownError: Internal error` lines, most likely the browser's storage failing on a profile kept on a `\\wsl.localhost` path; not checked against `main`.
-
+- Committed as `6278b72` and pushed to `origin/claude/move-layers-and-overlays-into-the-main-view-d898bd` on the user's approval: "Tried it, approve, scroll".
