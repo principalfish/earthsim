@@ -130,6 +130,8 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - Piece 2 adds a direct Laplacian operator, accurate at the cube's seams. The user: "A: add it now" (2026-11-13)
 
 - Before piece 2 is committed, its accuracy tests also measure the cells between the outermost ring and an eighth of the way into each face (where the seam stencils are used), held to the same bound as edge and corner cells. The user: "Yes, add that test" (2026-11-13)
+- Self review 01: fix findings 1, 2 and 4; skip 3 (a current answer dropped while a newer request is held back). The user: "Fix 1, 2 and 4 (Recommended)" (2026-11-15)
+- Self review 01 fixes approved, and the temperature's own switch-on also asks at once (the same 0.4 s "Not calculated yet" on a fresh world), in the same commit, with a light correctness re-check and a second look before the commit. The user: "Approve, and fix it (A)" (2026-11-15)
 
 ## Open
 - None.
@@ -145,5 +147,3 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - The wind unit option sits in the View section and is remembered by the browser, like which panel sections are open; it is not saved with the world.
 - Pressure is shown in hectopascals (the same as millibars), with no unit option.
 - The observed winds and pressure come from the same source as the observed temperature, NOAA's 20th Century Reanalysis v3 long-term monthly means: the 10 m eastward and northward winds and the mean sea-level pressure. NOT VERIFIED: NOAA's download server did not answer on 2026-11-13 (even the temperature file timed out), so the file names and folders are unconfirmed. The builder's first check; if the files are not there, come back to the user with alternatives before building on another source.
-- Self review 01: fix findings 1, 2 and 4; skip 3 (a current answer dropped while a newer request is held back). The user: "Fix 1, 2 and 4 (Recommended)" (2026-11-15)
-- Self review 01 fixes approved, and the temperature's own switch-on also asks at once (the same 0.4 s "Not calculated yet" on a fresh world), in the same commit, with a light correctness re-check and a second look before the commit. The user: "Approve, and fix it (A)" (2026-11-15)
