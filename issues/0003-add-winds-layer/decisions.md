@@ -132,6 +132,7 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - Before piece 2 is committed, its accuracy tests also measure the cells between the outermost ring and an eighth of the way into each face (where the seam stencils are used), held to the same bound as edge and corner cells. The user: "Yes, add that test" (2026-11-13)
 - Self review 01: fix findings 1, 2 and 4; skip 3 (a current answer dropped while a newer request is held back). The user: "Fix 1, 2 and 4 (Recommended)" (2026-11-15)
 - Self review 01 fixes approved, and the temperature's own switch-on also asks at once (the same 0.4 s "Not calculated yet" on a fresh world), in the same commit, with a light correctness re-check and a second look before the commit. The user: "Approve, and fix it (A)" (2026-11-15)
+- Self review 01: the 0.4 s "Not calculated yet" after creating a new world with Temperature showing (wiring.ts reset then refresh) is fixed here too, before the commit, with a light re-check and another look. The user: "Approve, fix it here" (2026-11-15)
 
 ## Open
 - None.
