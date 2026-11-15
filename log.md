@@ -87,3 +87,4 @@
 - 2026-11-15 12:37 · move-layers-and-overlays-into-the-main-view (0004) · GitHub issue #7
 - 2026-11-15 12:44 · move-layers-and-overlays-into-the-main-view (0004) · investigating → planned
 - 2026-11-15 12:44 · move-layers-and-overlays-into-the-main-view (0004) · build_model = claude-opus-5-5
+- 2026-11-15 12:50 · move-layers-and-overlays-into-the-main-view (0004) · tracking session local_add73007-806b-4a2a-bdab-70cd7e365620
