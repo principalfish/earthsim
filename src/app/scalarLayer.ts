@@ -22,6 +22,7 @@ import {
 	PRESSURE_RAMP,
 	SEASONAL_RANGE_RAMP,
 	TEMPERATURE_RAMP,
+	type ValueRange,
 } from './globe/ramp';
 import type { LayerStatus, LayerStore } from './layers';
 import {
@@ -31,13 +32,11 @@ import {
 } from './observedData';
 import {
 	cellWeights,
-	type FittedScale,
 	fitRange,
 	fitRangeCentred,
 	fitRangeFromZero,
 	formatTick,
 	MIN_FITTED_SPAN_C,
-	NOTHING_BEYOND,
 } from './ui/legend';
 import {
 	isScalarLayer,
@@ -486,8 +485,8 @@ const CENTRED_ON_YEAR_MEAN: ScaleFit = {
 
 /**
  * Where the winds and the pressure stand for showing, from where the
- * temperature and the winds do: what the pressure's legend and the key to
- * the wind arrows say.
+ * temperature and the winds do: what the pressure's legend and the info
+ * box's status line say of them.
  *
  * @remarks
  * The winds are worked out from the temperature, and are not asked for
@@ -751,7 +750,7 @@ export const yearField = (
  * A scale fitted end to end or centred is fitted to every month of the
  * years together, each cell weighted by area as {@link cellWeights} gives
  * it. One from zero runs up to the largest of the field's in each year, as
- * {@link fitRangeFromZero} fits it, with nothing beyond it.
+ * {@link fitRangeFromZero} fits it.
  *
  * @param layer - The layer's description.
  * @param view - The view of the year.
@@ -763,20 +762,17 @@ export const fitSummaryScale = (
 	view: ScalarSummarySpec,
 	years: readonly LayerYear[],
 	key: YearFieldKey,
-): FittedScale => {
+): ValueRange => {
 	const fit = view.scale;
 	if (fit.kind === 'fromZero') {
 		return {
-			range: {
-				min: 0,
-				max: Math.max(
-					...years.map(
-						(year) =>
-							fitRangeFromZero(yearField(layer, year, key), layer.minSpan).max,
-					),
+			min: 0,
+			max: Math.max(
+				...years.map(
+					(year) =>
+						fitRangeFromZero(yearField(layer, year, key), layer.minSpan).max,
 				),
-			},
-			beyond: NOTHING_BEYOND,
+			),
 		};
 	}
 	const months = years.flatMap((year) => year.months);

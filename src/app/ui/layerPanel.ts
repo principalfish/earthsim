@@ -7,19 +7,18 @@
  * it: the simulated values, the observed ones or, for the layer, the
  * difference; the month on screen, and whether the year plays through it,
  * for a layer's Month view, and in Terrain view too while the globe is lit
- * by the sun or shows the winds, as the timeline chooses them; and the
- * legend and the key to the wind arrows, laid over the globe. Once the
- * observed winds are on hand, the key also says how far the simulated
- * winds are from them.
+ * by the sun or shows the winds, as the timeline chooses them; and what
+ * the info box over the globe shows of them: the legend, and where the
+ * layer and the winds stand, said on the info box's status line.
  *
  * Each computed layer is shown as its description, a
  * {@link ScalarLayerSpec}, says: its views of the year, their colours and
  * scales, its wording and its comparison. {@link createLayerPanel} decides
- * what the globe, the legend and the key show, from the view settings and
+ * what the globe and the info box show, from the view settings and
  * the layer store, and switches each layer's calculation on and off with
  * the layer and the winds' with the dock's Winds tile.
- * {@link createLayerControls} is the legend and the key on the page, which
- * only show what they are told; the layer is chosen on the dock, and told
+ * The info box, given as {@link LayerControls}, only shows what it is
+ * told; the layer is chosen on the dock, and told
  * to the panel by {@link LayerPanel.setLayer}, the view of its year and
  * the source on the top bar, told by {@link LayerPanel.setSummary} and
  * {@link LayerPanel.setSource}, and the month and whether the year plays
@@ -35,14 +34,10 @@ import {
 	type MonthlyTemperature,
 	type MonthlyWind,
 	type Resolution,
-	type WindComparison,
-	type WindErrorFigures,
-	windErrorFigures,
 } from '../../core/index';
-import { type ColourRamp, centredRange } from '../globe/ramp';
+import { type ColourRamp, centredRange, type ValueRange } from '../globe/ramp';
 import type { Globe } from '../globe/renderer';
 import type { WindField } from '../globe/wind';
-import { DEFAULT_WIND_STYLE, type WindStyle } from '../globe/windMotion';
 import type { LayerStore, SolvedWinds } from '../layers';
 import type { ObservedLoader } from '../observedData';
 import { createPlayback, type PlaybackOptions } from '../playback';
@@ -80,51 +75,27 @@ import {
 	type WindSource,
 	windSourceFor,
 } from '../view';
-import { DEFAULT_WIND_UNIT, type WindUnit } from '../windUnits';
 import type { ComparisonContent } from './comparison';
+import { type LegendContent, type LegendSource, legendContent } from './legend';
 import {
-	createLegend,
-	type FittedScale,
-	type LegendContent,
-	type LegendSource,
-	legendContent,
-} from './legend';
-import type { MainView } from './mainView';
-import {
-	createWindKey,
 	OBSERVED_WINDS_FAILED_TEXT,
 	OBSERVED_WINDS_LOADING_TEXT,
 	type WindKeyContent,
 	windKeyContent,
 } from './windKey';
 
-/** What the layer controls start with. */
-export type LayerControlsOptions = {
-	/**
-	 * The unit the key to the wind arrows writes its speeds in at first; m/s
-	 * when left out.
-	 */
-	readonly windUnit?: WindUnit;
-	/**
-	 * How the winds are drawn at first, which the key follows; as arrows
-	 * when left out.
-	 */
-	readonly windStyle?: WindStyle;
-};
-
-/** The layer controls on the page. */
+/**
+ * What the info box shows of the layer and the winds: the legend, and what
+ * is said of the winds on its status line.
+ */
 export type LayerControls = {
 	/** Shows a legend, or hides it for null. */
 	showLegend(content: LegendContent | null): void;
-	/** Shows the key to the wind arrows, or hides it for null. */
-	showWindKey(content: WindKeyContent | null): void;
-	/** Writes the speeds of the key to the wind arrows in another unit. */
-	setWindUnit(unit: WindUnit): void;
 	/**
-	 * Shows the key for the winds drawn another way: its arrows for arrows,
-	 * a line in their place for streaks.
+	 * Says what is said of the winds, or nothing of them for null while
+	 * they are not shown.
 	 */
-	setWindStyle(style: WindStyle): void;
+	showWindKey(content: WindKeyContent | null): void;
 };
 
 /** What the layer panel joins. */
@@ -154,8 +125,8 @@ export type LayerPanelOptions = Pick<
 	 * dock's Winds tile is on, or a layer they calculate is on screen.
 	 */
 	readonly winds: Pick<WindsScheduler, 'setShowing'>;
-	/** Adds the legend and the key to the wind arrows to the page. */
-	readonly createControls: (options: LayerControlsOptions) => LayerControls;
+	/** Gives what the info box shows of the layer and the winds. */
+	readonly createControls: () => LayerControls;
 	/**
 	 * Called with the view settings, and whether the year is playing,
 	 * whenever any of them changes.
@@ -185,16 +156,6 @@ export type LayerPanelOptions = Pick<
 	 * be loaded.
 	 */
 	readonly reportError: (error: unknown) => void;
-	/**
-	 * The unit the key to the wind arrows writes its speeds in at first; m/s
-	 * when left out.
-	 */
-	readonly windUnit?: WindUnit;
-	/**
-	 * How the winds are drawn at first, which the key follows; as arrows
-	 * when left out.
-	 */
-	readonly windStyle?: WindStyle;
 };
 
 /** What the globe shows of a computed layer, as the layer panel gave it. */
@@ -206,13 +167,6 @@ export type ShownLayer = {
 	 * It belongs to the panel and must not be changed.
 	 */
 	readonly field: Float32Array;
-	/** What of the year the field is. */
-	readonly summary: Summary;
-	/**
-	 * The month on screen when the field was given, from January at 0; what
-	 * the field is for the Month view.
-	 */
-	readonly month: number;
 	/** Where the field comes from. */
 	readonly source: Source;
 	/**
@@ -234,18 +188,6 @@ export type ShownWinds = {
 	 */
 	readonly field: WindField;
 	/**
-	 * Whether they are the year's mean winds, as on a layer's Annual
-	 * average; the winds of a month when not.
-	 */
-	readonly annualMean: boolean;
-	/**
-	 * While they are the year's mean, the label of the Annual average of the
-	 * layer whose view of the year they follow, such as `Annual average` for
-	 * the temperature, for the readout to name them by as it names that
-	 * layer's values. Left out for a month's winds.
-	 */
-	readonly annualMeanLabel?: string;
-	/**
 	 * Where they come from: the simulated winds, or the observed Earth's;
 	 * the simulation when left out.
 	 */
@@ -255,7 +197,7 @@ export type ShownWinds = {
 	 * globe keeps earlier winds than those chosen, and, but for the observed
 	 * winds, which are never out of date, while the store's winds are out of
 	 * date, being worked out again or no longer calculable; so whenever the
-	 * key does not say they are current.
+	 * info box's status line does not say they are current.
 	 */
 	readonly current: boolean;
 };
@@ -362,21 +304,6 @@ export type LayerPanel = {
 	 * off, and while the globe has none, as before there is a result.
 	 */
 	shownWinds(): ShownWinds | null;
-	/**
-	 * Writes the speeds of the key to the wind arrows, and how far off the
-	 * winds are, in another unit. The arrows on the globe are as they were.
-	 *
-	 * @param unit - The unit to write them in.
-	 */
-	setWindUnit(unit: WindUnit): void;
-	/**
-	 * Shows the key for the winds drawn another way, as arrows or as
-	 * streaks; the winds on the globe and what the key says of them stay as
-	 * they are.
-	 *
-	 * @param style - How the winds are drawn.
-	 */
-	setWindStyle(style: WindStyle): void;
 };
 
 /** What the globe is given to show of a layer, and how. */
@@ -404,10 +331,10 @@ type ObservedYear = LayerYear & {
 type Derived = LayerYear & {
 	readonly result: object;
 	/** The scales fitted to this year alone, by {@link scaleKey}. */
-	readonly scales: Map<string, FittedScale>;
+	readonly scales: Map<string, ValueRange>;
 	against?: ObservedYear;
 	/** The scales fitted to this year and the observed one together. */
-	readonly shared: Map<string, FittedScale>;
+	readonly shared: Map<string, ValueRange>;
 	readonly differences: Map<YearFieldKey, Float32Array>;
 	readonly figures: Map<YearFieldKey, FieldDifference>;
 };
@@ -461,22 +388,26 @@ type LayerState = ObservedRequest & {
 };
 
 /**
- * What is worked out from one winds result: its annual mean and its error
- * figures against the observed winds, each when first needed, kept with it
- * until the next result; the figures for the observed winds they were
- * worked out against.
+ * What is worked out from one winds result: its annual mean, when first
+ * needed, kept with it until the next result.
  */
 type DerivedWinds = {
 	readonly solved: SolvedWinds;
 	summary?: WindField;
-	against?: ObservedWinds;
-	comparison?: WindComparison;
 };
 
 /** Where the observed year shown stands: never out of date. */
 const OBSERVED_STATUS: Pick<ScalarLayerReading, 'status' | 'progress'> = {
 	status: 'current',
 	progress: null,
+};
+
+/**
+ * What is said of observed winds on show: they are never out of date.
+ */
+const OBSERVED_WINDS_STATUS: WindKeyContent = {
+	state: 'current',
+	status: null,
 };
 
 /** What is kept in a map under a key, worked out and kept if it is not. */
@@ -505,31 +436,28 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * the winds, and is kept from one layer to another while it is offered.
  *
  * On a computed layer, the globe shows the latest result in the store, as
- * the layer's description reads it: the month on screen or a summary of
- * the year it offers, such as, for the temperature, its annual mean, its
- * warmest or coldest month, or its seasonal range. Each view is drawn in
- * its own colours on a scale fitted as it says: the temperature's four
- * temperatures on one scale fitted to the result's whole year, so the
- * colours do not change their meaning as the month moves on or another
- * summary is chosen, spanning the middle 99% of the year's values by area,
- * as `fitRange` fits it with the cell areas of `cellWeights`;
- * colder and hotter places take the end colours, and the legend says so at
- * each end beyond which the year holds values, the same in every month and
- * summary. The temperature's seasonal range has a scale of its own, from
- * zero up to the largest range in the world, marked at its own step, with
- * nothing beyond it; a layer centred on a value, as `fitRangeCentred`
- * fits it, reaches as far either side of it. Every scale is at least the
- * layer's smallest span. The summaries and scales are worked out once for
- * each result, when first shown, and kept until the next result or until
- * the store drops this one, so each is sent to the globe once. Until there
- * is a result, the globe shows the height colours and the legend says why.
- * A result that is out of date, or being calculated again, stays on the
- * globe until the next arrives. A field is sent to the globe when it
- * arrives or another month or summary is chosen, or its scale changes, not
- * again as its status or progress change. When the store drops its result,
- * as when the world is replaced, the globe goes back to the height colours.
- * In Terrain view, the globe shows the height colours and the legend is
- * hidden.
+ * the layer's description reads it: the month on screen or a summary of the
+ * year it offers, such as, for the temperature, its annual mean, its warmest
+ * or coldest month, or its seasonal range. Each view is drawn in its own
+ * colours on a scale fitted as it says: the temperature's four temperatures
+ * on one scale fitted to the result's whole year, so the colours do not
+ * change their meaning as the month moves on or another summary is chosen,
+ * spanning the middle 99% of the year's values by area, as `fitRange` fits
+ * it with the cell areas of `cellWeights`; colder and hotter places take the
+ * end colours. The temperature's seasonal range has a scale of its own, from
+ * zero up to the largest range in the world, marked at its own step; a layer
+ * centred on a value, as `fitRangeCentred` fits it, reaches as far either
+ * side of it. Every scale is at least the layer's smallest span. The
+ * summaries and scales are worked out once for each result, when first
+ * shown, and kept until the next result or until the store drops this one,
+ * so each is sent to the globe once. Until there is a result, the globe
+ * shows the height colours and the legend says why. A result that is out of
+ * date, or being calculated again, stays on the globe until the next
+ * arrives. A field is sent to the globe when it arrives or another month or
+ * summary is chosen, or its scale changes, not again as its status or
+ * progress change. When the store drops its result, as when the world is
+ * replaced, the globe goes back to the height colours. In Terrain view, the
+ * globe shows the height colours and the legend is hidden.
  *
  * While the world is the measured Earth, as the page says through
  * {@link LayerPanel.newWorld} and {@link LayerPanel.setEarth}, the
@@ -564,20 +492,19 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  *
  * While the comparison is offered and the observed year has arrived, the
  * simulated and the observed years share each scale, fitted as above to
- * their 24 months together, the same in every month and summary, and a
- * scale from zero runs up to the largest of either; until then, and once
- * the world stops being the measured Earth, the simulated year has its
- * own. The difference, of every month and summary, is drawn in the colours
- * of the layer's difference on a scale centred on zero and reaching as far
- * either way as it says, marked at its step, whose legend always says what
- * lies beyond both ends. The legend then also gives the error figures of
- * the simulated field for the month or summary on screen against the
- * observed one, as {@link compareField} works them out, whichever the
+ * their 24 months together, the same in every month and summary, and a scale
+ * from zero runs up to the largest of either; until then, and once the world
+ * stops being the measured Earth, the simulated year has its own. The
+ * difference, of every month and summary, is drawn in the colours of the
+ * layer's difference on a scale centred on zero and reaching as far either
+ * way as it says, marked at its step. The legend then also gives the error
+ * figures of the simulated field for the month or summary on screen against
+ * the observed one, as {@link compareField} works them out, whichever the
  * source, except under the observed year while the store's result is not
  * current, as while it is out of date or being calculated again. The
  * observed year is never marked out of date; the difference is marked
- * whenever the simulated year would be. All three need a result: until
- * there is one, the globe shows the height colours.
+ * whenever the simulated year would be. All three need a result: until there
+ * is one, the globe shows the height colours.
  *
  * In the Month view, and in Terrain view while the globe is lit by the sun
  * or shows the winds, {@link LayerPanel.togglePlaying} plays the year, a
@@ -591,61 +518,47 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  *
  * While the winds are shown, as the page says through
  * {@link LayerPanel.setWinds}, the winds are told they are showing, which
- * asks for them, and the globe shows the latest winds result in the store
- * as arrows over whatever colours it shows: in Terrain view and in the
- * Month view the winds of the month on screen, following the year as it
- * plays; while the layer on screen shows its annual average, their annual
- * mean, worked out once for each result, when first shown; and on any
- * other summary the month last on screen. Winds that are out of date or
- * being worked out again stay on the globe until the next arrive; until
- * there is a result there are none, and when the store drops its result,
- * as for a new world, they go. A field is sent to
- * the globe when it arrives or another month or the annual mean is chosen,
- * not again as the status changes. Turned off, the winds are told they are
- * not showing, unless the layer on screen is one they calculate, and the
- * globe is given no winds. The key to the arrows shows while the winds are
- * shown, its line saying where the store's winds stand, as
- * {@link windKeyContent} words it from {@link windsStatus}, the rule the
- * pressure's legend follows, so that it says the winds are being worked
- * out while the temperature they wait for is; and its speeds in the unit
- * given, m/s when none is, or the one last set through
- * {@link LayerPanel.setWindUnit}.
+ * asks for them, and the globe shows the latest winds result in the store as
+ * arrows over whatever colours it shows: in Terrain view and in the Month
+ * view the winds of the month on screen, following the year as it plays;
+ * while the layer on screen shows its annual average, their annual mean,
+ * worked out once for each result, when first shown; and on any other
+ * summary the month last on screen. Winds that are out of date or being
+ * worked out again stay on the globe until the next arrive; until there is a
+ * result there are none, and when the store drops its result, as for a new
+ * world, they go. A field is sent to the globe when it arrives or another
+ * month or the annual mean is chosen, not again as the status changes.
+ * Turned off, the winds are told they are not showing, unless the layer on
+ * screen is one they calculate, and the globe is given no winds. While the
+ * winds are shown, the info box's status line is given where the store's
+ * winds stand, as {@link windKeyContent} words it from {@link windsStatus},
+ * the rule the pressure's legend follows, so that it says the winds are
+ * being worked out while the temperature they wait for is.
  *
  * While the world is the measured Earth, the arrows follow the source, as
  * {@link windSourceFor} says: the observed winds on Observed, and the
- * simulated on Simulated and on Difference. The observed winds are asked
- * of `loadObservedWinds` the first time they are needed on a world, never
+ * simulated on Simulated and on Difference. The observed winds are asked of
+ * `loadObservedWinds` the first time they are needed on a world, never
  * before: when Observed or Difference is chosen while the winds are shown,
- * or the winds are shown while either is on; on Difference they give the
- * key its figures. They are kept for that world, as a layer's observed
- * year is, by the same epochs: the key's line says
- * {@link OBSERVED_WINDS_LOADING_TEXT} until they arrive, the simulated
- * arrows staying meanwhile; if they cannot be loaded, it says
+ * or the winds are shown while either is on. They are kept for that world,
+ * as a layer's observed year is, by the same epochs: the info box's status
+ * line says {@link OBSERVED_WINDS_LOADING_TEXT} until they arrive, the
+ * simulated arrows staying meanwhile; if they cannot be loaded, it says
  * {@link OBSERVED_WINDS_FAILED_TEXT}, the source goes back to Simulated if
- * the winds are still shown, and the next time they are needed asks
- * again; and what arrives after a new world, or after the world stopped or
- * started being the measured Earth, is set aside. Observed and arrived,
- * the arrows are drawn from them as from a result: the month's, or on the
- * annual average their mean over the year, worked out once as the
- * result's is; like the result's, they need a result to be shown. They
- * are never out of date, so under them the key's line says nothing of the
- * store's winds.
+ * the winds are still shown, and the next time they are needed asks again;
+ * and what arrives after a new world, or after the world stopped or started
+ * being the measured Earth, is set aside. Observed and arrived, the arrows
+ * are drawn from them as from a result: the month's, or on the annual
+ * average their mean over the year, worked out once as the result's is; like
+ * the result's, they need a result to be shown. They are never out of date,
+ * so under them the info box's status line says nothing of the store's
+ * winds.
  *
- * From the time the observed winds have arrived, while the world is the
- * measured Earth and there is a winds result, the key also gives how far
- * the result is from them, whichever the source: the figures
- * `windErrorFigures` works out, once for each result and observed winds,
- * for the month the arrows are of, or for the year while they are its
- * mean. Under the observed winds they are left off while the store's winds
- * are not current, as the legend leaves off a layer's figures under its
- * observed year; under the simulated they stay.
- *
- * The legend's scale, ramp, caption, ticks and words for what lies beyond
- * the ends are always those of what the globe shows: what it was last
- * given, or no scale while it shows the height colours, written as the
- * layer that field is of writes its values, with its error figures in that
- * layer's unit. Its line and bar say where the chosen layer's result
- * stands, in that layer's words.
+ * The legend's scale, ramp, caption and ticks are always those of what the
+ * globe shows: what it was last given, or no scale while it shows the height
+ * colours, written as the layer that field is of writes its values, with its
+ * error figures in that layer's unit. Its line and bar say where the chosen
+ * layer's result stands, in that layer's words.
  *
  * Nothing here throws in normal use; what the globe throws reaches the
  * store's record of errors when it comes from a change of the store, and
@@ -662,10 +575,9 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * `reportError` too.
  *
  * @param options - The store, the layers, the globe, the temperature, the
- * winds, the legend and the key, the timers the year plays by, the
- * observed years' and the observed winds' loaders, whom to tell of the
- * view, of the comparison and of an error with no control to hand it back
- * to.
+ * winds, the info box, the timers the year plays by, the observed years'
+ * and the observed winds' loaders, whom to tell of the view, of the
+ * comparison and of an error with no control to hand it back to.
  * @returns The panel.
  */
 export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
@@ -695,13 +607,6 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	let derivedWinds: DerivedWinds | null = null;
 	/** The winds the globe was last given, or null for none. */
 	let shownWinds: WindField | null = null;
-	/** Whether {@link shownWinds} is a result's annual mean. */
-	let shownWindsMean = false;
-	/**
-	 * The label of the Annual average of the layer whose view of the year
-	 * {@link shownWinds} followed, while they are the annual mean.
-	 */
-	let shownWindsMeanLabel: string | undefined;
 	/** Where {@link shownWinds} come from. */
 	let shownWindsSource: WindSource = DEFAULT_WIND_SOURCE;
 	/** What {@link LayerPanel.shownWinds} gives, as of the latest update. */
@@ -795,7 +700,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		const key: YearFieldKey = summary === 'month' ? playback.month : summary;
 		const on = (
 			field: Float32Array,
-			{ range, beyond }: FittedScale,
+			range: ValueRange,
 			ramp: ColourRamp,
 			tickStep?: number,
 		): Shown => ({
@@ -809,7 +714,6 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 					playback.month,
 					earth === null || spec.observed === null ? undefined : showing,
 				),
-				beyond,
 				tickStep,
 				figures: year === null ? null : figuresOf(spec, from, year, key),
 			},
@@ -841,10 +745,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 				const { difference } = spec.observed as ObservedComparison;
 				return on(
 					differenceOf(spec, from, year, key),
-					{
-						range: centredRange(difference.halfSpan),
-						beyond: { below: true, above: true },
-					},
+					centredRange(difference.halfSpan),
 					difference.ramp,
 					difference.tickStep,
 				);
@@ -853,10 +754,9 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	};
 
 	/**
-	 * The observed winds a winds result is compared with: those that have
-	 * arrived for this world while the world is the measured Earth, on the
-	 * result's grid, with the figures worked out against others dropped.
-	 * Null when there are none.
+	 * The observed winds that may be shown in place of a winds result: those
+	 * that have arrived for this world while the world is the measured
+	 * Earth, on the result's grid. Null when there are none.
 	 */
 	const observedWindsFor = (from: DerivedWinds): ObservedWinds | null => {
 		const year = observedWinds.observed;
@@ -868,37 +768,11 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		) {
 			return null;
 		}
-		if (from.against !== year) {
-			from.against = year;
-			from.comparison = undefined;
-		}
 		return year;
 	};
 
 	/** Whether the wind arrows are the year's mean, as the view settings say. */
 	const windsMeanShown = (): boolean => onScreen()?.summary === 'annualMean';
-
-	/**
-	 * The error figures of a winds result against the observed winds, for
-	 * the month on screen or, with the year's mean shown, the year: all of
-	 * them worked out once for each result and observed winds.
-	 */
-	const windFiguresOf = (
-		from: DerivedWinds,
-		year: ObservedWinds,
-	): WindErrorFigures => {
-		const { winds: simulated } = from.solved;
-		// The figures read only the winds; the simulated pressure stands in
-		// for the observed, which is not fetched for the winds.
-		from.comparison ??= windErrorFigures(
-			simulated,
-			{ ...year.winds, pressure: simulated.pressure },
-			getGrid(year.resolution),
-		);
-		return windsMeanShown()
-			? from.comparison.year
-			: (from.comparison.months[playback.month] as WindErrorFigures);
-	};
 
 	/**
 	 * The winds the globe is to show of a result, or of the observed winds
@@ -930,7 +804,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		};
 	};
 
-	/** Brings the arrows on the globe and the key up to date. */
+	/** Brings the arrows on the globe and what is said of them up to date. */
 	const updateWinds = (): void => {
 		const { result } = store.winds;
 		if (derivedWinds !== null && derivedWinds.solved !== result) {
@@ -938,8 +812,6 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		}
 		/** The winds the globe is to show, once they are known. */
 		let target: WindField | null | undefined;
-		/** The figures the key is to give, once they are known. */
-		let figures: WindErrorFigures | null = null;
 		try {
 			let next: WindField | null = null;
 			let nextSource: WindSource = DEFAULT_WIND_SOURCE;
@@ -954,7 +826,6 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 					derivedWinds,
 					nextSource === 'observed' ? year : null,
 				);
-				figures = year === null ? null : windFiguresOf(derivedWinds, year);
 			}
 			target = next;
 			// Sent again only for other arrays: a month's are the result's
@@ -965,27 +836,12 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			) {
 				globe.setWinds(next);
 				shownWinds = next;
-				shownWindsMean =
-					next !== null &&
-					(next === derivedWinds?.summary ||
-						next === observedWinds.observed?.mean);
 				shownWindsSource = nextSource;
 			}
-			// Reached only with the winds on the globe as chosen, so the mean
-			// is of the layer on screen's Annual average, whichever layer that
-			// is now; the same mean is not sent again for another layer's.
-			const state = onScreen();
-			shownWindsMeanLabel =
-				shownWindsMean && state !== null
-					? summaryOf(state.spec, 'annualMean').label
-					: undefined;
 		} finally {
 			// Brought up to date even when the globe throws, which leaves the
 			// winds it shows, and so `shownWinds`, as they were. The observed
-			// winds are never out of date, whatever the store's winds; the
-			// figures, worked out from those, are left off under them while
-			// the store's winds are not current, as the legend leaves off a
-			// layer's figures under its observed year.
+			// winds are never out of date, whatever the store's winds.
 			const observedShown = shownWindsSource === 'observed';
 			const showsTarget =
 				target !== undefined &&
@@ -998,35 +854,34 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 				windsOn && shownWinds !== null
 					? {
 							field: shownWinds,
-							annualMean: shownWindsMean,
-							annualMeanLabel: shownWindsMeanLabel,
 							source: shownWindsSource,
 							current: showsTarget && (observedShown || storeCurrent),
 						}
 					: null;
-			const status =
+			const { state, status } =
 				observedShown && showsTarget
-					? null
+					? OBSERVED_WINDS_STATUS
 					: windKeyContent({
 							status: windsStatus(store.temperature.status, store.winds.status),
-						}).status;
-			const shownFigures =
-				figures === null || (observedShown && !storeCurrent) ? null : figures;
+						});
 			controls.showWindKey(
 				windsOn
 					? {
+							state,
 							// Where the winds themselves stand comes first: the line
 							// about the observed winds, loading or failed, shows only
 							// while there is nothing else to say.
 							status: status ?? observedWinds.message,
-							...(shownFigures === null ? {} : { figures: shownFigures }),
 						}
 					: null,
 			);
 		}
 	};
 
-	/** Brings what the globe shows of the layer on screen and the legend up to date. */
+	/**
+	 * Brings what the globe shows of the layer on screen and the legend up to
+	 * date.
+	 */
 	const updateLayer = (): void => {
 		const state = onScreen();
 		const reading = state === null ? null : state.spec.read(store);
@@ -1094,8 +949,6 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 					: {
 							layer: shown.layer,
 							field: shown.field,
-							summary: shown.summary,
-							month: shown.month,
 							source: shown.source,
 							current:
 								showsResult && status !== null && status.status === 'current',
@@ -1116,7 +969,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		}
 	};
 
-	/** Brings the globe, the legend and the key up to date. */
+	/** Brings the globe and what the info box shows up to date. */
 	const update = (): void => {
 		try {
 			updateLayer();
@@ -1161,7 +1014,8 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		options.onComparison?.({
 			offered: offered(),
 			source,
-			// The winds' lines are the key's own.
+			// The winds' loading and failure lines go to the info box's
+			// status line.
 			message: onScreen()?.message ?? null,
 		});
 	};
@@ -1321,10 +1175,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		onPlayingChange: announce,
 	});
 
-	const controls = options.createControls({
-		windUnit: options.windUnit ?? DEFAULT_WIND_UNIT,
-		windStyle: options.windStyle ?? DEFAULT_WIND_STYLE,
-	});
+	const controls = options.createControls();
 	store.addListener(update);
 	update();
 
@@ -1456,36 +1307,5 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		},
 		shown: () => shownLayer,
 		shownWinds: () => shownWindsState,
-		setWindUnit: (unit) => controls.setWindUnit(unit),
-		setWindStyle: (style) => controls.setWindStyle(style),
-	};
-};
-
-/**
- * Adds the legend and the key to the wind arrows to their places over the
- * globe.
- *
- * @param places - Where the legend and the key go, each after what its
- * place holds.
- * @param options - How the key writes the winds' speeds and draws them at
- * first.
- * @returns The controls, with the legend and the key hidden.
- */
-export const createLayerControls = (
-	places: Pick<MainView, 'legend' | 'windKey'>,
-	options: LayerControlsOptions,
-): LayerControls => {
-	const legend = createLegend();
-	const windKey = createWindKey(
-		options.windUnit ?? DEFAULT_WIND_UNIT,
-		options.windStyle ?? DEFAULT_WIND_STYLE,
-	);
-	places.legend.append(legend.element);
-	places.windKey.append(windKey.element);
-	return {
-		showLegend: legend.show,
-		showWindKey: windKey.show,
-		setWindUnit: windKey.setUnit,
-		setWindStyle: windKey.setStyle,
 	};
 };

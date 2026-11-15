@@ -47,16 +47,16 @@ describe('createMainView', () => {
 		]);
 	});
 
-	it('leaves every region empty but the info region, which holds the legend’s place, then the wind key’s, then the strip’s', () => {
+	it('leaves every region empty', () => {
 		const { view, as } = make();
-		for (const region of [view.dock, view.topBar, view.corner, view.timeline]) {
+		for (const region of [
+			view.dock,
+			view.topBar,
+			view.corner,
+			view.info,
+			view.timeline,
+		]) {
 			expect(as(region).children).toEqual([]);
-		}
-		const places = [as(view.legend), as(view.windKey), as(view.readout)];
-		expect(as(view.info).children).toEqual(places);
-		for (const place of places) {
-			expect(place.className).toBe('main-view__place');
-			expect(place.children).toEqual([]);
 		}
 	});
 });

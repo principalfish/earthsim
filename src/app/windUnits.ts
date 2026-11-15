@@ -1,7 +1,7 @@
 /**
  * Wind speeds and directions in words: the units a speed can be written
  * in, the eight points of the compass, and a wind as the page writes it,
- * such as `7 m/s from the north-east`.
+ * such as `7 m/s NE`.
  *
  * The winds themselves are always in metres a second; the unit changes
  * only how a speed is written.
@@ -28,16 +28,16 @@ const PER_METRE_A_SECOND: Readonly<Record<WindUnit, number>> = {
 /** What a calm wind is called, whatever the unit. */
 export const WIND_CALM_TEXT = 'calm';
 
-/** The eight points of the compass, clockwise from north. */
+/** The eight points of the compass, clockwise from north, abbreviated. */
 export const COMPASS_POINTS = [
-	'north',
-	'north-east',
-	'east',
-	'south-east',
-	'south',
-	'south-west',
-	'west',
-	'north-west',
+	'N',
+	'NE',
+	'E',
+	'SE',
+	'S',
+	'SW',
+	'W',
+	'NW',
 ] as const;
 
 /** One of the eight points of the compass. */
@@ -111,7 +111,8 @@ export const windFromDeg = (east: number, north: number): number => {
 };
 
 /**
- * A wind as the page writes it, such as `7 m/s from the north-east`, or
+ * A wind as the page writes it, its speed then the point of the compass it
+ * blows from, such as `7 m/s NE` for a wind from the north-east, or
  * {@link WIND_CALM_TEXT} below {@link CALM_SPEED} metres a second, whatever
  * the unit.
  *
@@ -127,4 +128,4 @@ export const formatWind = (
 ): string =>
 	speedMs < CALM_SPEED
 		? WIND_CALM_TEXT
-		: `${formatWindSpeed(speedMs, unit)} from the ${compassPoint(fromDeg)}`;
+		: `${formatWindSpeed(speedMs, unit)} ${compassPoint(fromDeg)}`;

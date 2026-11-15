@@ -667,20 +667,24 @@ body {
   display: none;
 }
 
-/* Laid over the globe's bottom-right corner, on the backing the cursor
-   readout has. It is as wide as the panel and has the panel's inline
-   padding, room for the values marked at the ends of the scale, which
-   stand out past the ramp by half their width. In a window narrower than
-   that it is as wide as the globe's area allows. The pointer passes
-   through it to the globe, so turning and sculpting work under it. */
-.legend {
+/* The info box over the globe's bottom-right corner: the legend, the status
+   line with its bar, and what lies under the pointer, one under the other on
+   a backing that lets the globe show through. Its width is fixed, with room
+   in a wide font for the pointer's usual lines, such as `27.9° N, 86.9° E ·
+   3,400 m deep` and `−12 °C difference out of date · 36 km/h NE`, so it
+   keeps its size as the values change; in a window narrower than that it is
+   as wide as the area allows. Its inline padding leaves room for the values
+   marked at the ends of the legend's scale, which stand out past the ramp by
+   half their width. The pointer passes through it to the globe, so turning
+   and sculpting work under it. */
+.info-box {
+  position: relative;
   display: grid;
-  flex: none;
   gap: var(--space-sm);
-  inline-size: var(--panel-width);
-  max-inline-size: 100%;
+  inline-size: min(27em, 100%);
   padding: var(--space-sm) var(--space-md);
   font-size: var(--font-size-sm);
+  line-height: 1.4;
   color: var(--color-text);
   background: var(--color-overlay-bg);
   border: 1px solid var(--color-border);
@@ -688,30 +692,48 @@ body {
   pointer-events: none;
 }
 
-/* A part of the legend with nothing to show is hidden, which the display
-   set on it would otherwise undo. */
-.legend[hidden],
-.legend [hidden] {
+/* The box, or a part of it, with nothing to show is hidden, which the
+   display set on it would otherwise undo. */
+.info-box[hidden],
+.info-box [hidden] {
   display: none;
 }
 
-.legend__scale {
+/* The one status line. Left empty rather than hidden when there is nothing
+   to say, so that a screen reader announces what is written into it next;
+   empty, it is taken out of the box's flow, so it keeps no room and no gap
+   around it. */
+.info-box__status {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.info-box__status:empty {
+  position: absolute;
+}
+
+.info-box__bar {
+  width: 100%;
+  height: 0.25rem;
+  accent-color: var(--color-accent);
+}
+
+/* In a narrow globe's area the box takes the whole width beside the dock. */
+@container viewport (width < 560px) {
+  .info-box {
+    inline-size: 100%;
+  }
+}
+
+/* The legend's block: its caption, the ramp, the values marked and the
+   error figures. */
+.legend {
   display: grid;
   gap: var(--space-xs);
 }
 
-.legend__caption,
-.legend__status {
+.legend__caption {
   margin: 0;
-  line-height: 1.4;
-}
-
-/* The status line is left empty rather than hidden when there is nothing
-   to say, so that a screen reader announces what is written into it; its
-   one line is kept either way, so the legend does not shift as it fills. */
-.legend__status {
-  min-height: 1.4em;
-  color: var(--color-text-muted);
 }
 
 .legend__ramp {
@@ -746,124 +768,26 @@ body {
   background: var(--color-text);
 }
 
-/* What the end colours stand for, on a line of its own under the values
-   marked so that the two never meet: the low end's words at the left, the
-   high end's at the right, even when the low end's are hidden. */
-.legend__ends {
-  display: flex;
-  gap: var(--space-sm);
-  margin: 0;
-  line-height: 1.4;
-  color: var(--color-text-muted);
-}
-
-.legend__end {
-  font-variant-numeric: tabular-nums;
-}
-
-.legend__end--high {
-  margin-left: auto;
-  text-align: right;
-}
-
-/* The error figures against the observed temperature, directly under the
-   words for the ends. */
+/* The error figures against the observed temperature, under the values
+   marked. */
 .legend__figures {
   margin: 0;
   font-variant-numeric: tabular-nums;
-  line-height: 1.4;
   color: var(--color-text-muted);
 }
 
-.legend__bar {
-  width: 100%;
-  height: 0.25rem;
-  accent-color: var(--color-accent);
-}
-
-/* The key to the wind arrows, on the legend's backing, beside the legend
-   or in the corner while it is hidden: a caption, an arrow and its speed
-   on each line, and the status line, worded as the legend's. The arrows
-   are drawn at their size on the globe, one CSS pixel to a pixel. */
-.wind-key {
-  display: grid;
-  flex: none;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  font-size: var(--font-size-sm);
-  color: var(--color-text);
-  background: var(--color-overlay-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  pointer-events: none;
-}
-
-/* Hidden by the page, which the display set on it would otherwise undo. */
-.wind-key[hidden] {
-  display: none;
-}
-
-.wind-key__caption,
-.wind-key__status {
-  margin: 0;
-  line-height: 1.4;
-}
-
-/* Each arrow stands in a column as wide as the longest, so the speeds line
-   up after them. */
-.wind-key__row {
-  display: grid;
-  grid-template-columns: 2.25rem auto;
-  gap: var(--space-sm);
-  align-items: center;
-}
-
-.wind-key__arrow {
-  display: block;
-  overflow: visible;
-}
-
-.wind-key__label {
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
-}
-
-/* How to read the streaks, in the arrows' place while the winds are drawn
-   as streaks. */
-.wind-key__streaks {
-  margin: 0;
-  line-height: 1.4;
-  color: var(--color-text-muted);
-}
-
-/* How far the simulated winds are from the observed, on the measured
-   Earth. Each line takes the pointer, though the key does not, so that its
-   tooltip, the figure's exact definition, shows. */
-.wind-key__figure {
-  margin: 0;
-  line-height: 1.4;
-  font-variant-numeric: tabular-nums;
-  pointer-events: auto;
-}
-
-/* Left empty rather than hidden when there is nothing to say, as the
-   legend's line is, with its one line kept. */
-.wind-key__status {
-  min-height: 1.4em;
-  color: var(--color-text-muted);
-}
-
-/* The regions laid over the globe's area, a small margin in from its
-   edges: the dock down the left edge, as tall as its tiles and no taller
-   than the area, scrolling when they do not fit; the top bar along the top
-   beside it, with the corner at its right end; the info region at the
-   bottom right, as wide as the area beside the dock; and the timeline
-   under it along the bottom. A region with nothing in it takes no room.
-   The timeline always keeps its row: in an area too short for all of them,
-   the info region's row gives way, and what it holds rises over the globe
-   above it rather than pushing the timeline out of view. Neither the
-   regions nor the space between them take the pointer, which passes
-   through to the globe; only the controls in them take it. */
+/* The regions laid over the globe's area, a small margin in from its edges:
+   the dock down the left edge, as tall as its tiles and no taller than the
+   area, scrolling when they do not fit; the top bar along the top beside it,
+   with the corner at its right end; the info region at the bottom right, as
+   wide as the area beside the dock; and the timeline under it along the
+   bottom. A region with nothing in it takes no room. The timeline always
+   keeps its row: in an area too short for all of them, the info region's row
+   gives way, and what it holds rises over the globe above it rather than
+   pushing the timeline out of view, its top tucked under the top bar and the
+   corner, which are drawn above it so that it never covers their controls.
+   Neither the regions nor the space between them take the pointer, which
+   passes through to the globe; only the controls in them take it. */
 .main-view {
   grid-area: 1 / 1;
   display: grid;
@@ -903,31 +827,22 @@ body {
 }
 
 .main-view__top-bar {
+  z-index: 1;
   grid-area: top-bar;
   min-width: 0;
 }
 
 .main-view__corner {
+  z-index: 1;
   grid-area: corner;
 }
 
-/* The legend, the key to the wind arrows and the cursor readout, in a row.
-   The legend comes first, then the key, then the strip, and the row runs
-   from right to left, so the legend takes the bottom-right corner, the key
-   stands to its left, or in the corner while the legend is hidden, and the
-   strip, pushed along by its margin, takes the left edge, beside the dock.
-   The lines stack upwards, so when they do not all fit side by side the
-   legend keeps the bottom and what does not fit sits on a line directly
-   above; on one line all stand on the bottom edge. */
+/* The info box, in the bottom-right corner, standing on the timeline. */
 .main-view__info {
   grid-area: info;
-  display: flex;
-  flex-direction: row-reverse;
-  flex-wrap: wrap-reverse;
-  /* With the lines stacked upwards, the start is the bottom. */
-  align-items: flex-start;
+  display: grid;
+  justify-items: end;
   align-self: end;
-  gap: var(--space-sm);
   min-width: 0;
   min-height: 0;
 }
@@ -935,11 +850,6 @@ body {
 .main-view__timeline {
   grid-area: timeline;
   min-width: 0;
-}
-
-/* A place that draws no box, so what it holds is laid out by the row. */
-.main-view__place {
-  display: contents;
 }
 
 /* The dock's two groups of tiles, each under its small heading, worded as
@@ -967,7 +877,7 @@ body {
   gap: var(--space-xs);
 }
 
-/* A tile: its icon over its name, on the backing the legend has. All are
+/* A tile: its icon over its name, on the backing the info box has. All are
    as wide as the widest, which the longest name, `Temperature`, sets. The
    tile chosen, and each overlay that is on, is outlined and tinted in the
    accent colour. Only the tiles take the pointer. */
@@ -1029,7 +939,7 @@ body {
   }
 }
 
-/* The top bar's controls side by side, each on the backing the legend has
+/* The top bar's controls side by side, each on the backing the info box has
    and taking the pointer, though the bar does not: the Show choice, its
    label beside its drop-down, then the comparison, its line under its
    segments. When they do not fit side by side the comparison goes under
@@ -1069,7 +979,7 @@ body {
 }
 
 /* The timeline along the bottom of the globe's area, beside the dock and
-   under the info region, a small gap from it, on the backing the legend
+   under the info region, a small gap from it, on the backing the info box
    has: the play button, then the month slider with the months' first
    letters standing over its track. The box takes no pointer, so the globe
    can be turned and sculpted through its gaps; the button, the letters and
@@ -1163,53 +1073,36 @@ body {
   pointer-events: auto;
 }
 
-/* What lies under the pointer, against the left edge of the info region.
-   The pointer passes through it to the globe, so it never stops a stroke or
-   a drag. Its width is fixed, with room in a wide font for the longest
-   usual line, `Annual average −12 °C difference · out of date`, so it keeps
-   its size as the values change; in a window narrower than that it is as
-   wide as the area allows. Each part has a line of its own and a part with
-   nothing to say takes none, so the strip is two lines high in Terrain view
-   and three in Temperature view, with one more for the wind while the
-   winds are shown: its height changes only with what is shown, not with
-   the values. */
+/* What lies under the pointer, the last block of the info box, in two
+   lines: the place, and its values, the second hidden while there are
+   none. Each line is never wrapped: one longer than the box is cut short
+   with an ellipsis, so the box keeps its width, and a narrow window
+   neither makes it taller nor scrolls. */
 .cursor-readout {
   display: flex;
-  flex: none;
   flex-direction: column;
-  inline-size: min(26em, 100%);
-  margin-inline-end: auto;
-  padding: var(--space-xs) var(--space-sm);
+  min-width: 0;
   overflow: hidden;
-  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
-  line-height: 1.4;
-  color: var(--color-text);
-  background: var(--color-overlay-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  pointer-events: none;
 }
 
-/* Hidden by the page, which the display set on it would otherwise undo. */
-.cursor-readout[hidden] {
-  display: none;
+/* The block is set off by a rule from what is above it, when anything
+   is. */
+.info-box:has(> .legend:not([hidden]), > .info-box__status:not(:empty))
+  > .cursor-readout {
+  padding-block-start: var(--space-sm);
+  border-block-start: 1px solid var(--color-border);
 }
 
-/* One line each, never wrapped: a line longer than the strip is cut short
-   with an ellipsis, so a narrow window neither makes the strip taller nor
-   scrolls. */
-.cursor-readout__position,
-.cursor-readout__elevation,
-.cursor-readout__temperature,
-.cursor-readout__wind {
+.cursor-readout__place,
+.cursor-readout__values {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-/* The end of the temperature's line and of the wind's, each after a middle
-   dot that is hidden with it. */
+/* The marks after the layer's value and after the wind, each after a
+   space and hidden with it. */
 .cursor-readout__status,
 .cursor-readout__wind-status {
   color: var(--color-text-muted);
@@ -1217,7 +1110,7 @@ body {
 
 .cursor-readout__status::before,
 .cursor-readout__wind-status::before {
-  content: " · ";
+  content: " ";
 }
 
 /* Utilities */

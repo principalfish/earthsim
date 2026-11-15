@@ -52,9 +52,11 @@ Some worlds have two settled climates: an ordinary one and a frozen one. A calcu
 
 Terrain edits carry on, but only until the terrain has drifted past a limit since the last fresh calculation; the next one then starts afresh. The limit is about as much as raising 25 patches of land, each 1,000 km across, by 1,000 m, or sweeping the default brush over land for some 80 seconds. On a world that sits right at a freezing tipping point, the result can be in the wrong climate until that limit is reached.
 
-### What the legend says meanwhile
+### What the info box says meanwhile
 
-| Legend | Meaning |
+The status line of the info box, under the legend, says where the result stands, unless the winds, while they are shown, have something worse to say; see the [user guide](user-guide.md#the-info-box).
+
+| Status line | Meaning |
 |-|-|
 | "Calculating", with the years done and a bar | A new result is on its way; the one before stays on the globe |
 | "Out of date" | The result on the globe no longer describes the world |
@@ -67,7 +69,7 @@ Until the first result arrives, the globe keeps the height colours.
 
 - **Colours** run from dark blue for the coldest, through red, to pale yellow for the hottest, growing lighter from cold to hot.
 - **One scale for the whole year.** It is fitted to the world's whole year, so a colour means the same temperature in every month and every summary.
-- **Fitted to the middle 99%.** The scale spans the middle 99% of the year by area, so a tall peak or a small cold corner does not squeeze the rest of the world into a few colours. Places beyond it take the colour at the end, and the legend says so, such as "−34 and below".
+- **Fitted to the middle 99%.** The scale spans the middle 99% of the year by area, so a tall peak or a small cold corner does not squeeze the rest of the world into a few colours. Places beyond it take the colour at the end; the legend marks only the values along the scale.
 - **Seasonal range has its own scale and colours,** from near white to deep violet, starting at zero and marked every 5 degrees. The colours change fastest at the low end, since most of a world changes little through the year.
 
 ## Earth comparison

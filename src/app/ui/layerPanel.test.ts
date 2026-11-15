@@ -10,7 +10,6 @@ import {
 	summariseTemperature,
 	summariseWinds,
 	type TemperatureResult,
-	windErrorFigures,
 } from '../../core/index';
 import {
 	progressOf,
@@ -26,7 +25,6 @@ import {
 	type ValueRange,
 } from '../globe/ramp';
 import type { WindField } from '../globe/wind';
-import type { WindStyle } from '../globe/windMotion';
 import { createLayerStore, type LayerStore, type SolvedWinds } from '../layers';
 import type { ObservedLoader } from '../observedData';
 import { PLAYBACK_STEP_MS } from '../playback';
@@ -38,7 +36,6 @@ import {
 	OBSERVED_PRESSURE_LOADING_TEXT,
 	PRESSURE_LAYER,
 	SEASONAL_RANGE_TICK_STEP,
-	summaryOf,
 	TEMPERATURE_LAYER,
 	TEMPERATURE_NOT_SHOWN_TEXT,
 	TEMPERATURE_UNAVAILABLE_TEXT,
@@ -47,6 +44,7 @@ import {
 	byClass,
 	createFakeDocument,
 	type FakeDocument,
+	type FakeElement,
 	oneByClass,
 } from '../testing/fakeDocument';
 import { createFakeTimers } from '../testing/fakeTimers';
@@ -68,14 +66,9 @@ import {
 	type Summary,
 	WIND_SOURCES,
 } from '../view';
-import type { WindUnit } from '../windUnits';
 import type { ComparisonContent } from './comparison';
-import {
-	createLayerControls,
-	createLayerPanel,
-	type LayerControlsOptions,
-	type LayerPanel,
-} from './layerPanel';
+import { createInfoBox, type InfoBox } from './infoBox';
+import { createLayerPanel, type LayerPanel } from './layerPanel';
 import {
 	cellWeights,
 	FIT_TAIL_SHARE,
@@ -83,7 +76,6 @@ import {
 	fitRangeCentred,
 	fitRangeFromZero,
 	formatFigures,
-	formatTick,
 	LEGEND_CALCULATING_TEXT,
 	LEGEND_EMPTY_TEXT,
 	LEGEND_FIRST_YEAR_TEXT,
@@ -130,7 +122,7 @@ const resultSpanning = (min: number, max: number): TemperatureResult => {
 
 /** The year's scale of a result, fitted as the panel fits it. */
 const yearRange = (result: TemperatureResult) =>
-	fitRange(result.months, cellWeights(result.months[0]?.length ?? 0)).range;
+	fitRange(result.months, cellWeights(result.months[0]?.length ?? 0));
 
 /**
  * A result on the 64 grid. Its smallest cells, a few more than half a
@@ -164,13 +156,8 @@ const tickLabels = (legend: LegendContent | null | undefined) =>
 
 /**
  * The layer panel on a real store, with stand-ins for everything else.
- *
- * @param windUnit - The unit the key starts in; the panel's own when left
- * out.
- * @param windStyle - How the winds are drawn at first; the panel's own when
- * left out.
  */
-const createStage = (windUnit?: WindUnit, windStyle?: WindStyle) => {
+const createStage = () => {
 	const errors: unknown[] = [];
 	/** What the panel reported as errors of its own. */
 	const reported: unknown[] = [];
@@ -181,12 +168,8 @@ const createStage = (windUnit?: WindUnit, windStyle?: WindStyle) => {
 	const windsShowing: boolean[] = [];
 	/** Every wind field the globe was given, or null for none. */
 	const winds: (WindField | null)[] = [];
-	/** What the key to the arrows was told to show. */
+	/** What was said of the winds, for the info box's status line. */
 	const keys: (WindKeyContent | null)[] = [];
-	/** Every unit the key to the arrows was told to write its speeds in. */
-	const keyUnits: WindUnit[] = [];
-	/** Every way the key to the winds was told the winds are drawn. */
-	const keyStyles: WindStyle[] = [];
 	const legends: (LegendContent | null)[] = [];
 	/** What the comparison control was told to show. */
 	const comparisons: ComparisonContent[] = [];
@@ -203,7 +186,6 @@ const createStage = (windUnit?: WindUnit, windStyle?: WindStyle) => {
 	/** What the panel told of the view settings. */
 	const told: PageView[] = [];
 	const timers = createFakeTimers();
-	let controls: LayerControlsOptions | undefined;
 	/** What the globe throws when next asked to show something, if anything. */
 	let failure: Error | null = null;
 	/** What the globe throws when next given winds, if anything. */
@@ -212,8 +194,6 @@ const createStage = (windUnit?: WindUnit, windStyle?: WindStyle) => {
 	let reportFailure: Error | null = null;
 	const panel: LayerPanel = createLayerPanel({
 		store,
-		windUnit,
-		windStyle,
 		setTimer: timers.setTimer,
 		clearTimer: timers.clearTimer,
 		onView: (view, playing) => {
@@ -252,22 +232,11 @@ const createStage = (windUnit?: WindUnit, windStyle?: WindStyle) => {
 		},
 		temperature: { setShowing: (next) => showing.push(next) },
 		winds: { setShowing: (next) => windsShowing.push(next) },
-		createControls: (options) => {
-			controls = options;
-			return {
-				showLegend: (content) => legends.push(content),
-				showWindKey: (content) => keys.push(content),
-				setWindUnit: (unit) => keyUnits.push(unit),
-				setWindStyle: (style) => keyStyles.push(style),
-			};
-		},
+		createControls: () => ({
+			showLegend: (content) => legends.push(content),
+			showWindKey: (content) => keys.push(content),
+		}),
 	});
-	const required = (): LayerControlsOptions => {
-		if (controls === undefined) {
-			throw new Error('The panel made no controls');
-		}
-		return controls;
-	};
 	/** Has a result arrive, current, as the scheduler does. */
 	const arrive = (result: TemperatureResult): void => {
 		store.markCalculating();
@@ -282,8 +251,6 @@ const createStage = (windUnit?: WindUnit, windStyle?: WindStyle) => {
 		windsShowing,
 		winds,
 		keys,
-		keyUnits,
-		keyStyles,
 		legends,
 		comparisons,
 		observedAsked,
@@ -291,9 +258,6 @@ const createStage = (windUnit?: WindUnit, windStyle?: WindStyle) => {
 		told,
 		timers,
 		panel,
-		get controls() {
-			return required();
-		},
 		arrive,
 		lastLegend: () => legends.at(-1),
 		/** What the panel last told of the view settings, with playing. */
@@ -350,6 +314,7 @@ describe('createLayerPanel', () => {
 		expect(stage.shown).toEqual([]);
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
+			state: 'empty',
 			status: LEGEND_EMPTY_TEXT,
 			bar: null,
 		});
@@ -456,6 +421,7 @@ describe('createLayerPanel', () => {
 		expect(stage.shown.at(-1)?.field).toBeNull();
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
+			state: 'empty',
 			status: LEGEND_EMPTY_TEXT,
 			bar: null,
 		});
@@ -501,6 +467,7 @@ describe('createLayerPanel', () => {
 		expect(stage.shown).toEqual([]);
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
+			state: 'unavailable',
 			status: TEMPERATURE_UNAVAILABLE_TEXT,
 			bar: null,
 		});
@@ -629,6 +596,7 @@ describe('createLayerPanel', () => {
 		expect(stage.shown).toEqual([]);
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
+			state: 'outOfDate',
 			status: LEGEND_OUT_OF_DATE_TEXT,
 			bar: null,
 		});
@@ -643,6 +611,7 @@ describe('createLayerPanel', () => {
 		expect(stage.shown).toEqual([]);
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
+			state: 'unavailable',
 			status: TEMPERATURE_NOT_SHOWN_TEXT,
 			bar: null,
 		});
@@ -672,7 +641,7 @@ describe('createLayerPanel', () => {
 		expect(stage.errors).toEqual([]);
 	});
 
-	it("fits the year's scale to the middle 99% of a real grid by area, saying what lies beyond", () => {
+	it("fits the year's scale to the middle 99% of a real grid by area, with no words for what lies beyond", () => {
 		const stage = createStage();
 		stage.panel.setLayer('temperature');
 		const result = resultOnGrid();
@@ -681,10 +650,10 @@ describe('createLayerPanel', () => {
 		// cell-months, the cold cells would take the scale below zero.
 		expect(stage.shown.at(-1)?.range).toEqual({ min: 10, max: 54 });
 		const evenly = new Float64Array(getGrid(64).cellCount).fill(1);
-		expect(fitRange(result.months, evenly).range.min).toBe(-16);
+		expect(fitRange(result.months, evenly).min).toBe(-16);
 		const legend = stage.lastLegend();
-		expect(legend?.scale?.below).toBe('10 and below');
-		expect(legend?.scale?.above).toBe('54 and above');
+		expect(legend?.scale).not.toHaveProperty('below');
+		expect(legend?.scale).not.toHaveProperty('above');
 	});
 
 	it('fits the year once per result, on one scale through every month, summary and change of status', () => {
@@ -701,9 +670,9 @@ describe('createLayerPanel', () => {
 			stage.panel.setSummary('temperature', view);
 			expect(stage.shown.at(-1)?.range).toBe(scale);
 			// The warmest and coldest months hold values beyond the scale
-			// too, which take its end colours, and the legend says so.
-			expect(stage.lastLegend()?.scale?.below).toBe('10 and below');
-			expect(stage.lastLegend()?.scale?.above).toBe('54 and above');
+			// too, which take its end colours; the legend has no words for them.
+			expect(stage.lastLegend()?.scale).not.toHaveProperty('below');
+			expect(stage.lastLegend()?.scale).not.toHaveProperty('above');
 		}
 		stage.panel.setSummary('temperature', 'month');
 		expect(stage.shown.every((shown) => shown.range === scale)).toBe(true);
@@ -1233,7 +1202,7 @@ describe('createLayerPanel, the summaries', () => {
 		const stage = createStage();
 		stage.panel.setLayer('temperature');
 		stage.arrive(resultOnGrid());
-		expect(stage.lastLegend()?.scale?.below).not.toBeNull();
+		expect(stage.lastLegend()?.scale).not.toHaveProperty('below');
 		stage.panel.setSummary('temperature', 'range');
 		expect(stage.shown.at(-1)?.range).toEqual({ min: 0, max: 44 });
 		const legend = stage.lastLegend();
@@ -1249,8 +1218,8 @@ describe('createLayerPanel, the summaries', () => {
 			'35',
 			'40',
 		]);
-		expect(legend?.scale?.below).toBeNull();
-		expect(legend?.scale?.above).toBeNull();
+		expect(legend?.scale).not.toHaveProperty('below');
+		expect(legend?.scale).not.toHaveProperty('above');
 	});
 
 	it('asks nothing for the temperature view already chosen', () => {
@@ -1331,6 +1300,7 @@ describe('createLayerPanel, the summaries', () => {
 		expect(stage.shown).toEqual([]);
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
+			state: 'unavailable',
 			status: TEMPERATURE_NOT_SHOWN_TEXT,
 			bar: null,
 		});
@@ -1393,25 +1363,21 @@ describe('createLayerPanel, what the globe shows', () => {
 		expect(shown).toEqual({
 			layer: TEMPERATURE_LAYER,
 			field: result.months[DEFAULT_MONTH],
-			summary: 'month',
-			month: DEFAULT_MONTH,
 			source: 'simulated',
 			current: true,
 		});
 		expect(shown?.field).toBe(stage.shown.at(-1)?.field);
 
 		stage.panel.setMonth(2);
-		expect(stage.panel.shown()?.month).toBe(2);
 		expect(stage.panel.shown()?.field).toBe(result.months[2]);
 	});
 
-	it('names the summary on show, with the array sent to the globe', () => {
+	it('gives the array of the summary on show, as sent to the globe', () => {
 		const stage = createStage();
 		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
 		for (const view of ['annualMean', 'warmest', 'coldest', 'range'] as const) {
 			stage.panel.setSummary('temperature', view);
-			expect(stage.panel.shown()?.summary).toBe(view);
 			expect(stage.panel.shown()?.field).toBe(stage.shown.at(-1)?.field);
 			expect(stage.panel.shown()?.current).toBe(true);
 		}
@@ -1439,7 +1405,7 @@ describe('createLayerPanel, what the globe shows', () => {
 		expect(stage.panel.shown()).toMatchObject({ field, current: false });
 	});
 
-	it('keeps the earlier field and its month, not current, while the globe refuses the one chosen', () => {
+	it('keeps the earlier field, not current, while the globe refuses the one chosen', () => {
 		const stage = createStage();
 		stage.panel.setLayer('temperature');
 		const first = resultWith();
@@ -1454,8 +1420,6 @@ describe('createLayerPanel, what the globe shows', () => {
 		expect(stage.panel.shown()).toEqual({
 			layer: TEMPERATURE_LAYER,
 			field: first.months[DEFAULT_MONTH],
-			summary: 'month',
-			month: DEFAULT_MONTH,
 			source: 'simulated',
 			current: false,
 		});
@@ -1464,7 +1428,6 @@ describe('createLayerPanel, what the globe shows', () => {
 		expect(() => stage.panel.setMonth(0)).toThrow('Refused again');
 		expect(stage.panel.shown()).toMatchObject({
 			field: first.months[DEFAULT_MONTH],
-			month: DEFAULT_MONTH,
 			current: false,
 		});
 
@@ -1472,8 +1435,6 @@ describe('createLayerPanel, what the globe shows', () => {
 		expect(stage.panel.shown()).toEqual({
 			layer: TEMPERATURE_LAYER,
 			field: second.months[1],
-			summary: 'month',
-			month: 1,
 			source: 'simulated',
 			current: true,
 		});
@@ -1682,23 +1643,21 @@ describe('createLayerPanel, the comparison', () => {
 			[...result.months, ...observed],
 			cellWeights(observed[0]?.length ?? 0),
 		);
-		expect(shared.range).not.toEqual(own);
+		expect(shared).not.toEqual(own);
 		const last = stage.shown.at(-1);
 		expect(last?.field).toBe(observed[DEFAULT_MONTH]);
-		expect(last?.range).toEqual(shared.range);
+		expect(last?.range).toEqual(shared);
 		expect(last?.ramp).toBe(TEMPERATURE_RAMP);
 		expect(stage.lastLegend()?.scale?.caption).toBe(
 			'Observed air temperature in July, °C',
 		);
-		expect(stage.lastLegend()?.scale?.below).toBe(
-			shared.beyond.below ? `${formatTick(shared.range.min)} and below` : null,
-		);
+		expect(stage.lastLegend()?.scale).not.toHaveProperty('below');
 
 		const theirs = summariseTemperature(observed);
 		for (const view of ['annualMean', 'warmest', 'coldest'] as const) {
 			stage.panel.setSummary('temperature', view);
 			expect(stage.shown.at(-1)?.field, view).toEqual(theirs[view]);
-			expect(stage.shown.at(-1)?.range, view).toEqual(shared.range);
+			expect(stage.shown.at(-1)?.range, view).toEqual(shared);
 		}
 		stage.panel.setSummary('temperature', 'range');
 		expect(stage.shown.at(-1)?.field).toEqual(theirs.range);
@@ -1718,9 +1677,9 @@ describe('createLayerPanel, the comparison', () => {
 		expect(stage.shown.at(-1)?.range).toEqual(stage.shown.at(-2)?.range);
 		stage.panel.setSummary('temperature', 'month');
 		expect(stage.shown.at(-1)?.field).toBe(result.months[DEFAULT_MONTH]);
-		expect(stage.shown.at(-1)?.range).toEqual(shared.range);
+		expect(stage.shown.at(-1)?.range).toEqual(shared);
 		stage.panel.setMonth(0);
-		expect(stage.shown.at(-1)?.range).toEqual(shared.range);
+		expect(stage.shown.at(-1)?.range).toEqual(shared);
 	});
 
 	it('gives the simulated year its own scale again once the world stops being the measured Earth, and the shared one when it is again', async () => {
@@ -1729,7 +1688,7 @@ describe('createLayerPanel, the comparison', () => {
 		const shared = fitRange(
 			[...result.months, ...observed],
 			cellWeights(observed[0]?.length ?? 0),
-		).range;
+		);
 		stage.panel.setEarth(null);
 		expect(stage.shown.at(-1)?.field).toBe(result.months[DEFAULT_MONTH]);
 		expect(stage.shown.at(-1)?.range).toEqual(yearRange(result));
@@ -1786,8 +1745,8 @@ describe('createLayerPanel, the comparison', () => {
 				'10',
 				'20',
 			]);
-			expect(scale?.below).toBe('−20 and below');
-			expect(scale?.above).toBe('20 and above');
+			expect(scale).not.toHaveProperty('below');
+			expect(scale).not.toHaveProperty('above');
 		};
 		expectFixed('Simulated less observed in July, °C');
 		stage.panel.setMonth(0);
@@ -1966,7 +1925,6 @@ describe('createLayerPanel, the comparison', () => {
 		expect(stage.lastLegend()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		expect(stage.panel.shown()).toMatchObject({
 			source: 'observed',
-			month: DEFAULT_MONTH,
 			current: false,
 		});
 	});
@@ -2154,7 +2112,7 @@ describe('layerCaption', () => {
 	});
 });
 
-describe('createLayerControls', () => {
+describe('the info box over the globe', () => {
 	let fake: FakeDocument;
 	beforeEach(() => {
 		fake = createFakeDocument();
@@ -2164,82 +2122,11 @@ describe('createLayerControls', () => {
 		vi.unstubAllGlobals();
 	});
 
-	/** The controls, with the winds drawn as given. */
-	const make = (options: LayerControlsOptions = {}) => {
-		const place = fake.createElement('div');
-		const keyPlace = fake.createElement('div');
-		const controls = createLayerControls(
-			{
-				legend: place as unknown as HTMLElement,
-				windKey: keyPlace as unknown as HTMLElement,
-			},
-			options,
-		);
-		return { controls, place, keyPlace };
-	};
-
-	it('starts the key to the winds as the winds are drawn, and shows it for another way when told', () => {
-		const { controls, keyPlace } = make({ windStyle: 'streaks' });
-		const key = oneByClass(keyPlace, 'wind-key');
-		expect(byClass(key, 'wind-key__streaks')).toHaveLength(1);
-		expect(byClass(key, 'wind-key__row')).toEqual([]);
-		controls.setWindStyle('arrows');
-		expect(byClass(key, 'wind-key__streaks')).toEqual([]);
-		expect(byClass(key, 'wind-key__row')).toHaveLength(2);
-		const { keyPlace: arrowsPlace } = make();
-		expect(byClass(arrowsPlace, 'wind-key__row')).toHaveLength(2);
-		expect(byClass(arrowsPlace, 'wind-key__streaks')).toEqual([]);
-	});
-
-	it('adds the legend alone to its own place, hidden, with no month, layer, view of the year or source', () => {
-		const { place } = make();
-		expect(place.children.map((child) => child.className)).toEqual(['legend']);
-		expect(byClass(place, 'field__range')).toEqual([]);
-		expect(byClass(place, 'segmented__input')).toEqual([]);
-		expect(byClass(place, 'field__select')).toEqual([]);
-		expect(byClass(place, 'comparison')).toEqual([]);
-		expect(oneByClass(place, 'legend').hidden).toBe(true);
-	});
-
-	it('adds the key to the wind arrows to its own place, hidden, and shows it as told', () => {
-		const { controls, place, keyPlace } = make();
-		expect(keyPlace.children.map((child) => child.className)).toEqual([
-			'wind-key',
-		]);
-		expect(byClass(place, 'wind-key')).toEqual([]);
-		const key = oneByClass(keyPlace, 'wind-key');
-		expect(key.hidden).toBe(true);
-		controls.showWindKey({ status: 'x' });
-		expect(key.hidden).toBe(false);
-		expect(oneByClass(key, 'wind-key__status').textContent).toBe('x');
-		controls.showWindKey(null);
-		expect(key.hidden).toBe(true);
-	});
-
-	it('shows the legend it is given', () => {
-		const { controls, place } = make();
-		controls.showLegend({ scale: null, status: 'x', bar: null });
-		expect(oneByClass(place, 'legend').hidden).toBe(false);
-		controls.showLegend(null);
-		expect(oneByClass(place, 'legend').hidden).toBe(true);
-	});
-});
-
-describe('the legend over the globe', () => {
-	let fake: FakeDocument;
-	beforeEach(() => {
-		fake = createFakeDocument();
-		vi.stubGlobal('document', fake.document);
-	});
-	afterEach(() => {
-		vi.unstubAllGlobals();
-	});
-
-	/** The real layer panel and controls, the legend in its place. */
+	/** The real layer panel, showing what it has in a real info box. */
 	const make = () => {
-		const place = fake.createElement('div');
 		const store = createLayerStore(() => {});
 		const timers = createFakeTimers();
+		let box: InfoBox | undefined;
 		const panel = createLayerPanel({
 			store,
 			setTimer: timers.setTimer,
@@ -2252,55 +2139,78 @@ describe('the legend over the globe', () => {
 			globe: { setLayer: () => {}, setWinds: () => {} },
 			temperature: { setShowing: () => {} },
 			winds: { setShowing: () => {} },
-			createControls: (options) =>
-				createLayerControls(
-					{
-						legend: place as unknown as HTMLElement,
-						windKey: fake.createElement('div') as unknown as HTMLElement,
-					},
-					options,
-				),
+			createControls: () => {
+				box = createInfoBox();
+				return box;
+			},
 		});
+		if (box === undefined) {
+			throw new Error('The layer panel made no controls');
+		}
 		/** Picks a layer, as the dock tells it. */
 		const pickLayer = (layer: Layer): void => panel.setLayer(layer);
-		const legend = oneByClass(place, 'legend');
+		const root = box.element as unknown as FakeElement;
 		return {
 			store,
+			panel,
 			pickLayer,
-			legend,
-			status: () => oneByClass(legend, 'legend__status').textContent,
-			bar: oneByClass(legend, 'legend__bar'),
-			scale: oneByClass(legend, 'legend__scale'),
+			root,
+			legend: oneByClass(root, 'legend'),
+			status: () => oneByClass(root, 'info-box__status').textContent,
+			bar: oneByClass(root, 'info-box__bar'),
 		};
 	};
 
+	it('starts hidden, with no month, layer, view of the year or source in it', () => {
+		const { root } = make();
+		expect(root.hidden).toBe(true);
+		expect(byClass(root, 'field__range')).toEqual([]);
+		expect(byClass(root, 'segmented__input')).toEqual([]);
+		expect(byClass(root, 'field__select')).toEqual([]);
+		expect(byClass(root, 'comparison')).toEqual([]);
+	});
+
 	it('shows on Temperature and hides on Terrain', () => {
-		const { pickLayer, legend, status } = make();
-		expect(legend.hidden).toBe(true);
+		const { pickLayer, root, status } = make();
 		pickLayer('temperature');
-		expect(legend.hidden).toBe(false);
+		expect(root.hidden).toBe(false);
 		expect(status()).toBe(LEGEND_EMPTY_TEXT);
 		pickLayer('terrain');
-		expect(legend.hidden).toBe(true);
+		expect(root.hidden).toBe(true);
+		expect(status()).toBe('');
+	});
+
+	it('says where the winds stand while they are shown, and shows no box on Terrain once they are current', () => {
+		const { store, panel, root, status } = make();
+		panel.setWinds(true);
+		expect(root.hidden).toBe(false);
+		expect(status()).toBe(LEGEND_EMPTY_TEXT);
+		store.markWindsCalculating();
+		store.setWindsResult(solvedWinds(), true);
+		expect(status()).toBe('');
+		expect(root.hidden).toBe(true);
+		store.markWindsOutOfDate();
+		expect(status()).toBe(LEGEND_OUT_OF_DATE_TEXT);
+		panel.setWinds(false);
+		expect(root.hidden).toBe(true);
 	});
 
 	it('follows the calculation', () => {
-		const { store, pickLayer, legend, status, bar, scale } = make();
+		const { store, pickLayer, legend, status, bar } = make();
 		pickLayer('temperature');
 		store.markCalculating();
 		store.setProgress(progressOf(1));
-		expect(legend.hidden).toBe(false);
 		expect(status()).toBe(
 			legendContent(TEMPERATURE_LAYER, store.temperature, null, false).status,
 		);
 		expect(bar.hidden).toBe(false);
-		expect(scale.hidden).toBe(true);
+		expect(legend.hidden).toBe(true);
 
 		const result = resultWith();
 		store.setResult(result, true);
-		expect(legend.hidden).toBe(false);
+		expect(status()).toBe('');
 		expect(bar.hidden).toBe(true);
-		expect(scale.hidden).toBe(false);
+		expect(legend.hidden).toBe(false);
 		expect(oneByClass(legend, 'legend__caption').textContent).toBe(
 			layerCaption(TEMPERATURE_LAYER, 'month', DEFAULT_MONTH),
 		);
@@ -2362,7 +2272,10 @@ describe('createLayerPanel, the winds', () => {
 		expect(stage.windsShowing).toEqual([true]);
 		expect(stage.told.at(-1)).toEqual({ ...DEFAULT_PAGE_VIEW, winds: true });
 		expect(stage.winds).toEqual([]);
-		expect(stage.keys.at(-1)).toEqual({ status: LEGEND_EMPTY_TEXT });
+		expect(stage.keys.at(-1)).toEqual({
+			state: 'empty',
+			status: LEGEND_EMPTY_TEXT,
+		});
 	});
 
 	it('tells nothing for the setting it already has', () => {
@@ -2379,7 +2292,7 @@ describe('createLayerPanel, the winds', () => {
 		expect(stage.winds).toHaveLength(1);
 		expect(stage.winds[0]?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
 		expect(stage.winds[0]?.north).toBe(solved.winds.north[DEFAULT_MONTH]);
-		expect(stage.keys.at(-1)).toEqual({ status: null });
+		expect(stage.keys.at(-1)).toEqual({ state: 'current', status: null });
 	});
 
 	it('follows the month on the slider and as the year plays, in Terrain view', () => {
@@ -2416,26 +2329,29 @@ describe('createLayerPanel, the winds', () => {
 		[
 			'out of date',
 			(store: LayerStore) => store.markWindsOutOfDate(),
+			'outOfDate',
 			LEGEND_OUT_OF_DATE_TEXT,
 		],
 		[
 			'being worked out',
 			(store: LayerStore) => store.markWindsCalculating(),
+			'calculating',
 			WINDS_CALCULATING_TEXT,
 		],
 		[
 			'no longer calculable',
 			(store: LayerStore) => store.markWindsUnavailable(),
+			'unavailable',
 			WINDS_UNAVAILABLE_TEXT,
 		],
-	])(
+	] as const)(
 		'keeps the arrows while the winds are %s, and the key says so',
-		(_name, change, words) => {
+		(_name, change, state, words) => {
 			const stage = windy();
 			arrive(stage, solvedWinds());
 			change(stage.store);
 			expect(stage.winds).toHaveLength(1);
-			expect(stage.keys.at(-1)).toEqual({ status: words });
+			expect(stage.keys.at(-1)).toEqual({ state, status: words });
 		},
 	);
 
@@ -2444,7 +2360,10 @@ describe('createLayerPanel, the winds', () => {
 		arrive(stage, solvedWinds());
 		stage.store.clear();
 		expect(stage.winds.at(-1)).toBeNull();
-		expect(stage.keys.at(-1)).toEqual({ status: LEGEND_EMPTY_TEXT });
+		expect(stage.keys.at(-1)).toEqual({
+			state: 'empty',
+			status: LEGEND_EMPTY_TEXT,
+		});
 	});
 
 	it('shows the annual mean on Annual average, worked out once for each result', () => {
@@ -2538,7 +2457,6 @@ describe('createLayerPanel, the winds', () => {
 		expect(shown?.field).toBe(stage.winds.at(-1));
 		expect(shown?.field.east).toBe(solved.winds.east[DEFAULT_MONTH]);
 		expect(shown?.field.north).toBe(solved.winds.north[DEFAULT_MONTH]);
-		expect(shown?.annualMean).toBe(false);
 		expect(shown?.current).toBe(true);
 		stage.panel.setMonth(2);
 		expect(stage.panel.shownWinds()?.field.east).toBe(solved.winds.east[2]);
@@ -2546,15 +2464,19 @@ describe('createLayerPanel, the winds', () => {
 
 	it('says the globe shows the year’s mean winds on Annual average, and the month’s again after', () => {
 		const stage = windy();
-		arrive(stage, solvedWinds());
+		const solved = solvedWinds();
+		arrive(stage, solved);
 		stage.panel.setLayer('temperature');
 		stage.panel.setSummary('temperature', 'annualMean');
 		const shown = stage.panel.shownWinds();
 		expect(shown?.field).toBe(stage.winds.at(-1));
-		expect(shown?.annualMean).toBe(true);
+		// Month m blows m + 1 m/s, so the year's mean blows 6.5 m/s.
+		expect(Array.from(shown?.field.east ?? [])).toEqual([6.5, 0]);
 		expect(shown?.current).toBe(true);
 		stage.panel.setSummary('temperature', 'warmest');
-		expect(stage.panel.shownWinds()?.annualMean).toBe(false);
+		expect(stage.panel.shownWinds()?.field.east).toBe(
+			solved.winds.east[DEFAULT_MONTH],
+		);
 	});
 
 	it.each([
@@ -2610,31 +2532,6 @@ describe('createLayerPanel, the winds', () => {
 		expect(stage.panel.shownWinds()).toBeNull();
 	});
 
-	it('starts the key in m/s, or in the unit given, and passes on a change of unit', () => {
-		expect(createStage().controls.windUnit).toBe('m/s');
-		const stage = createStage('mph');
-		expect(stage.controls.windUnit).toBe('mph');
-		stage.panel.setWindUnit('km/h');
-		expect(stage.keyUnits).toEqual(['km/h']);
-		expect(stage.winds).toEqual([]);
-	});
-
-	it('starts the key on arrows, or as the winds are drawn, and passes on a change of it alone', () => {
-		expect(createStage().controls.windStyle).toBe('arrows');
-		const stage = createStage(undefined, 'streaks');
-		expect(stage.controls.windStyle).toBe('streaks');
-		arrive(stage, solvedWinds());
-		stage.panel.setWinds(true);
-		const winds = stage.winds.length;
-		const keys = stage.keys.length;
-		stage.panel.setWindStyle('arrows');
-		stage.panel.setWindStyle('streaks');
-		expect(stage.keyStyles).toEqual(['arrows', 'streaks']);
-		// The globe's winds and the key's words are as they were.
-		expect(stage.winds).toHaveLength(winds);
-		expect(stage.keys).toHaveLength(keys);
-	});
-
 	it('keeps the winds for a new world', () => {
 		const stage = windy();
 		stage.panel.setMonth(2);
@@ -2671,13 +2568,6 @@ describe('createLayerPanel, the observed winds', () => {
 		east: monthsOf((m, cell) => 6 - (cell % 7) + m * 0.1),
 		north: monthsOf((m, cell) => (cell % 4) - 1.5 + m * 0.05),
 	});
-	/** The figures the core works out for a simulated year and observed winds. */
-	const coreFigures = (solved: SolvedWinds, observed: MonthlyWind) =>
-		windErrorFigures(
-			solved.winds,
-			{ ...observed, pressure: solved.winds.pressure },
-			grid,
-		);
 	/** Has winds arrive, current, as the scheduler does. */
 	const arrive = (
 		stage: ReturnType<typeof createStage>,
@@ -2776,7 +2666,6 @@ describe('createLayerPanel, the observed winds', () => {
 		expect(stage.winds.at(-1)?.east).toBe(observed.east[DEFAULT_MONTH]);
 		expect(stage.winds.at(-1)?.north).toBe(observed.north[DEFAULT_MONTH]);
 		expect(stage.panel.shownWinds()).toMatchObject({
-			annualMean: false,
 			source: 'observed',
 			current: true,
 		});
@@ -2798,8 +2687,7 @@ describe('createLayerPanel, the observed winds', () => {
 		expect(mean?.east).toEqual(expected.east);
 		expect(mean?.north).toEqual(expected.north);
 		expect(stage.panel.shownWinds()).toMatchObject({
-			annualMean: true,
-			annualMeanLabel: 'Annual average',
+			field: mean,
 			source: 'observed',
 		});
 		stage.panel.setSummary('temperature', 'month');
@@ -2843,7 +2731,7 @@ describe('createLayerPanel, the observed winds', () => {
 		expect(stage.lastKey()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 	});
 
-	it('goes back to Simulated when the observed winds cannot be loaded, the key saying so, and fetches again at the next choice', async () => {
+	it('goes back to Simulated when the observed winds cannot be loaded, the status line saying so, and fetches again at the next choice', async () => {
 		const { stage, deferred, solved } = createWindsStage();
 		stage.panel.setSource('observed');
 		const error = new Error('offline');
@@ -2857,7 +2745,6 @@ describe('createLayerPanel, the observed winds', () => {
 		});
 		expect(stage.panel.shownWinds()?.source).toBe('simulated');
 		expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
-		expect(stage.lastKey()?.figures).toBeUndefined();
 		stage.panel.setSource('observed');
 		expect(deferred.calls).toHaveLength(2);
 		expect(stage.lastKey()?.status).toBe(OBSERVED_WINDS_LOADING_TEXT);
@@ -2913,13 +2800,11 @@ describe('createLayerPanel, the observed winds', () => {
 			source: 'simulated',
 		});
 		expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
-		expect(stage.lastKey()?.figures).toBeUndefined();
 		stage.panel.setEarth(64);
 		expect(stage.lastComparison()).toMatchObject({
 			offered: WIND_SOURCES,
 			source: 'simulated',
 		});
-		expect(stage.lastKey()?.figures).toBeDefined();
 		stage.panel.setSource('observed');
 		expect(deferred.calls).toHaveLength(1);
 		expect(stage.winds.at(-1)?.east).toBe(observed.east[DEFAULT_MONTH]);
@@ -2934,75 +2819,44 @@ describe('createLayerPanel, the observed winds', () => {
 			source: 'simulated',
 		});
 		arrive(stage, solved);
-		expect(stage.lastKey()?.figures).toBeUndefined();
 		stage.panel.setSource('observed');
 		expect(deferred.calls).toHaveLength(2);
 	});
 
-	it('gives the key the month’s figures of windErrorFigures once the observed winds are fetched, for both sources, worked out once', async () => {
-		const { stage, solved, observed, observe } = createWindsStage();
-		expect(stage.lastKey()?.figures).toBeUndefined();
+	it('says only where the winds stand, with no figures of them against the observed winds, for both sources', async () => {
+		const { stage, observe } = createWindsStage();
 		await observe();
-		const figures = coreFigures(solved, observed);
-		expect(stage.lastKey()?.figures).toEqual(figures.months[DEFAULT_MONTH]);
-		const kept = stage.lastKey()?.figures;
+		expect(stage.lastKey()).toEqual({ state: 'current', status: null });
 		stage.panel.setSource('simulated');
-		expect(stage.lastKey()?.figures).toBe(kept);
-		expect(stage.lastKey()?.status).toBeNull();
-		stage.panel.setMonth(1);
-		expect(stage.lastKey()?.figures).toEqual(figures.months[1]);
-		// The figures the key writes are the ones the brief names.
-		expect(kept?.rmsVectorDifference).toBeGreaterThan(0);
-		expect(kept?.directionShare).not.toBeNull();
-	});
-
-	it('gives the key the year’s figures on the annual average, and the month’s on another summary', async () => {
-		const { stage, solved, observed, observe } = createWindsStage();
-		await observe();
-		const figures = coreFigures(solved, observed);
+		expect(stage.lastKey()).toEqual({ state: 'current', status: null });
 		stage.panel.setLayer('temperature');
 		stage.panel.setSummary('temperature', 'annualMean');
-		expect(stage.lastKey()?.figures).toEqual(figures.year);
-		stage.panel.setSummary('temperature', 'warmest');
-		expect(stage.lastKey()?.figures).toEqual(figures.months[DEFAULT_MONTH]);
+		expect(stage.lastKey()).toEqual({ state: 'current', status: null });
 	});
 
-	it('works the figures out again for each new result', async () => {
-		const { stage, observed, observe } = createWindsStage();
-		await observe();
-		const next = arrive(stage, simulatedOnGrid(2));
-		expect(stage.lastKey()?.figures).toEqual(
-			coreFigures(next, observed).months[DEFAULT_MONTH],
-		);
-	});
-
-	it('keeps the figures under the simulated winds while they are out of date, and leaves them off under the observed, as the legend does', async () => {
+	it('says nothing of the simulated winds being out of date under the observed, and says so under the simulated', async () => {
 		const { stage, observe } = createWindsStage();
 		await observe();
 		stage.store.markWindsOutOfDate();
 		// Under the observed winds, which are never out of date.
-		expect(stage.lastKey()?.figures).toBeUndefined();
 		expect(stage.lastKey()?.status).toBeNull();
 		expect(stage.panel.shownWinds()?.current).toBe(true);
 		stage.panel.setSource('simulated');
-		expect(stage.lastKey()?.figures).toBeDefined();
 		expect(stage.lastKey()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		expect(stage.panel.shownWinds()?.current).toBe(false);
 		stage.store.markWindsCalculating();
-		expect(stage.lastKey()?.figures).toBeDefined();
 		expect(stage.lastKey()?.status).toBe(WINDS_CALCULATING_TEXT);
 	});
 
-	it('gives no figures off the measured Earth, nor without a simulated result', async () => {
+	it('says nothing of the winds off the measured Earth once they are current, and drops the arrows without a simulated result', async () => {
 		const { stage, observe } = createWindsStage();
 		await observe();
 		stage.store.clear();
-		expect(stage.lastKey()?.figures).toBeUndefined();
 		expect(stage.winds.at(-1)).toBeNull();
 		const elsewhere = createStage();
 		elsewhere.panel.setWinds(true);
 		arrive(elsewhere, simulatedOnGrid());
-		expect(elsewhere.lastKey()).toEqual({ status: null });
+		expect(elsewhere.lastKey()).toEqual({ state: 'current', status: null });
 	});
 });
 
@@ -3010,18 +2864,33 @@ describe('createLayerPanel, the key’s wording', () => {
 	it('says Calculating while the temperature the winds wait for is worked out, and Not calculated yet only when nothing is under way', () => {
 		const stage = createStage();
 		stage.panel.setWinds(true);
-		expect(stage.lastKey()).toEqual({ status: LEGEND_EMPTY_TEXT });
+		expect(stage.lastKey()).toEqual({
+			state: 'empty',
+			status: LEGEND_EMPTY_TEXT,
+		});
 		stage.store.markCalculating();
 		expect(stage.store.winds.status).toBe('empty');
-		expect(stage.lastKey()).toEqual({ status: WINDS_CALCULATING_TEXT });
+		expect(stage.lastKey()).toEqual({
+			state: 'calculating',
+			status: WINDS_CALCULATING_TEXT,
+		});
 		stage.store.markFailed();
-		expect(stage.lastKey()).toEqual({ status: LEGEND_EMPTY_TEXT });
+		expect(stage.lastKey()).toEqual({
+			state: 'empty',
+			status: LEGEND_EMPTY_TEXT,
+		});
 		stage.store.markCalculating();
 		stage.store.setResult(temperatureOf(1), true);
 		// A temperature and no winds asked for yet: nothing is under way.
-		expect(stage.lastKey()).toEqual({ status: LEGEND_EMPTY_TEXT });
+		expect(stage.lastKey()).toEqual({
+			state: 'empty',
+			status: LEGEND_EMPTY_TEXT,
+		});
 		stage.store.markWindsCalculating();
-		expect(stage.lastKey()).toEqual({ status: WINDS_CALCULATING_TEXT });
+		expect(stage.lastKey()).toEqual({
+			state: 'calculating',
+			status: WINDS_CALCULATING_TEXT,
+		});
 	});
 
 	it('words its line as the pressure’s legend does, by the same rule', () => {
@@ -3057,7 +2926,6 @@ describe('createLayerPanel, another layer described', () => {
 		const asked: string[] = [];
 		/** The field the globe refuses, as a globe can refuse one it is given. */
 		let refused: Float32Array | null = null;
-		let made: LayerControlsOptions | undefined;
 		const panel = createLayerPanel({
 			store,
 			layers: [TEMPERATURE_LAYER, MADE_UP_LAYER],
@@ -3083,17 +2951,11 @@ describe('createLayerPanel, another layer described', () => {
 			winds: { setShowing: (next) => windsShowing.push(next) },
 			onView: (view) => told.push(view),
 			onComparison: (content) => comparisons.push(content),
-			createControls: (options) => {
-				made = options;
-				return {
-					showLegend: (content) => legends.push(content),
-					showWindKey: () => {},
-					setWindUnit: () => {},
-					setWindStyle: () => {},
-				};
-			},
+			createControls: () => ({
+				showLegend: (content) => legends.push(content),
+				showWindKey: () => {},
+			}),
 		});
-		const controls = made as LayerControlsOptions;
 		/** Has a year of winds and pressure arrive, current. */
 		const arrive = (solved: SolvedWinds = pressureWinds()): SolvedWinds => {
 			store.markWindsCalculating();
@@ -3103,7 +2965,6 @@ describe('createLayerPanel, another layer described', () => {
 		return {
 			store,
 			panel,
-			controls,
 			shown,
 			legends,
 			temperatureShowing,
@@ -3155,6 +3016,7 @@ describe('createLayerPanel, another layer described', () => {
 		stage.panel.setLayer(MADE_UP_ID);
 		expect(stage.legends.at(-1)).toEqual({
 			scale: null,
+			state: 'empty',
 			status: LEGEND_EMPTY_TEXT,
 			bar: null,
 		});
@@ -3168,7 +3030,7 @@ describe('createLayerPanel, another layer described', () => {
 				cellWeights(2),
 				weightedMean(solved.winds.pressure, cellWeights(2)),
 				MADE_UP_LAYER.minSpan,
-			).range,
+			),
 		);
 		expect(((last?.range?.min ?? 0) + (last?.range?.max ?? 0)) / 2).toBe(1016);
 		const legend = stage.legends.at(-1);
@@ -3181,8 +3043,6 @@ describe('createLayerPanel, another layer described', () => {
 		expect(stage.panel.shown()).toEqual({
 			layer: MADE_UP_LAYER,
 			field: solved.winds.pressure[DEFAULT_MONTH],
-			summary: 'month',
-			month: DEFAULT_MONTH,
 			source: 'simulated',
 			current: true,
 		});
@@ -3200,6 +3060,7 @@ describe('createLayerPanel, another layer described', () => {
 		stage.store.markWindsCalculating();
 		expect(stage.legends.at(-1)).toEqual({
 			scale: null,
+			state: 'calculating',
 			status: LEGEND_CALCULATING_TEXT,
 			bar: { fraction: null },
 		});
@@ -3241,11 +3102,11 @@ describe('createLayerPanel, another layer described', () => {
 		stage.store.markCalculating();
 		stage.store.setResult(temperatureOf(1), true);
 		stage.panel.setLayer('temperature');
-		expect(stage.panel.shown()?.summary).toBe('warmest');
+		expect(stage.told.at(-1)?.summaries.temperature).toBe('warmest');
 		stage.panel.setLayer(MADE_UP_ID);
-		expect(stage.panel.shown()?.summary).toBe('annualMean');
+		expect(stage.told.at(-1)?.summaries[MADE_UP_ID]).toBe('annualMean');
 		stage.panel.setLayer('temperature');
-		expect(stage.panel.shown()?.summary).toBe('warmest');
+		expect(stage.told.at(-1)?.summaries.temperature).toBe('warmest');
 	});
 
 	it('offers no comparison for a layer with no observed year, on the measured Earth too', () => {
@@ -3276,34 +3137,16 @@ describe('createLayerPanel, another layer described', () => {
 	it('has the winds show the year’s mean while it shows its annual average', () => {
 		const stage = createTwoLayerStage();
 		stage.panel.setWinds(true);
-		stage.arrive();
+		const solved = stage.arrive();
+		const month = solved.winds.east[DEFAULT_MONTH];
 		stage.panel.setLayer(MADE_UP_ID);
-		expect(stage.panel.shownWinds()?.annualMean).toBe(false);
+		expect(stage.panel.shownWinds()?.field.east).toBe(month);
 		stage.panel.setSummary(MADE_UP_ID, 'annualMean');
-		expect(stage.panel.shownWinds()?.annualMean).toBe(true);
+		expect(stage.panel.shownWinds()?.field.east).toEqual(
+			summariseWinds(solved.winds).east,
+		);
 		stage.panel.setLayer('terrain');
-		expect(stage.panel.shownWinds()?.annualMean).toBe(false);
-	});
-
-	it('names the year’s mean winds as the layer on screen names its Annual average', () => {
-		const stage = createTwoLayerStage();
-		stage.panel.setWinds(true);
-		stage.arrive();
-		stage.panel.setSummary('temperature', 'annualMean');
-		stage.panel.setSummary(MADE_UP_ID, 'annualMean');
-		stage.panel.setLayer(MADE_UP_ID);
-		expect(stage.panel.shownWinds()?.annualMeanLabel).toBe(
-			summaryOf(MADE_UP_LAYER, 'annualMean').label,
-		);
-		expect(stage.panel.shownWinds()?.annualMeanLabel).toBe('Yearly mean');
-		// The same mean, not sent again, takes the other layer's name.
-		stage.panel.setLayer('temperature');
-		expect(stage.panel.shownWinds()?.annualMean).toBe(true);
-		expect(stage.panel.shownWinds()?.annualMeanLabel).toBe(
-			summaryOf(TEMPERATURE_LAYER, 'annualMean').label,
-		);
-		stage.panel.setSummary('temperature', 'warmest');
-		expect(stage.panel.shownWinds()?.annualMeanLabel).toBeUndefined();
+		expect(stage.panel.shownWinds()?.field.east).toBe(month);
 	});
 
 	it('keeps the scale of the layer the globe still shows, as that layer writes it, when it refuses the first field of another', () => {
@@ -3334,6 +3177,7 @@ describe('createLayerPanel, another layer described', () => {
 		expect(stage.panel.shown()?.layer).toBe(TEMPERATURE_LAYER);
 		expect(stage.legends.at(-1)).toEqual({
 			scale: temperatureScale,
+			state: 'calculating',
 			status: LEGEND_CALCULATING_TEXT,
 			bar: { fraction: null },
 		});
@@ -3357,7 +3201,7 @@ describe('createLayerPanel, the pressure', () => {
 			cellWeights(2),
 			weightedMean(solved.winds.pressure, cellWeights(2)),
 			10,
-		).range;
+		);
 
 	it('offers the Pressure after the Temperature, with only the Month and the Annual average', () => {
 		const stage = createStage();
@@ -3405,6 +3249,7 @@ describe('createLayerPanel, the pressure', () => {
 		stage.panel.setLayer('pressure');
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
+			state: 'empty',
 			status: LEGEND_EMPTY_TEXT,
 			bar: null,
 		});
@@ -3425,8 +3270,6 @@ describe('createLayerPanel, the pressure', () => {
 		expect(stage.panel.shown()).toEqual({
 			layer: PRESSURE_LAYER,
 			field: solved.winds.pressure[DEFAULT_MONTH],
-			summary: 'month',
-			month: DEFAULT_MONTH,
 			source: 'simulated',
 			current: true,
 		});
@@ -3464,6 +3307,7 @@ describe('createLayerPanel, the pressure', () => {
 		stage.store.markWindsCalculating();
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
+			state: 'calculating',
 			status: LEGEND_CALCULATING_TEXT,
 			bar: { fraction: null },
 		});
@@ -3477,6 +3321,7 @@ describe('createLayerPanel, the pressure', () => {
 		arriveWinds(refused);
 		expect(refused.lastLegend()).toEqual({
 			scale: null,
+			state: 'unavailable',
 			status: 'Pressure could not be shown',
 			bar: null,
 		});
@@ -3581,8 +3426,8 @@ describe('createLayerPanel, the pressure', () => {
 			'10',
 			'20',
 		]);
-		expect(shownDifference?.scale?.below).toBe('−20 and below');
-		expect(shownDifference?.scale?.above).toBe('20 and above');
+		expect(shownDifference?.scale).not.toHaveProperty('below');
+		expect(shownDifference?.scale).not.toHaveProperty('above');
 		expect(shownDifference?.scale?.figures).toBe(formatFigures(figures, 'hPa'));
 		stage.panel.setSummary('pressure', 'annualMean');
 		expect(stage.lastLegend()?.scale?.caption).toBe(
@@ -3652,14 +3497,12 @@ describe('createLayerPanel, the pressure', () => {
 		const solved = arriveWinds(stage);
 		stage.panel.setLayer('pressure');
 		expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
-		expect(stage.panel.shownWinds()?.annualMean).toBe(false);
 		stage.panel.setSummary('pressure', 'annualMean');
 		const mean = stage.winds.at(-1);
 		expect(mean?.east).toEqual(summariseWinds(solved.winds).east);
 		expect(mean?.north).toEqual(summariseWinds(solved.winds).north);
 		expect(mean?.east).not.toBe(solved.winds.east[DEFAULT_MONTH]);
-		expect(stage.panel.shownWinds()?.annualMean).toBe(true);
-		expect(stage.panel.shownWinds()?.annualMeanLabel).toBe('Annual average');
+		expect(stage.panel.shownWinds()?.field).toBe(mean);
 		stage.panel.setSummary('pressure', 'month');
 		stage.panel.setMonth(2);
 		expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[2]);
@@ -3672,17 +3515,17 @@ describe('createLayerPanel, the pressure', () => {
 		stage.panel.setLayer('temperature');
 		stage.panel.setSummary('temperature', 'warmest');
 		stage.panel.setLayer('pressure');
-		expect(stage.panel.shown()?.summary).toBe('month');
+		expect(stage.told.at(-1)?.summaries.pressure).toBe('month');
 		stage.panel.setSummary('pressure', 'annualMean');
 		stage.panel.setLayer('temperature');
-		expect(stage.panel.shown()?.summary).toBe('warmest');
+		expect(stage.told.at(-1)?.summaries.temperature).toBe('warmest');
 		expect(stage.panel.shown()?.layer).toBe(TEMPERATURE_LAYER);
 		expect(stage.told.at(-1)?.summaries).toEqual({
 			temperature: 'warmest',
 			pressure: 'annualMean',
 		});
 		stage.panel.setLayer('pressure');
-		expect(stage.panel.shown()?.summary).toBe('annualMean');
+		expect(stage.told.at(-1)?.summaries.pressure).toBe('annualMean');
 	});
 });
 
@@ -3812,16 +3655,9 @@ describe('createLayerPanel, one source for the layer and the winds', () => {
 		expect(observedWinds.calls).toHaveLength(1);
 	});
 
-	it('still writes the legend’s difference figures and the key’s error figures on Difference with the winds on', async () => {
-		const {
-			stage,
-			years,
-			observedWinds,
-			result,
-			solved,
-			observed,
-			windsObserved,
-		} = createSourceStage('temperature', true);
+	it('still writes the legend’s difference figures on Difference with the winds on, and says only where the winds stand', async () => {
+		const { stage, years, observedWinds, result, observed, windsObserved } =
+			createSourceStage('temperature', true);
 		stage.panel.setSource('difference');
 		years.last().resolve(observed);
 		observedWinds.last().resolve(windsObserved);
@@ -3835,14 +3671,7 @@ describe('createLayerPanel, one source for the layer and the winds', () => {
 		expect(stage.lastLegend()?.scale?.caption).toBe(
 			'Simulated less observed in July, °C',
 		);
-		expect(stage.lastKey()).toEqual({
-			status: null,
-			figures: windErrorFigures(
-				solved.winds,
-				{ ...windsObserved, pressure: solved.winds.pressure },
-				grid,
-			).months[DEFAULT_MONTH],
-		});
+		expect(stage.lastKey()).toEqual({ state: 'current', status: null });
 		// And on Observed, with the observed winds under them, as before.
 		stage.panel.setSource('observed');
 		expect(stage.lastLegend()?.scale?.figures).toBe(
@@ -3851,7 +3680,6 @@ describe('createLayerPanel, one source for the layer and the winds', () => {
 				observed[DEFAULT_MONTH] as Float32Array,
 			),
 		);
-		expect(stage.lastKey()?.figures).toBeDefined();
 	});
 
 	it('asks for both observed sets on Observed with the winds on, only the layer’s with them off, and the winds’ once they are turned on', () => {

@@ -1,7 +1,9 @@
 /**
  * The legend of a data layer: its colour ramp with the values marked at
  * round numbers, and a line saying whether what is on the globe describes
- * the world as it is, with the progress of a calculation under way.
+ * the world as it is, with the progress of a calculation under way. The
+ * legend's block in the info box draws the ramp; the box's one status line
+ * says the line, unless the winds have worse to say.
  */
 
 import {
@@ -12,6 +14,7 @@ import {
 	weightedQuantiles,
 } from '../../core/index';
 import { type ColourRamp, rampGradient, type ValueRange } from '../globe/ramp';
+import type { LayerStatus } from '../layers';
 import type { ScalarLayerReading, ScalarLayerSpec } from '../scalarLayer';
 import { createElement } from './fields';
 
@@ -95,25 +98,6 @@ export const LEGEND_FIRST_YEAR_TEXT = 'Calculating · first year';
  */
 export const LEGEND_CALCULATING_TEXT = 'Calculating';
 
-/** Whether a field shown on a scale holds values beyond either of its ends. */
-export type ValuesBeyond = {
-	/** Whether some value lies below the scale's low end. */
-	readonly below: boolean;
-	/** Whether some value lies above the scale's high end. */
-	readonly above: boolean;
-};
-
-/** No value beyond either end of a scale. */
-export const NOTHING_BEYOND: ValuesBeyond = { below: false, above: false };
-
-/** A scale fitted to some fields, and whether it leaves values out. */
-export type FittedScale = {
-	/** The range the scale spans. */
-	readonly range: ValueRange;
-	/** Whether the fields hold values beyond either end of the range. */
-	readonly beyond: ValuesBeyond;
-};
-
 /**
  * What each cell of a field counts for when a scale is fitted to it.
  *
@@ -149,8 +133,7 @@ export const cellWeights = (cellCount: number): ArrayLike<number> => {
  * rest into a few colours. Values beyond the ends take the end colours.
  * Before they are rounded, the ends are widened about their middle to the
  * smallest span if they are closer than that. They are then rounded
- * outward to whole numbers, the low end down and the high end up, so that
- * the legend's words for what lies beyond them are whole numbers.
+ * outward to whole numbers, the low end down and the high end up.
  *
  * @param months - The fields, such as the twelve months of a year, each one
  * value per cell. Values that are not numbers or are infinite are passed
@@ -159,8 +142,7 @@ export const cellWeights = (cellCount: number): ArrayLike<number> => {
  * {@link cellWeights}.
  * @param minSpan - The smallest span of the scale, above zero;
  * {@link MIN_FITTED_SPAN_C} when left out.
- * @returns The range, at least `minSpan` wide with whole ends, and whether
- * any finite value lies below its low end or above its high end.
+ * @returns The range, at least `minSpan` wide with whole ends.
  * @throws RangeError if no field holds a finite value, or a field or the
  * weights are not as {@link weightedQuantiles} takes them.
  */
@@ -168,22 +150,14 @@ export const fitRange = (
 	months: readonly Float32Array[],
 	weights: ArrayLike<number>,
 	minSpan: number = MIN_FITTED_SPAN_C,
-): FittedScale => {
-	const cuts = weightedQuantiles(months, weights, FIT_TAIL_SHARE);
-	let { low, high } = cuts;
+): ValueRange => {
+	let { low, high } = weightedQuantiles(months, weights, FIT_TAIL_SHARE);
 	if (high - low < minSpan) {
 		const middle = (low + high) / 2;
 		low = middle - minSpan / 2;
 		high = middle + minSpan / 2;
 	}
-	const range = { min: Math.floor(low), max: Math.ceil(high) };
-	return {
-		range,
-		beyond: {
-			below: cuts.lowest < range.min,
-			above: cuts.highest > range.max,
-		},
-	};
+	return { min: Math.floor(low), max: Math.ceil(high) };
 };
 
 /**
@@ -236,8 +210,7 @@ export const fitRangeFromZero = (
  * @param minSpan - The smallest span of the scale, above zero;
  * {@link MIN_FITTED_SPAN_C} when left out.
  * @returns The range, centred on the rounded centre and at least `minSpan`
- * wide, and whether any finite value lies below its low end or above its
- * high end.
+ * wide.
  * @throws RangeError if the centre is not finite, if no field holds a
  * finite value, or if a field or the weights are not as
  * {@link weightedQuantiles} takes them.
@@ -247,7 +220,7 @@ export const fitRangeCentred = (
 	weights: ArrayLike<number>,
 	centre: number,
 	minSpan: number = MIN_FITTED_SPAN_C,
-): FittedScale => {
+): ValueRange => {
 	if (!Number.isFinite(centre)) {
 		throw new RangeError(
 			`A scale must be centred on a finite value; got ${centre}`,
@@ -258,14 +231,7 @@ export const fitRangeCentred = (
 	const reach = Math.ceil(
 		Math.max(middle - cuts.low, cuts.high - middle, minSpan / 2),
 	);
-	const range = { min: middle - reach, max: middle + reach };
-	return {
-		range,
-		beyond: {
-			below: cuts.lowest < range.min,
-			above: cuts.highest > range.max,
-		},
-	};
+	return { min: middle - reach, max: middle + reach };
 };
 
 /**
@@ -521,21 +487,9 @@ export type LegendScale = {
 	/** The values marked along it. */
 	readonly ticks: readonly LegendTick[];
 	/**
-	 * What the legend says at the scale's low end, such as `−34 and below`,
-	 * when there are values below it that take its first colour; null when
-	 * there are none.
-	 */
-	readonly below: string | null;
-	/**
-	 * What the legend says at the scale's high end, such as `29 and above`,
-	 * when there are values above it that take its last colour; null when
-	 * there are none.
-	 */
-	readonly above: string | null;
-	/**
 	 * The error figures of the field on show against the observed one, as
-	 * {@link formatFigures} writes them, on a line under the ends; null when
-	 * there are none to show.
+	 * {@link formatFigures} writes them, on a line under the values marked;
+	 * null when there are none to show.
 	 */
 	readonly figures: string | null;
 };
@@ -548,8 +502,6 @@ export type LegendSource = {
 	readonly ramp: ColourRamp;
 	/** What the field shown measures, with its unit. */
 	readonly caption: string;
-	/** Whether there are values beyond either end of the range. */
-	readonly beyond: ValuesBeyond;
 	/**
 	 * A step of the scale's own to mark it at, as {@link legendTicks} takes
 	 * it; left out, the legend chooses one.
@@ -566,6 +518,13 @@ export type LegendSource = {
 export type LegendContent = {
 	/** The scale of the result on show, or null when there is none. */
 	readonly scale: LegendScale | null;
+	/**
+	 * Where what the legend shows stands, which the line says: `current`
+	 * while it describes the world as it is, `outOfDate` also while the
+	 * globe keeps an earlier result, and `unavailable` also while the globe
+	 * could not take a current one.
+	 */
+	readonly state: LayerStatus;
 	/**
 	 * What the legend says of the result, or null when it describes the
 	 * world as it is.
@@ -605,9 +564,9 @@ export type LegendContent = {
  * {@link progressLine} and a bar of {@link progressFraction}, and any other
  * {@link LEGEND_CALCULATING_TEXT} and a bar that does not know how far it
  * has come. The scale's ticks are at its own step when it has one, written
- * as the source's layer writes them, and it says what its end colours
- * stand for at each end that has values beyond it, and gives the source's
- * error figures in that layer's unit when it has them.
+ * as the source's layer writes them, and it gives the source's error
+ * figures in that layer's unit when it has them. Values beyond the ends,
+ * which the globe draws in the end colours, are not marked.
  */
 export const legendContent = (
 	layer: ScalarLayerSpec,
@@ -630,12 +589,6 @@ export const legendContent = (
 						label: sourceLayer.formatTick(value),
 						position: tickPosition(value, source.range),
 					})),
-					below: source.beyond.below
-						? `${sourceLayer.formatTick(source.range.min)} and below`
-						: null,
-					above: source.beyond.above
-						? `${sourceLayer.formatTick(source.range.max)} and above`
-						: null,
 					figures:
 						source.figures === undefined || source.figures === null
 							? null
@@ -644,135 +597,113 @@ export const legendContent = (
 	switch (reading.status) {
 		case 'current': {
 			if (scale === null) {
-				return { scale, status: layer.notShownText, bar: null };
+				return {
+					scale,
+					state: 'unavailable',
+					status: layer.notShownText,
+					bar: null,
+				};
 			}
-			return {
-				scale,
-				status: showsResult ? null : LEGEND_OUT_OF_DATE_TEXT,
-				bar: null,
-			};
+			return showsResult
+				? { scale, state: 'current', status: null, bar: null }
+				: {
+						scale,
+						state: 'outOfDate',
+						status: LEGEND_OUT_OF_DATE_TEXT,
+						bar: null,
+					};
 		}
 		case 'outOfDate':
-			return { scale, status: LEGEND_OUT_OF_DATE_TEXT, bar: null };
+			return {
+				scale,
+				state: 'outOfDate',
+				status: LEGEND_OUT_OF_DATE_TEXT,
+				bar: null,
+			};
 		case 'calculating':
 			return layer.yearProgress
 				? {
 						scale,
+						state: 'calculating',
 						status: progressLine(reading.progress),
 						bar: { fraction: progressFraction(reading.progress) },
 					}
-				: { scale, status: LEGEND_CALCULATING_TEXT, bar: { fraction: null } };
+				: {
+						scale,
+						state: 'calculating',
+						status: LEGEND_CALCULATING_TEXT,
+						bar: { fraction: null },
+					};
 		case 'unavailable':
-			return { scale, status: layer.unavailableText, bar: null };
+			return {
+				scale,
+				state: 'unavailable',
+				status: layer.unavailableText,
+				bar: null,
+			};
 		case 'empty':
-			return { scale, status: LEGEND_EMPTY_TEXT, bar: null };
+			return { scale, state: 'empty', status: LEGEND_EMPTY_TEXT, bar: null };
 	}
 };
 
-/** The legend on the page. */
+/** The legend's block on the page. */
 export type Legend = {
-	/** The legend, to put in its place over the globe. */
+	/** The block, to put in the info box. */
 	readonly element: HTMLElement;
-	/** Shows the content given, or hides the legend for null. */
+	/**
+	 * Shows the scale of the content given, or hides the block for null and
+	 * while the content has no scale. The content's line and bar are the
+	 * info box's to show.
+	 */
 	show(content: LegendContent | null): void;
 };
 
 /**
- * Creates a legend, hidden until it is given something to show.
+ * Creates the legend's block, hidden until it is given a scale to show.
  *
  * @remarks
- * The status line is a polite live region, so a screen reader announces
- * that the result is out of date or being calculated, without the focus
- * moving. The line is rewritten only when its words change, so the same
- * words are not announced again. While the legend shows, the line is never
- * hidden on its own, only left empty when there is nothing to say, since
- * many screen readers do not announce words written into a region that is
- * hidden at the time; the page keeps room for its line either way. It is
- * hidden only with the whole legend, when the legend is given nothing to
- * show.
- *
  * The caption over the ramp is the scale's own, so it changes with what the
- * scale measures, and is hidden with the scale.
- *
- * What the end colours stand for, such as `−34 and below` and `29 and
- * above`, is on a line of its own under the values marked, each part at its
- * own end, so that it never runs into a value marked near that end. The
- * line, and room for it, is there only while at least one part shows.
+ * scale measures.
  *
  * The error figures, when there are any, are on a line of their own
- * directly under that, and the line, and room for it, is there only while
- * there are.
+ * under the values marked, and the line, and room for it, is there only
+ * while there are.
  *
- * @returns The legend.
+ * @returns The block.
  */
 export const createLegend = (): Legend => {
 	const legend = createElement('div', 'legend');
 	legend.hidden = true;
 
 	const title = createElement('p', 'legend__caption');
-	const scale = createElement('div', 'legend__scale');
 	const ramp = createElement('div', 'legend__ramp');
 	const ticks = createElement('div', 'legend__ticks');
-	const ends = createElement('p', 'legend__ends');
-	const below = createElement('span', 'legend__end legend__end--low');
-	const above = createElement('span', 'legend__end legend__end--high');
-	ends.append(below, above);
 	const figures = createElement('p', 'legend__figures');
 	figures.hidden = true;
-	scale.append(title, ramp, ticks, ends, figures);
-
-	const status = createElement('p', 'legend__status');
-	status.setAttribute('aria-live', 'polite');
-	const bar = createElement('progress', 'legend__bar');
-	bar.max = 1;
-	bar.setAttribute('aria-label', 'Calculation progress');
-
-	legend.append(scale, status, bar);
+	legend.append(title, ramp, ticks, figures);
 
 	return {
 		element: legend,
 		show: (content) => {
-			legend.hidden = content === null;
-			if (content === null) {
+			const scale = content?.scale ?? null;
+			legend.hidden = scale === null;
+			if (scale === null) {
 				return;
 			}
-			scale.hidden = content.scale === null;
-			if (content.scale !== null) {
-				if (title.textContent !== content.scale.caption) {
-					title.textContent = content.scale.caption;
-				}
-				ramp.style.background = content.scale.gradient;
-				ticks.replaceChildren(
-					...content.scale.ticks.map((tick) => {
-						const mark = createElement('span', 'legend__tick');
-						mark.textContent = tick.label;
-						mark.style.left = `${tick.position}%`;
-						return mark;
-					}),
-				);
-				below.textContent = content.scale.below ?? '';
-				below.hidden = content.scale.below === null;
-				above.textContent = content.scale.above ?? '';
-				above.hidden = content.scale.above === null;
-				ends.hidden =
-					content.scale.below === null && content.scale.above === null;
-				figures.textContent = content.scale.figures ?? '';
-				figures.hidden = content.scale.figures === null;
+			if (title.textContent !== scale.caption) {
+				title.textContent = scale.caption;
 			}
-			const text = content.status ?? '';
-			if (status.textContent !== text) {
-				status.textContent = text;
-			}
-			bar.hidden = content.bar === null;
-			if (content.bar !== null) {
-				// A bar without a value is drawn as one that does not know
-				// how far it has come.
-				if (content.bar.fraction === null) {
-					bar.removeAttribute('value');
-				} else {
-					bar.value = content.bar.fraction;
-				}
-			}
+			ramp.style.background = scale.gradient;
+			ticks.replaceChildren(
+				...scale.ticks.map((tick) => {
+					const mark = createElement('span', 'legend__tick');
+					mark.textContent = tick.label;
+					mark.style.left = `${tick.position}%`;
+					return mark;
+				}),
+			);
+			figures.textContent = scale.figures ?? '';
+			figures.hidden = scale.figures === null;
 		},
 	};
 };

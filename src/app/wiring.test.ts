@@ -50,7 +50,6 @@ import type { ComparisonContent } from './ui/comparison';
 import type { LayerDockOptions } from './ui/layerDock';
 import {
 	createLayerPanel,
-	type LayerControlsOptions,
 	type ShownLayer,
 	type ShownWinds,
 } from './ui/layerPanel';
@@ -528,8 +527,6 @@ const createStage = (
 				togglePlaying: () => log.push('layerPanel.togglePlaying'),
 				shown: () => stage.shownTemperature,
 				shownWinds: () => stage.shownWinds,
-				setWindUnit: (unit) => log.push(`layerPanel.setWindUnit ${unit}`),
-				setWindStyle: (style) => log.push(`layerPanel.setWindStyle ${style}`),
 			};
 		},
 		createCursorReadout: (options) => {
@@ -1564,7 +1561,6 @@ describe('the temperature, on its worker', () => {
 							showLegend: () => {},
 							showWindKey: () => {},
 							setWindUnit: () => {},
-							setWindStyle: () => {},
 						};
 					},
 				}),
@@ -2010,8 +2006,6 @@ describe('the cursor readout', () => {
 		const shown: ShownLayer = {
 			layer: TEMPERATURE_LAYER,
 			field: new Float32Array(next.elevation.length),
-			summary: 'warmest',
-			month: 6,
 			source: 'simulated',
 			current: true,
 		};
@@ -2108,7 +2102,6 @@ describe('the cursor readout', () => {
 							showLegend: () => {},
 							showWindKey: () => {},
 							setWindUnit: () => {},
-							setWindStyle: () => {},
 						};
 					},
 				}),
@@ -2121,8 +2114,6 @@ describe('the cursor readout', () => {
 		expect(stage.readoutOptions.shownLayer()).toEqual({
 			layer: TEMPERATURE_LAYER,
 			field: result.months[DEFAULT_MONTH],
-			summary: 'month',
-			month: DEFAULT_MONTH,
 			source: 'simulated',
 			current: true,
 		});
@@ -2219,7 +2210,6 @@ describe('the month on screen', () => {
 						showLegend: () => {},
 						showWindKey: () => {},
 						setWindUnit: () => {},
-						setWindStyle: () => {},
 					}),
 				}),
 		});
@@ -2287,7 +2277,6 @@ const createSunStage = async (world?: World) => {
 					showLegend: () => {},
 					showWindKey: () => {},
 					setWindUnit: () => {},
-					setWindStyle: () => {},
 				}),
 			}),
 	});
@@ -2533,19 +2522,13 @@ describe('the Winds tile', () => {
 });
 
 /**
- * A started page with the real layer panel, on the terrain, whose controls
- * record the unit the key is given.
+ * A started page with the real layer panel, on the terrain.
  *
  * @param preferenceEntries - What the preferences' storage holds at first.
  */
 const createWindUnitStage = async (
 	preferenceEntries?: Readonly<Record<string, string>>,
 ) => {
-	let controls: LayerControlsOptions | undefined;
-	/** Every unit the key was told to write its speeds in, after the first. */
-	const keyUnits: string[] = [];
-	/** Every way the key was told the winds are drawn, after the first. */
-	const keyStyles: string[] = [];
 	const stage = await createStartedStage(undefined, {
 		preferenceEntries,
 		createLayerPanel: (options) =>
@@ -2555,15 +2538,10 @@ const createWindUnitStage = async (
 				setTimer: () => 0,
 				clearTimer: () => {},
 				reportError: () => {},
-				createControls: (made) => {
-					controls = made;
-					return {
-						showLegend: () => {},
-						showWindKey: () => {},
-						setWindUnit: (unit) => keyUnits.push(unit),
-						setWindStyle: (style) => keyStyles.push(style),
-					};
-				},
+				createControls: () => ({
+					showLegend: () => {},
+					showWindKey: () => {},
+				}),
 			}),
 	});
 	/** Has winds of the world's grid arrive in the store, current. */
@@ -2581,62 +2559,53 @@ const createWindUnitStage = async (
 	};
 	return {
 		stage,
-		controls: required(controls, 'layer controls'),
-		keyUnits,
-		keyStyles,
 		arriveWinds,
 	};
 };
 
 describe('the wind speed unit', () => {
-	it('starts in m/s with nothing stored, in the view controls, the key and the readout', async () => {
-		const { stage, controls } = await createWindUnitStage();
+	it('starts in m/s with nothing stored, in the view controls and the readout, and tells the layer panel nothing of it', async () => {
+		const { stage } = await createWindUnitStage();
 		expect(stage.viewPanelOptions.windUnit).toBe('m/s');
-		expect(stage.layerOptions.windUnit).toBe('m/s');
-		expect(controls.windUnit).toBe('m/s');
+		expect('windUnit' in stage.layerOptions).toBe(false);
 		expect(stage.readoutOptions.windUnit()).toBe('m/s');
 	});
 
-	it('starts in the stored unit, in the view controls, the key and the readout', async () => {
-		const { stage, controls, keyUnits } = await createWindUnitStage({
+	it('starts in the stored unit, in the view controls and the readout', async () => {
+		const { stage } = await createWindUnitStage({
 			[WIND_SPEED_UNIT_KEY]: 'mph',
 		});
 		expect(stage.viewPanelOptions.windUnit).toBe('mph');
-		expect(controls.windUnit).toBe('mph');
 		expect(stage.readoutOptions.windUnit()).toBe('mph');
-		// Started in it, not set to it after another.
-		expect(keyUnits).toEqual([]);
 		expect(stage.preferenceStorage.writes).toEqual([]);
 	});
 
 	it('starts in m/s when the storage holds something else', async () => {
-		const { stage, controls } = await createWindUnitStage({
+		const { stage } = await createWindUnitStage({
 			[WIND_SPEED_UNIT_KEY]: 'knots',
 		});
 		expect(stage.viewPanelOptions.windUnit).toBe('m/s');
-		expect(controls.windUnit).toBe('m/s');
 		expect(stage.readoutOptions.windUnit()).toBe('m/s');
 	});
 
-	it('stores a unit chosen, and changes the key and the readout at once', async () => {
-		const { stage, keyUnits } = await createWindUnitStage();
+	it('stores a unit chosen, and changes the readout at once', async () => {
+		const { stage } = await createWindUnitStage();
 		stage.viewPanelOptions.onWindUnit('km/h');
 		expect(stage.preferenceStorage.writes).toEqual([
 			[WIND_SPEED_UNIT_KEY, 'km/h'],
 		]);
-		expect(keyUnits).toEqual(['km/h']);
 		expect(stage.readoutOptions.windUnit()).toBe('km/h');
 		expect(stage.readoutCalls).toEqual(['invalidate']);
 		stage.viewPanelOptions.onWindUnit('mph');
-		expect(keyUnits).toEqual(['km/h', 'mph']);
 		expect(stage.readoutOptions.windUnit()).toBe('mph');
 		expect(stage.readoutCalls).toEqual(['invalidate', 'invalidate']);
 	});
 
-	it('tells the layer panel of the unit, and nothing else', async () => {
+	it('tells the readout of the unit, and nothing else', async () => {
 		const stage = await createStartedStage();
 		stage.viewPanelOptions.onWindUnit('mph');
-		expect(stage.log).toEqual(['layerPanel.setWindUnit mph']);
+		expect(stage.log).toEqual([]);
+		expect(stage.readoutCalls).toEqual(['invalidate']);
 	});
 
 	it('writes nothing to the world, and marks nothing for saving', async () => {
@@ -2650,80 +2619,71 @@ describe('the wind speed unit', () => {
 	});
 
 	it('is kept through a new world', async () => {
-		const { stage, keyUnits } = await createWindUnitStage();
+		const { stage } = await createWindUnitStage();
 		stage.viewPanelOptions.onWindUnit('mph');
 		stage.state.replaceWorld(createBlankWorld(64));
 		expect(stage.readoutOptions.windUnit()).toBe('mph');
-		expect(keyUnits).toEqual(['mph']);
 		expect(stage.preferenceStorage.writes).toHaveLength(1);
 	});
 });
 
 describe('how the winds are drawn', () => {
-	it('starts on arrows with nothing stored, in the globe, the view controls and the key', async () => {
-		const { stage, controls } = await createWindUnitStage();
+	it('starts on arrows with nothing stored, in the globe and the view controls, and tells the layer panel nothing of it', async () => {
+		const { stage } = await createWindUnitStage();
 		expect(stage.globeWindStyles).toEqual(['arrows']);
 		expect(stage.viewPanelOptions.windStyle).toBe('arrows');
-		expect(stage.layerOptions.windStyle).toBe('arrows');
-		expect(controls.windStyle).toBe('arrows');
+		expect('windStyle' in stage.layerOptions).toBe(false);
 	});
 
-	it('starts on the stored way, in the globe, the view controls and the key, with Winds still off', async () => {
-		const { stage, controls, keyStyles } = await createWindUnitStage({
+	it('starts on the stored way, in the globe and the view controls, with Winds still off', async () => {
+		const { stage } = await createWindUnitStage({
 			[WIND_STYLE_KEY]: 'streaks',
 		});
 		expect(stage.globeWindStyles).toEqual(['streaks']);
 		expect(stage.viewPanelOptions.windStyle).toBe('streaks');
-		expect(controls.windStyle).toBe('streaks');
-		// Started in it, not set to it after another.
-		expect(keyStyles).toEqual([]);
 		expect(stage.preferenceStorage.writes).toEqual([]);
 		expect(stage.dockOptions.view.winds).toBe(false);
 		expect(stage.timelineOptions.view.winds).toBe(false);
 	});
 
 	it('starts on arrows when the storage holds something else', async () => {
-		const { stage, controls } = await createWindUnitStage({
+		const { stage } = await createWindUnitStage({
 			[WIND_STYLE_KEY]: 'lines',
 		});
 		expect(stage.globeWindStyles).toEqual(['arrows']);
 		expect(stage.viewPanelOptions.windStyle).toBe('arrows');
-		expect(controls.windStyle).toBe('arrows');
 	});
 
-	it('stores a way chosen, and gives it to the globe and the key at once', async () => {
-		const { stage, keyStyles } = await createWindUnitStage();
+	it('stores a way chosen, and gives it to the globe at once', async () => {
+		const { stage } = await createWindUnitStage();
 		stage.viewPanelOptions.onWindStyle('streaks');
 		expect(stage.preferenceStorage.writes).toEqual([
 			[WIND_STYLE_KEY, 'streaks'],
 		]);
 		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks']);
-		expect(keyStyles).toEqual(['streaks']);
 		stage.viewPanelOptions.onWindStyle('arrows');
 		expect(stage.preferenceStorage.writes).toEqual([
 			[WIND_STYLE_KEY, 'streaks'],
 			[WIND_STYLE_KEY, 'arrows'],
 		]);
 		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks', 'arrows']);
-		expect(keyStyles).toEqual(['streaks', 'arrows']);
 	});
 
-	it('tells the layer panel of the way, and nothing else', async () => {
+	it('tells nothing else of the way: not the layer panel, nor the readout', async () => {
 		const stage = await createStartedStage();
 		stage.viewPanelOptions.onWindStyle('streaks');
-		expect(stage.log).toEqual(['layerPanel.setWindStyle streaks']);
+		expect(stage.log).toEqual([]);
 		expect(stage.readoutCalls).toEqual([]);
 	});
 
 	it('writes nothing to the world, marks nothing for saving, and is kept through a new world', async () => {
-		const { stage, keyStyles } = await createWindUnitStage();
+		const { stage } = await createWindUnitStage();
 		const before = serializeWorld(stage.state.world);
 		stage.viewPanelOptions.onWindStyle('streaks');
 		expect(serializeWorld(stage.state.world)).toEqual(before);
 		expect(stage.log).not.toContain('autosave.markChanged');
 		stage.state.replaceWorld(createBlankWorld(64));
 		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks']);
-		expect(keyStyles).toEqual(['streaks']);
 		expect(stage.preferenceStorage.writes).toHaveLength(1);
 	});
 });
@@ -2758,7 +2718,7 @@ describe('the cursor readout, of the winds', () => {
 		expect(shown?.field.east).toBe(
 			stage.layerOptions.store.winds.result?.winds.east[DEFAULT_MONTH],
 		);
-		expect(shown).toMatchObject({ annualMean: false, current: true });
+		expect(shown?.current).toBe(true);
 		stage.layerOptions.store.markWindsOutOfDate();
 		expect(stage.readoutOptions.shownWinds()?.current).toBe(false);
 	});
@@ -2802,13 +2762,14 @@ describe('the cursor readout, of the winds', () => {
 		arriveWinds(4);
 		stage.dockOptions.onLayer('temperature');
 		stage.readoutCalls.length = 0;
+		const month = stage.readoutOptions.shownWinds()?.field;
 		stage.topBarOptions.onSummary('temperature', 'annualMean');
 		expect(stage.readoutCalls).toContain('invalidate');
-		expect(stage.readoutOptions.shownWinds()?.annualMean).toBe(true);
+		expect(stage.readoutOptions.shownWinds()?.field).not.toBe(month);
 		stage.readoutCalls.length = 0;
 		stage.dockOptions.onLayer('terrain');
 		expect(stage.readoutCalls).toContain('invalidate');
-		expect(stage.readoutOptions.shownWinds()?.annualMean).toBe(false);
+		expect(stage.readoutOptions.shownWinds()?.field.east).toBe(month?.east);
 	});
 });
 
@@ -2886,7 +2847,6 @@ describe('the Sunlight control', () => {
 						showLegend: () => {},
 						showWindKey: () => {},
 						setWindUnit: () => {},
-						setWindStyle: () => {},
 					}),
 				}),
 		});
@@ -3049,7 +3009,6 @@ describe('the comparison on the measured Earth', () => {
 						showLegend: () => {},
 						showWindKey: () => {},
 						setWindUnit: () => {},
-						setWindStyle: () => {},
 					}),
 				}),
 		});

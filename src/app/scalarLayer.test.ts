@@ -43,7 +43,6 @@ import {
 	FIT_TAIL_SHARE,
 	fitRange,
 	fitRangeCentred,
-	NOTHING_BEYOND,
 } from './ui/legend';
 import {
 	DEFAULT_SUMMARY,
@@ -397,7 +396,7 @@ describe('the pressure layer’s scale', () => {
 		];
 		for (const scale of scales) {
 			expect(scale).toEqual(scales[0]);
-			expect((scale.range.min + scale.range.max) / 2).toBe(centre);
+			expect((scale.min + scale.max) / 2).toBe(centre);
 		}
 		expect(scales[0]).toEqual(
 			fitRangeCentred(months, grid.areas, areaMean(months), 10),
@@ -407,18 +406,12 @@ describe('the pressure layer’s scale', () => {
 	it('is symmetric about the mean and clips the far tails at either end', () => {
 		const months = yearOnGrid();
 		const view = summaryOf(PRESSURE_LAYER, 'month');
-		const { range, beyond } = fitSummaryScale(
-			PRESSURE_LAYER,
-			view,
-			[{ months }],
-			6,
-		);
+		const range = fitSummaryScale(PRESSURE_LAYER, view, [{ months }], 6);
 		const centre = Math.round(areaMean(months));
 		expect(centre - range.min).toBe(range.max - centre);
 		// The tails 300 hPa out do not stretch it; they take the end colours.
 		expect(range.min).toBeGreaterThan(900);
 		expect(range.max).toBeLessThan(1100);
-		expect(beyond).toEqual({ below: true, above: true });
 	});
 
 	it('is never narrower than 10 hPa, for a nearly uniform year', () => {
@@ -426,7 +419,7 @@ describe('the pressure layer’s scale', () => {
 			new Float32Array(grid.cellCount).fill(1013 + 0.01 * m),
 		);
 		const view = summaryOf(PRESSURE_LAYER, 'annualMean');
-		const { range } = fitSummaryScale(
+		const range = fitSummaryScale(
 			PRESSURE_LAYER,
 			view,
 			[{ months }],
@@ -561,15 +554,15 @@ describe('fitSummaryScale', () => {
 			months: months.map((month, m) => month.map((v) => v * (m + 1))),
 		};
 		const own = fitSummaryScale(TEMPERATURE_LAYER, view, [year], 'range');
-		expect(own).toEqual({ range: { min: 0, max: 11 }, beyond: NOTHING_BEYOND });
+		expect(own).toEqual({ min: 0, max: 11 });
 		const shared = fitSummaryScale(
 			TEMPERATURE_LAYER,
 			view,
 			[year, wider],
 			'range',
 		);
-		expect(shared.range.min).toBe(0);
-		expect(shared.range.max).toBeGreaterThan(11);
+		expect(shared.min).toBe(0);
+		expect(shared.max).toBeGreaterThan(11);
 	});
 
 	it('fits a centred view about the centre the layer works out, at least its smallest span', () => {
@@ -584,7 +577,7 @@ describe('fitSummaryScale', () => {
 				MADE_UP_LAYER.minSpan,
 			),
 		);
-		expect((scale.range.min + scale.range.max) / 2).toBe(1016);
+		expect((scale.min + scale.max) / 2).toBe(1016);
 	});
 });
 

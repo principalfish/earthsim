@@ -71,14 +71,14 @@ describe('compassPoint', () => {
 			...COMPASS_POINTS,
 		]);
 		expect(COMPASS_POINTS).toEqual([
-			'north',
-			'north-east',
-			'east',
-			'south-east',
-			'south',
-			'south-west',
-			'west',
-			'north-west',
+			'N',
+			'NE',
+			'E',
+			'SE',
+			'S',
+			'SW',
+			'W',
+			'NW',
 		]);
 	});
 
@@ -95,24 +95,24 @@ describe('compassPoint', () => {
 	});
 
 	it('takes 22.5° as north-east, just under it as north, and 337.5° as north', () => {
-		expect(compassPoint(22.5)).toBe('north-east');
-		expect(compassPoint(22.499)).toBe('north');
-		expect(compassPoint(337.5)).toBe('north');
-		expect(compassPoint(337.499)).toBe('north-west');
-		expect(compassPoint(67.5)).toBe('east');
-		expect(compassPoint(67.499)).toBe('north-east');
+		expect(compassPoint(22.5)).toBe('NE');
+		expect(compassPoint(22.499)).toBe('N');
+		expect(compassPoint(337.5)).toBe('N');
+		expect(compassPoint(337.499)).toBe('NW');
+		expect(compassPoint(67.5)).toBe('E');
+		expect(compassPoint(67.499)).toBe('NE');
 	});
 
 	it('takes a bearing below 0° or from 360° up round the circle', () => {
-		expect(compassPoint(360)).toBe('north');
-		expect(compassPoint(-0)).toBe('north');
-		expect(compassPoint(-1)).toBe('north');
-		expect(compassPoint(-22.5)).toBe('north');
-		expect(compassPoint(-22.501)).toBe('north-west');
-		expect(compassPoint(-90)).toBe('west');
-		expect(compassPoint(405)).toBe('north-east');
-		expect(compassPoint(720 + 180)).toBe('south');
-		expect(compassPoint(-720 - 135)).toBe('south-west');
+		expect(compassPoint(360)).toBe('N');
+		expect(compassPoint(-0)).toBe('N');
+		expect(compassPoint(-1)).toBe('N');
+		expect(compassPoint(-22.5)).toBe('N');
+		expect(compassPoint(-22.501)).toBe('NW');
+		expect(compassPoint(-90)).toBe('W');
+		expect(compassPoint(405)).toBe('NE');
+		expect(compassPoint(720 + 180)).toBe('S');
+		expect(compassPoint(-720 - 135)).toBe('SW');
 	});
 });
 
@@ -143,9 +143,9 @@ describe('windFromDeg', () => {
 
 describe('formatWind', () => {
 	it('writes the speed in the unit and the point it blows from', () => {
-		expect(formatWind(7.2, 45, 'm/s')).toBe('7 m/s from the north-east');
-		expect(formatWind(10, 270, 'km/h')).toBe('36 km/h from the west');
-		expect(formatWind(10, 180, 'mph')).toBe('22 mph from the south');
+		expect(formatWind(7.2, 45, 'm/s')).toBe('7 m/s NE');
+		expect(formatWind(10, 270, 'km/h')).toBe('36 km/h W');
+		expect(formatWind(10, 180, 'mph')).toBe('22 mph S');
 	});
 
 	it('reads calm below 0.5 m/s in every unit, and not from 0.5 m/s', () => {
@@ -155,13 +155,13 @@ describe('formatWind', () => {
 			expect(formatWind(0.49, 90, unit), unit).toBe('calm');
 			expect(formatWind(0.5, 90, unit), unit).not.toBe('calm');
 		}
-		expect(formatWind(0.5, 90, 'm/s')).toBe('1 m/s from the east');
-		expect(formatWind(0.5, 90, 'km/h')).toBe('2 km/h from the east');
-		expect(formatWind(0.5, 90, 'mph')).toBe('1 mph from the east');
+		expect(formatWind(0.5, 90, 'm/s')).toBe('1 m/s E');
+		expect(formatWind(0.5, 90, 'km/h')).toBe('2 km/h E');
+		expect(formatWind(0.5, 90, 'mph')).toBe('1 mph E');
 	});
 
 	it('writes a strong wind uncapped, its digits grouped in threes', () => {
-		expect(formatWind(123.4, 0, 'm/s')).toBe('123 m/s from the north');
-		expect(formatWind(300, 0, 'km/h')).toBe('1,080 km/h from the north');
+		expect(formatWind(123.4, 0, 'm/s')).toBe('123 m/s N');
+		expect(formatWind(300, 0, 'km/h')).toBe('1,080 km/h N');
 	});
 });

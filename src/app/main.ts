@@ -12,9 +12,10 @@ import { createPreferences } from './preferences';
 import { loadLayerObserved } from './scalarLayer';
 import { createSculptController } from './sculpt';
 import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
-import { createCursorReadout, createReadoutStrip } from './ui/cursorReadout';
+import { createCursorReadout } from './ui/cursorReadout';
+import { createInfoBox } from './ui/infoBox';
 import { createLayerDock } from './ui/layerDock';
-import { createLayerControls, createLayerPanel } from './ui/layerPanel';
+import { createLayerPanel } from './ui/layerPanel';
 import { createMainView } from './ui/mainView';
 import { openNewWorldDialog } from './ui/newWorldDialog';
 import { createPanelSections } from './ui/panelSections';
@@ -98,6 +99,10 @@ if (globe !== null) {
 		createPanelMemory(browserStorage),
 	);
 	const mainView = createMainView(viewport);
+	// Made first, since the layer panel and the cursor readout both show
+	// what they have in it.
+	const infoBox = createInfoBox();
+	mainView.info.append(infoBox.element);
 	void startPage({
 		// The page starts on a blank ocean, which stays until the saved
 		// world, if there is one, has been read. A world keeps its own sea
@@ -176,14 +181,14 @@ if (globe !== null) {
 				setTimer,
 				clearTimer,
 				reportError: logError,
-				createControls: (controls) => createLayerControls(mainView, controls),
+				createControls: () => infoBox,
 			}),
 		createCursorReadout: (options) =>
 			createCursorReadout({
 				...options,
 				canvas,
 				globe,
-				show: createReadoutStrip(mainView.readout).show,
+				show: infoBox.showReadout,
 			}),
 		preferences: createPreferences(browserStorage),
 		openNewWorldDialog,

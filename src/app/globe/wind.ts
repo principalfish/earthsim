@@ -366,7 +366,7 @@ export const arrowWithHead = (
  * Its length and its weight grow in step with the speed above
  * {@link CALM_SPEED}, from {@link ARROW_MIN_LENGTH_PX} to
  * {@link ARROW_MAX_LENGTH_PX} long, until {@link ARROW_CAP_SPEED}, and no
- * further. The key draws its arrows with this too.
+ * further.
  *
  * @param speed - The wind speed, in metres a second.
  * @returns The arrow's shape, or null for a calm, or a speed that is not a

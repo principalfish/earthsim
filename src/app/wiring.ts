@@ -25,7 +25,6 @@ import type { Autosave, AutosaveOptions } from './autosave';
 import type { RotateButton, ViewInput } from './globe/input';
 import type { SunlightStyle } from './globe/material';
 import type { Globe } from './globe/renderer';
-import type { WindStyle } from './globe/windMotion';
 import { createLayerStore, type LayerStore } from './layers';
 import type { ObservedLoader } from './observedData';
 import type { Preferences } from './preferences';
@@ -148,10 +147,6 @@ export type PageLayerOptions = {
 	 * the line under it, for the top bar to show.
 	 */
 	readonly onComparison: (content: ComparisonContent) => void;
-	/** The unit the key to the wind arrows writes its speeds in at first. */
-	readonly windUnit: WindUnit;
-	/** How the winds are drawn at first, which the key to them follows. */
-	readonly windStyle: WindStyle;
 };
 
 /** What the cursor readout reads of the page. */
@@ -275,8 +270,6 @@ export type PageParts = {
 		| 'togglePlaying'
 		| 'shown'
 		| 'shownWinds'
-		| 'setWindUnit'
-		| 'setWindStyle'
 	>;
 	/**
 	 * Lays the cursor readout over the globe, hidden until the pointer is
@@ -416,16 +409,14 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  *
  * The unit wind speeds are written in is a preference of the browser, not
  * part of the world: it is read once, as the page starts, and the view
- * controls, the key to the wind arrows and the readout all start in it. A
- * unit chosen in the view controls is remembered by the preferences, and
- * reaches the key, through the layer panel, and the readout at once. It
- * is never saved with the world.
+ * controls and the readout start in it. A unit chosen in the view controls
+ * is remembered by the preferences, and reaches the readout at once. It is
+ * never saved with the world.
  *
  * So is how the winds are drawn, as arrows or as streaks: read once as the
  * page starts, the globe is told it before the view controls are made, and
- * the view controls and the key to the winds start in it. A way chosen in
- * the view controls is remembered by the preferences, and reaches the
- * globe and then the key, through the layer panel, at once. Winds itself
+ * the view controls start in it. A way chosen in the view controls is
+ * remembered by the preferences, and reaches the globe at once. Winds itself
  * still starts off. The globe is also told whether the page is visible, as
  * the page starts and at each change, so that streaks move only while it
  * is.
@@ -650,12 +641,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		onWindStyle: (style) => {
 			parts.preferences.setWindStyle(style);
 			globe.setWindStyle(style);
-			layerPanel.setWindStyle(style);
 		},
 		onWindUnit: (unit) => {
 			windUnit = unit;
 			parts.preferences.setWindSpeedUnit(unit);
-			layerPanel.setWindUnit(unit);
 			readout.invalidate();
 		},
 	});
@@ -734,8 +723,6 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		loadObserved: parts.loadObserved,
 		loadObservedWinds: parts.loadObservedWinds,
 		onComparison: topBar.showComparison,
-		windUnit,
-		windStyle,
 	});
 	const statistics = parts.createStatistics({
 		currentWorld: () => state.world,
