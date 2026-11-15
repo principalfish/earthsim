@@ -12,13 +12,13 @@ Not included: any change to the temperature or wind models, a layout for phone-s
 
 ## Plan
 
-_2026-11-15 · 2 of 11 pieces done · now: piece 3 in progress_
+_2026-11-15 · 2 of 11 pieces done · now: waiting on review of piece 3_
 
 - [x] **1/11 The main-view regions, the icons, and the layer and overlay tiles** · `6278b72`
   Icon tiles down the left edge of the globe choose the colour layer and switch Winds, Sunlight and the grid.
 - [x] **2/11 Show and one comparison control at the top** · `996d82c`
   The view of the year and one Simulated, Observed or Difference control, for the layer and the winds together.
-- [ ] **3/11 The month timeline, and the Layers section removed** · in progress
+- [ ] **3/11 The month timeline, and the Layers section removed** · waiting on you
   The month slider and Play along the bottom of the globe; the side panel loses its Layers section.
 - [ ] **4/11 One info box** · not started
   The legend, the wind key, one status and the value under the pointer in a single box.
