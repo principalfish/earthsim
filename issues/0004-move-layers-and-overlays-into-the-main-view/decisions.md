@@ -34,8 +34,11 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - On an untouched Earth one Simulated, Observed or Difference control at the top applies to whatever is showing: the colour layer and the winds switch together, and Difference shows the layer's difference with the simulated winds. Observed winds can no longer be mixed with a simulated layer. The user: "One control for both" (2026-11-15)
 - The browser remembers the chosen layer, each layer's Show, and the Winds, Sunlight and Grid toggles, so the page reopens as it was left. The month still starts on July. The user: "Remember them" (2026-11-15)
 
+- Streaks is the starting choice except where the system asks for reduced motion, where it starts on Arrows; either can be chosen in Settings. The user: "Arrows if reduced motion" (2026-11-15)
+- The ledger is complete; the issue and plan follow. The user: "That's everything" (2026-11-15)
+
 ## Open
-- Streaks as the starting choice when the system asks for reduced motion.
+- None.
 
 ## Assumed
 - Nothing in a world file changes; the browser's remembered choices (open sections, wind unit, arrows or streaks) carry over, and the units join them.
