@@ -158,7 +158,7 @@ Rejected:
 ## Checkpoints
 
 - [x] 1. The main-view regions, the icons, and the layer and overlay tiles
-- [ ] 2. Show and one comparison control at the top
+- [x] 2. Show and one comparison control at the top
 - [ ] 3. The month timeline, and the Layers section removed
 - [ ] 4. One info box
 - [ ] 5. Everything worked out after every change, with Pause
@@ -207,5 +207,6 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - A fetch that fails after its layer has been left keeps the source and is asked for again on return; one that fails while it is on screen goes back to Simulated, as planned.
 - Uncovered changed lines, reason accepted by the coverage check: `src/app/main.ts` (the `createTopBar` part), the entry point's assembly with no test file.
 - `src/app/ui/topBar.ts:83`, uncovered after a review fix: the thrown error when a select field has no select, which `createSelectField` always builds, so it cannot be reached. Reason given at the review request; the coverage check did not run in the re-check, so it has not judged it.
-- Review: one round, four verified findings (one cleanup, three docs), all fixed; the light re-check confirmed them and raised three docs-wording findings in `docs/user-guide.md` (161, 185, 262), verified and left open for the user. In `findings.md`.
+- Review: one round, four verified findings (one cleanup, three docs), all fixed; the light re-check confirmed them and raised three docs-wording findings in `docs/user-guide.md` (161, 185, 262), verified; the user approved the piece and had them fixed ("Tried it, fix all"), with a docs light re-check of those three edits. In `findings.md`.
 - Browser look (headless Edge, own server on 5183, stopped): wide and narrow windows behaved as the Acceptance says; the wind key's "Loading observed winds" line was not caught, since "Calculating" comes first by design.
+- Committed as `996d82c` and pushed on the user's approval: "Tried it, fix all".

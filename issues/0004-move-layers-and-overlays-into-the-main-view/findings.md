@@ -28,7 +28,9 @@
 | round | docs | - | - | dropped | - | `src/app/ui/layerPanel.ts:1463` | Comment on what the layer controls add — dropped: accurate; only the `wiring.ts` part stands |
 | round | docs | - | - | dropped | - | `docs/user-guide.md:34` | "Switching Sunlight or Winds on opens Layers" — dropped: raised for the record, still true |
 | round | coverage | - | - | dropped | - | `src/app/ui/layerPanel.test.ts:4236` | No test ties a real stroke and undo to the source's reset — dropped: the check said no action, and the link predates this piece |
-| re-check | correctness | low | docs | verified | open | `docs/user-guide.md:185` | "Fetched when first needed" still says a failed fetch always goes back to Simulated; the layer's resets only while it is on screen, the winds' only while Winds is on |
-| re-check | correctness | low | docs | verified | open | `docs/user-guide.md:262` | The winds' "Fetched when first needed" says a failed download always goes back to Simulated; it does only while Winds is on |
-| re-check | docs | low | docs | verified | open | `docs/user-guide.md:161` | The Pressure bullet's edited clause is garbled and leaves out what happens when Pressure has been left |
+| re-check | correctness | low | docs | verified | fixed | `docs/user-guide.md:185` | "Fetched when first needed" still says a failed fetch always goes back to Simulated; the layer's resets only while it is on screen, the winds' only while Winds is on |
+| re-check | correctness | low | docs | verified | fixed | `docs/user-guide.md:262` | The winds' "Fetched when first needed" says a failed download always goes back to Simulated; it does only while Winds is on |
+| re-check | docs | low | docs | verified | fixed | `docs/user-guide.md:161` | The Pressure bullet's edited clause is garbled and leaves out what happens when Pressure has been left |
 | re-check | correctness | - | - | dropped | - | `docs/temperature.md:87` | "If Temperature has been left" is exact only for leaving for Pressure — dropped: accurate about the failure; going to Terrain resets through a separate, documented rule |
+| manual | user | low | docs | - | fixed | `docs/user-guide.md` | The user chose to fix the three standing re-check findings: "Tried it, fix all" |
+| re-check | docs | - | - | - | - | `docs/user-guide.md:161` | Light re-check of the three user-guide edits: clean |
