@@ -29,13 +29,23 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - The icons are drawn for the project as small SVGs kept in the repo, with no icon library. The user: "Drawn for the project" (2026-11-15)
 - Local `main` is level with `origin/main` (the merged winds, 302d9d3): the user said "Yes, fast-forward it", and it was already there (2026-11-15)
 
+- Units, as proposed: metric is °C, hPa, m/s, m and km; imperial is °F, inHg, mph, ft and mi. Each quantity (temperature, pressure, wind speed, heights and depths, distances) has an override under the main choice; wind speed's also offers km/h and knots, temperature's also offers kelvin. Latitude and longitude, day and year length and percentages are the same in both. A legend's scale is re-rounded for the unit, so its ticks are round numbers in that unit. The user: "Yes, as proposed" (2026-11-15)
+- The units reach the read-outs (legend, info box, Statistics, Planet read-outs) and the controls (Sea level, brush size and strength, the New world dialog). Sliders keep their metric steps underneath and show the converted value. The user: "Read-outs and controls" (2026-11-15)
+- On an untouched Earth one Simulated, Observed or Difference control at the top applies to whatever is showing: the colour layer and the winds switch together, and Difference shows the layer's difference with the simulated winds. Observed winds can no longer be mixed with a simulated layer. The user: "One control for both" (2026-11-15)
+- The browser remembers the chosen layer, each layer's Show, and the Winds, Sunlight and Grid toggles, so the page reopens as it was left. The month still starts on July. The user: "Remember them" (2026-11-15)
+
 ## Open
-- Automatic calculation: where the Pause button sits and what it shows; whether pausing is remembered; what happens when the page opens.
-- The one box: where it sits, and how it lays out the legend, the key, the status and the pointer's values.
-- Units: which quantities (temperature, pressure, wind speed, heights and depths, distances, areas); what imperial means for each; where the override is; whether sliders and the Planet section follow.
-- Where Winds' Simulated or Observed choice goes (on the untouched Earth only).
-- Narrow windows.
+- Streaks as the starting choice when the system asks for reduced motion.
 
 ## Assumed
 - Nothing in a world file changes; the browser's remembered choices (open sections, wind unit, arrows or streaks) carry over, and the units join them.
 - No change to the models in `src/core`: what changes is the page, and when the page asks the workers for results.
+- Pausing is not remembered: the page always opens running and solves the restored world at once. While paused, the results on screen are marked out of date and the status says Paused; a new world made while paused stays unsolved until Pause is released. Told to the user 2026-11-15, not objected to.
+- Without Pause, an edit is followed by a solve after the same short wait as today (a little under half a second after a stroke ends).
+- One status for the whole solve, in the info box, replaces the legend's and the wind key's own.
+- With one comparison control: on Terrain with Winds on it offers Simulated or Observed only; with nothing to compare it is hidden; any edit removes it, as today. The comparison choice is not remembered.
+- The stored wind speed unit carries over as the wind speed override. A stored choice of Arrows is kept; Streaks is the start only where nothing is stored.
+- Phone-sized screens stay out of scope, as today; "narrow" is a narrow desktop window. Told to the user 2026-11-15, not objected to.
+- Every tile is a real button with a tooltip naming it, and works from the keyboard. Told to the user 2026-11-15, not objected to.
+- The View section keeps relief exaggeration and sea level. The rule that ticking Sunlight or Winds opens the Layers section goes, with the section.
+- `docs/user-guide.md` is rewritten for the new layout.
