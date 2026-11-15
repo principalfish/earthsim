@@ -82,7 +82,7 @@ Keep this section current when a step is merged.
 | 1 Globe, grid and sculpting | Done, merged 2026-11-11 | 0001, GitHub #1, PR #2 |
 | 2 Sunlight and seasonal temperature | Done, merged 2026-11-13 | 0002, GitHub #3, PR #4 |
 | 3 Winds | Done 2026-11-15 | 0003, GitHub #5, PR #6 (merged) |
-| 3c Layers in the main view, out of the side panel | Not started; next, before 3a | |
+| 3c Layers in the main view, out of the side panel; also the climate worked out after every change with a Pause (brought forward from 3b), a Settings section and units | Planned 2026-11-15, before 3a | 0004, GitHub #7 |
 | 3a Core folders by component, page folders by role (refactor, no behaviour change) | Not started; after 3c, before step 4 | |
 | 3d One config.ts for every model's settings, with config.md | Not started; after 3a | |
 | 3b Heat carried by winds, and the climate loop | Not started; after 3a. Could instead open step 5; decide when planned | |
