@@ -71,6 +71,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - The wind comparison line ("Wind: off by … · …% correct direction") is removed from the info box too: it does not belong in a pointer tool. It may live somewhere else later, recorded as a roadmap follow-up. The user: "actually remove the wind correct % / direction - its not applicable to a mouse over tool. ,aybe it lives somewhere but not for now" (2026-11-15)
 - The pointer block is written in one or two lines joined by " · ": the place (position · height or depth), then the values (the layer's value · the wind), e.g. "1.7° N, 49.1° E · 4,628 m deep" and "28 °C · 15 mph S". The layer's value drops its month ("July 28 °C" becomes "28 °C"), and the wind's direction becomes a compass abbreviation ("from the south" becomes "S", "from the north-east" "NE"). The user: "all of these can be concatted into 1 or 2 lines separated by some suitable delimiter. remove July from the temp text, and from the south -> S in the wind text" (2026-11-15). This reverses issue 0003's pointer wording.
 
+- Piece 4 approved after the user tried it, with the standing test finding (two redundant cases in `cursorReadout.test.ts`) fixed first. The user: "Tried it, fix it" (2026-11-15)
+
 ## Open
 - None.
 
