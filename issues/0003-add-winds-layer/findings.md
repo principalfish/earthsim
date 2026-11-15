@@ -124,3 +124,25 @@ No findings: the correctness, security and coverage checks each came back clean,
 | round | coverage | low | test | dropped | - | `src/app/globe/renderer.ts:418` | The renderer's swap between drawing arrows and drawing streaks is untested — dropped: the renderer has never had unit tests (WebGL does not run under the test environment); the swap is thin, the loop's rule and the loop are tested, and each state was looked at in a browser |
 | re-check | correctness | low | cleanup | verified | fixed | `src/app/globe/renderer.ts:174` | A doc comment line added with the fix runs to about 120 columns where its neighbours wrap near 76 (a nit, as the check and the verifier both rate it) |
 | re-check | other | low | cleanup | noticed | fixed | `src/app/globe/renderer.ts` | Noticed by the verifier: the renderer builds a small view object and a camera-position array each frame while the streaks run, there before the fixes |
+
+## piece 16 · 2026-11-15 · The climate process diagram in the docs
+
+Reviewed by correctness and docs only, as the user chose. Correctness ran as two subagents, one on the wind model's 36 settings and one on the temperature model's 18 and the script, so that every setting's value and stated direction was compared with the code.
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | medium | docs | verified | fixed | `scripts/docs/climate-process.py:1085` | `correctionRefineK`, Raising it: said only "a little faster, a little less exact"; raised far, large corrections skip the finer passes and overshoot, to thousands of kelvin after a big change of planet, so the effect is mixed |
+| round | correctness | low | docs | verified | fixed | `scripts/docs/climate-process.py:857` | `blockingSlope`: "turns half of the wind along the slope instead" overstated it; the code takes away a share of the wind's part up or down the slope and does not redirect it |
+| round | correctness | low | docs | verified | fixed | `scripts/docs/climate-process.py:682` | `localBandsFullToDeg`, Lowering it: the threshold "below about 30°" had no support in the code |
+| round | correctness | low | docs | verified | fixed | `scripts/docs/climate-process.py:950` | `greenhouseFactor`: "holds back for each unit" read as 63%; outgoing heat is divided by 1 + factor × strength, so the Earth holds back about 39% |
+| round | correctness | low | docs | verified | fixed | `scripts/docs/climate-process.py:1053` | `solverToleranceK` and `solverMaxIterations`, Lowering it: left out that a step which fails to solve blocks convergence, so the solve runs its full limit of years (60) before it is marked not settled |
+| round | correctness | low | docs | verified | fixed | `scripts/docs/climate-process.py:1029` | `iceFullC`: "must stay below iceStartC" sat under Lowering it, though only raising it can reach that limit |
+| round | docs | low | docs | verified | fixed | `docs/temperature.md:16` | "There are no winds or ocean currents yet" was false once the branch built winds; no earlier piece had touched the file |
+| round | correctness | low | cleanup | verified | fixed | `scripts/docs/climate-process.py:1100` | The table's columns added up to 782 points, wider than the 781.89 it is split within; it worked only by a default of the library |
+| round | correctness | low | docs | dropped | - | `scripts/docs/climate-process.py:950` | `greenhouseFactor` leaves out that the same constant sets the Planet section's warmth and trust warning — dropped: that gauge reads the constant, not the model's setting, so changing the setting does not move it |
+| round | docs | low | docs | dropped | - | `docs/temperature.md:89` | The baseline is "for later steps, such as winds and ocean currents, to improve on" — dropped: winds do not yet feed back into the temperature, so they are still a later step for it |
+| round | docs | low | docs | dropped | - | `README.md:40` | "How the climate is to be worked out" could read "the climate process, as a diagram" — dropped: the check itself calls the line accurate; a preference |
+| round | other | low | docs | noticed | open | `src/core/wind/rules.ts:313` | Noticed by the wind check and the verifier, outside this piece's diff: the comment on `wideSummerFromShare` says the Earth's low lies "at most 0.40 of a cell" out, but runs show 0.51 for the global low and 0.79 for lows placed by longitude; the PDF states the figures from the runs |
+| re-check | correctness | low | docs | verified | open | `scripts/docs/climate-process.py:682` | `localBandsFullToDeg`, Lowering it, as fixed: says the bands between the new value and 40° follow land and sea less; the code cuts the local share at every latitude from the new value up to 70° |
+| re-check | docs | - | - | clean | - | `docs/temperature.md:16` | The fixed sentence is true of the app and reads right |
+
