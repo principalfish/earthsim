@@ -1,9 +1,9 @@
 /**
  * The view controls: how much relief is exaggerated, where the sea level
- * is, whether the cell grid is drawn, whether the globe is lit by the sun,
- * whether the winds are shown and whether as arrows or as streaks, on the
- * measured Earth whether they are the simulated or the observed, and the
- * unit their speeds are written in.
+ * is, whether the winds are drawn as arrows or as streaks, on the measured
+ * Earth whether they are the simulated or the observed, and the unit their
+ * speeds are written in. Whether the cell grid is drawn, the globe is lit
+ * by the sun and the winds are shown is chosen on the dock over the globe.
  */
 
 import {
@@ -26,12 +26,7 @@ import {
 	type WindSource,
 } from '../view';
 import { DEFAULT_WIND_UNIT, WIND_UNITS, type WindUnit } from '../windUnits';
-import {
-	createCheckField,
-	createRangeField,
-	createSelectField,
-	type RangeScale,
-} from './fields';
+import { createRangeField, createSelectField, type RangeScale } from './fields';
 
 /** The step between sea levels the slider can be set to, in metres. */
 export const SEA_LEVEL_SLIDER_STEP_M = 10;
@@ -53,12 +48,6 @@ export type ViewPanelOptions = {
 	readonly exaggeration?: number;
 	/** The sea level shown at first, in metres against the datum. */
 	readonly seaLevel: number;
-	/** Whether the grid starts shown; hidden by default. */
-	readonly gridVisible?: boolean;
-	/** Whether sunlight starts on; off by default. */
-	readonly sunlight?: boolean;
-	/** Whether the winds start shown; hidden by default. */
-	readonly winds?: boolean;
 	/** How the winds are drawn at first; as arrows by default. */
 	readonly windStyle?: WindStyle;
 	/** The unit wind speeds are written in at first; m/s by default. */
@@ -67,12 +56,6 @@ export type ViewPanelOptions = {
 	readonly onExaggeration: (factor: number) => void;
 	/** Called with the new level in metres when the sea-level slider moves. */
 	readonly onSeaLevel: (metres: number) => void;
-	/** Called when the grid checkbox is ticked or cleared. */
-	readonly onGridVisible: (visible: boolean) => void;
-	/** Called when the Sunlight checkbox is ticked or cleared. */
-	readonly onSunlight: (on: boolean) => void;
-	/** Called when the Winds checkbox is ticked or cleared. */
-	readonly onWinds: (on: boolean) => void;
 	/** Called with the way chosen when another is chosen to draw the winds. */
 	readonly onWindStyle: (style: WindStyle) => void;
 	/** Called with the unit when another is chosen for wind speeds. */
@@ -127,8 +110,8 @@ export const formatMetres = (metres: number): string => {
  * Adds the view controls to the View section of the side panel.
  *
  * @remarks
- * Directly under the Winds checkbox is the Winds drawn as choice, a
- * drop-down of Arrows and Streaks, shown whether or not the winds are;
+ * Under the sliders is the Winds drawn as choice, a drop-down of Arrows
+ * and Streaks, shown whether or not the winds are;
  * under it the Winds shown choice, a drop-down of Simulated and Observed,
  * hidden until it is offered and starting on Simulated; and under that the
  * Wind speed choice, a drop-down labelled so, shown whether or not the
@@ -182,24 +165,6 @@ export const createViewPanel = (
 			onInput: options.onExaggeration,
 		}).element,
 		seaLevel.element,
-		createCheckField({
-			id: 'view-grid',
-			label: 'Show cell grid',
-			checked: options.gridVisible ?? false,
-			onChange: options.onGridVisible,
-		}),
-		createCheckField({
-			id: 'view-sunlight',
-			label: 'Sunlight',
-			checked: options.sunlight ?? false,
-			onChange: options.onSunlight,
-		}),
-		createCheckField({
-			id: 'view-winds',
-			label: 'Winds',
-			checked: options.winds ?? false,
-			onChange: options.onWinds,
-		}),
 		createSelectField({
 			id: 'view-wind-style',
 			label: 'Winds drawn as',

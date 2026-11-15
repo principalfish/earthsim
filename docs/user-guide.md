@@ -2,6 +2,23 @@
 
 Every control on the page. For how the temperature is worked out, see [Temperature](temperature.md); for the winds, [Winds](winds.md).
 
+## The tiles over the globe
+
+A column of tiles down the left edge of the globe chooses what it shows. Each tile is a button with an icon over its name, and its name shows as a tooltip.
+
+| Tile | What it does |
+|-|-|
+| **Layers:** Terrain, Temperature, Pressure | What the globe is coloured by, one at a time, starting on Terrain; see [Layers](#layers). The chosen tile is outlined |
+| **Overlays:** Winds | Draws the surface winds over the globe, as arrows or streaks, starting off; see [Winds](#winds). Not saved |
+| **Overlays:** Sunlight | Lights the globe from the sun, starting off; see [The sun](#the-sun). Not saved |
+| **Overlays:** Grid | Draws the outlines of the grid's cells, starting off. Not saved |
+
+- Each overlay tile switches on and off by itself, and is outlined while it is on.
+- From the keyboard, Tab reaches the chosen layer's tile, and the arrow keys move the choice to the next layer or the one before, round from the last to the first. Tab then reaches each overlay tile, which Space or Enter switches.
+- In a narrow window only the icons show; the tooltips still name them.
+- In a window too short for all the tiles the column scrolls: turn the mouse wheel over a tile, or move to a tile with the keyboard.
+- The globe can still be turned and sculpted anywhere beside the tiles.
+
 ## The panel
 
 The panel on the right has six sections, in this order: **World, Layers, View, Planet, Tools, Statistics**.
@@ -9,7 +26,7 @@ The panel on the right has six sections, in this order: **World, Layers, View, P
 - Each section opens and closes from its heading, by mouse or with Enter or Space.
 - On a first visit only World is open. The browser remembers which sections are open; this is a browser setting, not part of the world.
 - While Tools is closed, its heading names the tool chosen, such as `Tools · Raise`.
-- Ticking **Sunlight** or **Winds** opens Layers if it is closed, because that is where their month controls are. Nothing else opens or closes a section by itself.
+- Switching **Sunlight** or **Winds** on opens Layers if it is closed, because that is where their month controls are. Nothing else opens or closes a section by itself.
 - A closed section's controls are skipped by the Tab key.
 
 ## World
@@ -77,9 +94,6 @@ The Tools section chooses what the left mouse button does on the globe.
 |-|-|-|
 | Relief exaggeration | 1× to 100×, starting at 40× | How much taller than true scale the land is drawn. Only the drawing changes |
 | Sea level | −6,000 to 6,000 m in steps of 10 m | Where the sea stands. Raising it floods low ground. It is part of the world |
-| Show cell grid | On or off | Draws the outlines of the grid's cells |
-| Sunlight | On or off | Lights the globe from the sun; see [The sun](#the-sun). Not saved |
-| Winds | On or off, starting off | Draws the surface winds over the globe, as arrows or streaks; see [Winds](#winds). Not saved |
 | Winds drawn as | Arrows or Streaks, starting on Arrows | Whether the winds are drawn as arrows that stand still or as streaks carried along by the wind; see [Arrows or streaks](#arrows-or-streaks). Shown whether or not Winds is on. The browser remembers it, as it does the wind speed unit; it is not saved with the world |
 | Winds shown | Simulated or Observed, starting on Simulated | On an untouched Earth only: whether the arrows are the simulated winds or the observed Earth's; see [Simulated or observed winds](#simulated-or-observed-winds). Hidden on any other world |
 | Wind speed | m/s, km/h or mph, starting on m/s | The unit wind speeds are written in, in the strip under the pointer and the key to the arrows. It changes both at once, and does not change the arrows. Shown whether or not Winds is on. The browser remembers it, as it does the open sections; it is not saved with the world |
@@ -108,7 +122,7 @@ Under the sliders:
 
 ## Layers
 
-The Layers section chooses what the globe is coloured by.
+The **Layers** tiles over the globe choose what it is coloured by; the Layers section holds what goes with a layer.
 
 - **Terrain:** the height colours the page opens on.
 - **Temperature:** the near-surface air temperature. The relief is still raised and shaded, and the coastline is drawn as a thin line.
@@ -171,7 +185,7 @@ The star is drawn in the scene as a glowing disc.
 - **Its size** is drawn larger than life: 2.7° across for Earth's settings, and from about 0.6° to 9.5° across the sliders. A heavier star or a closer orbit draws it larger.
 - **Its colour** follows its surface temperature, worked out from its brightness and mass: red for a cool star, through orange and yellow to near white for one like the Sun, and blue-white for a hot one. Brightness and mass are separate sliders, so a pairing no real star has gives a colour no real star of that mass has.
 
-**Sunlight**, in the View section, lights the globe from the sun:
+The **Sunlight** tile lights the globe from the sun:
 
 - **In Terrain view** the day side is evenly lit and the night side drawn at 30% brightness, with a soft edge between them.
 - **In Temperature and Pressure view** the colours are left alone, since a darkened colour would read as another value. The edge between day and night is drawn as a thin line.
@@ -179,7 +193,7 @@ The star is drawn in the scene as a glowing disc.
 
 ## Winds
 
-**Winds**, in the View section, draws the surface winds as arrows, or as streaks (see [Arrows or streaks](#arrows-or-streaks)), over whichever colours the globe shows, Terrain, Temperature or Pressure. The winds are worked out from the temperature, so ticking Winds asks for the temperature too, and the arrows appear once both are ready. [Winds](winds.md) explains how they are worked out and how far to trust them.
+The **Winds** tile draws the surface winds as arrows, or as streaks (see [Arrows or streaks](#arrows-or-streaks)), over whichever colours the globe shows, Terrain, Temperature or Pressure. The winds are worked out from the temperature, so switching Winds on asks for the temperature too, and the arrows appear once both are ready. [Winds](winds.md) explains how they are worked out and how far to trust them.
 
 - **Each arrow** points the way the wind blows and stands for the patch of the surface around it: it shows the mean wind of that patch, the winds of its cells averaged as arrows, the larger cells counting for more.
 - **Length and weight** grow with the speed, from 8 pixels just above 0.5 m/s to 26 pixels at 10 m/s, and no further for a stronger wind. A wind below 0.5 m/s is calm and has no arrow.
@@ -196,25 +210,25 @@ Which winds are shown follows the Layers section:
 | Warmest month, Coldest month, Seasonal range | The month last on screen |
 
 - While new winds are being worked out, the last ones stay on the globe. A new world drops them until its own are ready.
-- Clearing Winds removes the arrows and stops the winds being worked out, unless Pressure is on screen, which needs them.
+- Switching Winds off removes the arrows and stops the winds being worked out, unless Pressure is on screen, which needs them.
 - The strip under the pointer gives the wind of the place under it; see [The value under the pointer](#the-value-under-the-pointer).
 
 ### Arrows or streaks
 
-**Winds drawn as**, under Winds in the View section, draws the winds as **Arrows**, as above, or as **Streaks**: many short trails carried along by the wind and fading behind their heads, as on weather maps.
+**Winds drawn as**, in the View section, draws the winds as **Arrows**, as above, or as **Streaks**: many short trails carried along by the wind and fading behind their heads, as on weather maps.
 
 - **Faster and longer where the wind is stronger.** A trail's head moves with the wind where it is, about 15° of arc in three seconds in a 10 m/s wind and half as far in a wind half as strong, so a trail in a 10 m/s wind is about 3° long and one in a gentle wind short. Trails in calm air, below 0.5 m/s, fade out and start again elsewhere.
 - **The same winds as the arrows.** Streaks follow whatever the arrows would show: Simulated or Observed, the month on screen or the year's mean. Playing the year or changing the month changes the winds under the trails, which carry on from where they are.
 - **Each trail lives a few seconds,** fading in and out, and starts again somewhere else in view; one that passes out of view starts again too. There are more of them when the whole globe is in view and fewer close in, where each is longer on the screen; never more than 3,000.
 - **On the relief.** Like the arrows, the streaks lie on the raised relief at every exaggeration, keep their width on the screen, and fade out towards the globe's edge.
 - **The key** keeps its caption, its status line and, on an untouched Earth, its two lines of figures, and in place of its arrows says "Faster, longer streaks are stronger winds".
-- **The page draws continuously only while streaks are moving:** while Streaks is chosen, Winds is on, there are winds to show and the page is visible. Choosing Arrows, clearing Winds or putting the tab in the background stops it, and the page draws only when something changes, as it does with arrows.
+- **The page draws continuously only while streaks are moving:** while Streaks is chosen, Winds is on, there are winds to show and the page is visible. Choosing Arrows, switching Winds off or putting the tab in the background stops it, and the page draws only when something changes, as it does with arrows.
 - **Reduced motion.** Streaks are offered even when your system is set to reduce motion, since they move only if you choose them; choosing Arrows stops them.
 - The browser remembers the choice, as it does the open sections and the wind speed unit. Winds itself still starts off at each visit.
 
 ### Simulated or observed winds
 
-On an untouched Earth, **Winds shown**, under Winds in the View section, chooses whether the arrows are the simulated winds or the observed Earth's: the mean wind ten metres up for each month of 1981 to 2010, on a 1° grid taken onto the world's cells. On any other world it is hidden and the arrows are the simulated winds.
+On an untouched Earth, **Winds shown**, in the View section, chooses whether the arrows are the simulated winds or the observed Earth's: the mean wind ten metres up for each month of 1981 to 2010, on a 1° grid taken onto the world's cells. On any other world it is hidden and the arrows are the simulated winds.
 
 - **Fetched when first chosen.** Nothing is downloaded until Observed is chosen. Meanwhile the simulated arrows stay and the key says "Loading observed winds". If the download fails the key says "Observed winds could not be loaded", the choice goes back to Simulated, and choosing Observed again tries again. Where the winds themselves stand comes first on the key's line: while they are out of date or being worked out it says that, and the line about the observed winds shows once they are current.
 - **Which month.** The observed arrows follow the month on screen, and on Annual average they are the mean of the observed year, worked out as arrows as the simulated mean is. They need the simulated winds to be ready, as the observed temperature needs the simulated one.

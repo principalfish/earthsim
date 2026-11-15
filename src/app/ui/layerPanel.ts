@@ -1,25 +1,26 @@
 /**
- * The Layers section: what the globe is coloured by, Terrain or a layer of
- * one computed value per cell, such as Temperature; for such a layer, which
- * month or summary of the year is shown, with a slider and a play button
- * for the month, and, on the measured Earth for a layer compared with the
- * observed one, whether it is the simulated value, the observed one or the
- * difference; the slider and the play button in Terrain view too while the
- * globe is lit by the sun or shows the winds; and the legend and the key to
- * the wind arrows, which are laid over the globe rather than in the
- * section. On the measured Earth the wind arrows can be the observed winds
- * rather than the simulated, and the key then says how far apart the two
- * are.
+ * What the globe is coloured by, Terrain or a layer of one computed value
+ * per cell, such as Temperature, as the dock over the globe chooses it, and
+ * the Layers section: for such a layer, which month or summary of the year
+ * is shown, with a slider and a play button for the month, and, on the
+ * measured Earth for a layer compared with the observed one, whether it is
+ * the simulated value, the observed one or the difference; the slider and
+ * the play button in Terrain view too while the globe is lit by the sun or
+ * shows the winds; and the legend and the key to the wind arrows, which are
+ * laid over the globe rather than in the section. On the measured Earth the
+ * wind arrows can be the observed winds rather than the simulated, and the
+ * key then says how far apart the two are.
  *
  * Each computed layer is shown as its description, a
  * {@link ScalarLayerSpec}, says: its views of the year, their colours and
  * scales, its wording and its comparison. {@link createLayerPanel} decides
  * what the globe, the legend and the key show, from the view settings and
  * the layer store, and switches each layer's calculation on and off with
- * the layer and the winds' with the Winds control.
+ * the layer and the winds' with the dock's Winds tile.
  * {@link createLayerControls} is the section's controls, the legend and the
  * key on the page, which only show what they are told and pass on what is
- * chosen.
+ * chosen; the layer is chosen on the dock, and told to the panel by
+ * {@link LayerPanel.setLayer}.
  */
 
 import {
@@ -72,7 +73,6 @@ import {
 	type ScalarLayerId,
 	type Source,
 	type Summary,
-	TERRAIN_LABEL,
 	type WindSource,
 } from '../view';
 import { DEFAULT_WIND_UNIT, type WindUnit } from '../windUnits';
@@ -81,10 +81,8 @@ import {
 	createButton,
 	createElement,
 	createRangeField,
-	createSegmentedPicker,
 	createSelectField,
 } from './fields';
-import type { GlobeOverlays } from './globeOverlays';
 import {
 	createLegend,
 	type FittedScale,
@@ -92,6 +90,7 @@ import {
 	type LegendSource,
 	legendContent,
 } from './legend';
+import type { MainView } from './mainView';
 import type { WindSourceContent } from './viewPanel';
 import {
 	createWindKey,
@@ -103,15 +102,10 @@ import {
 
 /** What the layer controls start with and whom they tell of a choice. */
 export type LayerControlsOptions = {
-	/**
-	 * The computed layers offered, in the order the choice of layer lists
-	 * them after Terrain.
-	 */
+	/** The computed layers offered, in the order the dock lists them. */
 	readonly layers: readonly ScalarLayerSpec[];
 	/** The view settings shown at first, with the year not playing. */
 	readonly view: PageView;
-	/** Called with the layer when another is chosen. */
-	readonly onLayer: (layer: Layer) => void;
 	/** Called with a layer and the view of its year chosen for it. */
 	readonly onSummary: (layer: ScalarLayerId, summary: Summary) => void;
 	/** Called with the month whenever the month slider moves. */
@@ -166,8 +160,8 @@ export type LayerPanelOptions = Pick<
 	/** Where the computed layers and the winds are kept. */
 	readonly store: Pick<LayerStore, 'temperature' | 'winds' | 'addListener'>;
 	/**
-	 * The computed layers offered, in the order the choice of layer lists
-	 * them after Terrain; {@link SCALAR_LAYERS} when left out.
+	 * The computed layers offered, in the order the dock lists them after
+	 * Terrain; {@link SCALAR_LAYERS} when left out.
 	 */
 	readonly layers?: readonly ScalarLayerSpec[];
 	/**
@@ -182,7 +176,7 @@ export type LayerPanelOptions = Pick<
 	readonly temperature: Pick<TemperatureScheduler, 'setShowing'>;
 	/**
 	 * What calculates the winds, told whether they are showing: while the
-	 * Winds control is on, or a layer they calculate is on screen.
+	 * dock's Winds tile is on, or a layer they calculate is on screen.
 	 */
 	readonly winds: Pick<WindsScheduler, 'setShowing'>;
 	/** Adds the controls to the page. */
@@ -309,16 +303,25 @@ export type LayerPanel = {
 	 */
 	setEarth(earth: Resolution | null): void;
 	/**
-	 * Takes whether the globe is lit by the sun, as the view controls set
-	 * it. Turned on in Terrain view, the month controls show there; turned
-	 * off there, they are hidden again and the year stops playing. On a
-	 * computed layer the controls are as they were either way.
+	 * Takes the layer the globe is to be coloured by, as the dock chose it,
+	 * and tells what calculates each layer whether it is showing. A layer
+	 * that does not offer the month stops the year playing. The layer on
+	 * screen already changes nothing.
+	 *
+	 * @param layer - The layer chosen.
+	 */
+	setLayer(layer: Layer): void;
+	/**
+	 * Takes whether the globe is lit by the sun, as the dock sets it. Turned
+	 * on in Terrain view, the month controls show there; turned off there,
+	 * they are hidden again and the year stops playing. On a computed layer
+	 * the controls are as they were either way.
 	 *
 	 * @param on - Whether the globe is lit by the sun.
 	 */
 	setSunlight(on: boolean): void;
 	/**
-	 * Takes whether the winds are shown, as the view controls set it, and
+	 * Takes whether the winds are shown, as the dock sets it, and
 	 * tells what calculates them. Turned on in Terrain view, the month
 	 * controls show there, as for sunlight; turned off there with sunlight
 	 * off too, they are hidden again and the year stops playing. Turned
@@ -1139,7 +1142,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	/**
 	 * Tells what calculates the temperature and the winds whether each is
 	 * showing, when that has changed: the one that calculates the layer on
-	 * screen, and the winds while the Winds control is on.
+	 * screen, and the winds while the dock's Winds tile is on.
 	 */
 	const tellShowing = (): void => {
 		const scheduler = onScreen()?.spec.scheduler;
@@ -1264,18 +1267,6 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		view: view(),
 		windUnit: options.windUnit ?? DEFAULT_WIND_UNIT,
 		windStyle: options.windStyle ?? DEFAULT_WIND_STYLE,
-		onLayer: (next) => {
-			if (next === layer) {
-				return;
-			}
-			layer = next;
-			if (!offersMonth(view())) {
-				playback.pause();
-			}
-			tellShowing();
-			announce();
-			update();
-		},
 		onSummary: (id, next) => {
 			const state = stateOf(id);
 			if (
@@ -1362,6 +1353,18 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 				return;
 			}
 			playback.setMonth(DEFAULT_MONTH);
+			announce();
+			update();
+		},
+		setLayer: (next) => {
+			if (next === layer) {
+				return;
+			}
+			layer = next;
+			if (!offersMonth(view())) {
+				playback.pause();
+			}
+			tellShowing();
 			announce();
 			update();
 		},
@@ -1455,8 +1458,8 @@ const MONTH_SLIDER_ID = 'temperature-month';
 
 /**
  * Adds the layer controls to the Layers section of the side panel, the
- * choice of layer and the computed layers' view controls, and the legend to
- * its place over the globe.
+ * computed layers' view controls, and the legend and the key to the wind
+ * arrows to their places over the globe.
  *
  * @remarks
  * Each computed layer's controls show only while it is on screen: a
@@ -1482,7 +1485,7 @@ const MONTH_SLIDER_ID = 'temperature-month';
  */
 export const createLayerControls = (
 	body: HTMLElement,
-	places: Pick<GlobeOverlays, 'legend' | 'windKey'>,
+	places: Pick<MainView, 'legend' | 'windKey'>,
 	options: LayerControlsOptions,
 ): LayerControls => {
 	const legend = createLegend();
@@ -1549,20 +1552,7 @@ export const createLayerControls = (
 	};
 	showView(options.view, false);
 
-	const layerChoices: { readonly value: Layer; readonly label: string }[] = [
-		{ value: 'terrain', label: TERRAIN_LABEL },
-		...options.layers.map(({ id, label }) => ({ value: id, label })),
-	];
-	body.append(
-		createSegmentedPicker({
-			name: 'layer',
-			legend: 'Layer',
-			choices: layerChoices,
-			value: options.view.layer,
-			onChange: options.onLayer,
-		}),
-		layerControls,
-	);
+	body.append(layerControls);
 	places.legend.append(legend.element);
 	places.windKey.append(windKey.element);
 	return {

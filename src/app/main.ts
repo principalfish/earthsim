@@ -13,8 +13,9 @@ import { loadLayerObserved } from './scalarLayer';
 import { createSculptController } from './sculpt';
 import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
 import { createCursorReadout, createReadoutStrip } from './ui/cursorReadout';
-import { createGlobeOverlays } from './ui/globeOverlays';
+import { createLayerDock } from './ui/layerDock';
 import { createLayerControls, createLayerPanel } from './ui/layerPanel';
+import { createMainView } from './ui/mainView';
 import { openNewWorldDialog } from './ui/newWorldDialog';
 import { createPanelSections } from './ui/panelSections';
 import { createPlanetPanel } from './ui/planetPanel';
@@ -94,7 +95,7 @@ if (globe !== null) {
 		panel,
 		createPanelMemory(browserStorage),
 	);
-	const overlays = createGlobeOverlays(viewport);
+	const mainView = createMainView(viewport);
 	void startPage({
 		// The page starts on a blank ocean, which stays until the saved
 		// world, if there is one, has been read. A world keeps its own sea
@@ -124,6 +125,11 @@ if (globe !== null) {
 			}),
 		createToolPanel: (options) => createToolPanel(sections.tools, options),
 		createViewPanel: (options) => createViewPanel(sections.view.body, options),
+		createLayerDock: (options) => {
+			const dock = createLayerDock(options);
+			mainView.dock.append(dock.element);
+			return dock;
+		},
 		createPlanetPanel: (options) =>
 			createPlanetPanel(sections.planet.body, options),
 		createStatistics: (options) =>
@@ -159,14 +165,14 @@ if (globe !== null) {
 				clearTimer,
 				reportError: logError,
 				createControls: (controls) =>
-					createLayerControls(sections.layers.body, overlays, controls),
+					createLayerControls(sections.layers.body, mainView, controls),
 			}),
 		createCursorReadout: (options) =>
 			createCursorReadout({
 				...options,
 				canvas,
 				globe,
-				show: createReadoutStrip(overlays.readout).show,
+				show: createReadoutStrip(mainView.readout).show,
 			}),
 		preferences: createPreferences(browserStorage),
 		layersSection: sections.layers,

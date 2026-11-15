@@ -64,6 +64,7 @@ import { settle } from '../testing/settle';
 import {
 	DEFAULT_MONTH,
 	DEFAULT_PAGE_VIEW,
+	type Layer,
 	type PageView,
 	type Source,
 } from '../view';
@@ -350,7 +351,7 @@ describe('createLayerPanel', () => {
 
 	it('switches the temperature on when chosen, and says nothing is there yet', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.showing).toEqual([true]);
 		expect(stage.shown).toEqual([]);
 		expect(stage.lastLegend()).toEqual({
@@ -362,7 +363,7 @@ describe('createLayerPanel', () => {
 
 	it("shows July's field once a result arrives, on the year's fitted range and the ramp", () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		expect(stage.shown).toHaveLength(1);
@@ -386,11 +387,11 @@ describe('createLayerPanel', () => {
 
 	it('shows the result on hand at once when chosen again', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
-		stage.controls.onLayer('terrain');
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('terrain');
+		stage.panel.setLayer('temperature');
 		expect(stage.shown.map((shown) => shown.field)).toEqual([
 			result.months[DEFAULT_MONTH],
 			null,
@@ -402,9 +403,9 @@ describe('createLayerPanel', () => {
 
 	it('goes back to the height colours and switches the temperature off for Terrain', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.shown.at(-1)).toEqual({
 			field: null,
 			range: undefined,
@@ -416,15 +417,15 @@ describe('createLayerPanel', () => {
 
 	it('asks nothing for a layer chosen again that is already on show', () => {
 		const stage = createStage();
-		stage.controls.onLayer('terrain');
-		stage.controls.onLayer('temperature');
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('terrain');
+		stage.panel.setLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.showing).toEqual([true]);
 	});
 
 	it('sends each new result to the globe, on its own range', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
 		const next = resultWith(5);
 		stage.arrive(next);
@@ -435,7 +436,7 @@ describe('createLayerPanel', () => {
 
 	it('keeps the previous field on the globe while it is out of date or calculated again', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		stage.store.markOutOfDate();
@@ -455,7 +456,7 @@ describe('createLayerPanel', () => {
 
 	it('goes back to the height colours when the store drops its result, as for a new world', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
 		stage.store.clear();
 		expect(stage.shown.at(-1)?.field).toBeNull();
@@ -473,7 +474,7 @@ describe('createLayerPanel', () => {
 
 	it('fits a result afresh that comes again after the store dropped it', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		stage.store.clear();
@@ -488,7 +489,7 @@ describe('createLayerPanel', () => {
 
 	it('keeps the field on the globe once the temperature is unavailable', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		stage.store.markUnavailable();
@@ -501,7 +502,7 @@ describe('createLayerPanel', () => {
 
 	it('says the temperature is unavailable with no result, leaving the terrain', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.store.markUnavailable();
 		expect(stage.shown).toEqual([]);
 		expect(stage.lastLegend()).toEqual({
@@ -513,7 +514,7 @@ describe('createLayerPanel', () => {
 
 	it('records what the globe throws, still updates the legend, and shows the next result', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const failure = new RangeError('The field is not one value per cell');
 		stage.failNext(failure);
 		stage.arrive(resultWith());
@@ -538,7 +539,7 @@ describe('createLayerPanel', () => {
 
 	it('sends a field the globe refused again at the next change', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.failNext(new RangeError('Refused once'));
 		stage.arrive(result);
@@ -551,7 +552,7 @@ describe('createLayerPanel', () => {
 
 	it("keeps the legend on the globe's scale while the globe refuses a new result, until it takes it", () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const first = resultSpanning(-10, 10);
 		stage.arrive(first);
 		const firstTicks = ['−10', '−5', '0', '5', '10'];
@@ -586,7 +587,7 @@ describe('createLayerPanel', () => {
 
 	it('marks the earlier result out of date while the globe refuses a current one, until it takes it', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const first = resultSpanning(-10, 10);
 		stage.arrive(first);
 		expect(stage.lastLegend()?.status).toBeNull();
@@ -612,8 +613,8 @@ describe('createLayerPanel', () => {
 		expect(stage.lastLegend()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		// Leaving for the terrain and coming back sends the refused field;
 		// taken, the legend moves to its scale with nothing said.
-		stage.controls.onLayer('terrain');
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('terrain');
+		stage.panel.setLayer('temperature');
 		expect(stage.shown.at(-1)?.field).toBe(second.months[DEFAULT_MONTH]);
 		expect(tickLabels(stage.lastLegend())).toEqual([
 			'0',
@@ -627,7 +628,7 @@ describe('createLayerPanel', () => {
 
 	it('shows no scale but says where the result stands when the first field is refused', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.failNext(new RangeError('Refused once'));
 		stage.store.markCalculating();
 		stage.store.setResult(resultSpanning(-10, 10), false);
@@ -641,7 +642,7 @@ describe('createLayerPanel', () => {
 
 	it('says a current first result the globe refused could not be shown, until it takes one', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.failNext(new RangeError('Refused once'));
 		stage.arrive(resultSpanning(-10, 10));
 		expect(stage.store.temperature.status).toBe('current');
@@ -670,7 +671,7 @@ describe('createLayerPanel', () => {
 
 	it('records nothing as an error in normal use', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
 		stage.store.markOutOfDate();
 		stage.store.clear();
@@ -679,7 +680,7 @@ describe('createLayerPanel', () => {
 
 	it("fits the year's scale to the middle 99% of a real grid by area, saying what lies beyond", () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultOnGrid();
 		stage.arrive(result);
 		// By area the cold cells and the hot one are left out; counted by
@@ -694,7 +695,7 @@ describe('createLayerPanel', () => {
 
 	it('fits the year once per result, on one scale through every month, summary and change of status', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultOnGrid();
 		stage.arrive(result);
 		const scale = stage.shown.at(-1)?.range;
@@ -719,7 +720,7 @@ describe('createLayerPanel', () => {
 
 	it('captions the legend with the month on screen', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
 		expect(stage.lastLegend()?.scale?.caption).toBe(
 			'Air temperature in July, °C',
@@ -734,7 +735,7 @@ describe('createLayerPanel', () => {
 describe('createLayerPanel, the month', () => {
 	it('shows the month the slider is moved to, on the same scale as July', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		const ticks = tickLabels(stage.lastLegend());
@@ -765,7 +766,7 @@ describe('createLayerPanel, the month', () => {
 
 	it('asks nothing for the month already on screen', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
 		const told = stage.told.length;
 		stage.controls.onMonth(DEFAULT_MONTH);
@@ -775,18 +776,18 @@ describe('createLayerPanel, the month', () => {
 
 	it('keeps the month across a switch to the terrain and back', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		stage.controls.onMonth(2);
-		stage.controls.onLayer('terrain');
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('terrain');
+		stage.panel.setLayer('temperature');
 		expect(stage.shown.at(-1)?.field).toBe(result.months[2]);
 	});
 
 	it('keeps the month and the view for a new result, as after an edit', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
 		stage.controls.onMonth(2);
 		const next = resultWith(5);
@@ -797,7 +798,7 @@ describe('createLayerPanel, the month', () => {
 
 	it('puts July back on screen and stops playing for a new world, keeping the view', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		stage.controls.onMonth(2);
@@ -821,7 +822,7 @@ describe('createLayerPanel, the month', () => {
 
 	it('stops playing for a new world on July, sending nothing more', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
 		stage.controls.onPlay();
 		const shown = stage.shown.length;
@@ -843,7 +844,7 @@ describe('createLayerPanel, the month', () => {
 
 	it('keeps a summary chosen when a new world puts July back', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onSummary('temperature', 'range');
 		stage.controls.onMonth(2);
 		stage.panel.newWorld(null);
@@ -862,7 +863,7 @@ describe('createLayerPanel, playing the year', () => {
 	/** A stage in the Month view with a result on show, playing from a month. */
 	const playingFrom = (month: number) => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		stage.controls.onMonth(month);
@@ -920,12 +921,12 @@ describe('createLayerPanel, playing the year', () => {
 
 	it('stops when the layer leaves Temperature', () => {
 		const { stage } = playingFrom(DEFAULT_MONTH);
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.lastView()?.playing).toBe(false);
 		expect(stage.timers.pending()).toBe(0);
 		stage.timers.advance(PLAYBACK_STEP_MS);
 		expect(stage.lastView()?.view.month).toBe(DEFAULT_MONTH);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.lastView()?.playing).toBe(false);
 		expect(stage.timers.pending()).toBe(0);
 	});
@@ -1032,7 +1033,7 @@ describe('createLayerPanel, playing the year', () => {
 
 	it('moves the month on before there is a result, and shows it once there is', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onPlay();
 		stage.timers.advance(2 * PLAYBACK_STEP_MS);
 		expect(stage.shown).toEqual([]);
@@ -1110,7 +1111,7 @@ describe('createLayerPanel, under sunlight', () => {
 
 	it('keeps the year playing in Temperature view when sunlight is turned on or off', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onPlay();
 		stage.panel.setSunlight(true);
 		expect(stage.lastView()?.playing).toBe(true);
@@ -1122,21 +1123,21 @@ describe('createLayerPanel, under sunlight', () => {
 	it('keeps the year playing from the Month view to Terrain, and stops it on the way to a summary', () => {
 		const stage = createStage();
 		stage.panel.setSunlight(true);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onPlay();
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.lastView()?.playing).toBe(true);
 		expect(stage.timers.pending()).toBe(1);
 		stage.controls.onSummary('temperature', 'annualMean');
 		expect(stage.lastView()?.playing).toBe(true);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.lastView()?.playing).toBe(false);
 		expect(stage.timers.pending()).toBe(0);
 	});
 
 	it('stops the year on a summary chosen in Temperature view, as without sunlight', () => {
 		const stage = sunlit();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onPlay();
 		stage.controls.onSummary('temperature', 'warmest');
 		expect(stage.lastView()?.playing).toBe(false);
@@ -1145,10 +1146,10 @@ describe('createLayerPanel, under sunlight', () => {
 
 	it('keeps the month last on screen while a summary is shown', () => {
 		const stage = sunlit();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onMonth(2);
 		stage.controls.onSummary('temperature', 'range');
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.told.at(-1)).toEqual({
 			layer: 'terrain',
 			summaries: { temperature: 'range', pressure: 'month' },
@@ -1178,7 +1179,7 @@ describe('createLayerPanel, the summaries', () => {
 		['coldest', 'Air temperature in the coldest month, °C'],
 	] as const)("shows the %s on the year's scale and ramp", (view, caption) => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		stage.controls.onSummary('temperature', view);
@@ -1195,7 +1196,7 @@ describe('createLayerPanel, the summaries', () => {
 
 	it('gives the expected values for each summary', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
 		const fieldFor = (view: Parameters<typeof stage.controls.onSummary>[1]) => {
 			stage.controls.onSummary('temperature', view);
@@ -1210,7 +1211,7 @@ describe('createLayerPanel, the summaries', () => {
 
 	it('shows the seasonal range on its own scale from zero, in its own ramp', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		result.months[0]?.set([-40.5, 10]);
 		stage.arrive(result);
@@ -1234,7 +1235,7 @@ describe('createLayerPanel, the summaries', () => {
 
 	it('marks the seasonal range every 5 degrees, with no words at its ends', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultOnGrid());
 		expect(stage.lastLegend()?.scale?.below).not.toBeNull();
 		stage.controls.onSummary('temperature', 'range');
@@ -1258,7 +1259,7 @@ describe('createLayerPanel, the summaries', () => {
 
 	it('asks nothing for the temperature view already chosen', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
 		stage.controls.onSummary('temperature', 'range');
 		const counts = () => [
@@ -1274,7 +1275,7 @@ describe('createLayerPanel, the summaries', () => {
 
 	it('works each summary out once per result, giving the same arrays again', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		stage.controls.onSummary('temperature', 'annualMean');
@@ -1300,7 +1301,7 @@ describe('createLayerPanel, the summaries', () => {
 
 	it('works the summaries out afresh for a result that comes again after the store dropped it', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onSummary('temperature', 'annualMean');
 		const result = resultWith();
 		stage.arrive(result);
@@ -1314,7 +1315,7 @@ describe('createLayerPanel, the summaries', () => {
 
 	it('goes back to the height colours when the store drops its result in a summary', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onSummary('temperature', 'range');
 		stage.arrive(resultWith());
 		stage.store.clear();
@@ -1324,7 +1325,7 @@ describe('createLayerPanel, the summaries', () => {
 
 	it('says a seasonal range the globe refused could not be shown, and sends it at the next change', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onSummary('temperature', 'range');
 		const failure = new RangeError('Refused once');
 		stage.failNext(failure);
@@ -1347,7 +1348,7 @@ describe('createLayerPanel, the summaries', () => {
 
 	it("keeps the legend on what the globe shows while it refuses another view's field", () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		const failure = new RangeError('Refused once');
@@ -1380,7 +1381,7 @@ describe('createLayerPanel, what the globe shows', () => {
 		expect(stage.panel.shown()).toBeNull();
 		stage.arrive(resultWith());
 		expect(stage.panel.shown()).toBeNull();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.store.clear();
 		expect(stage.panel.shown()).toBeNull();
 		stage.store.markCalculating();
@@ -1389,7 +1390,7 @@ describe('createLayerPanel, what the globe shows', () => {
 
 	it('gives the field the globe was last given, with its month, current', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		const shown = stage.panel.shown();
@@ -1410,7 +1411,7 @@ describe('createLayerPanel, what the globe shows', () => {
 
 	it('names the summary on show, with the array sent to the globe', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
 		for (const view of ['annualMean', 'warmest', 'coldest', 'range'] as const) {
 			stage.controls.onSummary('temperature', view);
@@ -1422,7 +1423,7 @@ describe('createLayerPanel, what the globe shows', () => {
 
 	it('is not current while the result is out of date, calculated again or no longer calculable', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const result = resultWith();
 		stage.arrive(result);
 		const field = result.months[DEFAULT_MONTH];
@@ -1444,7 +1445,7 @@ describe('createLayerPanel, what the globe shows', () => {
 
 	it('keeps the earlier field and its month, not current, while the globe refuses the one chosen', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		const first = resultWith();
 		stage.arrive(first);
 
@@ -1484,11 +1485,11 @@ describe('createLayerPanel, what the globe shows', () => {
 
 	it('shows nothing again once the globe is back on the height colours', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.panel.shown()).toBeNull();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.panel.shown()).not.toBeNull();
 		stage.store.clear();
 		expect(stage.panel.shown()).toBeNull();
@@ -1538,7 +1539,7 @@ const createEarthStage = () => {
 	const stage = createStage();
 	const deferred = createDeferredLoader();
 	stage.setLoader(deferred.loader);
-	stage.controls.onLayer('temperature');
+	stage.panel.setLayer('temperature');
 	stage.panel.newWorld(64);
 	const result = resultOnGrid();
 	stage.arrive(result);
@@ -1571,15 +1572,15 @@ describe('createLayerPanel, the comparison', () => {
 		stage.panel.setEarth(64);
 		// Terrain view: not offered.
 		expect(stage.lastComparison()?.offered).toBe(false);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.lastComparison()).toEqual({
 			offered: true,
 			source: 'simulated',
 			message: null,
 		});
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.lastComparison()?.offered).toBe(false);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.panel.setEarth(null);
 		expect(stage.lastComparison()?.offered).toBe(false);
 		stage.panel.newWorld(64);
@@ -1590,7 +1591,7 @@ describe('createLayerPanel, the comparison', () => {
 
 	it('names no source in the caption until it is offered, and the source from then on', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.arrive(resultOnGrid());
 		expect(stage.lastLegend()?.scale?.caption).toBe(
 			'Air temperature in July, °C',
@@ -2082,7 +2083,7 @@ describe('createLayerPanel, the comparison', () => {
 		const stage = createStage();
 		const deferred = createDeferredLoader();
 		stage.setLoader(deferred.loader);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.panel.newWorld(64);
 		stage.controls.onSource('temperature', 'observed');
 		deferred.last().resolve(observedFor(resultOnGrid()));
@@ -2188,7 +2189,6 @@ describe('createLayerControls', () => {
 			{
 				layers,
 				view: { ...DEFAULT_PAGE_VIEW, ...view },
-				onLayer: (next) => chosen.push(next),
 				onSummary: (_layer, next) => chosen.push(next),
 				onMonth: (next) => chosen.push(`month ${next}`),
 				onPlay: () => chosen.push('play'),
@@ -2213,7 +2213,6 @@ describe('createLayerControls', () => {
 			{
 				layers: SCALAR_LAYERS,
 				view: DEFAULT_PAGE_VIEW,
-				onLayer: () => {},
 				onSummary: () => {},
 				onMonth: () => {},
 				onPlay: () => {},
@@ -2232,26 +2231,16 @@ describe('createLayerControls', () => {
 		expect(byClass(arrowsPlace, 'wind-key__streaks')).toEqual([]);
 	});
 
-	it('adds the layer controls with Terrain chosen, and the legend to its own place, hidden', () => {
+	it('adds the layer controls with no choice of layer, and the legend to its own place, hidden', () => {
 		const { section, place, radios } = make();
 		expect(section.children.map((child) => child.className)).toEqual([
-			'segmented',
 			'temperature-view',
 		]);
 		expect(place.children.map((child) => child.className)).toEqual(['legend']);
-		expect(
-			radios('layer').map((radio) => [radio.value, radio.checked]),
-		).toEqual([
-			['terrain', true],
-			['temperature', false],
-			['pressure', false],
-		]);
+		expect(radios('layer')).toEqual([]);
 		expect(
 			byClass(section, 'segmented__label').map((label) => label.textContent),
 		).toEqual([
-			'Terrain',
-			'Temperature',
-			'Pressure',
 			// The temperature's sources, then the pressure's.
 			'Simulated',
 			'Observed',
@@ -2296,24 +2285,6 @@ describe('createLayerControls', () => {
 		]);
 		fake.pick(radios('temperature-source')[2] as FakeElement);
 		expect(chosen).toEqual(['difference']);
-	});
-
-	it('starts on the layer it is given', () => {
-		const { radios } = make({ layer: 'temperature' });
-		expect(
-			radios('layer').map((radio) => [radio.value, radio.checked]),
-		).toEqual([
-			['terrain', false],
-			['temperature', true],
-			['pressure', false],
-		]);
-	});
-
-	it('passes on the layer chosen', () => {
-		const { radios, chosen } = make();
-		fake.pick(radios('layer')[1] as FakeElement);
-		fake.pick(radios('layer')[0] as FakeElement);
-		expect(chosen).toEqual(['temperature', 'terrain']);
 	});
 
 	it('adds the key to the wind arrows to its own place, hidden, and shows it as told', () => {
@@ -2523,7 +2494,7 @@ describe('the legend over the globe', () => {
 		const place = fake.createElement('div');
 		const store = createLayerStore(() => {});
 		const timers = createFakeTimers();
-		createLayerPanel({
+		const panel = createLayerPanel({
 			store,
 			setTimer: timers.setTimer,
 			clearTimer: timers.clearTimer,
@@ -2546,13 +2517,8 @@ describe('the legend over the globe', () => {
 				),
 		});
 		const body = section.body as unknown as FakeElement;
-		/** Picks a layer on the controls, as a click does. */
-		const pickLayer = (index: number): void => {
-			const radios = byClass(body, 'segmented__input').filter(
-				(input) => input.name === 'layer',
-			);
-			fake.pick(radios[index] as FakeElement);
-		};
+		/** Picks a layer, as the dock tells it. */
+		const pickLayer = (layer: Layer): void => panel.setLayer(layer);
 		const legend = oneByClass(place, 'legend');
 		return {
 			section,
@@ -2584,10 +2550,10 @@ describe('the legend over the globe', () => {
 			section.setOpen(open);
 			expect(body.hidden).toBe(!open);
 			expect(legend.hidden).toBe(true);
-			pickLayer(1);
+			pickLayer('temperature');
 			expect(legend.hidden).toBe(false);
 			expect(status()).toBe(LEGEND_EMPTY_TEXT);
-			pickLayer(0);
+			pickLayer('terrain');
 			expect(legend.hidden).toBe(true);
 		},
 	);
@@ -2595,7 +2561,7 @@ describe('the legend over the globe', () => {
 	it('follows the calculation while the Layers section is closed, as when it is open', () => {
 		const { section, store, pickLayer, legend, status, bar, scale } =
 			make(true);
-		pickLayer(1);
+		pickLayer('temperature');
 		section.setOpen(false);
 		store.markCalculating();
 		store.setProgress(progressOf(1));
@@ -2760,7 +2726,7 @@ describe('createLayerPanel, the winds', () => {
 		const stage = windy();
 		const solved = solvedWinds();
 		arrive(stage, solved);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onSummary('temperature', 'annualMean');
 		const mean = stage.winds.at(-1);
 		expect(mean?.east).toEqual(summariseWinds(solved.winds).east);
@@ -2777,7 +2743,7 @@ describe('createLayerPanel, the winds', () => {
 			const stage = windy();
 			const solved = solvedWinds();
 			arrive(stage, solved);
-			stage.controls.onLayer('temperature');
+			stage.panel.setLayer('temperature');
 			stage.controls.onMonth(3);
 			stage.controls.onSummary('temperature', view);
 			expect(stage.winds.at(-1)).toEqual(monthOf(solved, 3));
@@ -2789,9 +2755,9 @@ describe('createLayerPanel, the winds', () => {
 		const stage = windy();
 		const solved = solvedWinds();
 		arrive(stage, solved);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onSummary('temperature', 'annualMean');
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.winds.at(-1)).toEqual(monthOf(solved, DEFAULT_MONTH));
 	});
 
@@ -2856,7 +2822,7 @@ describe('createLayerPanel, the winds', () => {
 	it('says the globe shows the year’s mean winds on Annual average, and the month’s again after', () => {
 		const stage = windy();
 		arrive(stage, solvedWinds());
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onSummary('temperature', 'annualMean');
 		const shown = stage.panel.shownWinds();
 		expect(shown?.field).toBe(stage.winds.at(-1));
@@ -3028,7 +2994,7 @@ describe('createLayerPanel, the observed winds', () => {
 			offered: true,
 			source: 'simulated',
 		});
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onMonth(2);
 		stage.panel.setWinds(false);
 		stage.panel.setWinds(true);
@@ -3088,7 +3054,7 @@ describe('createLayerPanel, the observed winds', () => {
 	it('draws the observed winds’ year mean on the annual average, worked out once, as the simulated mean is', async () => {
 		const { stage, solved, observed, observe } = createWindsStage();
 		await observe();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onSummary('temperature', 'annualMean');
 		const mean = stage.winds.at(-1);
 		const expected = summariseWinds({
@@ -3260,7 +3226,7 @@ describe('createLayerPanel, the observed winds', () => {
 		const { stage, solved, observed, observe } = createWindsStage();
 		await observe();
 		const figures = coreFigures(solved, observed);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onSummary('temperature', 'annualMean');
 		expect(stage.lastKey()?.figures).toEqual(figures.year);
 		stage.controls.onSummary('temperature', 'warmest');
@@ -3327,7 +3293,7 @@ describe('createLayerPanel, the key’s wording', () => {
 	it('words its line as the pressure’s legend does, by the same rule', () => {
 		const stage = createStage();
 		stage.panel.setWinds(true);
-		stage.controls.onLayer('pressure');
+		stage.panel.setLayer('pressure');
 		stage.store.markCalculating();
 		expect(stage.lastKey()?.status).toBe(WINDS_CALCULATING_TEXT);
 		expect(stage.lastLegend()?.status).toBe(LEGEND_CALCULATING_TEXT);
@@ -3433,32 +3399,32 @@ describe('createLayerPanel, another layer described', () => {
 
 	it('asks what calculates the layer chosen, the winds here, and gives it back for another', () => {
 		const stage = createTwoLayerStage();
-		stage.controls.onLayer(MADE_UP_ID);
+		stage.panel.setLayer(MADE_UP_ID);
 		expect(stage.windsShowing).toEqual([true]);
 		expect(stage.temperatureShowing).toEqual([]);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.windsShowing).toEqual([true, false]);
 		expect(stage.temperatureShowing).toEqual([true]);
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.temperatureShowing).toEqual([true, false]);
 	});
 
-	it('keeps the winds showing while the Winds control is on, whatever the layer', () => {
+	it('keeps the winds showing while the Winds tile is on, whatever the layer', () => {
 		const stage = createTwoLayerStage();
 		stage.panel.setWinds(true);
-		stage.controls.onLayer(MADE_UP_ID);
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer(MADE_UP_ID);
+		stage.panel.setLayer('terrain');
 		expect(stage.windsShowing).toEqual([true]);
-		stage.controls.onLayer(MADE_UP_ID);
+		stage.panel.setLayer(MADE_UP_ID);
 		stage.panel.setWinds(false);
 		expect(stage.windsShowing).toEqual([true]);
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.windsShowing).toEqual([true, false]);
 	});
 
 	it('shows its months from where it says, on a scale centred on the year’s mean, in its colours and words', () => {
 		const stage = createTwoLayerStage();
-		stage.controls.onLayer(MADE_UP_ID);
+		stage.panel.setLayer(MADE_UP_ID);
 		expect(stage.legends.at(-1)).toEqual({
 			scale: null,
 			status: LEGEND_EMPTY_TEXT,
@@ -3502,7 +3468,7 @@ describe('createLayerPanel, another layer described', () => {
 
 	it('says its own words while its calculation is under way or unavailable', () => {
 		const stage = createTwoLayerStage();
-		stage.controls.onLayer(MADE_UP_ID);
+		stage.panel.setLayer(MADE_UP_ID);
 		stage.store.markWindsCalculating();
 		expect(stage.legends.at(-1)).toEqual({
 			scale: null,
@@ -3515,7 +3481,7 @@ describe('createLayerPanel, another layer described', () => {
 
 	it('offers only its own views, its annual average on the same scale as its months', () => {
 		const stage = createTwoLayerStage();
-		stage.controls.onLayer(MADE_UP_ID);
+		stage.panel.setLayer(MADE_UP_ID);
 		const solved = stage.arrive();
 		const monthRange = stage.shown.at(-1)?.range;
 		stage.controls.onSummary(MADE_UP_ID, 'range');
@@ -3546,18 +3512,18 @@ describe('createLayerPanel, another layer described', () => {
 		stage.arrive();
 		stage.store.markCalculating();
 		stage.store.setResult(temperatureOf(1), true);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.panel.shown()?.summary).toBe('warmest');
-		stage.controls.onLayer(MADE_UP_ID);
+		stage.panel.setLayer(MADE_UP_ID);
 		expect(stage.panel.shown()?.summary).toBe('annualMean');
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.panel.shown()?.summary).toBe('warmest');
 	});
 
 	it('offers no comparison for a layer with no observed year, on the measured Earth too', () => {
 		const stage = createTwoLayerStage();
 		stage.panel.setEarth(64);
-		stage.controls.onLayer(MADE_UP_ID);
+		stage.panel.setLayer(MADE_UP_ID);
 		stage.arrive();
 		expect(
 			stage.comparisons.every(
@@ -3570,7 +3536,7 @@ describe('createLayerPanel, another layer described', () => {
 		expect(stage.legends.at(-1)?.scale?.caption).toBe(
 			'Made-up pressure in month 7, hPa',
 		);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.comparisons.at(-1)).toEqual([
 			'temperature',
 			{ offered: true, source: 'simulated', message: null },
@@ -3581,11 +3547,11 @@ describe('createLayerPanel, another layer described', () => {
 		const stage = createTwoLayerStage();
 		stage.panel.setWinds(true);
 		stage.arrive();
-		stage.controls.onLayer(MADE_UP_ID);
+		stage.panel.setLayer(MADE_UP_ID);
 		expect(stage.panel.shownWinds()?.annualMean).toBe(false);
 		stage.controls.onSummary(MADE_UP_ID, 'annualMean');
 		expect(stage.panel.shownWinds()?.annualMean).toBe(true);
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.panel.shownWinds()?.annualMean).toBe(false);
 	});
 
@@ -3595,13 +3561,13 @@ describe('createLayerPanel, another layer described', () => {
 		stage.arrive();
 		stage.controls.onSummary('temperature', 'annualMean');
 		stage.controls.onSummary(MADE_UP_ID, 'annualMean');
-		stage.controls.onLayer(MADE_UP_ID);
+		stage.panel.setLayer(MADE_UP_ID);
 		expect(stage.panel.shownWinds()?.annualMeanLabel).toBe(
 			summaryOf(MADE_UP_LAYER, 'annualMean').label,
 		);
 		expect(stage.panel.shownWinds()?.annualMeanLabel).toBe('Yearly mean');
 		// The same mean, not sent again, takes the other layer's name.
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.panel.shownWinds()?.annualMean).toBe(true);
 		expect(stage.panel.shownWinds()?.annualMeanLabel).toBe(
 			summaryOf(TEMPERATURE_LAYER, 'annualMean').label,
@@ -3612,14 +3578,14 @@ describe('createLayerPanel, another layer described', () => {
 
 	it('keeps the scale of the layer the globe still shows, as that layer writes it, when it refuses the first field of another', () => {
 		const stage = createTwoLayerStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.store.markCalculating();
 		stage.store.setResult(temperatureOf(1), true);
 		const temperatureScale = stage.legends.at(-1)?.scale;
 		expect(temperatureScale?.caption).toMatch(/, °C$/);
 		const solved = stage.arrive();
 		stage.refuse(solved.winds.pressure[DEFAULT_MONTH] ?? null);
-		expect(() => stage.controls.onLayer(MADE_UP_ID)).toThrow(
+		expect(() => stage.panel.setLayer(MADE_UP_ID)).toThrow(
 			'The globe refuses this field',
 		);
 		expect(stage.panel.shown()?.layer).toBe(TEMPERATURE_LAYER);
@@ -3667,7 +3633,7 @@ describe('createLayerPanel, the pressure', () => {
 		const stage = createStage();
 		expect(stage.controls.layers).toEqual([TEMPERATURE_LAYER, PRESSURE_LAYER]);
 		expect(stage.controls.view.summaries.pressure).toBe('month');
-		stage.controls.onLayer('pressure');
+		stage.panel.setLayer('pressure');
 		stage.controls.onSummary('pressure', 'warmest');
 		expect(stage.told.at(-1)?.summaries.pressure).toBe('month');
 		stage.controls.onSummary('pressure', 'annualMean');
@@ -3676,34 +3642,34 @@ describe('createLayerPanel, the pressure', () => {
 
 	it('tells the winds they are showing while it is on screen, and the temperature it is not', () => {
 		const stage = createStage();
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.showing).toEqual([true]);
 		expect(stage.windsShowing).toEqual([]);
-		stage.controls.onLayer('pressure');
+		stage.panel.setLayer('pressure');
 		expect(stage.showing).toEqual([true, false]);
 		expect(stage.windsShowing).toEqual([true]);
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.windsShowing).toEqual([true, false]);
 		expect(stage.showing).toEqual([true, false]);
 	});
 
-	it('leaves the winds showing when it is left with the Winds control on', () => {
+	it('leaves the winds showing when it is left with the Winds tile on', () => {
 		const stage = createStage();
 		stage.panel.setWinds(true);
-		stage.controls.onLayer('pressure');
-		stage.controls.onLayer('temperature');
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('pressure');
+		stage.panel.setLayer('temperature');
+		stage.panel.setLayer('terrain');
 		expect(stage.windsShowing).toEqual([true]);
-		stage.controls.onLayer('pressure');
+		stage.panel.setLayer('pressure');
 		stage.panel.setWinds(false);
 		expect(stage.windsShowing).toEqual([true]);
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.windsShowing).toEqual([true, false]);
 	});
 
 	it('shows the month’s pressure of the winds’ result, centred on the year’s mean, in its colours and words', () => {
 		const stage = createStage();
-		stage.controls.onLayer('pressure');
+		stage.panel.setLayer('pressure');
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
 			status: LEGEND_EMPTY_TEXT,
@@ -3741,7 +3707,7 @@ describe('createLayerPanel, the pressure', () => {
 
 	it('shows the year’s mean pressure on its Annual average, on the months’ scale, worked out once', () => {
 		const stage = createStage();
-		stage.controls.onLayer('pressure');
+		stage.panel.setLayer('pressure');
 		const solved = arriveWinds(stage);
 		const monthRange = stage.shown.at(-1)?.range;
 		stage.controls.onSummary('pressure', 'annualMean');
@@ -3761,7 +3727,7 @@ describe('createLayerPanel, the pressure', () => {
 
 	it('says Calculating with no year count, and its own words when it cannot be calculated or shown', () => {
 		const stage = createStage();
-		stage.controls.onLayer('pressure');
+		stage.panel.setLayer('pressure');
 		stage.store.markWindsCalculating();
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
@@ -3773,7 +3739,7 @@ describe('createLayerPanel, the pressure', () => {
 		expect(stage.lastLegend()?.status).toBe('Pressure unavailable');
 
 		const refused = createStage();
-		refused.controls.onLayer('pressure');
+		refused.panel.setLayer('pressure');
 		refused.failNext(new Error('The globe refuses this field'));
 		arriveWinds(refused);
 		expect(refused.lastLegend()).toEqual({
@@ -3814,7 +3780,7 @@ describe('createLayerPanel, the pressure', () => {
 		const stage = createStage();
 		const deferred = createDeferredLoader();
 		stage.setLoader(deferred.loader);
-		stage.controls.onLayer('pressure');
+		stage.panel.setLayer('pressure');
 		stage.panel.newWorld(64);
 		const solved = arriveWinds(stage, pressureOnGrid());
 		const observed = observedPressureFor(solved);
@@ -3947,7 +3913,7 @@ describe('createLayerPanel, the pressure', () => {
 		expect(deferred.calls).toHaveLength(1);
 		expect(stage.panel.shown()?.source).toBe('observed');
 		// Off its own view, the choice is hidden.
-		stage.controls.onLayer('terrain');
+		stage.panel.setLayer('terrain');
 		expect(stage.lastPressureComparison()?.offered).toBe(false);
 	});
 
@@ -3955,7 +3921,7 @@ describe('createLayerPanel, the pressure', () => {
 		const stage = createStage();
 		stage.panel.setWinds(true);
 		const solved = arriveWinds(stage);
-		stage.controls.onLayer('pressure');
+		stage.panel.setLayer('pressure');
 		expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
 		expect(stage.panel.shownWinds()?.annualMean).toBe(false);
 		stage.controls.onSummary('pressure', 'annualMean');
@@ -3974,19 +3940,19 @@ describe('createLayerPanel, the pressure', () => {
 		const stage = createStage();
 		stage.arrive(resultWith());
 		arriveWinds(stage);
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		stage.controls.onSummary('temperature', 'warmest');
-		stage.controls.onLayer('pressure');
+		stage.panel.setLayer('pressure');
 		expect(stage.panel.shown()?.summary).toBe('month');
 		stage.controls.onSummary('pressure', 'annualMean');
-		stage.controls.onLayer('temperature');
+		stage.panel.setLayer('temperature');
 		expect(stage.panel.shown()?.summary).toBe('warmest');
 		expect(stage.panel.shown()?.layer).toBe(TEMPERATURE_LAYER);
 		expect(stage.told.at(-1)?.summaries).toEqual({
 			temperature: 'warmest',
 			pressure: 'annualMean',
 		});
-		stage.controls.onLayer('pressure');
+		stage.panel.setLayer('pressure');
 		expect(stage.panel.shown()?.summary).toBe('annualMean');
 	});
 });
@@ -4013,7 +3979,6 @@ describe('createLayerControls, the pressure', () => {
 			{
 				layers: SCALAR_LAYERS,
 				view: DEFAULT_PAGE_VIEW,
-				onLayer: (next) => chosen.push(next),
 				onSummary: (layer, next) => chosen.push(`${layer} ${next}`),
 				onMonth: () => {},
 				onPlay: () => {},
@@ -4022,25 +3987,6 @@ describe('createLayerControls, the pressure', () => {
 		);
 		return { controls, chosen, section };
 	};
-
-	it('offers three layers, Terrain, Temperature and Pressure, in that order', () => {
-		const { section, chosen } = make();
-		const inputs = byClass(section, 'segmented__input').filter(
-			(input) => input.name === 'layer',
-		);
-		expect(inputs.map((input) => input.value)).toEqual([
-			'terrain',
-			'temperature',
-			'pressure',
-		]);
-		expect(
-			byClass(section, 'segmented__label')
-				.slice(0, 3)
-				.map((label) => label.textContent),
-		).toEqual(['Terrain', 'Temperature', 'Pressure']);
-		fake.pick(inputs[2] as FakeElement);
-		expect(chosen).toEqual(['pressure']);
-	});
 
 	it('gives it a Show control of its own, of the Month and the Annual average, and its own comparison', () => {
 		const { controls, section, chosen } = make();
@@ -4126,7 +4072,6 @@ describe('createLayerControls, another layer described', () => {
 					},
 					sources: { ...DEFAULT_PAGE_VIEW.sources, [MADE_UP_ID]: 'simulated' },
 				},
-				onLayer: (next) => chosen.push(next),
 				onSummary: (layer, next) => chosen.push(`${layer} ${next}`),
 				onMonth: () => {},
 				onPlay: () => {},
@@ -4135,20 +4080,6 @@ describe('createLayerControls, another layer described', () => {
 		);
 		return { controls, chosen, section };
 	};
-
-	it('offers the layer by its own name after the others', () => {
-		const { section } = make();
-		expect(
-			byClass(section, 'segmented__input')
-				.filter((input) => input.name === 'layer')
-				.map((input) => input.value),
-		).toEqual(['terrain', 'temperature', MADE_UP_ID]);
-		expect(
-			byClass(section, 'segmented__label')
-				.slice(0, 3)
-				.map((label) => label.textContent),
-		).toEqual(['Terrain', 'Temperature', 'Made-up pressure']);
-	});
 
 	it('adds its own Show control, with only its views, and no comparison for it', () => {
 		const { section, chosen } = make();

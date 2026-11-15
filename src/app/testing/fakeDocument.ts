@@ -28,6 +28,7 @@ export type FakeElement = {
 	max: string | number;
 	step: string;
 	title: string;
+	tabIndex: number;
 	/** For a label, the `id` it is for; for an output, its token list. */
 	htmlFor: string | { add(id: string): void };
 	readonly valueAsNumber: number;
@@ -39,10 +40,14 @@ export type FakeElement = {
 	removeAttribute(name: string): void;
 	append(...children: FakeElement[]): void;
 	replaceChildren(...children: FakeElement[]): void;
-	addEventListener(type: string, listener: () => void): void;
+	addEventListener(type: string, listener: (event: never) => void): void;
 	focus(): void;
-	/** Sends the element an event of a type, as the browser would. */
-	fire(type: string): void;
+	/**
+	 * Sends the element an event of a type, as the browser would, with what
+	 * the listeners are to find on it, such as a key pressed; an event with
+	 * nothing on it but a `preventDefault` that does nothing when left out.
+	 */
+	fire(type: string, event?: object): void;
 };
 
 /** The stand-in document and what tests ask of it. */
@@ -64,7 +69,7 @@ const createFakeElement = (
 	onFocus: (element: FakeElement) => void,
 ): FakeElement => {
 	const attributes = new Map<string, string>();
-	const listeners = new Map<string, (() => void)[]>();
+	const listeners = new Map<string, ((event: object) => void)[]>();
 	let text: string | null = '';
 	let value: string | number = '';
 	const classes = (): string[] =>
@@ -118,6 +123,7 @@ const createFakeElement = (
 		max: '',
 		step: '',
 		title: '',
+		tabIndex: 0,
 		htmlFor: { add: () => {} },
 		get valueAsNumber() {
 			return Number(value);
@@ -146,12 +152,15 @@ const createFakeElement = (
 			element.append(...children);
 		},
 		addEventListener: (type, listener) => {
-			listeners.set(type, [...(listeners.get(type) ?? []), listener]);
+			listeners.set(type, [
+				...(listeners.get(type) ?? []),
+				listener as (event: object) => void,
+			]);
 		},
 		focus: () => onFocus(element),
-		fire: (type) => {
+		fire: (type, event = { preventDefault: () => {} }) => {
 			for (const listener of listeners.get(type) ?? []) {
-				listener();
+				listener(event);
 			}
 		},
 	};

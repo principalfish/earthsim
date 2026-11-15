@@ -15,6 +15,7 @@
   --space-sm: 0.5rem;
   --space-md: 1rem;
   --space-lg: 1.5rem;
+  --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --radius-sm: 0.375rem;
   --opacity-disabled: 0.55;
@@ -46,9 +47,12 @@ body {
 }
 
 /* Layout */
-/* One cell, the globe's area, which the globe fills and the overlays are
-   laid over; neither can stretch it. */
+/* One cell, the globe's area, which the globe fills and the regions over
+   it are laid over; neither can stretch it. It is the container the
+   regions' narrow layout is measured against: only its width is
+   contained, which its column of the page sets whatever it holds. */
 .viewport {
+  container: viewport / inline-size;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   grid-template-columns: minmax(0, 1fr);
@@ -873,18 +877,70 @@ body {
   color: var(--color-text-muted);
 }
 
-/* The row along the bottom of the globe's area that the legend, the key to
-   the wind arrows and the cursor readout sit in, a small margin in from its
-   edges. The legend comes first, then the key, then the strip, and the row
-   runs from right to left, so the legend takes the bottom-right corner, the
-   key stands to its left, or in the corner while the legend is hidden, and
-   the strip, pushed along by its margin, takes the left edge. The lines
-   stack upwards, so when they do not all fit side by side the legend keeps
-   the bottom and what does not fit sits on a line directly above; on one
-   line all stand on the bottom edge. The pointer passes through the row and
-   all it holds to the globe. */
-.globe-overlays {
+/* The regions laid over the globe's area, a small margin in from its
+   edges: the dock down the left edge, as tall as its tiles and no taller
+   than the area, scrolling when they do not fit; the top bar along the top
+   beside it, with the corner at its right end; the info region at the
+   bottom right, as wide as the area beside the dock; and the timeline
+   under it along the bottom. A region with nothing in it takes no room.
+   Neither the regions nor the space between them take the pointer, which
+   passes through to the globe; only the controls in them take it. */
+.main-view {
   grid-area: 1 / 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "dock top-bar corner"
+    "dock . ."
+    "dock info info"
+    "dock timeline timeline";
+  column-gap: var(--space-sm);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-sm);
+  pointer-events: none;
+}
+
+/* The dock is no taller than the globe's area and scrolls when the area is
+   too short for all its tiles: the wheel over a tile brings the hidden
+   ones into view, and so does moving to one with the keyboard. Its padding,
+   taken back by its margin so that nothing moves, keeps a focused tile's
+   outline from being cut off at its edges, and it keeps room for its
+   scrollbar whether or not it is scrolling, so the tiles keep their width
+   and the regions beside it start that much further right in every window.
+   The dock itself takes no pointer, as the regions do not, so its
+   scrollbar only shows how far it is scrolled and cannot be dragged. */
+.main-view__dock {
+  grid-area: dock;
+  align-self: start;
+  max-height: calc(100% + 2 * var(--space-xs));
+  margin: calc(-1 * var(--space-xs));
+  padding: var(--space-xs);
+  overflow-y: auto;
+  scroll-padding-block: var(--space-xs);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.main-view__top-bar {
+  grid-area: top-bar;
+}
+
+.main-view__corner {
+  grid-area: corner;
+}
+
+/* The legend, the key to the wind arrows and the cursor readout, in a row.
+   The legend comes first, then the key, then the strip, and the row runs
+   from right to left, so the legend takes the bottom-right corner, the key
+   stands to its left, or in the corner while the legend is hidden, and the
+   strip, pushed along by its margin, takes the left edge, beside the dock.
+   The lines stack upwards, so when they do not all fit side by side the
+   legend keeps the bottom and what does not fit sits on a line directly
+   above; on one line all stand on the bottom edge. */
+.main-view__info {
+  grid-area: info;
   display: flex;
   flex-direction: row-reverse;
   flex-wrap: wrap-reverse;
@@ -893,16 +949,105 @@ body {
   align-self: end;
   gap: var(--space-sm);
   min-width: 0;
-  margin: var(--space-sm);
-  pointer-events: none;
+}
+
+.main-view__timeline {
+  grid-area: timeline;
 }
 
 /* A place that draws no box, so what it holds is laid out by the row. */
-.globe-overlays__place {
+.main-view__place {
   display: contents;
 }
 
-/* What lies under the pointer, against the left edge of the globe's area.
+/* The dock's two groups of tiles, each under its small heading, worded as
+   the panel's headings are. */
+.layer-dock {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.layer-dock__group {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.layer-dock__heading {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.layer-dock__tiles {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+/* A tile: its icon over its name, on the backing the legend has. All are
+   as wide as the widest, which the longest name, `Temperature`, sets. The
+   tile chosen, and each overlay that is on, is outlined and tinted in the
+   accent colour. Only the tiles take the pointer. */
+.layer-tile {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+  color: var(--color-text);
+  cursor: pointer;
+  background: var(--color-overlay-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  pointer-events: auto;
+}
+
+.layer-tile:hover {
+  background: var(--color-border);
+}
+
+.layer-tile:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.layer-tile[aria-checked="true"],
+.layer-tile[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-accent) 25%, var(--color-bg));
+  border-color: var(--color-accent);
+}
+
+.icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* In a narrow globe's area only the tiles' icons show: each name is hidden
+   from the eye but stays the tile's accessible name, and its tooltip; so
+   is each heading, which still names its group, with a line between the
+   two groups in its place. */
+@container viewport (width < 560px) {
+  .layer-dock__group + .layer-dock__group {
+    padding-block-start: var(--space-md);
+    border-block-start: 1px solid var(--color-border);
+  }
+
+  .layer-dock__heading,
+  .layer-tile__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+}
+
+/* What lies under the pointer, against the left edge of the info region.
    The pointer passes through it to the globe, so it never stops a stroke or
    a drag. Its width is fixed, with room in a wide font for the longest
    usual line, `Annual average −12 °C difference · out of date`, so it keeps
