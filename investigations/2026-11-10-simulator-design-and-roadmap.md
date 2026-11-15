@@ -81,9 +81,9 @@ Keep this section current when a step is merged.
 |-|-|-|
 | 1 Globe, grid and sculpting | Done, merged 2026-11-11 | 0001, GitHub #1, PR #2 |
 | 2 Sunlight and seasonal temperature | Done, merged 2026-11-13 | 0002, GitHub #3, PR #4 |
-| 3 Winds | Building | 0003, GitHub #5, PR #6 |
-| 3c Layers in the main view, out of the side panel | Not started; next after step 3 merges, before 3a | |
-| 3a Core folders by component, page folders by role (refactor, no behaviour change) | Not started; after step 3 merges, before step 4 | |
+| 3 Winds | Done 2026-11-15 | 0003, GitHub #5, PR #6 (merged) |
+| 3c Layers in the main view, out of the side panel | Not started; next, before 3a | |
+| 3a Core folders by component, page folders by role (refactor, no behaviour change) | Not started; after 3c, before step 4 | |
 | 3d One config.ts for every model's settings, with config.md | Not started; after 3a | |
 | 3b Heat carried by winds, and the climate loop | Not started; after 3a. Could instead open step 5; decide when planned | |
 | 4 Moisture, rainfall and Köppen zones | Not started | |
@@ -127,7 +127,7 @@ The user, 2026-11-14: "i think we will do a separate UI piece to bring out layer
 
 ### Step 3d: one config.ts for every model's settings, with config.md
 The user, 2026-11-14: "remind me of the parameters we are fine tuning at the moment. these probably need to be easily editrable and documented"; "both, but ultimately structured to expand to all"; "maybe as a follow up to the folders refactor (or as part of it) we can make a config.ts which is referenced in wind/ and temp/", "with a config.md beside it"; and chose "One config.ts + config.md" as "Its own step after the folders".
-- **Where the settings are before this step:** two objects in two files and two shapes, each overridable for a run: the winds' 31 as `DEFAULT_WIND_SETTINGS` in `src/core/wind/rules.ts` (step 3, piece 7c-1) and the temperature's 18 (13 physical, 5 for the solver) as `TEMPERATURE_MODEL` in `src/core/temperature.ts`. What each is and where it comes from is in doc comments only.
+- **Where the settings are before this step:** two objects in two files and two shapes, each overridable for a run: the winds' 36 as `DEFAULT_WIND_SETTINGS` in `src/core/wind/rules.ts` (step 3, piece 7c-1) and the temperature's 18 (13 physical, 5 for the solver) as `TEMPERATURE_MODEL` in `src/core/temperature.ts`. What each is and where it comes from is in doc comments only.
 - **What this step makes:** `src/core/config.ts`, one file at the top of the core (it stays there; the folder step leaves it flat), with a section for each model that `temperature/` and `wind/` read their numbers from. Each setting carries its value, its unit, one line on what it does, where its starting value comes from (an observed figure, a published figure with its source, or a guess), and whether and against what it was tuned. Changing a setting is changing one number in that file. Each later model (heat carried by winds, ocean currents, ice, rain) adds its section there.
 - **`src/core/config.md` beside it,** written from `config.ts` by an npm command: a table of every setting for each model, in the project's Markdown style, with a test that fails when the committed page differs from what the command would write, so it cannot drift. The models' own docs point to it. The solver's numerical settings are listed apart from the physical ones.
 - **No value changes:** the Earth temperature baseline is unchanged and the Earth's wind figures are the same bit for bit; both models stay overridable for a run as now, and the page and its workers never override.
