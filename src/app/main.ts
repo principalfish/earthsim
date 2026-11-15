@@ -6,8 +6,10 @@ import { loadEarthData } from './earthData';
 import { attachViewInput } from './globe/input';
 import { MAX_DRAWN_SEA_LEVEL_M, MIN_DRAWN_SEA_LEVEL_M } from './globe/material';
 import { createGlobe, type Globe } from './globe/renderer';
-import { loadObservedTemperature } from './observedData';
+import { loadObservedWinds } from './observedData';
 import { createPanelMemory, reachStorage } from './panelMemory';
+import { createPreferences } from './preferences';
+import { loadLayerObserved } from './scalarLayer';
 import { createSculptController } from './sculpt';
 import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
 import { createCursorReadout, createReadoutStrip } from './ui/cursorReadout';
@@ -24,6 +26,7 @@ import { startPage } from './wiring';
 import {
 	createStatisticsService,
 	createTemperatureService,
+	createWindsService,
 } from './workerService';
 
 /** Looks up an element the page markup is required to contain. */
@@ -69,7 +72,8 @@ const createGlobeOrExplain = (): Globe | null => {
 
 /**
  * Starts an instance of the simulation worker. Each service has one of its
- * own, so that a slow temperature solve never holds up the statistics.
+ * own, so that a slow temperature or wind solve never holds up the
+ * statistics or the other.
  */
 const createWorker = (): Worker =>
 	new Worker(new URL('../worker/sim.worker.ts', import.meta.url), {
@@ -83,9 +87,12 @@ const logError = (error: unknown): void => console.error(error);
 
 const globe = createGlobeOrExplain();
 if (globe !== null) {
+	// Reached once for both: the open sections and the preferences are
+	// settings of the browser, kept apart from the saved world.
+	const browserStorage = reachStorage(() => window.localStorage);
 	const sections = createPanelSections(
 		panel,
-		createPanelMemory(reachStorage(() => window.localStorage)),
+		createPanelMemory(browserStorage),
 	);
 	const overlays = createGlobeOverlays(viewport);
 	void startPage({
@@ -136,6 +143,14 @@ if (globe !== null) {
 				clearTimer,
 				logError,
 			}),
+		createWinds: (options) =>
+			createWindsService({
+				...options,
+				createWorker,
+				setTimer,
+				clearTimer,
+				logError,
+			}),
 		createLayerPanel: (options) =>
 			createLayerPanel({
 				...options,
@@ -144,7 +159,7 @@ if (globe !== null) {
 				clearTimer,
 				reportError: logError,
 				createControls: (controls) =>
-					createLayerControls(sections.layers.body, overlays.legend, controls),
+					createLayerControls(sections.layers.body, overlays, controls),
 			}),
 		createCursorReadout: (options) =>
 			createCursorReadout({
@@ -153,10 +168,12 @@ if (globe !== null) {
 				globe,
 				show: createReadoutStrip(overlays.readout).show,
 			}),
+		preferences: createPreferences(browserStorage),
 		layersSection: sections.layers,
 		openNewWorldDialog,
 		loadEarth: loadEarthData,
-		loadObserved: loadObservedTemperature,
+		loadObserved: loadLayerObserved,
+		loadObservedWinds,
 		exportWorld: (world) => exportWorldFile(world),
 		importWorld: importWorldFile,
 		setInert: (inert) => {
@@ -179,6 +196,11 @@ if (globe !== null) {
 				}
 			});
 			window.addEventListener('pagehide', listener);
+		},
+		onPageVisibility: (listener) => {
+			const tell = (): void => listener(document.visibilityState !== 'hidden');
+			tell();
+			document.addEventListener('visibilitychange', tell);
 		},
 		logError,
 	});

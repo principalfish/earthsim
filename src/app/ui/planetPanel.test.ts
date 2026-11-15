@@ -15,6 +15,7 @@ import {
 import {
 	createPlanetPanel,
 	formatAu,
+	formatDayLength,
 	formatGreenhouse,
 	formatSolar,
 	formatSunlight,
@@ -28,6 +29,7 @@ import {
 	ROUGH_NOTE_TEXT,
 	roughNoteFor,
 	settingText,
+	windRoughNoteFor,
 } from './planetPanel';
 
 /** The slider of a setting. */
@@ -48,6 +50,28 @@ const planetWith = (changes: Partial<PlanetSettings>): PlanetSettings => ({
 	...DEFAULT_PLANET,
 	...changes,
 });
+
+/** The start of every sentence of the winds' note. */
+const WIND_NOTE_START =
+	'The wind model is calibrated on the Earth, so its winds are rough for a planet with';
+
+/**
+ * Counts the writes of an element's text from here on.
+ *
+ * @returns A function that gives the number of writes so far.
+ */
+const countWrites = (element: FakeElement): (() => number) => {
+	let writes = 0;
+	const text = Object.getOwnPropertyDescriptor(element, 'textContent');
+	Object.defineProperty(element, 'textContent', {
+		get: () => text?.get?.call(element),
+		set: (value) => {
+			writes += 1;
+			text?.set?.call(element, value);
+		},
+	});
+	return () => writes;
+};
 
 describe('the planet sliders', () => {
 	it('set each of the settings once, in the order of the settings', () => {
@@ -174,6 +198,37 @@ describe('the planet sliders', () => {
 			12,
 		);
 	});
+
+	it('set the day on a logarithmic scale from 3 hours to 30 days, with a stop exactly on 24 hours', () => {
+		const { scale } = sliderFor('dayLengthHours');
+		expect(scale.steps).toBe(200);
+		expect(scale.toSetting(0)).toBe(3);
+		expect(scale.toSetting(200)).toBe(720);
+		expect(scale.earthPosition).toBe(76);
+		expect(scale.toSetting(76)).toBe(24);
+		expect(scale.toSetting(76) / scale.toSetting(75)).toBeCloseTo(
+			8 ** (1 / 76),
+			12,
+		);
+		expect(scale.toSetting(77) / scale.toSetting(76)).toBeCloseTo(
+			30 ** (1 / 124),
+			12,
+		);
+	});
+
+	it('write every position of the day with words of its own', () => {
+		const slider = sliderFor('dayLengthHours');
+		const texts = positionsOf(slider).map((position) =>
+			settingText(slider, slider.scale.toSetting(position)),
+		);
+		for (let position = 1; position < texts.length; position += 1) {
+			expect(texts[position]).not.toBe(texts[position - 1]);
+		}
+		expect(new Set(texts).size).toBe(texts.length);
+		expect(texts[0]).toBe('3 hours');
+		expect(texts[76]).toBe('24 hours (Earth)');
+		expect(texts[200]).toBe('30 days');
+	});
 });
 
 describe('linearSliderScale and logSliderScale', () => {
@@ -220,6 +275,27 @@ describe('the values as written', () => {
 		expect(formatGreenhouse(3)).toBe('3.00 × Earth');
 	});
 
+	it('write a day to three significant figures, in hours under two days and in days from there', () => {
+		expect(formatDayLength(3)).toBe('3 hours');
+		expect(formatDayLength(3.08)).toBe('3.08 hours');
+		expect(formatDayLength(10)).toBe('10 hours');
+		expect(formatDayLength(24)).toBe('24 hours');
+		expect(formatDayLength(24.7)).toBe('24.7 hours');
+		expect(formatDayLength(24.74)).toBe('24.7 hours');
+		expect(formatDayLength(47)).toBe('47 hours');
+		expect(formatDayLength(47.94)).toBe('47.9 hours');
+		expect(formatDayLength(48)).toBe('2 days');
+		expect(formatDayLength(49.2)).toBe('2.05 days');
+		expect(formatDayLength(391)).toBe('16.3 days');
+		expect(formatDayLength(384)).toBe('16 days');
+		expect(formatDayLength(720)).toBe('30 days');
+	});
+
+	it('write a day that rounds to 48 hours in days', () => {
+		expect(formatDayLength(47.95)).toBe('2 days');
+		expect(formatDayLength(47.99)).toBe('2 days');
+	});
+
 	it('say when a value is Earth’s, unless the value as written says so already', () => {
 		expect(settingText(sliderFor('axialTiltDeg'), 23.44)).toBe(
 			'23.44° (Earth)',
@@ -236,6 +312,10 @@ describe('the values as written', () => {
 		expect(settingText(sliderFor('greenhouseStrength'), 1)).toBe(
 			'1.00 × Earth',
 		);
+		expect(settingText(sliderFor('dayLengthHours'), 24)).toBe(
+			'24 hours (Earth)',
+		);
+		expect(settingText(sliderFor('dayLengthHours'), 10)).toBe('10 hours');
 	});
 });
 
@@ -309,6 +389,57 @@ describe('roughNoteFor', () => {
 	});
 });
 
+describe('windRoughNoteFor', () => {
+	it('says nothing for a day from 6 to 96 hours and a tilt up to 54°, the ends included', () => {
+		for (const dayLengthHours of [6, 24, 96]) {
+			expect(windRoughNoteFor(planetWith({ dayLengthHours }))).toBeNull();
+		}
+		for (const axialTiltDeg of [0, 23.44, 54]) {
+			expect(windRoughNoteFor(planetWith({ axialTiltDeg }))).toBeNull();
+		}
+		expect(
+			windRoughNoteFor(planetWith({ dayLengthHours: 6, axialTiltDeg: 54 })),
+		).toBeNull();
+	});
+
+	it('says the winds are rough for a day shorter than 6 hours', () => {
+		for (const dayLengthHours of [3, 5.9]) {
+			expect(windRoughNoteFor(planetWith({ dayLengthHours }))).toBe(
+				'The wind model is calibrated on the Earth, so its winds are rough for a planet with a day shorter than 6 hours.',
+			);
+		}
+	});
+
+	it('says the winds are rough for a day longer than 4 days', () => {
+		for (const dayLengthHours of [96.1, 720]) {
+			expect(windRoughNoteFor(planetWith({ dayLengthHours }))).toBe(
+				'The wind model is calibrated on the Earth, so its winds are rough for a planet with a day longer than 4 days.',
+			);
+		}
+	});
+
+	it('says the winds are rough for a tilt above 54°', () => {
+		for (const axialTiltDeg of [54.01, 90]) {
+			expect(windRoughNoteFor(planetWith({ axialTiltDeg }))).toBe(
+				'The wind model is calibrated on the Earth, so its winds are rough for a planet with a tilt above 54°.',
+			);
+		}
+	});
+
+	it('names both reasons when the spin and the tilt are both outside, the spin first', () => {
+		expect(
+			windRoughNoteFor(planetWith({ dayLengthHours: 4, axialTiltDeg: 60 })),
+		).toBe(
+			'The wind model is calibrated on the Earth, so its winds are rough for a planet with a day shorter than 6 hours and a tilt above 54°.',
+		);
+		expect(
+			windRoughNoteFor(planetWith({ dayLengthHours: 200, axialTiltDeg: 90 })),
+		).toBe(
+			'The wind model is calibrated on the Earth, so its winds are rough for a planet with a day longer than 4 days and a tilt above 54°.',
+		);
+	});
+});
+
 describe('createPlanetPanel', () => {
 	beforeEach(() => {
 		vi.stubGlobal('document', createFakeDocument().document);
@@ -344,6 +475,7 @@ describe('createPlanetPanel', () => {
 			input.fire('input');
 		};
 		const values = byClass(section, 'planet-readout__value');
+		const regions = byClass(section, 'planet-readout__note-region');
 		return {
 			section,
 			controls,
@@ -353,7 +485,10 @@ describe('createPlanetPanel', () => {
 			move,
 			sunlight: () => values[0]?.textContent,
 			year: () => values[1]?.textContent,
-			region: oneByClass(section, 'planet-readout__note-region'),
+			/** The temperature's note's region. */
+			region: regions[0] as FakeElement,
+			/** The winds' note's region. */
+			windRegion: regions[1] as FakeElement,
 			reset: oneByClass(section, 'planet-reset'),
 		};
 	};
@@ -361,6 +496,7 @@ describe('createPlanetPanel', () => {
 	it('adds the planet controls to the section’s body: the sliders, the two lines, the note and the button', () => {
 		const { section } = make();
 		expect(section.children.map((child) => child.className)).toEqual([
+			'field',
 			'field',
 			'field',
 			'field',
@@ -384,6 +520,7 @@ describe('createPlanetPanel', () => {
 			['Star mass', 'planet-star-mass'],
 			['Orbit distance', 'planet-orbit-distance'],
 			['Greenhouse strength', 'planet-greenhouse'],
+			['Day length', 'planet-day-length'],
 		]);
 		expect(
 			inputs.map((input) => [
@@ -425,6 +562,7 @@ describe('createPlanetPanel', () => {
 				'1.00 AU (Earth)',
 			],
 			['planet-greenhouse', 'range', '0', '60', '1', '20', '1.00 × Earth'],
+			['planet-day-length', 'range', '0', '200', '1', '76', '24 hours (Earth)'],
 		]);
 		expect(
 			byClass(section, 'field__value').map((output) => output.textContent),
@@ -434,6 +572,7 @@ describe('createPlanetPanel', () => {
 			'1.00 × Sun (Earth)',
 			'1.00 AU (Earth)',
 			'1.00 × Earth',
+			'24 hours (Earth)',
 		]);
 	});
 
@@ -446,9 +585,10 @@ describe('createPlanetPanel', () => {
 			'Earth: 1.00 × Sun',
 			'Earth: 1.00 AU',
 			'Earth: 1.00 × Earth',
+			'Earth: 24 hours',
 		]);
 		expect(marks.map((mark) => mark.style.left)).toEqual(
-			[47 / 180, 0.5, 0.5, 105 / 200, 1 / 3].map(
+			[47 / 180, 0.5, 0.5, 105 / 200, 1 / 3, 76 / 200].map(
 				(fraction) =>
 					`calc(var(--range-thumb-size) / 2 + (100% - var(--range-thumb-size)) * ${fraction})`,
 			),
@@ -456,7 +596,7 @@ describe('createPlanetPanel', () => {
 	});
 
 	it('shows Earth’s sunlight and year, with no note', () => {
-		const { sunlight, year, region, section } = make();
+		const { sunlight, year, region, windRegion, section } = make();
 		expect(
 			byClass(section, 'planet-readout__label').map((term) => term.textContent),
 		).toEqual(['Sunlight', 'Year']);
@@ -464,6 +604,7 @@ describe('createPlanetPanel', () => {
 		expect(year()).toBe('365 days');
 		expect(region.getAttribute('aria-live')).toBe('polite');
 		expect(region.children).toEqual([]);
+		expect(windRegion.children).toEqual([]);
 	});
 
 	it('passes on the settings with the one a slider sets, at each movement', () => {
@@ -600,8 +741,17 @@ describe('createPlanetPanel', () => {
 	});
 
 	it('puts every one of Earth’s settings back with one change', () => {
-		const { move, changes, reset, inputs, sunlight, year, region, section } =
-			make();
+		const {
+			move,
+			changes,
+			reset,
+			inputs,
+			sunlight,
+			year,
+			region,
+			windRegion,
+			section,
+		} = make();
 		expect(reset.tagName).toBe('BUTTON');
 		expect(reset.type).toBe('button');
 		expect(reset.textContent).toBe(RESET_PLANET_LABEL);
@@ -611,17 +761,20 @@ describe('createPlanetPanel', () => {
 		move('starMass', 0);
 		move('orbitDistanceAu', 200);
 		move('greenhouseStrength', 60);
+		move('dayLengthHours', 0);
 		changes.length = 0;
 
 		reset.fire('click');
 		expect(changes).toEqual([DEFAULT_PLANET]);
 		expect(changes[0]).not.toBe(DEFAULT_PLANET);
+		expect(changes[0]?.dayLengthHours).toBe(24);
 		expect(inputs.map((input) => input.value)).toEqual([
 			'47',
 			'100',
 			'100',
 			'105',
 			'20',
+			'76',
 		]);
 		expect(
 			byClass(section, 'field__value').map((output) => output.textContent),
@@ -631,10 +784,12 @@ describe('createPlanetPanel', () => {
 			'1.00 × Sun (Earth)',
 			'1.00 AU (Earth)',
 			'1.00 × Earth',
+			'24 hours (Earth)',
 		]);
 		expect(sunlight()).toBe("100% of Earth's");
 		expect(year()).toBe('365 days');
 		expect(region.children).toEqual([]);
+		expect(windRegion.children).toEqual([]);
 
 		move('greenhouseStrength', 21);
 		expect(changes.at(-1)).toEqual(planetWith({ greenhouseStrength: 1.05 }));
@@ -654,22 +809,35 @@ describe('createPlanetPanel', () => {
 			starMass: 10,
 			orbitDistanceAu: 0.3,
 			greenhouseStrength: 0,
+			dayLengthHours: 24,
 		};
-		const { inputs, changes, sunlight, year, region } = make(planet);
+		const { inputs, changes, sunlight, year, region, windRegion } =
+			make(planet);
 		expect(inputs.map((input) => input.value)).toEqual([
 			'120',
 			'0',
 			'200',
 			'0',
 			'0',
+			'76',
 		]);
 		expect(inputs.map((input) => input.getAttribute('aria-valuetext'))).toEqual(
-			['60°', '0.100 × Sun', '10.0 × Sun', '0.300 AU', '0.00 × Earth'],
+			[
+				'60°',
+				'0.100 × Sun',
+				'10.0 × Sun',
+				'0.300 AU',
+				'0.00 × Earth',
+				'24 hours (Earth)',
+			],
 		);
 		expect(sunlight()).toBe("111% of Earth's");
 		expect(year()).toBe('19 days');
 		expect(region.children.map((child) => child.textContent)).toEqual([
 			ROUGH_NOTE_TEXT.cold,
+		]);
+		expect(windRegion.children.map((child) => child.textContent)).toEqual([
+			`${WIND_NOTE_START} a tilt above 54°.`,
 		]);
 		expect(changes).toEqual([]);
 	});
@@ -703,9 +871,120 @@ describe('createPlanetPanel', () => {
 			'100',
 			'105',
 			'20',
+			'76',
 		]);
 		expect(region.children).toEqual([]);
 		expect(changes).toHaveLength(1);
+	});
+
+	it('passes on the day a slider sets, and writes it', () => {
+		const { move, changes, field } = make();
+		move('dayLengthHours', 0);
+		move('dayLengthHours', 200);
+		move('dayLengthHours', 76);
+		expect(changes).toEqual([
+			planetWith({ dayLengthHours: 3 }),
+			planetWith({ dayLengthHours: 720 }),
+			DEFAULT_PLANET,
+		]);
+		expect(field('dayLengthHours').output.textContent).toBe('24 hours (Earth)');
+		move('dayLengthHours', 200);
+		expect(field('dayLengthHours').output.textContent).toBe('30 days');
+		expect(field('dayLengthHours').input.getAttribute('aria-valuetext')).toBe(
+			'30 days',
+		);
+	});
+
+	it('shows the winds’ note for a day under 6 hours or over 96, and not from 6 to 96', () => {
+		const { controls, move, windRegion } = make();
+		const noteText = () =>
+			windRegion.children.map((child) => child.textContent);
+		const fast = `${WIND_NOTE_START} a day shorter than 6 hours.`;
+		const slow = `${WIND_NOTE_START} a day longer than 4 days.`;
+		for (const [dayLengthHours, expected] of [
+			[5.9, [fast]],
+			[6, []],
+			[24, []],
+			[96, []],
+			[96.1, [slow]],
+		] as const) {
+			controls.setPlanet(planetWith({ dayLengthHours }));
+			expect(noteText(), `${dayLengthHours} hours`).toEqual(expected);
+		}
+		move('dayLengthHours', 0);
+		expect(noteText()).toEqual([fast]);
+		move('dayLengthHours', 76);
+		expect(noteText()).toEqual([]);
+		move('dayLengthHours', 200);
+		expect(noteText()).toEqual([slow]);
+	});
+
+	it('shows the winds’ note for a tilt above 54°, and not at or below it', () => {
+		const { move, windRegion } = make();
+		const noteText = () =>
+			windRegion.children.map((child) => child.textContent);
+		// Half a degree to a position.
+		move('axialTiltDeg', 108);
+		expect(noteText()).toEqual([]);
+		move('axialTiltDeg', 109);
+		expect(noteText()).toEqual([`${WIND_NOTE_START} a tilt above 54°.`]);
+		move('axialTiltDeg', 47);
+		expect(noteText()).toEqual([]);
+	});
+
+	it('names both reasons in the winds’ note when the spin and the tilt are both outside', () => {
+		const { move, windRegion } = make();
+		move('axialTiltDeg', 180);
+		move('dayLengthHours', 0);
+		expect(windRegion.children.map((child) => child.textContent)).toEqual([
+			`${WIND_NOTE_START} a day shorter than 6 hours and a tilt above 54°.`,
+		]);
+	});
+
+	it('keeps the winds’ note in a live region of its own, under the temperature’s', () => {
+		const { section, region, windRegion } = make();
+		const readout = oneByClass(section, 'planet-readout');
+		expect(readout.children).toEqual([
+			oneByClass(section, 'planet-readout__lines'),
+			region,
+			windRegion,
+		]);
+		expect(windRegion).not.toBe(region);
+		expect(windRegion.getAttribute('aria-live')).toBe('polite');
+	});
+
+	it('writes each note only when its own text changes', () => {
+		const { move, region, windRegion } = make();
+		move('axialTiltDeg', 120);
+		move('starBrightness', 90);
+		const [windNote] = windRegion.children;
+		const [roughNote] = region.children;
+		if (windNote === undefined || roughNote === undefined) {
+			throw new Error('Both notes were not shown');
+		}
+		const windWrites = countWrites(windNote);
+		const roughWrites = countWrites(roughNote);
+
+		// A change of the temperature's note leaves the winds' alone.
+		move('starBrightness', 110);
+		expect(roughWrites()).toBe(1);
+		expect(windWrites()).toBe(0);
+		// The same winds' note for another tilt is not written again.
+		move('axialTiltDeg', 150);
+		expect(windWrites()).toBe(0);
+		// A change of the winds' note leaves the temperature's alone.
+		move('dayLengthHours', 0);
+		expect(windWrites()).toBe(1);
+		expect(roughWrites()).toBe(1);
+		expect(windRegion.children.map((child) => child.textContent)).toEqual([
+			`${WIND_NOTE_START} a day shorter than 6 hours and a tilt above 54°.`,
+		]);
+		move('dayLengthHours', 76);
+		move('axialTiltDeg', 47);
+		expect(windRegion.children).toEqual([]);
+		expect(region.children).toEqual([roughNote]);
+		expect(windWrites()).toBe(2);
+		expect(roughWrites()).toBe(1);
 	});
 
 	it('writes a setting between two stops as it is, on the nearer stop', () => {

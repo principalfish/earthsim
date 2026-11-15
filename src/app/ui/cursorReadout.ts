@@ -1,7 +1,9 @@
 /**
  * The cursor readout: a strip over the globe's bottom-left corner saying
- * what lies under the pointer, such as `27.9° N, 86.9° E`, `8,123 m` and,
- * in Temperature view, `July −18 °C`.
+ * what lies under the pointer, such as `27.9° N, 86.9° E`, `8,123 m`, on a
+ * computed layer its value, such as `July −18 °C` in Temperature view, and,
+ * while the winds are shown, `7 m/s from the north-east`, marked `observed`
+ * for the observed winds.
  *
  * The writing is in the pure functions at the top. {@link createCursorReadout}
  * follows the pointer and decides when to look again, and
@@ -17,18 +19,26 @@ import {
 	type World,
 } from '../../core/index';
 import type { Globe, WindowPoint } from '../globe/renderer';
+import { type ScalarLayerSpec, summaryOf } from '../scalarLayer';
 import {
 	MONTH_NAMES,
-	TEMPERATURE_VIEW_LABELS,
-	type TemperatureSource,
-	type TemperatureView,
+	type Source,
+	SUMMARY_LABELS,
+	type Summary,
+	type WindSource,
 } from '../view';
+import {
+	DEFAULT_WIND_UNIT,
+	formatWind,
+	type WindUnit,
+	windFromDeg,
+} from '../windUnits';
 import { createElement } from './fields';
-import type { ShownTemperature } from './layerPanel';
+import type { ShownLayer, ShownWinds } from './layerPanel';
 
 /**
- * What the readout says beside a temperature that is not the current
- * result as chosen, as the legend marks its scale out of date.
+ * What the readout says beside a layer's value, or a wind, that is not the
+ * current result as chosen, as the legend marks its scale out of date.
  */
 export const READOUT_OUT_OF_DATE_TEXT = 'out of date';
 
@@ -86,67 +96,126 @@ export const formatElevation = (heightM: number): string =>
 		: `${groupedWhole(heightM)} m deep`;
 
 /**
- * What the readout calls the field a temperature view shows: the month's
- * name for the Month view, and the view's own name for the others.
+ * What the readout calls the field a view of a layer's year shows: the
+ * month's name for the Month view, and the view's own name, as the layer
+ * names it, for the others.
  *
- * @param view - What of the year is shown.
+ * @param layer - The layer's description.
+ * @param summary - What of the year is shown.
  * @param month - The month shown, from January at 0; read only for the
  * Month view.
  */
-const fieldName = (view: TemperatureView, month: number): string =>
-	view === 'month' ? (MONTH_NAMES[month] ?? '') : TEMPERATURE_VIEW_LABELS[view];
+const fieldName = (
+	layer: ScalarLayerSpec,
+	summary: Summary,
+	month: number,
+): string =>
+	summary === 'month'
+		? (MONTH_NAMES[month] ?? '')
+		: summaryOf(layer, summary).label;
 
 /**
- * A value of the temperature field on screen as the readout writes it,
- * named by what the field is: `July 18 °C`, `Annual average 14 °C`,
- * `Warmest month 27 °C`, `Coldest month −31 °C` or `Seasonal range 12 °C`;
- * and by where it comes from, when that is not the simulation: `July
- * 21 °C observed`, or `July +2 °C difference` for the simulated less the
- * observed.
+ * A value of a layer's field on screen as the readout writes it, named by
+ * what the field is and followed by the layer's unit, such as, for the
+ * temperature, `July 18 °C`, `Annual average 14 °C`, `Warmest month
+ * 27 °C`, `Coldest month −31 °C` or `Seasonal range 12 °C`; and by where it
+ * comes from, when that is not the simulation: `July 21 °C observed`, or
+ * `July +2 °C difference` for the simulated less the observed.
  *
  * @remarks
- * The value is rounded to a whole degree, a half upwards, and written with
- * its digits grouped in threes and a true minus sign; a value that rounds
- * to zero is `0`, never `−0`. A difference is signed both ways, `+2` above
- * zero and `−3` below, and one that rounds to zero is `0`, never `+0`. The
- * seasonal range is named as a range, so that it does not read as a
- * temperature: it is the difference between the warmest and the coldest
- * month.
+ * The value is written as the layer writes it, the temperature's rounded
+ * to a whole degree, a half upwards, with its digits grouped in threes and
+ * a true minus sign; a value that rounds to zero is `0`, never `−0`. A
+ * difference is signed both ways, `+2` above zero and `−3` below, and one
+ * that rounds to zero is `0`, never `+0`. The temperature's seasonal range
+ * is named as a range, so that it does not read as a temperature: it is
+ * the difference between the warmest and the coldest month.
  *
- * @param value - The value in degrees Celsius.
- * @param view - What of the year the field is.
+ * @param layer - The layer's description.
+ * @param value - The value, in the layer's unit.
+ * @param summary - What of the year the field is.
  * @param month - The month the field is for the Month view, from January
  * at 0; read only for that view.
  * @param source - Where the field comes from; the simulation when left
  * out.
  */
-export const formatTemperature = (
+export const formatLayerValue = (
+	layer: ScalarLayerSpec,
 	value: number,
-	view: TemperatureView,
+	summary: Summary,
 	month: number,
-	source: TemperatureSource = 'simulated',
+	source: Source = 'simulated',
 ): string => {
-	// Rounded once, so that the sign and the digits agree: −0.5 rounds to
-	// zero, and is written `0`.
-	const rounded = Math.round(value);
-	const positive = source === 'difference' && rounded > 0 ? '+' : '';
-	const sign = rounded < 0 ? '−' : positive;
-	const text = `${fieldName(view, month)} ${sign}${groupedWhole(rounded)} °C`;
+	const text = `${fieldName(layer, summary, month)} ${layer.formatValue(value, source === 'difference')} ${layer.unit}`;
 	return source === 'simulated' ? text : `${text} ${source}`;
 };
 
-/** The temperature at the place under the pointer, from what is on screen. */
-export type ReadoutTemperature = {
-	/** The value of the field on screen at the place, in degrees Celsius. */
+/** A layer's value at the place under the pointer, from what is on screen. */
+export type ReadoutValue = {
+	/** The layer on screen. */
+	readonly layer: ScalarLayerSpec;
+	/** The value of the field on screen at the place, in the layer's unit. */
 	readonly value: number;
 	/** What of the year the field is. */
-	readonly view: TemperatureView;
+	readonly summary: Summary;
 	/** The month the field is for the Month view, from January at 0. */
 	readonly month: number;
 	/** Where the field comes from. */
-	readonly source: TemperatureSource;
+	readonly source: Source;
 	/** Whether the field is the one chosen and up to date. */
 	readonly current: boolean;
+};
+
+/** The wind at the place under the pointer, from what is on screen. */
+export type ReadoutWind = {
+	/** The eastward wind at the place, in metres a second. */
+	readonly east: number;
+	/** The northward wind at the place, in metres a second. */
+	readonly north: number;
+	/** Whether it is the year's mean wind; the month's when not. */
+	readonly annualMean: boolean;
+	/**
+	 * What the year's mean is called on the layer whose view of the year
+	 * the winds follow, as its Annual average is labelled; read only for the
+	 * year's mean wind, and {@link SUMMARY_LABELS}' when left out.
+	 */
+	readonly annualMeanLabel?: string;
+	/** Where the winds come from; the simulation when left out. */
+	readonly source?: WindSource;
+	/** Whether the winds are the ones chosen and up to date. */
+	readonly current: boolean;
+};
+
+/** What the readout says after a wind of the observed Earth. */
+export const READOUT_OBSERVED_WIND_TEXT = 'observed';
+
+/**
+ * A wind as the readout writes it, such as `7 m/s from the north-east`, or
+ * `Annual average 7 m/s from the north-east` for the year's mean wind,
+ * named as the layer on screen names its value on that view; `calm` below
+ * 0.5 m/s, as {@link formatWind} writes it. An observed wind is marked so
+ * at the end, as an observed value of a layer is: `7 m/s from the west
+ * observed`, `Annual average 7 m/s from the west observed` or `calm
+ * observed`.
+ *
+ * @param wind - The wind.
+ * @param unit - The unit to write its speed in.
+ */
+export const formatReadoutWind = (
+	wind: ReadoutWind,
+	unit: WindUnit,
+): string => {
+	const text = formatWind(
+		Math.hypot(wind.east, wind.north),
+		windFromDeg(wind.east, wind.north),
+		unit,
+	);
+	const named = wind.annualMean
+		? `${wind.annualMeanLabel ?? SUMMARY_LABELS.annualMean} ${text}`
+		: text;
+	return wind.source === 'observed'
+		? `${named} ${READOUT_OBSERVED_WIND_TEXT}`
+		: named;
 };
 
 /** What the readout says of one place. */
@@ -157,8 +226,10 @@ export type ReadoutParts = {
 	readonly longitudeDeg: number;
 	/** Height of the place above the sea level in metres; negative below. */
 	readonly heightM: number;
-	/** The temperature on screen at the place, or null for none. */
-	readonly temperature: ReadoutTemperature | null;
+	/** The layer's value on screen at the place, or null for none. */
+	readonly value: ReadoutValue | null;
+	/** The wind on screen at the place, or null for none. */
+	readonly wind: ReadoutWind | null;
 };
 
 /** The readout's text, part by part, as the strip shows it. */
@@ -167,38 +238,52 @@ export type ReadoutText = {
 	readonly position: string;
 	/** Its elevation, as {@link formatElevation} writes it. */
 	readonly elevation: string;
-	/** Its temperature, as {@link formatTemperature} writes it, or null. */
-	readonly temperature: string | null;
 	/**
-	 * {@link READOUT_OUT_OF_DATE_TEXT} when the temperature is not the
+	 * The layer's value there, as {@link formatLayerValue} writes it, or
+	 * null.
+	 */
+	readonly value: string | null;
+	/**
+	 * {@link READOUT_OUT_OF_DATE_TEXT} when the layer's value is not the
 	 * current result as chosen; null when it is, or there is none.
 	 */
 	readonly status: string | null;
+	/** Its wind, as {@link formatReadoutWind} writes it, or null. */
+	readonly wind: string | null;
+	/**
+	 * {@link READOUT_OUT_OF_DATE_TEXT} when the wind is not the current
+	 * result as chosen; null when it is, or there is none.
+	 */
+	readonly windStatus: string | null;
 };
 
 /**
  * The readout's text for one place.
  *
  * @param parts - What there is to say of the place.
+ * @param unit - The unit to write a wind's speed in; m/s when left out.
  */
-export const describeReadout = (parts: ReadoutParts): ReadoutText => {
-	const { temperature } = parts;
+export const describeReadout = (
+	parts: ReadoutParts,
+	unit: WindUnit = DEFAULT_WIND_UNIT,
+): ReadoutText => {
+	const { value, wind } = parts;
 	return {
 		position: formatLatLon(parts.latitudeDeg, parts.longitudeDeg),
 		elevation: formatElevation(parts.heightM),
-		temperature:
-			temperature === null
+		value:
+			value === null
 				? null
-				: formatTemperature(
-						temperature.value,
-						temperature.view,
-						temperature.month,
-						temperature.source,
+				: formatLayerValue(
+						value.layer,
+						value.value,
+						value.summary,
+						value.month,
+						value.source,
 					),
-		status:
-			temperature === null || temperature.current
-				? null
-				: READOUT_OUT_OF_DATE_TEXT,
+		status: value === null || value.current ? null : READOUT_OUT_OF_DATE_TEXT,
+		wind: wind === null ? null : formatReadoutWind(wind, unit),
+		windStatus: wind === null || wind.current ? null : READOUT_OUT_OF_DATE_TEXT,
 	};
 };
 
@@ -207,21 +292,26 @@ export const describeReadout = (parts: ReadoutParts): ReadoutText => {
  *
  * @remarks
  * The position is the direction's own, so it moves smoothly with the
- * pointer and reaches the poles. The height and the temperature are of the
- * one cell the direction falls in, with no blending of its neighbours: its
- * elevation less the world's sea level, and the field's value at it. A
- * field that is not one value per cell of the world, or whose value there
- * is not finite, gives no temperature.
+ * pointer and reaches the poles. The height, the layer's value and the
+ * wind are of the one cell the direction falls in, with no blending of its
+ * neighbours: its elevation less the world's sea level, the field's value
+ * at it, and the wind there, uncapped, of the winds the globe's arrows are
+ * drawn from, not the mean of an arrow's patch. A field that is not one
+ * value per cell of the world, or whose value there is not finite, gives
+ * no value, and winds that are not, no wind.
  *
  * @param world - The world on show.
  * @param direction - The direction of the place, as the globe picks it.
- * @param shown - What the globe shows of the temperature, or null for
+ * @param shown - What the globe shows of a computed layer, or null for
  * none.
+ * @param winds - What the globe shows of the winds, or null for none; none
+ * when left out.
  */
 export const readoutPartsAt = (
 	world: World,
 	direction: Vec3,
-	shown: ShownTemperature | null,
+	shown: ShownLayer | null,
+	winds: ShownWinds | null = null,
 ): ReadoutParts => {
 	const grid = getGrid(world.resolution);
 	const cell = cellAt(grid, direction);
@@ -230,18 +320,36 @@ export const readoutPartsAt = (
 		shown !== null && shown.field.length === grid.cellCount
 			? (shown.field[cell] as number)
 			: Number.NaN;
+	const onGrid =
+		winds !== null &&
+		winds.field.east.length === grid.cellCount &&
+		winds.field.north.length === grid.cellCount;
+	const east = onGrid ? (winds.field.east[cell] as number) : Number.NaN;
+	const north = onGrid ? (winds.field.north[cell] as number) : Number.NaN;
 	return {
 		latitudeDeg,
 		longitudeDeg,
 		heightM: (world.elevation[cell] as number) - world.seaLevel,
-		temperature:
+		value:
 			shown !== null && Number.isFinite(value)
 				? {
+						layer: shown.layer,
 						value,
-						view: shown.view,
+						summary: shown.summary,
 						month: shown.month,
 						source: shown.source,
 						current: shown.current,
+					}
+				: null,
+		wind:
+			winds !== null && Number.isFinite(east) && Number.isFinite(north)
+				? {
+						east,
+						north,
+						annualMean: winds.annualMean,
+						annualMeanLabel: winds.annualMeanLabel,
+						source: winds.source,
+						current: winds.current,
 					}
 				: null,
 	};
@@ -254,8 +362,10 @@ const sameText = (a: ReadoutText | null, b: ReadoutText | null): boolean =>
 		b !== null &&
 		a.position === b.position &&
 		a.elevation === b.elevation &&
-		a.temperature === b.temperature &&
-		a.status === b.status);
+		a.value === b.value &&
+		a.status === b.status &&
+		a.wind === b.wind &&
+		a.windStatus === b.windStatus);
 
 /** What the cursor readout follows, and where it shows what it finds. */
 export type CursorReadoutOptions = {
@@ -267,8 +377,12 @@ export type CursorReadoutOptions = {
 	readonly currentWorld: () => World;
 	/** Whether a brush stroke is under way. */
 	readonly isStrokeActive: () => boolean;
-	/** What the globe shows of the temperature, at the time it is asked. */
-	readonly shownTemperature: () => ShownTemperature | null;
+	/** What the globe shows of a computed layer, at the time it is asked. */
+	readonly shownLayer: () => ShownLayer | null;
+	/** What the globe shows of the winds, at the time it is asked. */
+	readonly shownWinds: () => ShownWinds | null;
+	/** The unit wind speeds are written in, at the time it is asked. */
+	readonly windUnit: () => WindUnit;
 	/** Shows the readout's text, or hides the readout for null. */
 	readonly show: (text: ReadoutText | null) => void;
 };
@@ -278,8 +392,9 @@ export type CursorReadout = {
 	/**
 	 * Says that what lies under the pointer may have changed though the
 	 * pointer has not moved: the terrain, the sea level, the world, the
-	 * camera, or the temperature on screen. The readout looks again at the
-	 * next animation frame.
+	 * camera, the layer or the winds on screen, or the unit wind
+	 * speeds are written in. The readout looks again at the next animation
+	 * frame.
 	 */
 	invalidate(): void;
 	/**
@@ -345,8 +460,10 @@ export const createCursorReadout = (
 						readoutPartsAt(
 							options.currentWorld(),
 							direction,
-							options.shownTemperature(),
+							options.shownLayer(),
+							options.shownWinds(),
 						),
+						options.windUnit(),
 					),
 		);
 		if (direction !== null && options.isStrokeActive()) {
@@ -426,10 +543,11 @@ export type ReadoutStrip = {
  *
  * @remarks
  * The strip holds one line for each piece of the text: the position, the
- * elevation and the temperature, in that order, each hidden while it has
- * nothing to say. The mark that the temperature is out of date is the end
- * of the temperature's line, hidden while it has nothing to say, and the
- * stylesheet puts a middle dot before it. The stylesheet lays the strip
+ * elevation, the layer's value and the wind, in that order, each hidden
+ * while it has nothing to say. The mark that the value is out of date is
+ * the end of the value's line, and the mark that the wind
+ * is, the end of the wind's, each hidden while it has nothing to say; the
+ * stylesheet puts a middle dot before each. The stylesheet lays the strip
  * over the globe's bottom-left corner, beside or above the legend, out of
  * the pointer's way.
  *
@@ -447,11 +565,17 @@ export const createReadoutStrip = (container: HTMLElement): ReadoutStrip => {
 	element.hidden = true;
 	const position = createElement('span', 'cursor-readout__position');
 	const elevation = createElement('span', 'cursor-readout__elevation');
-	const temperature = createElement('span', 'cursor-readout__temperature');
+	// The value's line is classed by the temperature's name, the one the
+	// stylesheet gives it, whichever layer it shows.
+	const layerValue = createElement('span', 'cursor-readout__temperature');
 	const value = createElement('span', 'cursor-readout__value');
 	const status = createElement('span', 'cursor-readout__status');
-	temperature.append(value, status);
-	element.append(position, elevation, temperature);
+	layerValue.append(value, status);
+	const wind = createElement('span', 'cursor-readout__wind');
+	const windValue = createElement('span', 'cursor-readout__wind-value');
+	const windStatus = createElement('span', 'cursor-readout__wind-status');
+	wind.append(windValue, windStatus);
+	element.append(position, elevation, layerValue, wind);
 	container.append(element);
 
 	const write = (part: HTMLElement, text: string | null): void => {
@@ -468,9 +592,12 @@ export const createReadoutStrip = (container: HTMLElement): ReadoutStrip => {
 			element.hidden = text === null;
 			write(position, text?.position ?? null);
 			write(elevation, text?.elevation ?? null);
-			temperature.hidden = (text?.temperature ?? null) === null;
-			write(value, text?.temperature ?? null);
+			layerValue.hidden = (text?.value ?? null) === null;
+			write(value, text?.value ?? null);
 			write(status, text?.status ?? null);
+			wind.hidden = (text?.wind ?? null) === null;
+			write(windValue, text?.wind ?? null);
+			write(windStatus, text?.windStatus ?? null);
 		},
 	};
 };

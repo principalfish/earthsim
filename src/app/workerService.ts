@@ -1,8 +1,9 @@
 /**
- * The services the page runs on simulation workers: starting a worker and
- * its client, keeping only the newest answer, starting the worker afresh
- * when a slow computation is overtaken, and what follows when a worker
- * cannot be had.
+ * The services the page runs on simulation workers, the statistics, the
+ * temperature and the winds, each on a worker of its own: starting a
+ * worker and its client, keeping only the newest answer, starting the
+ * worker afresh when a slow computation is overtaken in the services that
+ * restart it, and what follows when a worker cannot be had.
  *
  * Nothing here starts a real worker or a real timer: each is handed in, so
  * that all of it can be run with stand-ins.
@@ -25,11 +26,13 @@ import type { LayerStore } from './layers';
 import {
 	createRefreshScheduler,
 	createTemperatureScheduler,
+	createWindsScheduler,
 	type LatestOutcome,
 	type RefreshScheduler,
 	STATS_DEBOUNCE_MS,
 	TEMPERATURE_DEBOUNCE_MS,
 	type TemperatureScheduler,
+	type WindsScheduler,
 } from './refresh';
 
 /** The error a request to a service that has no worker rejects with. */
@@ -111,10 +114,15 @@ type Started = {
  * again, and its listeners are told, once.
  *
  * Without `restartWhenOvertaken`, a request that is overtaken still runs
- * to the end on the worker, which answers the newer one after it. With it,
- * a request that overtakes one still under way first ends the worker,
- * which drops the older request's answer for good, and then starts a fresh
- * one: the newest request never waits behind a stale one. A worker that
+ * to the end on the worker, which answers the newer one after it. Every
+ * call is posted, and so copied for the worker, when it is made; a caller
+ * that wants no requests queued behind a computation makes one call at a
+ * time, as the statistics and the winds do through their schedulers
+ * (`oneAtATime` of {@link createRefreshScheduler}). With
+ * `restartWhenOvertaken`, a request that overtakes one still under way
+ * first ends the worker, which drops the older request's answer for good,
+ * and then starts a fresh one: the newest request never waits behind a
+ * stale one. A worker that
  * answered everything it was asked is kept. If the fresh worker cannot be
  * started, the service becomes unavailable, and the request rejects.
  *
@@ -260,6 +268,11 @@ export type StatisticsServiceOptions<H> = {
  * nothing more is asked. A request that fails is recorded and the readout
  * says there are none until the next change asks again.
  *
+ * One request is asked at a time: a change made while one is being
+ * answered is asked for once that answer arrives, with the world as it is
+ * then, and that answer, overtaken, is shown to nobody (see
+ * {@link createRefreshScheduler}).
+ *
  * @param options - The worker, the world, the readout and the timers.
  * @returns What to tell whenever the terrain or the sea level has changed,
  * and whenever the world has been replaced.
@@ -276,6 +289,7 @@ export const createStatisticsService = <H>(
 	const scheduler = createRefreshScheduler<TerrainStats, H>({
 		request: () =>
 			service.latest('terrainStats', { world: options.currentWorld() }),
+		oneAtATime: true,
 		debounceMs: STATS_DEBOUNCE_MS,
 		setTimer: options.setTimer,
 		clearTimer: options.clearTimer,
@@ -292,7 +306,7 @@ export const createStatisticsService = <H>(
 	return scheduler;
 };
 
-/** What the page's temperature is made from. */
+/** What the page's temperature, or its winds, are made from. */
 export type TemperatureServiceOptions<H> = Omit<
 	StatisticsServiceOptions<H>,
 	'readout'
@@ -332,6 +346,52 @@ export const createTemperatureService = <H>(
 				{ world: options.currentWorld(), start },
 				{ onProgress },
 			),
+		store: options.store,
+		debounceMs: TEMPERATURE_DEBOUNCE_MS,
+		setTimer: options.setTimer,
+		clearTimer: options.clearTimer,
+		isBusy: options.isStrokeActive,
+		onError: options.logError,
+	});
+	service.onUnavailable(scheduler.markUnavailable);
+	return scheduler;
+};
+
+/**
+ * Starts a simulation worker for the winds and keeps the store's winds up
+ * to date with its temperature and the world while the winds are showing.
+ *
+ * @remarks
+ * Unlike the temperature's, a wind solve is never cut short: the worker is
+ * kept, with the grid tables it has built, which a fresh worker would have
+ * to build again and so make the next solve slower. The scheduler asks for
+ * one solve at a time, and asks again once it is answered if things have
+ * moved on meanwhile, the answer so overtaken kept by nobody (see
+ * {@link createWindsScheduler}). Whatever goes wrong with the worker costs
+ * only the winds: the store says they are unavailable, keeping what it
+ * had, and nothing more is asked. A request that fails is recorded, and
+ * the store keeps the last winds, marked out of date, or stays empty if
+ * there were none.
+ *
+ * The winds are asked for after a change of the day length with the
+ * temperature's wait, {@link TEMPERATURE_DEBOUNCE_MS}; see
+ * {@link createWindsScheduler} for the rest.
+ *
+ * @param options - The worker, the world, the store and the timers.
+ * @returns The scheduler, with the winds not yet showing.
+ */
+export const createWindsService = <H>(
+	options: TemperatureServiceOptions<H>,
+): WindsScheduler => {
+	const service = createWorkerService({
+		createWorker: options.createWorker,
+		createClient: options.createClient,
+		logError: options.logError,
+	});
+	const scheduler = createWindsScheduler<H>({
+		request: (world, temperature) =>
+			service.latest('winds', { world, temperatures: temperature.months }),
+		currentWorld: options.currentWorld,
 		store: options.store,
 		debounceMs: TEMPERATURE_DEBOUNCE_MS,
 		setTimer: options.setTimer,

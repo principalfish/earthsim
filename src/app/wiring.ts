@@ -10,11 +10,13 @@
 
 import {
 	isMeasuredEarth,
+	type MonthlyWind,
 	normaliseSeaLevel,
 	type Resolution,
 	sunColour,
 	sunDirection,
 	sunDrawnSize,
+	TEMPERATURE_SETTINGS,
 	type World,
 	type WorldFileResult,
 } from '../core/index';
@@ -23,9 +25,16 @@ import type { Autosave, AutosaveOptions } from './autosave';
 import type { RotateButton, ViewInput } from './globe/input';
 import type { SunlightStyle } from './globe/material';
 import type { Globe } from './globe/renderer';
+import type { WindStyle } from './globe/windMotion';
 import { createLayerStore, type LayerStore } from './layers';
 import type { ObservedLoader } from './observedData';
-import type { RefreshScheduler, TemperatureScheduler } from './refresh';
+import type { Preferences } from './preferences';
+import type {
+	RefreshScheduler,
+	TemperatureScheduler,
+	WindsScheduler,
+} from './refresh';
+import { type ScalarObservedLoader, scalarLayerOf } from './scalarLayer';
 import {
 	DEFAULT_TOOL,
 	rotateButtonFor,
@@ -36,7 +45,7 @@ import { applyStartup, decideStartup, type StartupRead } from './startup';
 import type { WorldStore } from './storage';
 import type { CursorReadout } from './ui/cursorReadout';
 import { createDateLine } from './ui/dateLine';
-import type { LayerPanel, ShownTemperature } from './ui/layerPanel';
+import type { LayerPanel, ShownLayer, ShownWinds } from './ui/layerPanel';
 import {
 	FIRST_NEW_WORLD_VALUES,
 	type NewWorldDialogOptions,
@@ -48,7 +57,11 @@ import {
 import type { PlanetPanel, PlanetPanelOptions } from './ui/planetPanel';
 import type { Section } from './ui/section';
 import type { ToolPanel, ToolPanelOptions } from './ui/toolPanel';
-import type { ViewPanel, ViewPanelOptions } from './ui/viewPanel';
+import type {
+	ViewPanel,
+	ViewPanelOptions,
+	WindSourceContent,
+} from './ui/viewPanel';
 import {
 	describeWorld,
 	EXPORT_FAILED_MESSAGE,
@@ -62,6 +75,7 @@ import {
 	type ShortcutEvent,
 } from './undo';
 import { DEFAULT_PAGE_VIEW, type Layer, type PageView } from './view';
+import type { WindUnit } from './windUnits';
 
 /** What the page asks of its globe once the globe exists. */
 export type PageGlobe = Pick<
@@ -73,6 +87,8 @@ export type PageGlobe = Pick<
 	| 'setSun'
 	| 'setSunlight'
 	| 'updateElevation'
+	| 'setWindStyle'
+	| 'setPageVisible'
 >;
 
 /** What the page's autosave is made from; the timing is the maker's. */
@@ -89,9 +105,15 @@ export type PageStatisticsOptions = {
 	readonly isStrokeActive: () => boolean;
 };
 
-/** What the page's temperature is computed from, and where it is kept. */
+/**
+ * What the page's temperature, or its winds, are computed from, and where
+ * they are kept.
+ */
 export type PageTemperatureOptions = PageStatisticsOptions & {
-	/** Where the temperature is kept, for whatever shows it to read. */
+	/**
+	 * Where the temperature and the winds are kept, for whatever shows them
+	 * to read.
+	 */
 	readonly store: LayerStore;
 };
 
@@ -101,16 +123,37 @@ export type PageLayerOptions = {
 	readonly store: LayerStore;
 	/** What calculates the temperature, told whether it is showing. */
 	readonly temperature: Pick<TemperatureScheduler, 'setShowing'>;
+	/**
+	 * The switch for the winds: tells what calculates them whether they are
+	 * showing, which also says whether the temperature they need is wanted.
+	 * The layer panel flips it as the Winds control is ticked and cleared.
+	 */
+	readonly winds: Pick<WindsScheduler, 'setShowing'>;
 	/** Called with the view settings whenever any of them changes. */
 	readonly onView: (view: PageView) => void;
-	/** Gives the observed temperature on a world's grid. */
-	readonly loadObserved: ObservedLoader;
+	/** Gives a layer's observed year on a world's grid. */
+	readonly loadObserved: ScalarObservedLoader;
+	/** Gives the observed winds on a world's grid. */
+	readonly loadObservedWinds: ObservedLoader<MonthlyWind>;
+	/**
+	 * Called with whether the choice of where the wind arrows come from is
+	 * offered and which is chosen, for the view controls to show.
+	 */
+	readonly onWindSource: (content: WindSourceContent) => void;
+	/** The unit the key to the wind arrows writes its speeds in at first. */
+	readonly windUnit: WindUnit;
+	/** How the winds are drawn at first, which the key to them follows. */
+	readonly windStyle: WindStyle;
 };
 
 /** What the cursor readout reads of the page. */
 export type PageReadoutOptions = PageStatisticsOptions & {
-	/** What the globe shows of the temperature, at the time it is asked. */
-	readonly shownTemperature: () => ShownTemperature | null;
+	/** What the globe shows of a computed layer, at the time it is asked. */
+	readonly shownLayer: () => ShownLayer | null;
+	/** What the globe shows of the winds, at the time it is asked. */
+	readonly shownWinds: () => ShownWinds | null;
+	/** The unit wind speeds are written in, at the time it is asked. */
+	readonly windUnit: () => WindUnit;
 };
 
 /** The parts of a page, for {@link startPage} to join. */
@@ -152,7 +195,7 @@ export type PageParts = {
 	/** Adds the view controls to the panel. */
 	readonly createViewPanel: (
 		options: ViewPanelOptions,
-	) => Pick<ViewPanel, 'setSeaLevel'>;
+	) => Pick<ViewPanel, 'setSeaLevel' | 'showWindSource'>;
 	/** Adds the planet controls to the panel. */
 	readonly createPlanetPanel: (
 		options: PlanetPanelOptions,
@@ -167,16 +210,37 @@ export type PageParts = {
 	/** Starts whatever computes the temperature, not yet showing. */
 	readonly createTemperature: (
 		options: PageTemperatureOptions,
-	) => Pick<TemperatureScheduler, 'refresh' | 'reset' | 'setShowing'>;
+	) => Pick<
+		TemperatureScheduler,
+		'refresh' | 'refreshNow' | 'reset' | 'setShowing'
+	>;
+	/**
+	 * Starts whatever computes the winds from the temperature, not yet
+	 * showing, on the store the temperature writes.
+	 */
+	readonly createWinds: (
+		options: PageTemperatureOptions,
+	) => Pick<WindsScheduler, 'refresh' | 'reset' | 'setShowing'>;
 	/**
 	 * Adds the layer controls to the panel, which hold the view settings:
 	 * what the globe is coloured by, and so whether the temperature is
-	 * showing, and what of the temperature's year it shows. It starts on
+	 * showing, and what of each computed layer's year it shows. It starts on
 	 * {@link DEFAULT_PAGE_VIEW}.
 	 */
 	readonly createLayerPanel: (
 		options: PageLayerOptions,
-	) => Pick<LayerPanel, 'newWorld' | 'setEarth' | 'setSunlight' | 'shown'>;
+	) => Pick<
+		LayerPanel,
+		| 'newWorld'
+		| 'setEarth'
+		| 'setSunlight'
+		| 'setWinds'
+		| 'shown'
+		| 'shownWinds'
+		| 'setWindUnit'
+		| 'setWindStyle'
+		| 'setWindSource'
+	>;
 	/**
 	 * Lays the cursor readout over the globe, hidden until the pointer is
 	 * over it, and has it follow the pointer.
@@ -185,8 +249,17 @@ export type PageParts = {
 		options: PageReadoutOptions,
 	) => Pick<CursorReadout, 'invalidate' | 'clear'>;
 	/**
+	 * The page's preferences, remembered by the browser apart from the
+	 * world: the unit wind speeds are written in, and how the winds are
+	 * drawn.
+	 */
+	readonly preferences: Pick<
+		Preferences,
+		'windSpeedUnit' | 'setWindSpeedUnit' | 'windStyle' | 'setWindStyle'
+	>;
+	/**
 	 * The panel's Layers section, already in the panel, which ticking the
-	 * Sunlight control opens.
+	 * Sunlight or the Winds control opens.
 	 */
 	readonly layersSection: Pick<Section, 'setOpen'>;
 	/** Opens the dialog that starts a new world. */
@@ -194,10 +267,15 @@ export type PageParts = {
 	/** Gives the Earth's elevation data, for a world that starts as Earth. */
 	readonly loadEarth: WorldSources['loadEarth'];
 	/**
-	 * Gives the Earth's observed temperature on a world's grid, for the
-	 * comparison on the measured Earth.
+	 * Gives a layer's observed year of the Earth on a world's grid, such as
+	 * the temperature's, for the comparison on the measured Earth.
 	 */
-	readonly loadObserved: ObservedLoader;
+	readonly loadObserved: ScalarObservedLoader;
+	/**
+	 * Gives the Earth's observed winds on a world's grid, for the wind
+	 * arrows on the measured Earth.
+	 */
+	readonly loadObservedWinds: ObservedLoader<MonthlyWind>;
 	/** Offers a world to the user as a file; may throw. */
 	readonly exportWorld: (world: World) => void;
 	/** Reads a file as a world, trusting nothing about it. */
@@ -216,14 +294,20 @@ export type PageParts = {
 	 * may never run again.
 	 */
 	readonly onPageHiding: (listener: () => void) => void;
+	/**
+	 * Has a listener called with whether the page is visible, rather than in
+	 * a hidden tab: at once, and whenever that changes.
+	 */
+	readonly onPageVisibility: (listener: (visible: boolean) => void) => void;
 	/** Records an error that the page carries on after. */
 	readonly logError: (error: unknown) => void;
 };
 
 /**
  * How the globe is lit for a layer and the Sunlight setting. In Terrain
- * view the night side is darkened. In Temperature view the colours are
- * shaded as without the sun, since a darkened colour would read as another
+ * view the night side is darkened. On a computed layer it is lit as the
+ * layer's description says: in Temperature view the colours are shaded as
+ * without the sun, since a darkened colour would read as another
  * temperature, and the line between day and night is drawn instead.
  *
  * @param layer - What the globe is coloured by.
@@ -233,7 +317,7 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
 	if (!sunlight) {
 		return 'off';
 	}
-	return layer === 'temperature' ? 'line' : 'darkened';
+	return scalarLayerOf(layer)?.sunlightStyle ?? 'darkened';
 };
 
 /**
@@ -245,10 +329,19 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * the panel shows them, so the parts that fill them can be made in an
  * order of their own: the world controls, the tools, the view controls,
  * the planet controls, the layers and then the statistics. The
- * temperature, which has nothing of its own in the panel, is made just
- * before the layers, which switch it on and off. The page opens on the
- * height colours with the temperature not showing, so nothing asks for the
- * temperature until it is chosen.
+ * temperature and then the winds, which have nothing of their own in the
+ * panel, are made just before the layers, which switch them on and off.
+ * The page opens on the height colours with neither showing, so nothing
+ * asks for the temperature until it is chosen.
+ *
+ * The temperature is needed while the Temperature layer is chosen or the
+ * winds are showing, and is told it is showing while either is so: the
+ * winds are worked out from it, so switching them on with no current
+ * temperature asks for the temperature, and its result then asks for the
+ * winds. The layer panel is handed the switch for the winds, and flips it
+ * as the Winds control is ticked and cleared: the control tells the layer
+ * panel, which shows the winds on the globe, and the month controls in
+ * Terrain view, while it is on; a new world keeps it.
  *
  * The date line under the world's description is written as soon as the
  * world controls are made, and follows the world's age and every change of
@@ -268,41 +361,72 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * drawn instead, whether or not there is a temperature on the globe yet.
  * The globe is told how it is lit once for each change of that, by the
  * Sunlight control or by a change of layer. Ticking the Sunlight control
- * also opens the Layers section, where the month controls are, if it is
- * closed; clearing it leaves the section as it is. Nothing else the page
- * does opens or closes a section: a new, imported or restored world leaves
- * every section as it is.
+ * or the Winds control also opens the Layers section, where the month
+ * controls are, if it is closed; clearing either leaves the section as it
+ * is. Nothing else the page does opens or closes a section: a new,
+ * imported or restored world leaves every section as it is.
  *
  * The cursor readout over the globe is made after the statistics, and reads
- * what the globe shows of the temperature from the layer panel. Besides
- * following the pointer, it looks again at what lies under a pointer held
- * still after each turn and zoom of the camera, each change of the terrain
- * or the sea level, each new world, each change of the view settings and
- * each change of the temperature store. Opening the New world dialog hides
- * it until the next pointer event on the canvas: a move, a press or a
- * release. Once the readout is made, the layer panel is told whether the
- * world the page opens on is the measured Earth.
+ * what the globe shows of the temperature and of the winds from the layer
+ * panel. Besides following the pointer, it looks again at what lies under
+ * a pointer held still after each turn and zoom of the camera, each change
+ * of the terrain or the sea level, each new world, each change of the view
+ * settings, the Winds control's included, each change of the store of the
+ * temperature and the winds, and each change of the wind speed unit.
+ * Opening the New world dialog hides the readout until the next pointer
+ * event on the canvas: a move, a press or a release. Once the readout is
+ * made, the layer panel is told whether the world the page opens on is the
+ * measured Earth.
+ *
+ * The unit wind speeds are written in is a preference of the browser, not
+ * part of the world: it is read once, as the page starts, and the view
+ * controls, the key to the wind arrows and the readout all start in it. A
+ * unit chosen in the view controls is remembered by the preferences, and
+ * reaches the key, through the layer panel, and the readout at once. It
+ * is never saved with the world.
+ *
+ * So is how the winds are drawn, as arrows or as streaks: read once as the
+ * page starts, the globe is told it before the view controls are made, and
+ * the view controls and the key to the winds start in it. A way chosen in
+ * the view controls is remembered by the preferences, and reaches the
+ * globe and then the key, through the layer panel, at once. Winds itself
+ * still starts off. The globe is also told whether the page is visible, as
+ * the page starts and at each change, so that streaks move only while it
+ * is.
+ *
+ * The view controls' choice of where the wind arrows come from goes to the
+ * layer panel, which decides when it is offered, on the measured Earth, and
+ * tells the view controls so, with the source it has, each time it shows
+ * the view settings; its change of the arrows reaches the readout as any
+ * change of the view settings does.
  *
  * A world that replaces the one being edited reaches, in this order: the
  * sculpt controller, which ends a stroke still under way on the old world
  * and then has the history forget that world; the globe; the sea-level
  * control; the planet controls, which show the world's settings without
- * passing them on; the world's description; the statistics and then the
- * temperature, each first reset and then asked for again; the layer panel,
- * which stops the year playing, puts July back on screen and is told
- * whether the world is the measured Earth; the date line;
- * the panel's message, which is taken back; and the autosave. An edit of
+ * passing them on; the world's description; the statistics, reset and
+ * then asked for again; the temperature and then the winds, each reset;
+ * the layer panel, which stops the year playing, puts July back on screen
+ * and is told whether the world is the measured Earth; the date line; the
+ * panel's message, which is taken back; the autosave; and last the
+ * temperature again, asked for at once if it is showing, with no wait,
+ * once every part before it is on the new world. The winds are asked for
+ * again by the temperature's next result if they are showing. An edit of
  * the world, which is no new world, keeps the month on screen.
  *
  * A committed stroke, an undo, a redo and the sea-level control each ask
  * for the statistics and the temperature again, tell the layer panel
  * whether the world is still, or is again, the measured Earth, and mark
- * the world changed for the autosave. A change of the planet settings,
- * which {@link AppState.setPlanet} tells the planet listeners of, asks for
- * the temperature again, tells the layer panel the same and marks the world
- * changed; the statistics do not depend on it. Whether the world is the
- * measured Earth is worked out once for each of these, and once for each
- * new world, never during a stroke. The planet
+ * the world changed for the autosave; the winds follow from the
+ * temperature's next result. A change of the planet settings, which
+ * {@link AppState.setPlanet} tells the planet listeners of, asks for the
+ * temperature again, tells the layer panel the same and marks the world
+ * changed; the statistics do not depend on it. A change of the day length
+ * alone, which the temperature does not depend on, asks for the winds
+ * again instead and never for the temperature; a change of several
+ * settings that includes any other goes to the temperature. Whether the
+ * world is the measured Earth is worked out once for each of these, and
+ * once for each new world, never during a stroke. The planet
  * controls make such a change through {@link AppState.setPlanet} at each
  * movement of a slider. A drag needs no wait of its own: the temperature
  * waits for the changes to stop, and stops a calculation a later change
@@ -467,8 +591,15 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			handleHistoryKey(event, edits.perform);
 		}
 	});
+	/** The unit wind speeds are written in, as last chosen. */
+	let windUnit = parts.preferences.windSpeedUnit();
+	/** How the winds are drawn as the page starts, as last chosen. */
+	const windStyle = parts.preferences.windStyle();
+	globe.setWindStyle(windStyle);
 	const view = parts.createViewPanel({
 		seaLevel: state.world.seaLevel,
+		windUnit,
+		windStyle,
 		onExaggeration: globe.setExaggeration,
 		onSeaLevel: (metres) => {
 			const { world } = state;
@@ -488,6 +619,24 @@ export const startPage = (parts: PageParts): Promise<void> => {
 				parts.layersSection.setOpen(true);
 			}
 		},
+		onWinds: (on) => {
+			layerPanel.setWinds(on);
+			if (on) {
+				parts.layersSection.setOpen(true);
+			}
+		},
+		onWindStyle: (style) => {
+			parts.preferences.setWindStyle(style);
+			globe.setWindStyle(style);
+			layerPanel.setWindStyle(style);
+		},
+		onWindUnit: (unit) => {
+			windUnit = unit;
+			parts.preferences.setWindSpeedUnit(unit);
+			layerPanel.setWindUnit(unit);
+			readout.invalidate();
+		},
+		onWindSource: (source) => layerPanel.setWindSource(source),
 	});
 	const planet = parts.createPlanetPanel({
 		planet: state.world.planet,
@@ -501,9 +650,33 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		isStrokeActive: sculpt.isStrokeActive,
 		store: layers,
 	});
+	const winds = parts.createWinds({
+		currentWorld: () => state.world,
+		isStrokeActive: sculpt.isStrokeActive,
+		store: layers,
+	});
+	/** Whether the Temperature layer is chosen, as the layer panel last said. */
+	let temperatureChosen = false;
+	/** Whether the winds are showing, as last said. */
+	let windsShowing = false;
+	/** Tells the temperature whether anything needs it. */
+	const needTemperature = (): void =>
+		temperature.setShowing(temperatureChosen || windsShowing);
 	const layerPanel = parts.createLayerPanel({
 		store: layers,
-		temperature,
+		temperature: {
+			setShowing: (showing) => {
+				temperatureChosen = showing;
+				needTemperature();
+			},
+		},
+		winds: {
+			setShowing: (showing) => {
+				windsShowing = showing;
+				winds.setShowing(showing);
+				needTemperature();
+			},
+		},
 		onView: (next) => {
 			date.setView(next);
 			layer = next.layer;
@@ -515,6 +688,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			readout.invalidate();
 		},
 		loadObserved: parts.loadObserved,
+		loadObservedWinds: parts.loadObservedWinds,
+		onWindSource: view.showWindSource,
+		windUnit,
+		windStyle,
 	});
 	const statistics = parts.createStatistics({
 		currentWorld: () => state.world,
@@ -524,7 +701,9 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	const readout = parts.createCursorReadout({
 		currentWorld: () => state.world,
 		isStrokeActive: sculpt.isStrokeActive,
-		shownTemperature: layerPanel.shown,
+		shownLayer: layerPanel.shown,
+		shownWinds: layerPanel.shownWinds,
+		windUnit: () => windUnit,
 	});
 	// Told after the layer panel, which brings what the globe shows up to
 	// date first.
@@ -549,9 +728,11 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	state.addListener(statistics.reset);
 	state.addListener(statistics.refresh);
 	// The temperature on hand is the old world's, and is not where the new
-	// world's solve starts from.
+	// world's solve starts from. It is asked for again below, last.
 	state.addListener(temperature.reset);
-	state.addListener(temperature.refresh);
+	// So are the winds on hand and any on their way; the new world's
+	// temperature asks for its winds when it comes.
+	state.addListener(winds.reset);
 	// The month on screen is the view's, but a new world starts again from
 	// July and from the simulated temperature, after the store has dropped
 	// the old world's result so that the old result is not shown for July
@@ -572,11 +753,34 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// The autosave takes no note of this until it is started, which is
 	// after the world brought back when the page opens is in place.
 	state.addListener(autosave.markChanged);
+	// The new world's temperature is asked for last, once every part above
+	// is on the new world, and at once: a new world is whole when it
+	// arrives, with no run of changes to wait out, and a wait would leave
+	// the layers reading as not calculated until it ended.
+	state.addListener(temperature.refreshNow);
+	/**
+	 * The planet settings as the planet listener last saw them, to tell a
+	 * change of the day length alone from one the temperature depends on.
+	 */
+	let planetSeen = { ...state.world.planet };
+	state.addListener((world) => {
+		planetSeen = { ...world.planet };
+	});
 	// The planet settings are saved with the world, and the temperature
-	// depends on them.
-	state.addPlanetListener(() => {
+	// depends on all of them but the day length, which the winds alone read.
+	// A change the temperature depends on reaches the winds through the
+	// temperature's next result.
+	state.addPlanetListener((world) => {
 		placeSun();
-		temperature.refresh();
+		const forTemperature = TEMPERATURE_SETTINGS.some(
+			(name) => world.planet[name] !== planetSeen[name],
+		);
+		planetSeen = { ...world.planet };
+		if (forTemperature) {
+			temperature.refresh();
+		} else {
+			winds.refresh();
+		}
 		checkEarth();
 		autosave.markChanged();
 	});
@@ -584,6 +788,8 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// A page being hidden or closed may never run again, so what has not
 	// been saved is saved now rather than when its wait is over.
 	parts.onPageHiding(autosave.flush);
+	// Streaks move only on a page that can be seen.
+	parts.onPageVisibility(globe.setPageVisible);
 
 	/**
 	 * Brings back the world that was saved, or opens the dialog that starts

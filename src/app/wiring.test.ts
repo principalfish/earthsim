@@ -12,6 +12,7 @@ import {
 	PLANET_SETTINGS,
 	type PlanetSettings,
 	type Rgb,
+	type SimKind,
 	type SimRequest,
 	serializeWorld,
 	sunColour,
@@ -22,6 +23,7 @@ import {
 	type WorldFileResult,
 } from '../core/index';
 import { temperatureOf } from '../core/testing/temperatureFixtures';
+import { windResultOf } from '../core/testing/windFixtures';
 import {
 	createFakeWorker,
 	type FakeWorker,
@@ -30,19 +32,26 @@ import { type AppState, createAppState } from './appState';
 import { MAIN_BUTTON, SECONDARY_BUTTON } from './globe/input';
 import { createPanelMemory, panelMemoryKey } from './panelMemory';
 import { PLAYBACK_STEP_MS } from './playback';
+import {
+	createPreferences,
+	WIND_SPEED_UNIT_KEY,
+	WIND_STYLE_KEY,
+} from './preferences';
 import { TEMPERATURE_DEBOUNCE_MS } from './refresh';
+import { TEMPERATURE_LAYER } from './scalarLayer';
 import type { SculptOptions, StrokeChanges } from './sculpt';
 import { RESTORE_FAILED_MESSAGE } from './startup';
 import type { LoadOutcome } from './storage';
 import { createFakeDocument, type FakeDocument } from './testing/fakeDocument';
-import { createFakeStorage } from './testing/fakeStorage';
+import { createFakeStorage, type FakeStorage } from './testing/fakeStorage';
 import { createFakeTimers } from './testing/fakeTimers';
 import { settle } from './testing/settle';
 import type { ComparisonContent } from './ui/comparison';
 import {
 	createLayerPanel,
 	type LayerControlsOptions,
-	type ShownTemperature,
+	type ShownLayer,
+	type ShownWinds,
 } from './ui/layerPanel';
 import {
 	FIRST_NEW_WORLD_VALUES,
@@ -73,6 +82,7 @@ import {
 import {
 	createStatisticsService,
 	createTemperatureService,
+	createWindsService,
 } from './workerService';
 
 /** A page made of stand-ins, each writing what it is asked into one log. */
@@ -104,6 +114,7 @@ type Stage = {
 	readonly planetPanelOptions: PlanetPanelOptions;
 	readonly statisticsOptions: PageStatisticsOptions;
 	readonly temperatureOptions: PageTemperatureOptions;
+	readonly windsOptions: PageTemperatureOptions;
 	readonly layerOptions: PageLayerOptions;
 	readonly readoutOptions: PageReadoutOptions;
 	/** What the stand-in for the cursor readout was asked to do, in order. */
@@ -111,9 +122,19 @@ type Stage = {
 	/** What the stand-in for the Layers section was asked to do, in order. */
 	readonly sectionCalls: string[];
 	/** What the stand-in for the layer panel says the globe shows. */
-	shownTemperature: ShownTemperature | null;
+	shownTemperature: ShownLayer | null;
+	/** What the stand-in for the layer panel says the globe shows of the winds. */
+	shownWinds: ShownWinds | null;
+	/** The storage the page's preferences are kept in. */
+	readonly preferenceStorage: FakeStorage;
 	/** Every sun the globe was given, in order. */
 	readonly suns: Sun[];
+	/** Every way the globe was told to draw the winds, in order. */
+	readonly globeWindStyles: string[];
+	/** Everything the globe was told of whether the page is visible, in order. */
+	readonly globeVisibility: boolean[];
+	/** Says that the page has become visible, or hidden. */
+	setPageVisible(visible: boolean): void;
 	/** Turns or zooms the camera, as the view's input says it does. */
 	moveCamera(): void;
 	/** Presses a key as the page hears it. */
@@ -163,10 +184,14 @@ type StageParts = Partial<
 		PageParts,
 		| 'createStatistics'
 		| 'createTemperature'
+		| 'createWinds'
 		| 'createLayerPanel'
 		| 'layersSection'
 	>
->;
+> & {
+	/** What the storage of the page's preferences holds at first. */
+	readonly preferenceEntries?: Readonly<Record<string, string>>;
+};
 
 const createStage = (
 	world: World = createBlankWorld(64),
@@ -177,6 +202,8 @@ const createStage = (
 	const saved: World[] = [];
 	const dialogs: NewWorldDialogOptions[] = [];
 	const suns: Sun[] = [];
+	const globeWindStyles: string[] = [];
+	const globeVisibility: boolean[] = [];
 	const state = createAppState({ world, seaLevelRange: SEA_LEVEL_RANGE });
 	let sculptOptions:
 		| Pick<SculptOptions, 'onStrokeEnd' | 'onWorldChange'>
@@ -188,13 +215,16 @@ const createStage = (
 	let planetPanelOptions: PlanetPanelOptions | undefined;
 	let statisticsOptions: PageStatisticsOptions | undefined;
 	let temperatureOptions: PageTemperatureOptions | undefined;
+	let windsOptions: PageTemperatureOptions | undefined;
 	let layerOptions: PageLayerOptions | undefined;
 	let readoutOptions: PageReadoutOptions | undefined;
 	let onCameraMove: (() => void) | undefined;
 	const readoutCalls: string[] = [];
 	const sectionCalls: string[] = [];
+	const preferenceStorage = createFakeStorage(own.preferenceEntries);
 	let keyListener: ((event: ShortcutEvent) => void) | undefined;
 	let hidingListener: (() => void) | undefined;
+	let visibilityListener: ((visible: boolean) => void) | undefined;
 	let answerLoad: ((outcome: LoadOutcome) => void) | undefined;
 	let failLoad: ((error: unknown) => void) | undefined;
 
@@ -233,6 +263,9 @@ const createStage = (
 		get temperatureOptions() {
 			return required(temperatureOptions, 'temperature');
 		},
+		get windsOptions() {
+			return required(windsOptions, 'winds');
+		},
 		get layerOptions() {
 			return required(layerOptions, 'layer panel');
 		},
@@ -242,7 +275,13 @@ const createStage = (
 		readoutCalls,
 		sectionCalls,
 		shownTemperature: null,
+		shownWinds: null,
+		preferenceStorage,
 		suns,
+		globeWindStyles,
+		globeVisibility,
+		setPageVisible: (visible) =>
+			required(visibilityListener, 'page-visibility listener')(visible),
 		moveCamera: () => required(onCameraMove, 'view input')(),
 		pressKey: (press) => {
 			required(
@@ -278,6 +317,9 @@ const createStage = (
 			},
 			setSunlight: (style) => log.push(`globe.setSunlight ${style}`),
 			updateElevation: () => log.push('globe.updateElevation'),
+			// Recorded apart from the log, which the other tests read whole.
+			setWindStyle: (style) => globeWindStyles.push(style),
+			setPageVisible: (visible) => globeVisibility.push(visible),
 		},
 		createViewInput: (rotateButton, onMove) => {
 			log.push(`createViewInput ${rotateButton}`);
@@ -362,6 +404,10 @@ const createStage = (
 			viewPanelOptions = options;
 			return {
 				setSeaLevel: (metres) => log.push(`viewPanel.setSeaLevel ${metres}`),
+				showWindSource: (content) =>
+					log.push(
+						`viewPanel.showWindSource ${content.offered} ${content.source}`,
+					),
 			};
 		},
 		createPlanetPanel: (options) => {
@@ -391,8 +437,21 @@ const createStage = (
 			}
 			return {
 				refresh: () => log.push('temperature.refresh'),
+				refreshNow: () => log.push('temperature.refreshNow'),
 				reset: () => log.push('temperature.reset'),
 				setShowing: (showing) => log.push(`temperature.setShowing ${showing}`),
+			};
+		},
+		createWinds: (options) => {
+			log.push('createWinds');
+			windsOptions = options;
+			if (own.createWinds !== undefined) {
+				return own.createWinds(options);
+			}
+			return {
+				refresh: () => log.push('winds.refresh'),
+				reset: () => log.push('winds.reset'),
+				setShowing: (showing) => log.push(`winds.setShowing ${showing}`),
 			};
 		},
 		createLayerPanel: (options) => {
@@ -405,7 +464,13 @@ const createStage = (
 				newWorld: (earth) => log.push(`layerPanel.newWorld ${earth}`),
 				setEarth: (earth) => log.push(`layerPanel.setEarth ${earth}`),
 				setSunlight: (on) => log.push(`layerPanel.setSunlight ${on}`),
+				setWinds: (on) => log.push(`layerPanel.setWinds ${on}`),
 				shown: () => stage.shownTemperature,
+				shownWinds: () => stage.shownWinds,
+				setWindUnit: (unit) => log.push(`layerPanel.setWindUnit ${unit}`),
+				setWindStyle: (style) => log.push(`layerPanel.setWindStyle ${style}`),
+				setWindSource: (source) =>
+					log.push(`layerPanel.setWindSource ${source}`),
 			};
 		},
 		createCursorReadout: (options) => {
@@ -416,6 +481,7 @@ const createStage = (
 				clear: () => readoutCalls.push('clear'),
 			};
 		},
+		preferences: createPreferences(preferenceStorage),
 		layersSection: own.layersSection ?? {
 			setOpen: (open) => sectionCalls.push(`layersSection.setOpen ${open}`),
 		},
@@ -426,6 +492,8 @@ const createStage = (
 		loadEarth: () => Promise.reject(new Error('The Earth is not asked for')),
 		loadObserved: () =>
 			Promise.reject(new Error('The observed temperature is not asked for')),
+		loadObservedWinds: () =>
+			Promise.reject(new Error('The observed winds are not asked for')),
 		exportWorld: (current) => {
 			log.push('exportWorld');
 			stage.exportWorld(current);
@@ -438,6 +506,10 @@ const createStage = (
 		},
 		onPageHiding: (listener) => {
 			hidingListener = listener;
+		},
+		onPageVisibility: (listener) => {
+			visibilityListener = listener;
+			listener(true);
 		},
 		logError: (error) => errors.push(error),
 	});
@@ -498,6 +570,7 @@ describe('startPage', () => {
 			`createViewPanel ${DEFAULT_SEA_LEVEL_M}`,
 			`createPlanetPanel ${EARTH}`,
 			'createTemperature',
+			'createWinds',
 			'createLayerPanel',
 			'createStatistics',
 			'statistics.refresh',
@@ -538,6 +611,42 @@ describe('startPage', () => {
 		]);
 	});
 
+	it('gives the winds the world of the moment, the stroke and the store the temperature writes', async () => {
+		const stage = await createStartedStage();
+		const { windsOptions } = stage;
+		expect(windsOptions.store).toBe(stage.temperatureOptions.store);
+		expect(windsOptions.store.winds.status).toBe('empty');
+		const next = generateWorld({ resolution: 64, seed: 3, landFraction: 0.3 });
+		stage.state.replaceWorld(next);
+		expect(windsOptions.currentWorld()).toBe(next);
+		expect(windsOptions.isStrokeActive()).toBe(false);
+		stage.strokeActive = true;
+		expect(windsOptions.isStrokeActive()).toBe(true);
+	});
+
+	it('needs the temperature while the Temperature layer is chosen or the winds are showing', async () => {
+		const stage = await createStartedStage();
+		const { temperature, winds } = stage.layerOptions;
+		winds.setShowing(true);
+		temperature.setShowing(true);
+		winds.setShowing(false);
+		temperature.setShowing(false);
+		winds.setShowing(true);
+		winds.setShowing(false);
+		expect(stage.log).toEqual([
+			'winds.setShowing true',
+			'temperature.setShowing true',
+			'temperature.setShowing true',
+			'winds.setShowing false',
+			'temperature.setShowing true',
+			'temperature.setShowing false',
+			'winds.setShowing true',
+			'temperature.setShowing true',
+			'winds.setShowing false',
+			'temperature.setShowing false',
+		]);
+	});
+
 	it('gives the temperature the world of the moment, the stroke and an empty store', async () => {
 		const stage = await createStartedStage();
 		const { temperatureOptions } = stage;
@@ -572,11 +681,14 @@ describe('a world replacement', () => {
 			'statistics.reset',
 			'statistics.refresh',
 			'temperature.reset',
-			'temperature.refresh',
+			'winds.reset',
 			'layerPanel.newWorld null',
 			'globe.setSun',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
+			// Asked for last, and at once, once every part is on the new
+			// world.
+			'temperature.refreshNow',
 		]);
 	});
 
@@ -631,17 +743,18 @@ describe('the start of the page', () => {
 			'toolPanel.setHistoryState false false',
 			`globe.setWorld ${describeWorld(world)}`,
 			'viewPanel.setSeaLevel 250',
-			'planetPanel.setPlanet 45 1 2 1 1',
+			'planetPanel.setPlanet 45 1 2 1 1 24',
 			`worldPanel.setDescription ${describeWorld(world)}`,
 			'statistics.reset',
 			'statistics.refresh',
 			'temperature.reset',
-			'temperature.refresh',
+			'winds.reset',
 			'layerPanel.newWorld null',
 			'globe.setSun',
 			'worldPanel.setDate 2.4 million years',
 			'worldPanel.setMessage null',
 			'autosave.markChanged',
+			'temperature.refreshNow',
 			'worldPanel.setAutosaveState saved',
 			'autosave.start',
 		]);
@@ -928,6 +1041,64 @@ describe('the planet controls', () => {
 		]);
 	});
 
+	it('send a change of the day length alone to the winds, and never to the temperature', async () => {
+		const stage = await createStartedStage();
+		stage.planetPanelOptions.onChange({
+			...DEFAULT_PLANET,
+			dayLengthHours: 30,
+		});
+		expect(stage.log).toEqual([
+			'globe.setSun',
+			'winds.refresh',
+			'layerPanel.setEarth null',
+			'autosave.markChanged',
+		]);
+	});
+
+	it('send a change of several settings that includes another to the temperature alone', async () => {
+		const stage = await createStartedStage();
+		stage.planetPanelOptions.onChange({ ...TILTED, dayLengthHours: 30 });
+		stage.planetPanelOptions.onChange({ ...TILTED, dayLengthHours: 30 });
+		stage.planetPanelOptions.onChange({ ...TILTED, dayLengthHours: 20 });
+		expect(stage.log).toEqual([
+			'globe.setSun',
+			'temperature.refresh',
+			'layerPanel.setEarth null',
+			'autosave.markChanged',
+			'globe.setSun',
+			'winds.refresh',
+			'layerPanel.setEarth null',
+			'autosave.markChanged',
+		]);
+	});
+
+	it('tell a change of the day length alone from the settings of the world of the moment', async () => {
+		const stage = await createStartedStage();
+		const world = generateWorld({ resolution: 64, seed: 2, landFraction: 0.2 });
+		world.planet = { ...TILTED, dayLengthHours: 30 };
+		stage.state.replaceWorld(world, { keepSettings: true });
+		stage.log.length = 0;
+
+		stage.planetPanelOptions.onChange({ ...TILTED, dayLengthHours: 24 });
+		expect(stage.log).toContain('winds.refresh');
+		expect(stage.log).not.toContain('temperature.refresh');
+	});
+
+	it('put the day back to 24 hours with Earth’s settings, asking for the winds and not the temperature', async () => {
+		const stage = await createStartedStage();
+		stage.planetPanelOptions.onChange({
+			...DEFAULT_PLANET,
+			dayLengthHours: 30,
+		});
+		stage.log.length = 0;
+
+		stage.planetPanelOptions.onChange({ ...DEFAULT_PLANET });
+		expect(stage.state.world.planet).toEqual(DEFAULT_PLANET);
+		expect(stage.state.world.planet.dayLengthHours).toBe(24);
+		expect(stage.log).toContain('winds.refresh');
+		expect(stage.log).not.toContain('temperature.refresh');
+	});
+
 	it('reach nothing with the settings the world already has', async () => {
 		const stage = await createStartedStage();
 		stage.planetPanelOptions.onChange({ ...DEFAULT_PLANET });
@@ -965,13 +1136,14 @@ describe('the planet controls', () => {
 		stage.worldPanelOptions.onImport(new Blob());
 		await settle();
 
-		expect(stage.log).toContain('planetPanel.setPlanet 23.44 1 0.5 2 1');
+		expect(stage.log).toContain('planetPanel.setPlanet 23.44 1 0.5 2 1 24');
 		expect(
 			stage.log.filter((entry) => entry === 'autosave.markChanged'),
 		).toHaveLength(1);
+		// Asked for once, as for any new world, and not again for its planet.
 		expect(
-			stage.log.filter((entry) => entry === 'temperature.refresh'),
-		).toHaveLength(1);
+			stage.log.filter((entry) => entry.startsWith('temperature.refresh')),
+		).toEqual(['temperature.refreshNow']);
 	});
 
 	it('show Earth’s settings for a new world', async () => {
@@ -1226,7 +1398,10 @@ describe('the temperature, on its worker', () => {
 			createLayerPanel: (options) =>
 				createLayerPanel({
 					...options,
-					globe: { setLayer: (field) => shown.push(field) },
+					globe: {
+						setLayer: (field) => shown.push(field),
+						setWinds: () => {},
+					},
 					setTimer: () => 0,
 					clearTimer: () => {},
 					reportError: () => {},
@@ -1236,6 +1411,9 @@ describe('the temperature, on its worker', () => {
 							showLegend: () => {},
 							showView: () => {},
 							showComparison: () => {},
+							showWindKey: () => {},
+							setWindUnit: () => {},
+							setWindStyle: () => {},
 						};
 					},
 				}),
@@ -1342,7 +1520,7 @@ describe('the temperature, on its worker', () => {
 		expect(page.posted().length - before).toBe(1);
 	});
 
-	it('marks the store empty, then calculating, when the world is replaced', async () => {
+	it('marks the store empty, then calculating at once, when the world is replaced', async () => {
 		const page = await createWorkerStage();
 		await page.wait();
 		const worker = page.workers.at(-1) as FakeWorker;
@@ -1361,14 +1539,51 @@ describe('the temperature, on its worker', () => {
 		// Told apart from the world it replaces.
 		const next = createBlankWorld(64);
 		next.elevation[0] = 4321;
+		const before = page.posted().length;
 		page.stage.state.replaceWorld(next);
-		expect(store.temperature).toMatchObject({ status: 'empty', result: null });
-		await page.wait();
+		// With no wait: the new world never reads as not calculated once
+		// the page has taken it in.
+		expect(store.temperature).toMatchObject({
+			status: 'calculating',
+			result: null,
+		});
 		expect(statuses).toEqual(['empty', 'calculating']);
+		expect(page.posted()).toHaveLength(before + 1);
+		await page.wait();
+		expect(page.posted()).toHaveLength(before + 1);
 		const newest = page.posted().at(-1) as SimRequest<'temperature'>;
 		expect(newest.world).toEqual(next);
 		expect(newest.world.elevation[0]).toBe(4321);
 		expect(newest.start).toBeUndefined();
+	});
+
+	it('ends with one current result, the last world’s, when the world is replaced twice in a row', async () => {
+		const page = await createWorkerStage();
+		await page.wait();
+		const { store } = page.stage.temperatureOptions;
+		const before = page.posted().length;
+
+		page.stage.state.replaceWorld(createBlankWorld(64));
+		const last = createBlankWorld(64);
+		last.elevation[0] = 4321;
+		page.stage.state.replaceWorld(last);
+		expect(page.posted()).toHaveLength(before + 2);
+		const newest = page.posted().at(-1) as SimRequest<'temperature'>;
+		expect(newest.world.elevation[0]).toBe(4321);
+
+		(page.workers.at(-1) as FakeWorker).respond({
+			id: newest.id,
+			kind: 'temperature',
+			ok: true,
+			result: temperatureOf(2),
+		});
+		await settle();
+		expect(store.temperature).toMatchObject({
+			status: 'current',
+			result: temperatureOf(2),
+		});
+		await page.wait();
+		expect(page.posted()).toHaveLength(before + 2);
 	});
 
 	it('waits out a stroke under way and is asked for once after it', async () => {
@@ -1386,6 +1601,251 @@ describe('the temperature, on its worker', () => {
 	});
 });
 
+/**
+ * A started stage whose temperature and winds run on the real services,
+ * each on fake workers of its own, with fake timers, and the statistics on
+ * stand-ins as elsewhere. Neither is showing.
+ *
+ * @param options - Whether the winds can have a worker (true when left
+ * out).
+ */
+const createWindyStage = async (
+	options: { readonly windsWorker?: boolean } = {},
+) => {
+	const timers = createFakeTimers();
+	const temperatureWorkers: FakeWorker[] = [];
+	const windWorkers: FakeWorker[] = [];
+	/** The kind of every request posted to any worker, in order. */
+	const kinds: string[] = [];
+	const logged: unknown[] = [];
+	const starting = (workers: FakeWorker[]) => (): FakeWorker => {
+		const worker = createFakeWorker();
+		const post = worker.postMessage;
+		worker.postMessage = (message) => {
+			kinds.push(message.kind);
+			post(message);
+		};
+		workers.push(worker);
+		return worker;
+	};
+	const services = {
+		setTimer: timers.setTimer,
+		clearTimer: timers.clearTimer,
+		logError: (error: unknown) => logged.push(error),
+	};
+	const stage = await createStartedStage(undefined, {
+		createTemperature: (temperatureOptions) =>
+			createTemperatureService({
+				...temperatureOptions,
+				...services,
+				createWorker: starting(temperatureWorkers),
+			}),
+		createWinds: (windsOptions) =>
+			createWindsService({
+				...windsOptions,
+				...services,
+				createWorker:
+					options.windsWorker === false ? () => null : starting(windWorkers),
+			}),
+	});
+	const { store } = stage.temperatureOptions;
+	/** Answers the newest request on the newest of the workers. */
+	const answer = async (
+		workers: readonly FakeWorker[],
+		kind: SimKind,
+		result: unknown,
+	): Promise<void> => {
+		const worker = required(workers.at(-1), `${kind} worker`);
+		const request = required(worker.posted.at(-1), `${kind} request`);
+		worker.respond({ id: request.id, kind, ok: true, result });
+		await settle();
+	};
+	return {
+		stage,
+		store,
+		kinds,
+		logged,
+		temperatureWorkers,
+		windWorkers,
+		/** Moves past the wait, and lets what follows run. */
+		wait: async (): Promise<void> => {
+			timers.advance(TEMPERATURE_DEBOUNCE_MS);
+			await settle();
+		},
+		/** Answers the newest temperature request with a made-up result. */
+		answerTemperature: (yearsRun: number) =>
+			answer(
+				temperatureWorkers,
+				'temperature',
+				temperatureOf(yearsRun, stage.state.world.elevation.length),
+			),
+		/** Answers the newest winds request with made-up winds. */
+		answerWinds: (value: number) =>
+			answer(windWorkers, 'winds', windResultOf(value)),
+		/** The newest winds request. */
+		lastWinds: () =>
+			required(
+				windWorkers.flatMap((worker) => worker.posted).at(-1),
+				'winds request',
+			) as SimRequest<'winds'>,
+	};
+};
+
+describe('the winds, on their worker', () => {
+	it('with the winds switched on, a stroke leads to one temperature request and then one winds request, and the store ends holding winds for the edited world', async () => {
+		const page = await createWindyStage();
+		const { store } = page;
+		page.stage.layerOptions.winds.setShowing(true);
+		// With no temperature yet, the temperature is asked for first, and
+		// its result asks for the winds at once.
+		await page.wait();
+		expect(page.kinds).toEqual(['temperature']);
+		await page.answerTemperature(1);
+		expect(page.kinds).toEqual(['temperature', 'winds']);
+		await page.answerWinds(1);
+		expect(store.winds.status).toBe('current');
+
+		makeStroke(page.stage);
+		expect(store.winds.status).toBe('outOfDate');
+		await page.wait();
+		await page.wait();
+		expect(page.kinds).toEqual(['temperature', 'winds', 'temperature']);
+		await page.answerTemperature(2);
+		await page.wait();
+		expect(page.kinds).toEqual([
+			'temperature',
+			'winds',
+			'temperature',
+			'winds',
+		]);
+		const temperature = required(
+			store.temperature.result ?? undefined,
+			'temperature',
+		);
+		const request = page.lastWinds();
+		expect(request.world.elevation[5]).toBe(1234);
+		expect(request.world).toEqual(page.stage.state.world);
+		expect(request.temperatures).toEqual(temperature.months);
+
+		await page.answerWinds(2);
+		expect(store.winds).toEqual({
+			status: 'current',
+			result: { winds: windResultOf(2), temperature, dayLengthHours: 24 },
+		});
+		await page.wait();
+		expect(page.kinds).toHaveLength(4);
+		expect(page.logged).toEqual([]);
+	});
+
+	it('with the winds off, never asks for them, whatever changes', async () => {
+		const page = await createWindyStage();
+		page.stage.layerOptions.temperature.setShowing(true);
+		await page.wait();
+		await page.answerTemperature(1);
+		const changes: ((stage: Stage) => void)[] = [
+			makeStroke,
+			(stage) => stage.pressKey(UNDO_KEYS),
+			(stage) => stage.viewPanelOptions.onSeaLevel(-500),
+			(stage) =>
+				stage.planetPanelOptions.onChange({
+					...stage.state.world.planet,
+					axialTiltDeg: 10,
+				}),
+			(stage) =>
+				stage.planetPanelOptions.onChange({
+					...stage.state.world.planet,
+					dayLengthHours: 30,
+				}),
+			(stage) => stage.state.replaceWorld(createBlankWorld(64)),
+		];
+		for (const change of changes) {
+			change(page.stage);
+			await page.wait();
+			await page.wait();
+			await page.answerTemperature(2);
+		}
+		expect(page.windWorkers.flatMap((worker) => worker.posted)).toEqual([]);
+		expect(page.kinds.every((kind) => kind === 'temperature')).toBe(true);
+		expect(page.store.winds.status).toBe('empty');
+	});
+
+	it('asks for the winds and not the temperature for a change of the day length, and for the temperature and then the winds for another setting', async () => {
+		const page = await createWindyStage();
+		page.stage.layerOptions.winds.setShowing(true);
+		await page.wait();
+		await page.answerTemperature(1);
+		await page.answerWinds(1);
+		page.kinds.length = 0;
+
+		page.stage.planetPanelOptions.onChange({
+			...DEFAULT_PLANET,
+			dayLengthHours: 30,
+		});
+		expect(page.store.winds.status).toBe('outOfDate');
+		expect(page.store.temperature.status).toBe('current');
+		await page.wait();
+		await page.wait();
+		expect(page.kinds).toEqual(['winds']);
+		expect(page.lastWinds().world.planet.dayLengthHours).toBe(30);
+		await page.answerWinds(2);
+		expect(page.store.winds).toMatchObject({
+			status: 'current',
+			result: { dayLengthHours: 30 },
+		});
+
+		page.stage.planetPanelOptions.onChange({
+			...DEFAULT_PLANET,
+			dayLengthHours: 30,
+			axialTiltDeg: 10,
+		});
+		expect(page.store.winds.status).toBe('outOfDate');
+		await page.wait();
+		expect(page.kinds).toEqual(['winds', 'temperature']);
+		await page.answerTemperature(2);
+		expect(page.kinds).toEqual(['winds', 'temperature', 'winds']);
+	});
+
+	it('clears the winds for a new world, whose temperature then asks for its winds', async () => {
+		const page = await createWindyStage();
+		page.stage.layerOptions.winds.setShowing(true);
+		await page.wait();
+		await page.answerTemperature(1);
+
+		const next = createBlankWorld(64);
+		next.elevation[0] = 4321;
+		page.stage.state.replaceWorld(next);
+		expect(page.store.winds).toEqual({ status: 'empty', result: null });
+		// The old world's winds, answered late, are not kept.
+		await page.answerWinds(1);
+		expect(page.store.winds).toEqual({ status: 'empty', result: null });
+
+		await page.wait();
+		await page.answerTemperature(2);
+		expect(page.lastWinds().world).toEqual(next);
+		await page.answerWinds(2);
+		expect(page.store.winds.status).toBe('current');
+	});
+
+	it('with no worker for the winds, leaves them unavailable and the rest of the page working', async () => {
+		const page = await createWindyStage({ windsWorker: false });
+		expect(page.store.winds.status).toBe('unavailable');
+		page.stage.layerOptions.winds.setShowing(true);
+		await page.wait();
+		await page.answerTemperature(1);
+		expect(page.store.temperature.status).toBe('current');
+
+		makeStroke(page.stage);
+		await page.wait();
+		await page.wait();
+		await page.answerTemperature(2);
+		expect(page.store.temperature.status).toBe('current');
+		expect(page.store.winds.status).toBe('unavailable');
+		expect(page.kinds).toEqual(['temperature', 'temperature']);
+		expect(page.stage.log).toContain('statistics.refresh');
+		expect(page.stage.errors).toEqual([]);
+	});
+});
+
 describe('the cursor readout', () => {
 	it('reads the world of the moment, the stroke, and what the layer panel says the globe shows', async () => {
 		const stage = await createStartedStage();
@@ -1395,16 +1855,17 @@ describe('the cursor readout', () => {
 		expect(stage.readoutOptions.isStrokeActive()).toBe(false);
 		stage.strokeActive = true;
 		expect(stage.readoutOptions.isStrokeActive()).toBe(true);
-		expect(stage.readoutOptions.shownTemperature()).toBeNull();
-		const shown: ShownTemperature = {
+		expect(stage.readoutOptions.shownLayer()).toBeNull();
+		const shown: ShownLayer = {
+			layer: TEMPERATURE_LAYER,
 			field: new Float32Array(next.elevation.length),
-			view: 'warmest',
+			summary: 'warmest',
 			month: 6,
 			source: 'simulated',
 			current: true,
 		};
 		stage.shownTemperature = shown;
-		expect(stage.readoutOptions.shownTemperature()).toBe(shown);
+		expect(stage.readoutOptions.shownLayer()).toBe(shown);
 	});
 
 	it('looks again after each turn and zoom of the camera', async () => {
@@ -1446,10 +1907,11 @@ describe('the cursor readout', () => {
 		const stage = await createStartedStage();
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			temperatureView: 'month',
-			source: 'simulated',
+			summaries: { temperature: 'month', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 3,
 			sunlight: false,
+			winds: false,
 		});
 		expect(stage.readoutCalls).toEqual(['invalidate']);
 		stage.layerOptions.store.markCalculating();
@@ -1484,7 +1946,7 @@ describe('the cursor readout', () => {
 			createLayerPanel: (options) =>
 				createLayerPanel({
 					...options,
-					globe: { setLayer: () => {} },
+					globe: { setLayer: () => {}, setWinds: () => {} },
 					setTimer: () => 0,
 					clearTimer: () => {},
 					reportError: () => {},
@@ -1494,24 +1956,28 @@ describe('the cursor readout', () => {
 							showLegend: () => {},
 							showView: () => {},
 							showComparison: () => {},
+							showWindKey: () => {},
+							setWindUnit: () => {},
+							setWindStyle: () => {},
 						};
 					},
 				}),
 		});
 		required(choose, 'layer controls')('temperature');
-		expect(stage.readoutOptions.shownTemperature()).toBeNull();
+		expect(stage.readoutOptions.shownLayer()).toBeNull();
 		const result = temperatureOf(1, stage.state.world.elevation.length);
 		stage.layerOptions.store.markCalculating();
 		stage.layerOptions.store.setResult(result, true);
-		expect(stage.readoutOptions.shownTemperature()).toEqual({
+		expect(stage.readoutOptions.shownLayer()).toEqual({
+			layer: TEMPERATURE_LAYER,
 			field: result.months[DEFAULT_MONTH],
-			view: 'month',
+			summary: 'month',
 			month: DEFAULT_MONTH,
 			source: 'simulated',
 			current: true,
 		});
 		stage.layerOptions.store.markOutOfDate();
-		expect(stage.readoutOptions.shownTemperature()?.current).toBe(false);
+		expect(stage.readoutOptions.shownLayer()?.current).toBe(false);
 	});
 });
 
@@ -1520,31 +1986,35 @@ describe('the date line', () => {
 		const stage = await createStartedStage();
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			temperatureView: 'month',
-			source: 'simulated',
+			summaries: { temperature: 'month', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 6,
 			sunlight: false,
+			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			temperatureView: 'month',
-			source: 'simulated',
+			summaries: { temperature: 'month', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 7,
 			sunlight: false,
+			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'temperature',
-			temperatureView: 'annualMean',
-			source: 'simulated',
+			summaries: { temperature: 'annualMean', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 7,
 			sunlight: false,
+			winds: false,
 		});
 		stage.layerOptions.onView({
 			layer: 'terrain',
-			temperatureView: 'annualMean',
-			source: 'simulated',
+			summaries: { temperature: 'annualMean', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 7,
 			sunlight: false,
+			winds: false,
 		});
 		expect(stage.log).toEqual([
 			'worldPanel.setDate Year 0 · July',
@@ -1581,7 +2051,7 @@ describe('the month on screen', () => {
 			createLayerPanel: (options) =>
 				createLayerPanel({
 					...options,
-					globe: { setLayer: () => {} },
+					globe: { setLayer: () => {}, setWinds: () => {} },
 					setTimer: timers.setTimer,
 					clearTimer: timers.clearTimer,
 					reportError: () => {},
@@ -1591,6 +2061,9 @@ describe('the month on screen', () => {
 							showLegend: () => {},
 							showView: (view) => views.push(view),
 							showComparison: () => {},
+							showWindKey: () => {},
+							setWindUnit: () => {},
+							setWindStyle: () => {},
 						};
 					},
 				}),
@@ -1615,17 +2088,18 @@ describe('the month on screen', () => {
 
 	it('goes back to July for a new world, which the date line says', async () => {
 		const { page, controls, views } = await createMonthStage();
-		controls.onTemperatureView('warmest');
-		controls.onTemperatureView('month');
+		controls.onSummary('temperature', 'warmest');
+		controls.onSummary('temperature', 'month');
 		controls.onMonth(2);
 		page.stage.log.length = 0;
 		page.stage.state.replaceWorld(createBlankWorld(64));
 		expect(views.at(-1)).toEqual({
 			layer: 'temperature',
-			temperatureView: 'month',
-			source: 'simulated',
+			summaries: { temperature: 'month', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: DEFAULT_MONTH,
 			sunlight: false,
+			winds: false,
 		});
 		expect(page.stage.log).toContain('worldPanel.setDate Year 0 · July');
 	});
@@ -1649,7 +2123,7 @@ const createSunStage = async (world?: World) => {
 		createLayerPanel: (options) =>
 			createLayerPanel({
 				...options,
-				globe: { setLayer: () => {} },
+				globe: { setLayer: () => {}, setWinds: () => {} },
 				setTimer: timers.setTimer,
 				clearTimer: timers.clearTimer,
 				reportError: () => {},
@@ -1659,6 +2133,9 @@ const createSunStage = async (world?: World) => {
 						showLegend: () => {},
 						showView: (view) => views.push(view),
 						showComparison: () => {},
+						showWindKey: () => {},
+						setWindUnit: () => {},
+						setWindStyle: () => {},
 					};
 				},
 			}),
@@ -1692,13 +2169,17 @@ describe('the sun', () => {
 		const { planet } = stage.state.world;
 		const view: PageView = {
 			layer: 'temperature',
-			temperatureView: 'month',
-			source: 'simulated',
+			summaries: { temperature: 'month', pressure: 'month' },
+			sources: { temperature: 'simulated', pressure: 'simulated' },
 			month: 3,
 			sunlight: false,
+			winds: false,
 		};
 		stage.layerOptions.onView(view);
-		stage.layerOptions.onView({ ...view, temperatureView: 'annualMean' });
+		stage.layerOptions.onView({
+			...view,
+			summaries: { temperature: 'annualMean', pressure: 'month' },
+		});
 		stage.layerOptions.onView({ ...view, layer: 'terrain', sunlight: true });
 		stage.layerOptions.onView({ ...view, month: 4 });
 		expect(stage.suns).toEqual([sunOf(3, planet), sunOf(4, planet)]);
@@ -1737,7 +2218,7 @@ describe('the sun', () => {
 		const { stage, controls } = await createSunStage();
 		controls.onLayer('temperature');
 		controls.onMonth(1);
-		controls.onTemperatureView('coldest');
+		controls.onSummary('temperature', 'coldest');
 		controls.onLayer('terrain');
 		stage.suns.length = 0;
 		const planet: PlanetSettings = { ...DEFAULT_PLANET, axialTiltDeg: 60 };
@@ -1838,6 +2319,29 @@ describe('the panel’s sections', () => {
 		expect(storage.writes).toHaveLength(1);
 	});
 
+	it('have the Layers section opened when Winds is ticked, and nothing when it is cleared', async () => {
+		const stage = await createStartedStage();
+		stage.viewPanelOptions.onWinds(false);
+		expect(stage.sectionCalls).toEqual([]);
+		stage.viewPanelOptions.onWinds(true);
+		stage.viewPanelOptions.onWinds(false);
+		expect(stage.sectionCalls).toEqual(['layersSection.setOpen true']);
+	});
+
+	it('open a closed Layers section when Winds is ticked, and remember it as a click would', async () => {
+		const { storage, sections } = createSections();
+		const stage = await createStartedStage(undefined, {
+			layersSection: sections.layers,
+		});
+		stage.viewPanelOptions.onWinds(true);
+		expect(sections.layers.isOpen()).toBe(true);
+		expect(sections.layers.body.hidden).toBe(false);
+		expect(storage.writes).toEqual([[panelMemoryKey('layers'), 'open']]);
+		stage.viewPanelOptions.onWinds(false);
+		expect(sections.layers.isOpen()).toBe(true);
+		expect(storage.writes).toHaveLength(1);
+	});
+
 	it('leave an open Layers section alone when Sunlight is ticked', async () => {
 		const { storage, sections } = createSections({
 			[panelMemoryKey('layers')]: 'open',
@@ -1877,6 +2381,337 @@ describe('the panel’s sections', () => {
 	});
 });
 
+describe('the Winds control', () => {
+	it('tells the layer panel, and nothing of the globe or the sunlight', async () => {
+		const stage = await createStartedStage();
+		stage.viewPanelOptions.onWinds(true);
+		stage.viewPanelOptions.onWinds(false);
+		expect(stage.log).toEqual([
+			'layerPanel.setWinds true',
+			'layerPanel.setWinds false',
+		]);
+	});
+
+	it('asks for the winds, and the temperature they need, while it is on, and for neither once it is off, through the real layer panel', async () => {
+		const { stage } = await createSunStage();
+		stage.viewPanelOptions.onWinds(true);
+		stage.viewPanelOptions.onWinds(false);
+		expect(stage.log.filter((line) => line.includes('setShowing'))).toEqual([
+			'winds.setShowing true',
+			'temperature.setShowing true',
+			'winds.setShowing false',
+			'temperature.setShowing false',
+		]);
+	});
+
+	it('is asked for, with the temperature it needs, by choosing Pressure, as by turning it on, through the real layer panel', async () => {
+		const { stage, controls } = await createSunStage();
+		controls.onLayer('pressure');
+		controls.onLayer('terrain');
+		expect(stage.log.filter((line) => line.includes('setShowing'))).toEqual([
+			'winds.setShowing true',
+			'temperature.setShowing true',
+			'winds.setShowing false',
+			'temperature.setShowing false',
+		]);
+	});
+
+	it('shows the month controls in Terrain view while it is on, through the real layer panel', async () => {
+		const { stage, views } = await createSunStage();
+		const before = stage.log.length;
+		stage.viewPanelOptions.onWinds(true);
+		expect(views.at(-1)).toEqual({ ...DEFAULT_PAGE_VIEW, winds: true });
+		expect(stage.log.slice(before)).toContain(
+			'worldPanel.setDate Year 0 · July',
+		);
+		stage.viewPanelOptions.onWinds(false);
+		expect(views.at(-1)).toEqual(DEFAULT_PAGE_VIEW);
+	});
+});
+
+/**
+ * A started page with the real layer panel, on the terrain, whose controls
+ * record the unit the key is given.
+ *
+ * @param preferenceEntries - What the preferences' storage holds at first.
+ */
+const createWindUnitStage = async (
+	preferenceEntries?: Readonly<Record<string, string>>,
+) => {
+	let controls: LayerControlsOptions | undefined;
+	/** Every unit the key was told to write its speeds in, after the first. */
+	const keyUnits: string[] = [];
+	/** Every way the key was told the winds are drawn, after the first. */
+	const keyStyles: string[] = [];
+	const stage = await createStartedStage(undefined, {
+		preferenceEntries,
+		createLayerPanel: (options) =>
+			createLayerPanel({
+				...options,
+				globe: { setLayer: () => {}, setWinds: () => {} },
+				setTimer: () => 0,
+				clearTimer: () => {},
+				reportError: () => {},
+				createControls: (made) => {
+					controls = made;
+					return {
+						showLegend: () => {},
+						showView: () => {},
+						showComparison: () => {},
+						showWindKey: () => {},
+						setWindUnit: (unit) => keyUnits.push(unit),
+						setWindStyle: (style) => keyStyles.push(style),
+					};
+				},
+			}),
+	});
+	/** Has winds of the world's grid arrive in the store, current. */
+	const arriveWinds = (value: number): void => {
+		const cells = stage.state.world.elevation.length;
+		stage.layerOptions.store.markWindsCalculating();
+		stage.layerOptions.store.setWindsResult(
+			{
+				winds: windResultOf(value, cells),
+				temperature: temperatureOf(1, cells),
+				dayLengthHours: 24,
+			},
+			true,
+		);
+	};
+	return {
+		stage,
+		controls: required(controls, 'layer controls'),
+		keyUnits,
+		keyStyles,
+		arriveWinds,
+	};
+};
+
+describe('the wind speed unit', () => {
+	it('starts in m/s with nothing stored, in the view controls, the key and the readout', async () => {
+		const { stage, controls } = await createWindUnitStage();
+		expect(stage.viewPanelOptions.windUnit).toBe('m/s');
+		expect(stage.layerOptions.windUnit).toBe('m/s');
+		expect(controls.windUnit).toBe('m/s');
+		expect(stage.readoutOptions.windUnit()).toBe('m/s');
+	});
+
+	it('starts in the stored unit, in the view controls, the key and the readout', async () => {
+		const { stage, controls, keyUnits } = await createWindUnitStage({
+			[WIND_SPEED_UNIT_KEY]: 'mph',
+		});
+		expect(stage.viewPanelOptions.windUnit).toBe('mph');
+		expect(controls.windUnit).toBe('mph');
+		expect(stage.readoutOptions.windUnit()).toBe('mph');
+		// Started in it, not set to it after another.
+		expect(keyUnits).toEqual([]);
+		expect(stage.preferenceStorage.writes).toEqual([]);
+	});
+
+	it('starts in m/s when the storage holds something else', async () => {
+		const { stage, controls } = await createWindUnitStage({
+			[WIND_SPEED_UNIT_KEY]: 'knots',
+		});
+		expect(stage.viewPanelOptions.windUnit).toBe('m/s');
+		expect(controls.windUnit).toBe('m/s');
+		expect(stage.readoutOptions.windUnit()).toBe('m/s');
+	});
+
+	it('stores a unit chosen, and changes the key and the readout at once', async () => {
+		const { stage, keyUnits } = await createWindUnitStage();
+		stage.viewPanelOptions.onWindUnit('km/h');
+		expect(stage.preferenceStorage.writes).toEqual([
+			[WIND_SPEED_UNIT_KEY, 'km/h'],
+		]);
+		expect(keyUnits).toEqual(['km/h']);
+		expect(stage.readoutOptions.windUnit()).toBe('km/h');
+		expect(stage.readoutCalls).toEqual(['invalidate']);
+		stage.viewPanelOptions.onWindUnit('mph');
+		expect(keyUnits).toEqual(['km/h', 'mph']);
+		expect(stage.readoutOptions.windUnit()).toBe('mph');
+		expect(stage.readoutCalls).toEqual(['invalidate', 'invalidate']);
+	});
+
+	it('tells the layer panel of the unit, and nothing else', async () => {
+		const stage = await createStartedStage();
+		stage.viewPanelOptions.onWindUnit('mph');
+		expect(stage.log).toEqual(['layerPanel.setWindUnit mph']);
+	});
+
+	it('writes nothing to the world, and marks nothing for saving', async () => {
+		const stage = await createStartedStage();
+		const before = serializeWorld(stage.state.world);
+		stage.viewPanelOptions.onWindUnit('km/h');
+		expect(serializeWorld(stage.state.world)).toEqual(before);
+		expect(stage.log).not.toContain('autosave.markChanged');
+		expect(stage.saved).toEqual([]);
+		expect(JSON.stringify(stage.state.world)).not.toContain('km/h');
+	});
+
+	it('is kept through a new world', async () => {
+		const { stage, keyUnits } = await createWindUnitStage();
+		stage.viewPanelOptions.onWindUnit('mph');
+		stage.state.replaceWorld(createBlankWorld(64));
+		expect(stage.readoutOptions.windUnit()).toBe('mph');
+		expect(keyUnits).toEqual(['mph']);
+		expect(stage.preferenceStorage.writes).toHaveLength(1);
+	});
+});
+
+describe('how the winds are drawn', () => {
+	it('starts on arrows with nothing stored, in the globe, the view controls and the key', async () => {
+		const { stage, controls } = await createWindUnitStage();
+		expect(stage.globeWindStyles).toEqual(['arrows']);
+		expect(stage.viewPanelOptions.windStyle).toBe('arrows');
+		expect(stage.layerOptions.windStyle).toBe('arrows');
+		expect(controls.windStyle).toBe('arrows');
+	});
+
+	it('starts on the stored way, in the globe, the view controls and the key, with Winds still off', async () => {
+		const { stage, controls, keyStyles } = await createWindUnitStage({
+			[WIND_STYLE_KEY]: 'streaks',
+		});
+		expect(stage.globeWindStyles).toEqual(['streaks']);
+		expect(stage.viewPanelOptions.windStyle).toBe('streaks');
+		expect(controls.windStyle).toBe('streaks');
+		// Started in it, not set to it after another.
+		expect(keyStyles).toEqual([]);
+		expect(stage.preferenceStorage.writes).toEqual([]);
+		expect(stage.viewPanelOptions.winds ?? false).toBe(false);
+		expect(controls.view.winds).toBe(false);
+	});
+
+	it('starts on arrows when the storage holds something else', async () => {
+		const { stage, controls } = await createWindUnitStage({
+			[WIND_STYLE_KEY]: 'lines',
+		});
+		expect(stage.globeWindStyles).toEqual(['arrows']);
+		expect(stage.viewPanelOptions.windStyle).toBe('arrows');
+		expect(controls.windStyle).toBe('arrows');
+	});
+
+	it('stores a way chosen, and gives it to the globe and the key at once', async () => {
+		const { stage, keyStyles } = await createWindUnitStage();
+		stage.viewPanelOptions.onWindStyle('streaks');
+		expect(stage.preferenceStorage.writes).toEqual([
+			[WIND_STYLE_KEY, 'streaks'],
+		]);
+		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks']);
+		expect(keyStyles).toEqual(['streaks']);
+		stage.viewPanelOptions.onWindStyle('arrows');
+		expect(stage.preferenceStorage.writes).toEqual([
+			[WIND_STYLE_KEY, 'streaks'],
+			[WIND_STYLE_KEY, 'arrows'],
+		]);
+		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks', 'arrows']);
+		expect(keyStyles).toEqual(['streaks', 'arrows']);
+	});
+
+	it('tells the layer panel of the way, and nothing else', async () => {
+		const stage = await createStartedStage();
+		stage.viewPanelOptions.onWindStyle('streaks');
+		expect(stage.log).toEqual(['layerPanel.setWindStyle streaks']);
+		expect(stage.readoutCalls).toEqual([]);
+		expect(stage.sectionCalls).toEqual([]);
+	});
+
+	it('writes nothing to the world, marks nothing for saving, and is kept through a new world', async () => {
+		const { stage, keyStyles } = await createWindUnitStage();
+		const before = serializeWorld(stage.state.world);
+		stage.viewPanelOptions.onWindStyle('streaks');
+		expect(serializeWorld(stage.state.world)).toEqual(before);
+		expect(stage.log).not.toContain('autosave.markChanged');
+		stage.state.replaceWorld(createBlankWorld(64));
+		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks']);
+		expect(keyStyles).toEqual(['streaks']);
+		expect(stage.preferenceStorage.writes).toHaveLength(1);
+	});
+});
+
+describe('the page’s visibility', () => {
+	it('tells the globe whether the page is visible as it starts, and at each change', async () => {
+		const stage = await createStartedStage();
+		expect(stage.globeVisibility).toEqual([true]);
+		stage.setPageVisible(false);
+		expect(stage.globeVisibility).toEqual([true, false]);
+		stage.setPageVisible(true);
+		expect(stage.globeVisibility).toEqual([true, false, true]);
+	});
+
+	it('tells nothing else of it', async () => {
+		const stage = await createStartedStage();
+		stage.setPageVisible(false);
+		stage.setPageVisible(true);
+		expect(stage.log).toEqual([]);
+		expect(stage.readoutCalls).toEqual([]);
+		expect(stage.saved).toEqual([]);
+	});
+});
+
+describe('the cursor readout, of the winds', () => {
+	it('reads no winds while Winds is off, and the winds the arrows are drawn from while it is on', async () => {
+		const { stage, arriveWinds } = await createWindUnitStage();
+		arriveWinds(3);
+		expect(stage.readoutOptions.shownWinds()).toBeNull();
+		stage.viewPanelOptions.onWinds(true);
+		const shown = stage.readoutOptions.shownWinds();
+		expect(shown?.field.east).toBe(
+			stage.layerOptions.store.winds.result?.winds.east[DEFAULT_MONTH],
+		);
+		expect(shown).toMatchObject({ annualMean: false, current: true });
+		stage.layerOptions.store.markWindsOutOfDate();
+		expect(stage.readoutOptions.shownWinds()?.current).toBe(false);
+	});
+
+	it.each([true, false])('looks again when Winds is turned %s', async (on) => {
+		const { stage, arriveWinds } = await createWindUnitStage();
+		arriveWinds(3);
+		if (!on) {
+			stage.viewPanelOptions.onWinds(true);
+		}
+		stage.readoutCalls.length = 0;
+		stage.viewPanelOptions.onWinds(on);
+		expect(stage.readoutCalls).toContain('invalidate');
+		expect(stage.readoutOptions.shownWinds() !== null).toBe(on);
+	});
+
+	it('looks again when new winds arrive', async () => {
+		const { stage, arriveWinds } = await createWindUnitStage();
+		stage.viewPanelOptions.onWinds(true);
+		stage.readoutCalls.length = 0;
+		arriveWinds(4);
+		expect(stage.readoutCalls).toContain('invalidate');
+		expect(stage.readoutOptions.shownWinds()?.field.east[0]).toBe(4);
+	});
+
+	it('looks again when the month changes', async () => {
+		const { stage, controls, arriveWinds } = await createWindUnitStage();
+		stage.viewPanelOptions.onWinds(true);
+		arriveWinds(4);
+		stage.readoutCalls.length = 0;
+		controls.onMonth(2);
+		expect(stage.readoutCalls).toContain('invalidate');
+		expect(stage.readoutOptions.shownWinds()?.field.east).toBe(
+			stage.layerOptions.store.winds.result?.winds.east[2],
+		);
+	});
+
+	it('looks again when the view changes, to the year’s mean winds and back', async () => {
+		const { stage, controls, arriveWinds } = await createWindUnitStage();
+		stage.viewPanelOptions.onWinds(true);
+		arriveWinds(4);
+		controls.onLayer('temperature');
+		stage.readoutCalls.length = 0;
+		controls.onSummary('temperature', 'annualMean');
+		expect(stage.readoutCalls).toContain('invalidate');
+		expect(stage.readoutOptions.shownWinds()?.annualMean).toBe(true);
+		stage.readoutCalls.length = 0;
+		controls.onLayer('terrain');
+		expect(stage.readoutCalls).toContain('invalidate');
+		expect(stage.readoutOptions.shownWinds()?.annualMean).toBe(false);
+	});
+});
+
 describe('the Sunlight control', () => {
 	/** The calls that tell the globe how it is lit, in a log. */
 	const sunlightCalls = (log: readonly string[]) =>
@@ -1899,7 +2734,17 @@ describe('the Sunlight control', () => {
 		controls.onLayer('temperature');
 		stage.log.length = 0;
 		stage.viewPanelOptions.onSunlight(true);
-		expect(stage.readoutOptions.shownTemperature()).toBeNull();
+		expect(stage.readoutOptions.shownLayer()).toBeNull();
+		expect(sunlightCalls(stage.log)).toEqual(['globe.setSunlight line']);
+	});
+
+	it('draws the line in Pressure view, as in Temperature view', async () => {
+		const { stage, controls } = await createSunStage();
+		controls.onLayer('pressure');
+		stage.log.length = 0;
+		stage.viewPanelOptions.onSunlight(true);
+		controls.onLayer('temperature');
+		controls.onLayer('pressure');
 		expect(sunlightCalls(stage.log)).toEqual(['globe.setSunlight line']);
 	});
 
@@ -1935,7 +2780,7 @@ describe('the Sunlight control', () => {
 			createLayerPanel: (options) =>
 				createLayerPanel({
 					...options,
-					globe: { setLayer: () => {} },
+					globe: { setLayer: () => {}, setWinds: () => {} },
 					setTimer: () => 0,
 					clearTimer: () => {},
 					reportError: () => {},
@@ -1945,6 +2790,9 @@ describe('the Sunlight control', () => {
 							showLegend: () => {},
 							showView: (view) => views.push(view),
 							showComparison: () => {},
+							showWindKey: () => {},
+							setWindUnit: () => {},
+							setWindStyle: () => {},
 						};
 					},
 				}),
@@ -2006,7 +2854,7 @@ describe('the temperature, with a part showing it that fails', () => {
 });
 
 describe('a worker that fails to load', () => {
-	it('leaves both services unavailable and the page working', async () => {
+	it('leaves every service unavailable and the page working', async () => {
 		const failing = (): FakeWorker => {
 			const worker = createFakeWorker();
 			// A script that fails to load says so once, soon after it starts.
@@ -2044,12 +2892,22 @@ describe('a worker that fails to load', () => {
 					clearTimer: timers.clearTimer,
 					logError: (error) => temperatureLog.push(error),
 				}),
+			createWinds: (options) =>
+				createWindsService({
+					...options,
+					createWorker: make,
+					setTimer: timers.setTimer,
+					clearTimer: timers.clearTimer,
+					logError: (error) => temperatureLog.push(error),
+				}),
 		});
 		await settle();
-		expect(workers).toHaveLength(2);
+		expect(workers).toHaveLength(3);
 		expect(readout).toContain('showUnavailable');
 		const { store } = stage.temperatureOptions;
 		expect(store.temperature.status).toBe('unavailable');
+		expect(store.winds.status).toBe('unavailable');
+		stage.layerOptions.winds.setShowing(true);
 
 		// The page goes on: a stroke and its undo still work.
 		makeStroke(stage);
@@ -2059,6 +2917,7 @@ describe('a worker that fails to load', () => {
 		await settle();
 		expect(workers.flatMap((worker) => worker.posted)).toEqual([]);
 		expect(store.temperature.status).toBe('unavailable');
+		expect(store.winds.status).toBe('unavailable');
 		expect(stage.errors).toEqual([]);
 		expect(temperatureLog).toEqual([]);
 	});
@@ -2072,17 +2931,20 @@ describe('the comparison on the measured Earth', () => {
 	/** A page on a world, with the real layer panel, in Temperature view. */
 	const createComparisonStage = async (world: World = freshEarth()) => {
 		let controls: LayerControlsOptions | undefined;
+		/** What the temperature's comparison controls were told to show. */
 		const comparisons: ComparisonContent[] = [];
+		/** What the pressure's comparison controls were told to show. */
+		const pressureComparisons: ComparisonContent[] = [];
 		const stage = await createStartedStage(world, {
 			createLayerPanel: (options) =>
 				createLayerPanel({
 					...options,
-					loadObserved: async (resolution) =>
+					loadObserved: async (_layer, resolution) =>
 						Array.from(
 							{ length: 12 },
 							() => new Float32Array(6 * resolution * resolution),
 						),
-					globe: { setLayer: () => {} },
+					globe: { setLayer: () => {}, setWinds: () => {} },
 					setTimer: () => 0,
 					clearTimer: () => {},
 					reportError: () => {},
@@ -2091,7 +2953,13 @@ describe('the comparison on the measured Earth', () => {
 						return {
 							showLegend: () => {},
 							showView: () => {},
-							showComparison: (content) => comparisons.push(content),
+							showComparison: (layer, content) =>
+								(layer === 'pressure' ? pressureComparisons : comparisons).push(
+									content,
+								),
+							showWindKey: () => {},
+							setWindUnit: () => {},
+							setWindStyle: () => {},
 						};
 					},
 				}),
@@ -2108,20 +2976,28 @@ describe('the comparison on the measured Earth', () => {
 			);
 		};
 		arrive();
+		/** What the view controls were last told of the winds' source. */
+		const windSource = (): string | undefined =>
+			stage.log
+				.filter((entry) => entry.startsWith('viewPanel.showWindSource'))
+				.at(-1);
 		return {
 			stage,
 			controls: chosen,
 			arrive,
 			offered: (): boolean => comparisons.at(-1)?.offered ?? false,
 			source: () => comparisons.at(-1)?.source,
-			shownSource: () => stage.readoutOptions.shownTemperature()?.source,
+			shownSource: () => stage.readoutOptions.shownLayer()?.source,
+			pressureOffered: (): boolean =>
+				pressureComparisons.at(-1)?.offered ?? false,
+			windSource,
 		};
 	};
 
 	/** A page on the measured Earth showing the observed temperature. */
 	const createObservingStage = async () => {
 		const page = await createComparisonStage();
-		page.controls.onSource('observed');
+		page.controls.onSource('temperature', 'observed');
 		await settle();
 		expect(page.shownSource()).toBe('observed');
 		return page;
@@ -2163,6 +3039,39 @@ describe('the comparison on the measured Earth', () => {
 		expect(page.offered()).toBe(false);
 	});
 
+	it('offers the Pressure sources and the Winds shown choice on the measured Earth only; a stroke removes them, the winds back on Simulated, and its undo returns them', async () => {
+		const page = await createComparisonStage();
+		page.controls.onLayer('pressure');
+		expect(page.pressureOffered()).toBe(true);
+		expect(page.windSource()).toBe('viewPanel.showWindSource true simulated');
+		page.stage.viewPanelOptions.onWindSource('observed');
+		expect(page.windSource()).toBe('viewPanel.showWindSource true observed');
+		makeStroke(page.stage);
+		expect(page.pressureOffered()).toBe(false);
+		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		page.stage.pressKey(UNDO_KEYS);
+		expect(page.pressureOffered()).toBe(true);
+		expect(page.windSource()).toBe('viewPanel.showWindSource true simulated');
+		page.stage.planetPanelOptions.onChange({
+			...DEFAULT_PLANET,
+			dayLengthHours: 30,
+		});
+		expect(page.pressureOffered()).toBe(false);
+		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		page.stage.state.replaceWorld(createBlankWorld(64));
+		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		page.stage.state.replaceWorld(freshEarth());
+		expect(page.pressureOffered()).toBe(true);
+		expect(page.windSource()).toBe('viewPanel.showWindSource true simulated');
+	});
+
+	it('offers no Winds shown choice off the measured Earth', async () => {
+		const page = await createComparisonStage(createBlankWorld(64));
+		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+		page.stage.viewPanelOptions.onWindSource('observed');
+		expect(page.windSource()).toBe('viewPanel.showWindSource false simulated');
+	});
+
 	it('goes after a change of sea level, and comes back with the sea level set back', async () => {
 		const page = await createObservingStage();
 		page.stage.viewPanelOptions.onSeaLevel(-500);
@@ -2185,6 +3094,25 @@ describe('the comparison on the measured Earth', () => {
 		expect(page.offered()).toBe(true);
 		expect(page.source()).toBe('simulated');
 	});
+
+	it.each([3, 23.9, 24.1, 30, 720])(
+		'goes for a day of %s hours, and comes back at 24',
+		async (dayLengthHours) => {
+			const page = await createObservingStage();
+			page.stage.planetPanelOptions.onChange({
+				...DEFAULT_PLANET,
+				dayLengthHours,
+			});
+			expect(page.offered()).toBe(false);
+			expect(page.shownSource()).toBe('simulated');
+			page.stage.planetPanelOptions.onChange({
+				...DEFAULT_PLANET,
+				dayLengthHours: 24,
+			});
+			expect(page.offered()).toBe(true);
+			expect(page.source()).toBe('simulated');
+		},
+	);
 
 	it('goes for a new world that is not the measured Earth, and comes for one that is', async () => {
 		const page = await createObservingStage();

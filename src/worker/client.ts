@@ -58,14 +58,15 @@ export type SimClient = {
 	 *
 	 * @remarks
 	 * The worker is sent a copy of what the request carries as it is now.
-	 * The caller's world, elevation array included, and any start stay its
-	 * own to go on editing or to send again, and later edits do not reach a
-	 * request already sent. The result arrives as the worker transferred
-	 * it, and is the caller's alone.
+	 * The caller's world, elevation array included, and any start or
+	 * temperatures stay its own to go on editing or to send again, and
+	 * later edits do not reach a request already sent. The result arrives
+	 * as the worker transferred it, and is the caller's alone.
 	 *
 	 * @param kind - What to compute.
 	 * @param payload - What the request carries: the world to compute for,
-	 * and for a temperature solve, where to start from.
+	 * for a temperature solve, where to start from, and for the winds, the
+	 * twelve months of temperature.
 	 * @param options - Whom to tell of the progress.
 	 * @returns The result. Rejects with an `Error` if the worker answers
 	 * that it could not compute it, if the worker reports an error before
@@ -106,10 +107,11 @@ const asError = (thrown: unknown): Error =>
  * that is neither, are ignored.
  *
  * Requests are posted without a transfer list, so the worker receives a
- * structured clone of the world and of any start. Transferring their
- * buffers instead would avoid the copy but empty the caller's arrays: the
- * terrain being edited, and the last result, which stays on show and is
- * the start of the request after. The worker transfers its results back.
+ * structured clone of the world and of any start or temperatures.
+ * Transferring their buffers instead would avoid the copy but empty the
+ * caller's arrays: the terrain being edited, and the last result, which
+ * stays on show, is the start of the request after and gives the winds
+ * their temperatures. The worker transfers its results back.
  *
  * When the worker reports an `error` or a `messageerror` there is no
  * telling which request it belongs to, so every request waiting at that

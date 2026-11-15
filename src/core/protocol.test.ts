@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PLANET, PLANET_SETTINGS } from './planet';
+import {
+	DEFAULT_PLANET,
+	PLANET_SETTINGS,
+	TEMPERATURE_SETTINGS,
+	temperaturePlanet,
+} from './planet';
 import {
 	isSimKind,
 	isSimProgress,
@@ -32,14 +37,14 @@ const state = (): TemperatureState => ({
 /** A record of the right form; its values are for the solver. */
 const solvedFor = (): TemperatureConditions => ({
 	seaLevel: 0,
-	planet: { ...DEFAULT_PLANET },
+	planet: temperaturePlanet(DEFAULT_PLANET),
 });
 
 const months = (): Float32Array[] =>
 	Array.from({ length: 12 }, () => new Float32Array(3));
 
 const BAD_START =
-	"A temperature request's start must be an object whose solvedFor has a finite seaLevel and a planet of finite settings and whose state has temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number";
+	"A temperature request's start must be an object whose solvedFor has a finite seaLevel and a planet whose settings, the day length aside, are finite, and whose state has temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number";
 
 const PROGRESS: TemperatureProgress = {
 	yearsDone: 2,
@@ -62,6 +67,7 @@ describe('isSimKind', () => {
 	it('accepts the kinds of request', () => {
 		expect(isSimKind('terrainStats')).toBe(true);
 		expect(isSimKind('temperature')).toBe(true);
+		expect(isSimKind('winds')).toBe(true);
 	});
 
 	it('refuses other strings', () => {
@@ -101,6 +107,7 @@ describe('isWorldShaped', () => {
 					starMass: 0,
 					orbitDistanceAu: Infinity,
 					greenhouseStrength: 99,
+					dayLengthHours: 0,
 				},
 				ageYears: -5,
 				elevation: new Float32Array(3),
@@ -252,7 +259,23 @@ describe('parseSimRequest', () => {
 		}
 	});
 
-	it('refuses a request without a world of the right form', () => {
+	it('reads a world with a day length', () => {
+		const tenHours = {
+			...world,
+			planet: { ...world.planet, dayLengthHours: 10 },
+		};
+		const parsed = parseSimRequest({
+			id: 9,
+			kind: 'temperature',
+			world: tenHours,
+		});
+		expect(
+			(parsed as SimRequest<'temperature'>).world.planet.dayLengthHours,
+		).toBe(10);
+	});
+
+	it('refuses a request without a world of the right form, a planet without a day length or with one that is not a number included', () => {
+		const { dayLengthHours: _, ...noDay } = world.planet;
 		for (const payload of [
 			undefined,
 			null,
@@ -260,6 +283,9 @@ describe('parseSimRequest', () => {
 			{ ...world, elevation: Array.from({ length: 6 }, () => 0) },
 			{ ...world, planet: { ...world.planet, starMass: '1' } },
 			{ ...world, planet: undefined },
+			{ ...world, planet: noDay },
+			{ ...world, planet: { ...world.planet, dayLengthHours: '24' } },
+			{ ...world, planet: { ...world.planet, dayLengthHours: null } },
 		]) {
 			expect(refusal({ id: 9, kind: 'terrainStats', world: payload })).toEqual({
 				id: 9,
@@ -312,13 +338,30 @@ describe('parseSimRequest for temperature', () => {
 		expect(kept?.state?.referenceCoolingK).toBe(start.state.referenceCoolingK);
 		expect(kept).not.toHaveProperty('yearsRun');
 		expect(kept?.solvedFor).toEqual(record);
-		expect(Object.keys(kept?.solvedFor.planet ?? {})).toEqual(PLANET_SETTINGS);
+		expect(Object.keys(kept?.solvedFor.planet ?? {})).toEqual(
+			TEMPERATURE_SETTINGS,
+		);
+	});
+
+	it('keeps of a record’s planet only the settings the temperature reads, leaving any day length behind', () => {
+		for (const dayLengthHours of [24, '24', Number.NaN]) {
+			const planet = { ...DEFAULT_PLANET, dayLengthHours };
+			const parsed = parseSimRequest({
+				id: 3,
+				kind: 'temperature',
+				world,
+				start: { state: state(), solvedFor: { seaLevel: 0, planet } },
+			});
+			const kept = (parsed as SimRequest<'temperature'>).start?.solvedFor;
+			expect(kept, String(dayLengthHours)).toEqual(solvedFor());
+			expect(Object.keys(kept?.planet ?? {})).toEqual(TEMPERATURE_SETTINGS);
+		}
 	});
 
 	it('keeps a record whose sea level and settings lie beyond their limits, for the solver to bring within them', () => {
 		const record = {
 			seaLevel: 1e9,
-			planet: { ...DEFAULT_PLANET, axialTiltDeg: 400, starMass: -1 },
+			planet: { ...solvedFor().planet, axialTiltDeg: 400, starMass: -1 },
 		};
 		const parsed = parseSimRequest({
 			id: 3,
@@ -456,6 +499,75 @@ describe('parseSimRequest for temperature', () => {
 				start: 'nonsense',
 			}),
 		).toEqual({ id: 7, kind: 'terrainStats', world });
+	});
+});
+
+describe('parseSimRequest for winds', () => {
+	const BAD_TEMPERATURES =
+		"A winds request's temperatures must be an array of 12 Float32Arrays, one a month";
+
+	it('keeps the very months in a new array, and nothing else of the message', () => {
+		const temperatures = months();
+		const parsed = parseSimRequest({
+			id: 8,
+			kind: 'winds',
+			world,
+			temperatures,
+			fullResolution: true,
+		});
+		expect(parsed).toEqual({ id: 8, kind: 'winds', world, temperatures });
+		const request = parsed as SimRequest<'winds'>;
+		expect(request.temperatures).not.toBe(temperatures);
+		request.temperatures.forEach((month, index) => {
+			expect(month).toBe(temperatures[index]);
+		});
+	});
+
+	it('leaves the lengths and values of the months for the solver to judge', () => {
+		const temperatures = [
+			...months().slice(1),
+			Float32Array.of(Number.NaN, 1, 2, 3, 4),
+		];
+		expect(
+			parseSimRequest({ id: 9, kind: 'winds', world, temperatures }),
+		).toEqual({ id: 9, kind: 'winds', world, temperatures });
+	});
+
+	it('refuses temperatures that are not twelve Float32Arrays, keeping the id and kind', () => {
+		for (const temperatures of [
+			undefined,
+			null,
+			'warm',
+			months()[0],
+			{ length: 12 },
+			months().slice(1),
+			[...months(), new Float32Array(3)],
+			[],
+			[...months().slice(1), new Float64Array(3)],
+			[...months().slice(1), [0, 0, 0]],
+			[...months().slice(1), null],
+		]) {
+			expect(
+				refusal({ id: 10, kind: 'winds', world, temperatures }),
+				String(temperatures),
+			).toEqual({
+				id: 10,
+				kind: 'winds',
+				ok: false,
+				error: BAD_TEMPERATURES,
+			});
+		}
+	});
+
+	it('refuses a request without a world of the right form, keeping the id and kind', () => {
+		expect(
+			refusal({
+				id: 11,
+				kind: 'winds',
+				world: { ...world, elevation: [0] },
+				temperatures: months(),
+			}),
+		).toMatchObject({ id: 11, kind: 'winds', ok: false });
 	});
 });
 

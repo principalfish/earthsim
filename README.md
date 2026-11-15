@@ -7,12 +7,14 @@ It is a static site with no server and no account. The world is saved in the bro
 ## What works today
 
 - **A globe you can sculpt.** Start from a blank ocean, generated continents or the real Earth, then raise, lower and smooth the terrain and move the sea level, with undo and redo.
-- **Planet settings.** Axial tilt, the star's brightness and mass, the orbit's distance and the greenhouse strength.
+- **Planet settings.** Axial tilt, the star's brightness and mass, the orbit's distance, the greenhouse strength and the length of the day, which sets how many bands of wind there are and how wide.
 - **A temperature layer.** Air temperature for each month, or the year's average, warmest month, coldest month and seasonal range, recalculated after every change.
+- **Winds.** The surface winds for each month or the year's average, drawn over the globe as arrows or as moving streaks, with the wind under the pointer in m/s, km/h or mph.
+- **A pressure layer.** The sea-level pressure the winds are worked out from, for each month or the year's average.
 - **The sun.** Drawn in the scene, with an optional day and night side on the globe.
-- **Earth comparison.** On the Earth, the simulated temperature beside the observed one, and the difference.
+- **Earth comparison.** On the Earth, the simulated temperature and sea-level pressure beside the observed ones and the difference between them; the simulated winds beside the observed winds.
 
-Planned, in this order: winds; rainfall and climate zones; ocean currents; ice sheets and sea ice; tropical storm zones; plate tectonics and time stepping.
+Planned, in this order: rainfall and climate zones; ocean currents; ice sheets and sea ice; tropical storm zones; plate tectonics and time stepping.
 
 ## Quick start
 
@@ -32,9 +34,11 @@ Open the address Vite prints. The first visit shows the New world dialog; press 
 
 | Document | What is in it |
 |-|-|
-| [User guide](docs/user-guide.md) | Every control on the page: worlds, tools, view, planet, layers and the sun |
+| [User guide](docs/user-guide.md) | Every control on the page: worlds, tools, view, planet, layers, the sun and the winds |
 | [Temperature](docs/temperature.md) | How the temperature is worked out, when it is recalculated, its colours, and the Earth comparison |
-| [Development](docs/development.md) | Commands, the source layout, and the Earth temperature baseline |
+| [Winds](docs/winds.md) | How the surface winds and sea-level pressure are worked out, which planet settings they read, and how far to trust them |
+| [Climate process](docs/climate-process.pdf) | How the climate is to be worked out, as a diagram, and the settings of the temperature and wind models (PDF) |
+| [Development](docs/development.md) | Commands, the Earth temperature baseline, drawing the climate process diagram, and the source layout |
 | [Data](docs/data.md) | The Earth data files: formats, sources, licences and how to rebuild them |
 
 ## Commands
@@ -47,11 +51,11 @@ Open the address Vite prints. The first visit shows the New world dialog; press 
 | `npm run check` | Lint and check formatting with Biome |
 | `npm run typecheck` | Type-check every part of the source |
 
-The data and timing scripts are listed in [Development](docs/development.md).
+The other scripts (data, baselines, timing, the wind report and tuning) are listed in [Development](docs/development.md).
 
 ## Data credits
 
 - **Elevation:** NOAA's ETOPO 2022 global relief model (CC0-1.0).
-- **Observed temperature:** NOAA/CIRES/DOE 20th Century Reanalysis V3, provided by the NOAA PSL, Boulder, Colorado, USA (CC0-1.0).
+- **Observed temperature, winds and pressure:** NOAA/CIRES/DOE 20th Century Reanalysis V3, provided by the NOAA PSL, Boulder, Colorado, USA (CC0-1.0).
 
 Full citations, licences and caveats are in [Data](docs/data.md).

@@ -8,6 +8,7 @@ import {
 	type DataRampStop,
 	DIFFERENCE_RAMP,
 	MAX_RAMP_STOPS,
+	PRESSURE_RAMP,
 	rampColourAt,
 	rampGradient,
 	SEASONAL_RANGE_RAMP,
@@ -278,6 +279,59 @@ describe('the difference ramp', () => {
 		for (const t of [0.55, 0.7, 0.9, 1]) {
 			const h = hue(rampColourAt(DIFFERENCE_RAMP, t));
 			expect(h < 40 || h > 340, `${t}`).toBe(true);
+		}
+	});
+});
+
+describe('the pressure ramp', () => {
+	it('is one the globe can draw', () => {
+		expect(checkRamp(PRESSURE_RAMP)).toBe(PRESSURE_RAMP);
+		expect(PRESSURE_RAMP.stops.length).toBeLessThanOrEqual(MAX_RAMP_STOPS);
+	});
+
+	it('has its stops evenly spaced and symmetric about the middle', () => {
+		const { stops } = PRESSURE_RAMP;
+		expect(stops).toHaveLength(7);
+		stops.forEach((stop, index) => {
+			expect(stop.at).toBeCloseTo(index / 6, 12);
+			const mirror = stops[stops.length - 1 - index] as DataRampStop;
+			expect(stop.at + mirror.at).toBeCloseTo(1, 12);
+		});
+	});
+
+	it('is near white in the middle, teal at the low end and brown at the high', () => {
+		expect(lightness(rampColourAt(PRESSURE_RAMP, 0.5))).toBeGreaterThan(95);
+		const low = hue(rampColourAt(PRESSURE_RAMP, 0));
+		expect(low).toBeGreaterThan(160);
+		expect(low).toBeLessThan(185);
+		const high = hue(rampColourAt(PRESSURE_RAMP, 1));
+		expect(high).toBeGreaterThan(25);
+		expect(high).toBeLessThan(45);
+	});
+
+	it('grows darker at every step away from the middle, on either side', () => {
+		const samples = 500;
+		for (const side of [-1, 1]) {
+			let previous = lightness(rampColourAt(PRESSURE_RAMP, 0.5));
+			for (let i = 1; i <= samples; i++) {
+				const t = 0.5 + (side * i) / (2 * samples);
+				const next = lightness(rampColourAt(PRESSURE_RAMP, t));
+				expect(next).toBeLessThan(previous);
+				previous = next;
+			}
+		}
+	});
+
+	it('has end colours of no other ramp', () => {
+		const ends = (ramp: ColourRamp): number[] => [
+			ramp.stops[0]?.colour as number,
+			ramp.stops.at(-1)?.colour as number,
+		];
+		const others = [TEMPERATURE_RAMP, SEASONAL_RANGE_RAMP, DIFFERENCE_RAMP];
+		for (const colour of ends(PRESSURE_RAMP)) {
+			for (const other of others) {
+				expect(ends(other)).not.toContain(colour);
+			}
 		}
 	});
 });

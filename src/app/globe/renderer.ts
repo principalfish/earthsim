@@ -1,6 +1,7 @@
 /**
- * The globe on the page: a Three.js scene holding the globe's mesh and the
- * sun's, drawn only when something has changed.
+ * The globe on the page: a Three.js scene holding the globe's mesh, the
+ * sun's and the winds, as arrows or as streaks, drawn only when something
+ * has changed, or at every frame while the streaks move.
  *
  * The mesh's own coordinates are core coordinates. Its model matrix is the
  * rotation into the Three.js frame, so the shaders look elevation up with
@@ -41,6 +42,7 @@ import {
 	zoomCamera,
 } from './camera';
 import { coreToThree } from './coords';
+import { createFrameScheduler } from './frameLoop';
 import { buildSphereMesh, meshSegments } from './geometry';
 import {
 	aimSunlight,
@@ -59,7 +61,14 @@ import {
 } from './material';
 import { clientToNdc, raySphere } from './picking';
 import type { ColourRamp, ValueRange } from './ramp';
+import { createWindStreaks } from './streaks';
 import { createSunMaterial, shapeSun, sunPosition } from './sun';
+import { createWindArrows, pixelsPerRadian, type WindField } from './wind';
+import {
+	createWindMotion,
+	DEFAULT_WIND_STYLE,
+	type WindStyle,
+} from './windMotion';
 
 /** The most device pixels drawn per CSS pixel, to bound the cost per frame. */
 const MAX_PIXEL_RATIO = 2;
@@ -86,7 +95,7 @@ export type Globe = {
 	 * {@link Globe.setSeaLevel} would. After editing the array in place,
 	 * call {@link Globe.updateElevation}. A data layer shown for the world
 	 * before is dropped, so the height colours show until one is set for
-	 * this world.
+	 * this world, and so are the winds.
 	 */
 	setWorld(world: World): void;
 	/**
@@ -151,6 +160,44 @@ export type Globe = {
 		range?: ValueRange,
 		ramp?: ColourRamp,
 	): void;
+	/**
+	 * Shows the wind over the globe, as arrows or as streaks as
+	 * {@link Globe.setWindStyle} says, or none.
+	 *
+	 * @remarks
+	 * The arrows or streaks lie over whatever colours the globe shows,
+	 * raised onto the relief as it is drawn, and follow changes of the
+	 * terrain, the sea level and the exaggeration with nothing more done.
+	 * The arrows' spacing and the streaks' number follow the zoom. A new
+	 * world drops them. With none shown, the globe is drawn exactly as it is
+	 * without them. Streaks shown in other winds carry on from where they
+	 * are; shown again after none, they start afresh. The globe keeps hold
+	 * of the field without copying it, so it must not be changed while
+	 * shown; to show other winds, set them again.
+	 *
+	 * @param field - One month's wind or a mean of the year, one value of
+	 * each part per cell of the world on show; or null for none.
+	 * @throws RangeError if the field does not hold one value of each part
+	 * per cell of the world on show; the winds shown are then left as they
+	 * were.
+	 */
+	setWinds(field: WindField | null): void;
+	/**
+	 * Draws the winds as arrows or as streaks; it starts on arrows.
+	 *
+	 * @remarks
+	 * While streaks are drawn, the arrows are not, and while there are winds
+	 * to show and the page is visible the globe is drawn at every frame, the
+	 * streaks moving on at each; at any other time it is drawn only when
+	 * something changes, and nothing of the streaks' runs.
+	 */
+	setWindStyle(style: WindStyle): void;
+	/**
+	 * Takes whether the page is visible, rather than in a hidden tab: while
+	 * it is not, the streaks stop and the globe is not drawn at every frame.
+	 * It starts visible.
+	 */
+	setPageVisible(visible: boolean): void;
 	/**
 	 * Sets where the sun stands, how large it is drawn and its colour.
 	 *
@@ -237,7 +284,9 @@ export type Globe = {
 	 *
 	 * @remarks
 	 * For changes made from within an animation frame, which would
-	 * otherwise not show until the frame after.
+	 * otherwise not show until the frame after. While the streaks move,
+	 * nothing: the globe is drawn at every frame already, and the next draws
+	 * the change.
 	 */
 	draw(): void;
 	/**
@@ -257,7 +306,7 @@ const toVector3 = (v: Vec3): Vector3 => new Vector3(v[0], v[1], v[2]);
  * @remarks
  * Nothing is drawn until a world is set. The globe then redraws itself, at
  * most once per animation frame, whenever its world, settings, camera or
- * size change.
+ * size change, and at every frame while the streaks move.
  *
  * @param canvas - The canvas to draw on. Its size on the page is left to
  * the stylesheet; the drawing follows it.
@@ -317,6 +366,22 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 	sunMesh.renderOrder = 1;
 	scene.add(sunMesh);
 
+	// The arrows read the globe's own relief uniforms, so they stand on the
+	// relief as it is drawn whatever changes it.
+	const arrows = createWindArrows(uniforms);
+	arrows.mesh.matrix.copy(mesh.matrix);
+	arrows.mesh.matrixWorldNeedsUpdate = true;
+	scene.add(arrows.mesh);
+
+	// So do the streaks, which are in the scene in the arrows' place while
+	// they are the way the winds are drawn.
+	const streaks = createWindStreaks(uniforms);
+	for (const streakMesh of streaks.meshes) {
+		streakMesh.matrix.copy(mesh.matrix);
+		streakMesh.matrixWorldNeedsUpdate = true;
+	}
+	let windStyle: WindStyle = DEFAULT_WIND_STYLE;
+
 	let cameraState = createCameraState();
 	let elevation: CellTexture | null = null;
 	let layer: PreparedLayer | null = null;
@@ -324,7 +389,6 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 	let fullUploadPending = false;
 	let brushCursor: WindowPoint | null = null;
 	let brushRadius = 0;
-	let frame = 0;
 	let disposed = false;
 
 	const aspect = (): number => {
@@ -343,7 +407,6 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 	};
 
 	const render = (): void => {
-		frame = 0;
 		if (disposed) {
 			return;
 		}
@@ -354,6 +417,13 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		);
 		camera.up.copy(toVector3(coreToThree([0, 0, 1])));
 		camera.lookAt(0, 0, 0);
+		// Hidden arrows are not laid out again for the zoom; they are once
+		// they are drawn again.
+		if (windStyle === 'arrows') {
+			arrows.setZoom(
+				pixelsPerRadian(cameraState.distance, canvas.clientHeight, aspect()),
+			);
+		}
 		const brushCentre =
 			brushCursor === null
 				? null
@@ -368,18 +438,35 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		fullUploadPending = false;
 	};
 
-	const invalidate = (): void => {
-		if (frame === 0 && !disposed) {
-			frame = requestAnimationFrame(render);
-		}
+	// The camera as the streaks are told of it: one object and one array,
+	// filled in afresh each frame, since the streaks keep nothing of them.
+	const streakEye: [number, number, number] = [0, 0, 0];
+	const streakView = { eye: streakEye, widthPx: 0, heightPx: 0 };
+
+	/** Moves the streaks on by a frame's time, for the camera as it is. */
+	const moveStreaks = (seconds: number): void => {
+		cameraPosition(cameraState, streakEye);
+		streakView.widthPx = canvas.clientWidth;
+		streakView.heightPx = canvas.clientHeight;
+		streaks.update(seconds, streakView);
 	};
 
-	const draw = (): void => {
-		if (frame !== 0) {
-			cancelAnimationFrame(frame);
+	const frames = createFrameScheduler({
+		requestFrame: (callback) => requestAnimationFrame(callback),
+		cancelFrame: (handle) => cancelAnimationFrame(handle),
+		now: () => performance.now(),
+		draw: (seconds) => {
+			if (seconds !== null && !disposed) {
+				moveStreaks(seconds);
+			}
 			render();
-		}
-	};
+		},
+	});
+	const motion = createWindMotion(frames);
+
+	const invalidate = (): void => frames.invalidate();
+
+	const draw = (): void => frames.flush();
 
 	const resize = (): void => {
 		const { clientWidth, clientHeight } = canvas;
@@ -391,12 +478,11 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		camera.aspect = clientWidth / clientHeight;
 		camera.fov = verticalFovDeg(camera.aspect);
 		camera.updateProjectionMatrix();
+		arrows.setViewport(clientWidth, clientHeight);
+		streaks.setViewport(clientWidth, clientHeight);
 		// Resizing clears the canvas, so it is redrawn before the browser
 		// paints rather than a frame later.
-		if (frame !== 0) {
-			cancelAnimationFrame(frame);
-		}
-		render();
+		frames.drawNow();
 	};
 
 	const observer = new ResizeObserver(resize);
@@ -433,6 +519,9 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		uniforms.uElevation.value = elevation.texture;
 		uniforms.uResolution.value = world.resolution;
 		uniforms.uSeaLevel.value = drawnSeaLevel(world.seaLevel);
+		arrows.setWorld(world.resolution);
+		streaks.setWorld(world.resolution);
+		motion.setHasWinds(false);
 
 		const wanted = meshSegments(world.resolution);
 		if (wanted !== segments) {
@@ -537,6 +626,30 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		invalidate();
 	};
 
+	const setWinds = (field: WindField | null): void => {
+		// The arrows check the field first, and throw before anything changes.
+		arrows.setWinds(field);
+		streaks.setWinds(field);
+		motion.setHasWinds(field !== null);
+		invalidate();
+	};
+
+	const setWindStyle = (style: WindStyle): void => {
+		if (style === windStyle) {
+			return;
+		}
+		windStyle = style;
+		if (style === 'streaks') {
+			scene.remove(arrows.mesh);
+			scene.add(...streaks.meshes);
+		} else {
+			scene.remove(...streaks.meshes);
+			scene.add(arrows.mesh);
+		}
+		motion.setStyle(style);
+		invalidate();
+	};
+
 	const setSun = (direction: Vec3, sizeDeg: number, colour: Rgb): void => {
 		// Everything is checked before anything changes.
 		const unit = unitSunDirection(direction);
@@ -598,9 +711,7 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 
 	const dispose = (): void => {
 		disposed = true;
-		if (frame !== 0) {
-			cancelAnimationFrame(frame);
-		}
+		frames.dispose();
 		observer.disconnect();
 		pixelRatioQuery.removeEventListener('change', onPixelRatioChange);
 		canvas.removeEventListener('webglcontextrestored', invalidate);
@@ -610,6 +721,8 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		material.dispose();
 		sunMesh.geometry.dispose();
 		sun.material.dispose();
+		arrows.dispose();
+		streaks.dispose();
 		renderer.dispose();
 	};
 
@@ -620,6 +733,9 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		setExaggeration,
 		setGridVisible,
 		setLayer,
+		setWinds,
+		setWindStyle,
+		setPageVisible: (visible) => motion.setPageVisible(visible),
 		setSun,
 		setSunlight,
 		pick,

@@ -173,6 +173,8 @@ export const createFakeDocument = (): FakeDocument => {
 		});
 	const document = {
 		createElement,
+		// Elements of another namespace, such as SVG's, are made as any other.
+		createElementNS: (_namespace: string, tag: string) => createElement(tag),
 		get activeElement() {
 			return focused;
 		},

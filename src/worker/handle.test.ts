@@ -10,9 +10,11 @@ import {
 	type SimRequest,
 	type SimResponse,
 	solveTemperature,
+	solveWinds,
 	TEMPERATURE_MODEL,
 	type TemperatureResult,
 	temperatureConditions,
+	type WindResult,
 	type World,
 } from '../core/index';
 import { handleRequest } from './handle';
@@ -515,5 +517,110 @@ describe('handleRequest for statistics', () => {
 		expect(response.ok).toBe(true);
 		expect(transfer).toEqual([]);
 		expect(reports).toEqual([]);
+	});
+});
+
+/**
+ * Time allowed for each test here that solves a world's winds: about a
+ * second each, but coverage makes them several times slower.
+ */
+const WIND_SOLVE_TIMEOUT_MS = 60_000;
+
+/** A world with land and sea, for the winds. */
+const WINDY = generated(1984, 0.35);
+
+/** Twelve months of temperature for that world, warmer each month. */
+const windTemperatures = (): Float32Array[] =>
+	Array.from({ length: 12 }, (_, month) =>
+		new Float32Array(WINDY.elevation.length).fill(month),
+	);
+
+/** The solver's own winds for that world and those months. */
+const directWinds = shared(() => solveWinds(WINDY, windTemperatures()));
+
+/**
+ * The handler's answer for that world and those months, as they arrive in
+ * a worker, with every message about progress.
+ */
+const handledWinds = shared(() => {
+	const reports: SimProgress[] = [];
+	const { response, transfer } = handleRequest(
+		structuredClone({
+			id: 40,
+			kind: 'winds',
+			world: WINDY,
+			temperatures: windTemperatures(),
+		}),
+		(progress) => reports.push(progress),
+	);
+	return { response, transfer, reports };
+});
+
+/** The winds a response carries; fails the test if it has none. */
+const windsOf = (response: SimResponse): WindResult => {
+	if (!response.ok || response.kind !== 'winds') {
+		throw new Error(`expected winds: ${JSON.stringify(response)}`);
+	}
+	return response.result as WindResult;
+};
+
+describe('handleRequest for winds', { timeout: WIND_SOLVE_TIMEOUT_MS }, () => {
+	it('returns the winds and pressure the solver gives directly, telling of no progress', () => {
+		const { response, reports } = handledWinds();
+		expect(response).toEqual({
+			id: 40,
+			kind: 'winds',
+			ok: true,
+			result: directWinds(),
+		});
+		expect(reports).toEqual([]);
+	});
+
+	it('transfers the buffers of the twelve months of each field, each once, in a list a post accepts', () => {
+		const { response, transfer } = handledWinds();
+		const winds = windsOf(response);
+		const fields = [...winds.east, ...winds.north, ...winds.pressure];
+		expect(transfer).toHaveLength(36);
+		expect(new Set(transfer).size).toBe(36);
+		for (const field of fields) {
+			expect(transfer).toContain(field.buffer);
+		}
+
+		// Last, since posting empties the shared answer's arrays.
+		const values = winds.pressure[0]?.slice();
+		const posted = structuredClone(response, { transfer });
+		expect(windsOf(posted).pressure[0]).toEqual(values);
+		expect(winds.pressure[0]?.byteLength).toBe(0);
+		expect(winds.east[11]?.byteLength).toBe(0);
+	});
+
+	it('answers a malformed request with a failure, keeping the id and kind and transferring nothing', () => {
+		const temperatures = windTemperatures();
+		const short = new Float32Array(WINDY.elevation.length - 1);
+		for (const [message, reason] of [
+			[{ temperatures: temperatures.slice(1) }, 'array of 12 Float32Arrays'],
+			[{ temperatures: [...temperatures.slice(1), [0]] }, 'Float32Arrays'],
+			[{ temperatures: undefined }, 'Float32Arrays'],
+			[{ temperatures: [...temperatures.slice(1), short] }, 'month 11 holds'],
+			[
+				{ temperatures, world: { ...WINDY, elevation: new Float32Array(5) } },
+				'elevation',
+			],
+			[{ temperatures, world: { ...WINDY, resolution: 63 } }, '63'],
+		] as const) {
+			const reports: SimProgress[] = [];
+			const handledBadly = handleRequest(
+				{ id: 41, kind: 'winds', world: WINDY, ...message },
+				(progress) => reports.push(progress),
+			);
+			expect(handledBadly.response, reason).toMatchObject({
+				id: 41,
+				kind: 'winds',
+				ok: false,
+				error: expect.stringContaining(reason),
+			});
+			expect(handledBadly.transfer).toEqual([]);
+			expect(reports).toEqual([]);
+		}
 	});
 });

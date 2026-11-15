@@ -217,6 +217,19 @@ describe('cameraPosition', () => {
 		expect(y).toBeCloseTo(0, 12);
 		expect(z).toBeCloseTo(0, 12);
 	});
+
+	it('writes into the three numbers it is given and returns them', () => {
+		const into: [number, number, number] = [9, 9, 9];
+		const state = at(35, -120, 2.5);
+		const position = cameraPosition(state, into);
+		expect(position).toBe(into);
+		expect(into).toEqual(cameraPosition(state));
+	});
+
+	it('gives a new array each time when given none', () => {
+		const state = at(10, 20, 3);
+		expect(cameraPosition(state)).not.toBe(cameraPosition(state));
+	});
 });
 
 describe('verticalFovDeg', () => {

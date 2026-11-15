@@ -149,13 +149,13 @@ export const OCEAN_RAMP: readonly RampStop[] = [
 ];
 
 /** A number as a GLSL float literal. */
-const glslFloat = (value: number): string => {
+export const glslFloat = (value: number): string => {
 	const text = String(value);
 	return /[.e]/.test(text) ? text : `${text}.0`;
 };
 
 /** A `0xrrggbb` colour as a GLSL `vec3` of components from 0 to 1. */
-const glslColour = (colour: number): string => {
+export const glslColour = (colour: number): string => {
 	const channel = (shift: number): string =>
 		(((colour >> shift) & 0xff) / 255).toFixed(4);
 	return `vec3(${channel(16)}, ${channel(8)}, ${channel(0)})`;
@@ -390,12 +390,34 @@ float elevationLinear(vec3 d) {
 `;
 
 /**
- * Raises each vertex by its height above the sea, times the exaggeration,
- * so land stands up and the sea stays a sphere. `position` is a unit vector
- * in core coordinates; the model matrix turns it into the scene's frame.
+ * The globe's relief rule, for any shader that places something on the
+ * drawn surface: the sampling of {@link GlobeUniforms.uElevation} and
+ * `raisedSurface`, which raises a point of the sphere by its height above
+ * the sea, times the exaggeration, so land stands up and the sea stays a
+ * sphere.
+ *
+ * @remarks
+ * A shader built on this reads the elevation, the resolution, the sea level
+ * and the exaggeration from uniforms of the names in {@link ReliefUniforms}.
+ * Handed the globe's own uniform objects, it follows every change of the
+ * terrain and of the view with nothing more done.
+ */
+export const RELIEF_GLSL = /* glsl */ `
+${ELEVATION_GLSL}
+// The drawn surface over the unit direction d, in planet radii from the
+// centre, in core coordinates.
+vec3 raisedSurface(vec3 d) {
+	float raised = max(elevationAt(d) - uSeaLevel, 0.0);
+	return d * (1.0 + raised * uExaggeration / PLANET_RADIUS_M);
+}
+`;
+
+/**
+ * Raises each vertex by the relief rule. `position` is a unit vector in
+ * core coordinates; the model matrix turns it into the scene's frame.
  */
 const VERTEX_GLSL = /* glsl */ `
-${ELEVATION_GLSL}
+${RELIEF_GLSL}
 uniform mat4 modelViewMatrix;
 uniform mat4 projectionMatrix;
 
@@ -404,9 +426,7 @@ in vec3 position;
 out vec3 vSurface;
 
 void main() {
-	vec3 direction = normalize(position);
-	float raised = max(elevationAt(direction) - uSeaLevel, 0.0);
-	vSurface = direction * (1.0 + raised * uExaggeration / PLANET_RADIUS_M);
+	vSurface = raisedSurface(normalize(position));
 	gl_Position = projectionMatrix * modelViewMatrix * vec4(vSurface, 1.0);
 }
 `;
@@ -764,6 +784,15 @@ export type GlobeUniforms = {
 	 */
 	readonly uRampColour: IUniform<Float32Array>;
 };
+
+/**
+ * The uniforms {@link RELIEF_GLSL} reads: those of the globe that shape the
+ * drawn surface.
+ */
+export type ReliefUniforms = Pick<
+	GlobeUniforms,
+	'uElevation' | 'uResolution' | 'uSeaLevel' | 'uExaggeration'
+>;
 
 /** The globe's material and the uniforms that drive it. */
 export type GlobeMaterial = {

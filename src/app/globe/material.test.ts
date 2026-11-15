@@ -24,6 +24,7 @@ import {
 	NIGHT_BRIGHTNESS,
 	OCEAN_RAMP,
 	prepareLayer,
+	RELIEF_GLSL,
 	replaceLayer,
 	showLayer,
 	showSunlight,
@@ -196,6 +197,20 @@ describe('createGlobeMaterial', () => {
 		expect(material.fragmentShader).toContain('vec3 oceanColour(float x)');
 		expect(material.fragmentShader).toContain(
 			'const float PLANET_RADIUS_M = 6371000.0;',
+		);
+	});
+
+	it('raises the surface by the relief rule it shares, raising land alone by its height above the sea times the exaggeration', () => {
+		const { material } = createGlobeMaterial();
+		expect(material.vertexShader).toContain(RELIEF_GLSL);
+		expect(glslFunction(material.vertexShader, 'main')).toContain(
+			'vSurface = raisedSurface(normalize(position));',
+		);
+		expect(glslFunction(RELIEF_GLSL, 'raisedSurface')).toContain(
+			'max(elevationAt(d) - uSeaLevel, 0.0)',
+		);
+		expect(glslFunction(RELIEF_GLSL, 'raisedSurface')).toContain(
+			'd * (1.0 + raised * uExaggeration / PLANET_RADIUS_M)',
 		);
 	});
 });

@@ -1,7 +1,7 @@
 /**
  * Moving between a grid and the one a step coarser: a world averaged onto
- * the coarser grid, and a field on the coarser grid carried back onto the
- * finer.
+ * the coarser grid, and a field or a vector field on the coarser grid
+ * carried back onto the finer.
  *
  * The grids nest exactly: coarse cell `(face, i, j)` covers the four cells
  * `(face, 2i … 2i + 1, 2j … 2j + 1)` of the grid with twice as many cells
@@ -19,6 +19,7 @@ import {
 	SUPPORTED_RESOLUTIONS,
 	type Vec3,
 } from './grid';
+import type { VectorField } from './vector';
 import type { World } from './world';
 
 /** The four coarse cells, and their weights, that make up each fine cell. */
@@ -75,6 +76,69 @@ const assertRefinable = (resolution: number): Resolution => {
 };
 
 /**
+ * A field on the grid a step coarser: each coarse cell's value the mean of
+ * the four fine cells it covers, weighted by their areas.
+ *
+ * @remarks
+ * The mean of each block is taken in double precision, summed row by row,
+ * so the area-weighted mean of the whole field is kept to rounding, and a
+ * constant field is given back as it is, to rounding. The field is
+ * averaged without regard to what it stands for: land and sea alike.
+ *
+ * @param fine - One value per cell of the grid of `resolution`. It is not
+ * changed.
+ * @param resolution - The fine grid's cells along a face edge: 128 or 256.
+ * @param into - Where to write the coarse values, one per cell of the grid
+ * a step coarser; a new array when left out.
+ * @returns `into`, or the new array.
+ * @throws RangeError if the resolution is not supported or is the
+ * coarsest, or if `fine` or `into` has the wrong length.
+ */
+export const coarsenField = (
+	fine: ArrayLike<number>,
+	resolution: number,
+	into?: Float64Array,
+): Float64Array => {
+	const coarse = assertRefinable(resolution);
+	const fineGrid = getGrid(resolution);
+	if (fine.length !== fineGrid.cellCount) {
+		throw new RangeError(
+			`A field on ${resolution} cells per face edge has ${fineGrid.cellCount} values; got ${fine.length}`,
+		);
+	}
+	const coarseCount = FACE_COUNT * coarse * coarse;
+	const result = into ?? new Float64Array(coarseCount);
+	if (result.length !== coarseCount) {
+		throw new RangeError(
+			`A field a step coarser than ${resolution} cells per face edge has ${coarseCount} values; got ${result.length}`,
+		);
+	}
+	const { areas } = fineGrid;
+	const n = resolution;
+	let cell = 0;
+	for (let face = 0; face < FACE_COUNT; face++) {
+		for (let j = 0; j < coarse; j++) {
+			for (let i = 0; i < coarse; i++) {
+				let total = 0;
+				let area = 0;
+				for (let dj = 0; dj < 2; dj++) {
+					const row = (face * n + 2 * j + dj) * n;
+					for (let di = 0; di < 2; di++) {
+						const fineCell = row + 2 * i + di;
+						const fineArea = areas[fineCell] as number;
+						total += fineArea * (fine[fineCell] as number);
+						area += fineArea;
+					}
+				}
+				result[cell] = total / area;
+				cell++;
+			}
+		}
+	}
+	return result;
+};
+
+/**
  * The world on the grid a step coarser: half the cells along each face
  * edge, each coarse cell's elevation the mean of the four cells it covers,
  * weighted by their areas.
@@ -83,10 +147,10 @@ const assertRefinable = (resolution: number): Resolution => {
  * Everything else is the world's: its sea level, planet, date and origin.
  * A coarse cell is land when its mean elevation is above the sea level, so
  * land narrower than a coarse cell, an island or a strait, can vanish from
- * the coarse world or close up. The mean of each block is taken in double
- * precision, summed row by row as the Earth's data is summed when a coarser
- * Earth is made, and stored in single precision; so the Earth at 256 cells
- * per face edge, coarsened, is exactly the Earth at 128.
+ * the coarse world or close up. The means are {@link coarsenField}'s,
+ * stored in single precision, summed as the Earth's data is summed when a
+ * coarser Earth is made; so the Earth at 256 cells per face edge,
+ * coarsened, is exactly the Earth at 128.
  *
  * @param world - A world of more than 64 cells per face edge. It is not
  * changed.
@@ -104,36 +168,15 @@ export const coarsenWorld = (world: World): World => {
 			`A world of resolution ${world.resolution} has ${fine.cellCount} cells; its elevation holds ${world.elevation.length}`,
 		);
 	}
-	const { areas } = fine;
-	const n = world.resolution;
-	const elevation = new Float32Array(FACE_COUNT * resolution * resolution);
-	let cell = 0;
-	for (let face = 0; face < FACE_COUNT; face++) {
-		for (let j = 0; j < resolution; j++) {
-			for (let i = 0; i < resolution; i++) {
-				let total = 0;
-				let area = 0;
-				for (let dj = 0; dj < 2; dj++) {
-					const row = (face * n + 2 * j + dj) * n;
-					for (let di = 0; di < 2; di++) {
-						const fineCell = row + 2 * i + di;
-						const fineArea = areas[fineCell] as number;
-						total += fineArea * (world.elevation[fineCell] as number);
-						area += fineArea;
-					}
-				}
-				elevation[cell] = total / area;
-				cell++;
-			}
-		}
-	}
 	return {
 		resolution,
 		seaLevel: world.seaLevel,
 		origin: world.origin,
 		planet: { ...world.planet },
 		ageYears: world.ageYears,
-		elevation,
+		elevation: Float32Array.from(
+			coarsenField(world.elevation, world.resolution),
+		),
 	};
 };
 
@@ -422,6 +465,77 @@ export const refineField = (
 				((coarse[cells[first + 2] as number] as number) - base) +
 			(weights[first + 3] as number) *
 				((coarse[cells[first + 3] as number] as number) - base);
+	}
+	return result;
+};
+
+/**
+ * A vector field on the grid a step coarser carried onto a fine grid: each
+ * of its three components by {@link refineField}, and the result made
+ * tangent to the sphere at each fine cell's centre by dropping its part
+ * along the centre's direction.
+ *
+ * @remarks
+ * Interpolating the components in three dimensions, rather than eastward
+ * and northward ones, treats every direction alike, the poles included.
+ * The fine vectors are not rescaled after the projection: where the coarse
+ * vectors around a fine cell turn, its vector comes out a little shorter
+ * than theirs, as any average of them would.
+ *
+ * @param coarse - One tangent vector per cell of the grid a step coarser
+ * than `resolution`. It is not changed.
+ * @param resolution - The fine grid's cells along a face edge: 128 or 256.
+ * @param into - Where to write the fine vectors, one per fine cell; new
+ * arrays when left out.
+ * @returns `into`, or the new arrays.
+ * @throws RangeError if the resolution is not supported or is the
+ * coarsest, or if any array of `coarse` or `into` has the wrong length.
+ */
+export const refineVectors = (
+	coarse: VectorField,
+	resolution: number,
+	into?: VectorField,
+): VectorField => {
+	assertRefinable(resolution);
+	const fine = getGrid(resolution);
+	const result = into ?? {
+		x: new Float64Array(fine.cellCount),
+		y: new Float64Array(fine.cellCount),
+		z: new Float64Array(fine.cellCount),
+	};
+	// Every length is checked before any array is written.
+	const coarseCount = fine.cellCount / 4;
+	for (const name of ['x', 'y', 'z'] as const) {
+		const length = coarse[name]?.length;
+		if (length !== coarseCount) {
+			throw new RangeError(
+				`A field a step coarser than ${resolution} cells per face edge has ${coarseCount} values; its ${name} components have ${length}`,
+			);
+		}
+	}
+	for (const name of ['x', 'y', 'z'] as const) {
+		const length = result[name]?.length;
+		if (length !== fine.cellCount) {
+			throw new RangeError(
+				`A field on ${resolution} cells per face edge has ${fine.cellCount} values; the output's ${name} components have ${length}`,
+			);
+		}
+	}
+	const x = refineField(coarse.x, resolution, result.x);
+	const y = refineField(coarse.y, resolution, result.y);
+	const z = refineField(coarse.z, resolution, result.z);
+	const { centres, cellCount } = fine;
+	for (let cell = 0; cell < cellCount; cell++) {
+		const cx = centres[3 * cell] as number;
+		const cy = centres[3 * cell + 1] as number;
+		const cz = centres[3 * cell + 2] as number;
+		const vx = x[cell] as number;
+		const vy = y[cell] as number;
+		const vz = z[cell] as number;
+		const outward = vx * cx + vy * cy + vz * cz;
+		x[cell] = vx - outward * cx;
+		y[cell] = vy - outward * cy;
+		z[cell] = vz - outward * cz;
 	}
 	return result;
 };

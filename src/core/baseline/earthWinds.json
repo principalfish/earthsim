@@ -1,0 +1,18 @@
+{
+  "resolution": 64,
+  "year": {
+    "rmsVectorDifference": 3.822,
+    "directionSharePercent": 60.91,
+    "pressureRmsDifference": 7.085
+  },
+  "january": {
+    "rmsVectorDifference": 3.794,
+    "directionSharePercent": 63.397,
+    "pressureRmsDifference": 7.191
+  },
+  "july": {
+    "rmsVectorDifference": 4.263,
+    "directionSharePercent": 57.887,
+    "pressureRmsDifference": 6.784
+  }
+}

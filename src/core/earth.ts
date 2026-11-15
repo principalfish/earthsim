@@ -208,9 +208,10 @@ export const EARTH_ELEVATION_CHECKSUMS: Readonly<Record<Resolution, number>> =
  * whose temperature can be compared with the observed one.
  *
  * @remarks
- * All of these hold: the world started as the Earth; its five planet
- * settings are exactly {@link DEFAULT_PLANET}'s; its sea level is the
- * preset's, {@link DEFAULT_SEA_LEVEL_M}; and its elevation's
+ * All of these hold: the world started as the Earth; its six planet
+ * settings, the day length of 24 hours included, are exactly
+ * {@link DEFAULT_PLANET}'s; its sea level is the preset's,
+ * {@link DEFAULT_SEA_LEVEL_M}; and its elevation's
  * {@link elevationChecksum} is the one in
  * {@link EARTH_ELEVATION_CHECKSUMS} for its resolution. Any stroke that
  * changes a cell makes it something else, and undoing the stroke makes it

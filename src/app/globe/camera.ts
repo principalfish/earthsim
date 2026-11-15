@@ -215,17 +215,22 @@ export const rotateCamera = (
  * Where the camera is.
  *
  * @param state - The camera.
+ * @param into - Three numbers to write the position into, for a caller
+ * that asks every frame and would sooner not make a new array each time;
+ * a new array if left out.
  * @returns Its position in core coordinates, in planet radii from the
- * centre.
+ * centre: `into` where one is given.
  */
-export const cameraPosition = (state: CameraState): Vec3 => {
+export const cameraPosition = (
+	state: CameraState,
+	into: [number, number, number] = [0, 0, 0],
+): Vec3 => {
 	const { latitude, longitude, distance } = state;
 	const ring = distance * Math.cos(latitude);
-	return [
-		ring * Math.cos(longitude),
-		ring * Math.sin(longitude),
-		distance * Math.sin(latitude),
-	];
+	into[0] = ring * Math.cos(longitude);
+	into[1] = ring * Math.sin(longitude);
+	into[2] = distance * Math.sin(latitude);
+	return into;
 };
 
 /**

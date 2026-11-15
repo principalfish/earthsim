@@ -13,8 +13,13 @@ Requires Node.js and npm. Run `npm install` once.
 | `npm run typecheck` | Type-check every part of the source |
 | `npm run build:earth` | Rebuild the Earth's elevation data from its source; see [Data](data.md) |
 | `npm run build:observed-temperature` | Rebuild the Earth's observed temperature data; see [Data](data.md) |
+| `npm run build:observed-winds` | Rebuild the Earth's observed winds and sea-level pressure data; see [Data](data.md) |
 | `npm run baseline:temperature` | Write the Earth temperature baseline afresh; see below |
+| `npm run baseline:winds` | Write the Earth winds baseline afresh; see [Winds](winds.md#the-earth-winds-baseline) |
 | `npm run time:temperature` | Time the temperature solver at every resolution and print the simulated Earth's error figures, as Markdown tables. Takes a few minutes |
+| `npm run time:winds` | Time a year of the Earth's winds at every resolution, as `solveWinds` solves them by default (the pressure on the 64 grid) and wholly on the world's own grid beside it, and print how far the two lie apart, as Markdown tables. Takes about half a minute; see [Winds](winds.md#the-pressure-of-finer-worlds-is-worked-out-on-the-64-grid) |
+| `npm run tune:winds` | Run the wind model many times with its settings changed, on the wind report's nine cases, and print the Earth's error figures and every case's measures, as Markdown tables: a sweep of one setting, a search over several, every case for some settings, or the model run on the observed temperature; run with nothing after it to list the settings and the forms. It changes no setting; see [Winds](winds.md#the-settings-and-the-tuning-script) |
+| `npm run report:winds` | Write the wind report, `reports/winds/index.html`, to open in a browser: the observed Earth's winds and sea-level pressure in January and July, the nine worlds the wind models are run on, and each registered model's maps, error figures and solve times, and its section against published studies: how each paper was read, and for three checks (winds and the pressure low at a 60° tilt, and the tropical cell and bands of wind with a faster and a slower day) the papers' words beside what the model shows. The file is not committed |
 
 ## The Earth temperature baseline
 
@@ -23,6 +28,29 @@ Requires Node.js and npm. Run `npm install` once.
 - **What it holds:** for the Earth at 64 cells per face edge, the mean and root-mean-square difference (simulated less observed, in kelvin) for the annual average, each month, the warmest month, the coldest month and the seasonal range.
 - **The test:** a test solves that Earth and fails, naming each figure, if any is worse than the file's by more than 0.05 K. A figure that has improved passes.
 - **When a change is meant to move the figures:** run `npm run baseline:temperature`, which rewrites the file and prints what moved, and commit the file with the change.
+- **The winds follow the temperature,** so a change to the temperature model moves the Earth winds baseline too: run `npm run baseline:winds` as well; see [Winds](winds.md#the-earth-winds-baseline).
+
+## The climate process diagram
+
+`docs/climate-process.pdf` is drawn by `scripts/docs/climate-process.py`. Its first page is a diagram of how the climate is to be worked out when every part up to the biomes is built: the loop of temperature, pressure, winds and ocean currents, and what is worked out from its settled state. The pages after it list the settings of the temperature and wind models, each with its value, what it controls, what raising or lowering it does, and where the value comes from.
+
+It needs Python 3 and the `reportlab` library, which the project does not otherwise use, so run it from a throwaway environment outside the repository, `<dir>` being any folder there:
+
+```bash
+python3 -m venv <dir>
+```
+
+```bash
+<dir>/bin/pip install reportlab
+```
+
+```bash
+<dir>/bin/python scripts/docs/climate-process.py docs/climate-process.pdf
+```
+
+- **Re-running it with nothing changed** leaves the PDF byte-identical, so the PDF changes in a commit only when the script does. The committed PDF was drawn with reportlab 5.1.0; another version may write the same pages as different bytes.
+- **The diagram is a design,** mostly of parts not built yet. Redraw it when one of them, once built, changes it.
+- **The settings pages are a dated snapshot,** kept by hand in the script, with the date set once at its top. When a setting is added, removed or changed in `src/core/wind/rules.ts` or `src/core/temperature.ts`, bring the pages up to the code. A future `src/core/config.md` is to become the living list of the settings.
 
 ## Type-checking rules
 
@@ -43,20 +71,26 @@ A pure library with no DOM, Three.js or worker globals.
 | `brush.ts` | The sculpting brushes: raise, lower and smooth |
 | `history.ts` | The history of terrain edits, for undo and redo |
 | `stats.ts` | Summary statistics of a world's terrain |
-| `protocol.ts` | The messages between the page and the worker |
+| `protocol.ts` | The messages between the page and the worker, of three kinds: the terrain statistics, the temperature and the winds |
 | `index.ts` | What the core exports |
 | `serialize.ts` | The world file format and the checks a file must pass |
 | `earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
 | `observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
-| `planet.ts` | The planet settings, their limits and Earth's values; the sunlight, year length and trust warning that follow from them; a world's date |
+| `wind/model.ts` | The shape every wind model shares, its error figures against the observed winds and pressure, and the mean of a field by bands of latitude |
+| `wind/rules.ts` | The rules wind model on a world's own grid, and its parts: sea-level pressure from zonal bands placed by the temperature and the day length plus thermal highs and lows, and the wind from it by a balance of pressure gradient, turning and friction; see [Winds](winds.md) |
+| `wind/solve.ts` | The winds of a world: its input checked, the rules model's pressure worked out on the 64 grid and carried back to the world's grid, the winds from it there, and the annual mean of a year of winds |
+| `observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `vector.ts`'s directions east and north |
+| `observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
+| `planet.ts` | The six planet settings, their limits and Earth's values, and the five of them the temperature reads (all but the day length); the sunlight, year length, rotation rate and trust warnings that follow from them; a world's date |
 | `star.ts` | The star as the planet sees it: radius, surface temperature, colour, size in the sky and direction in each month |
 | `insolation.ts` | Sunlight by latitude and time of year, the twelve months, and each cell's latitude |
 | `temperature.ts` | The temperature model |
-| `coarsen.ts` | A world averaged onto the grid a step coarser, and a field carried back from it |
+| `coarsen.ts` | A world or a field averaged onto the grid a step coarser, and a field or a vector field carried back from it |
+| `vector.ts` | Vector fields on the grid, east and north at every cell, and the gradient, divergence, curl, Laplacian and smoothing of fields |
 | `exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
 | `compare.ts` | One field less another, and area-weighted error figures |
 | `quantile.ts` | Area-weighted quantiles of values on the grid |
-| `baseline/` | The Earth temperature baseline and its check |
+| `baseline/` | The Earth temperature baseline and the Earth winds baseline (`earthWinds.ts`, the figures in `earthWinds.json`), each with its check |
 | `testing/` | Helpers only the tests use |
 
 ### `src/app/`: the page
@@ -69,44 +103,58 @@ A pure library with no DOM, Three.js or worker globals.
 | `appState.ts` | The world being edited, and the ways to replace it or change its planet settings |
 | `sculpt.ts` | Sculpting with the mouse |
 | `undo.ts` | Undo and redo of strokes |
-| `refresh.ts` | When to ask a worker again after the world changes |
-| `workerService.ts` | The statistics and temperature services, each on its own worker |
-| `layers.ts` | The computed layers the page holds, and whether each is current |
-| `view.ts` | What the globe shows: the layer, the part of the year, the source and the month |
+| `refresh.ts` | When to ask a worker again after the world changes; the winds after each new temperature result and each change of the day length; with `oneAtATime` (statistics, winds) one request at a time, an overtaken answer ignored |
+| `workerService.ts` | The statistics, temperature and winds services, each on its own worker |
+| `layers.ts` | The computed layers the page holds, the temperature and the winds worked out from it, and whether each is current |
+| `view.ts` | What the globe shows: the layer, each computed layer's part of the year and source, the month, the sunlight and the winds |
+| `scalarLayer.ts` | Each layer of one computed value per cell described as data, the temperature and the sea-level pressure the two offered: its name, unit, how its values are written, its legend wording, its views of the year with their colours and scale fitting, its comparison with the observed Earth and where in the layer store its months come from; the layer panel, legend, cursor readout, comparison controls, date line and lighting take a description rather than naming the temperature |
 | `playback.ts` | Playing through the year |
 | `storage.ts`, `autosave.ts` | The saved world in IndexedDB, export and import, and when to save |
 | `panelMemory.ts` | Which panel sections are open, remembered by the browser |
-| `earthData.ts`, `observedData.ts` | Fetching the Earth data files when first needed |
-| `globe/` | The renderer, shaders, camera, picking and colour ramps |
-| `ui/` | The panel's sections and controls, the New world dialog, the legend and the cursor readout |
+| `preferences.ts` | The page's preferences, remembered by the browser apart from the world: the wind speed unit and whether the winds are drawn as arrows or streaks |
+| `windUnits.ts` | Wind speeds in m/s, km/h and mph, the eight compass points, and a wind in words |
+| `earthData.ts`, `observedData.ts` | Fetching the Earth data files when first needed, the observed years through a description of their file |
+| `globe/` | The renderer, shaders, camera, picking, colour ramps, the wind arrows and the wind streaks (`streaks.ts`: the trails moved along the wind, and their ribbons), when the globe is drawn (`frameLoop.ts`: on demand, or at every frame while animating) and the rule for when the streaks move (`windMotion.ts`) |
+| `ui/` | The panel's sections and controls, the New world dialog, the legend, the key to the wind arrows and the cursor readout |
 | `styles.css` | The page's styles |
-| `testing/` | Stand-ins for the canvas, document, storage and timers, which only the tests use |
+| `testing/` | Stand-ins for the canvas, document, storage, timers and animation frames, and a made-up layer description, which only the tests use |
 
 ### `src/worker/`: the Web Worker
 
-It computes from a copy of the world and keeps nothing between requests. The page runs two: one for the statistics and one for the temperature.
+It computes from a copy of the world, and its answers depend on the request alone: it keeps no results between requests, only tables it can build again, such as the grid's. The page runs three: one for the statistics, one for the temperature and one for the winds, which is sent the temperature's twelve months with the world.
 
 | File | What it holds |
 |-|-|
 | `sim.worker.ts` | The worker itself, which only passes messages to the handler |
-| `handle.ts` | The message handler, a plain function that answers one request |
+| `handle.ts` | The message handler, a plain function that answers one request of any kind |
 | `client.ts` | The page's side of the channel |
 | `testing/` | A stand-in worker for the tests |
 
-### `scripts/`: building the data
+### `scripts/`: building the data, the reports and the climate diagram
 
-Run with Node, not in the browser.
+Run with Node, not in the browser; `docs/` alone is Python.
 
 | File | What it does |
 |-|-|
 | `build-earth-data.ts` | Downloads the source and writes `public/data/earth-256.bin` |
 | `build-observed-temperature.ts` | Downloads the source and writes `public/data/earth-temperature-1deg.bin` |
+| `build-observed-winds.ts` | Downloads the three sources and writes `public/data/earth-wind-1deg.bin` and `public/data/earth-pressure-1deg.bin` |
+| `observedGdalRun.ts` | Runs GDAL's `gdallocationinfo` on an observed source and compares it with this project's reader, for both observed builds |
+| `observedBuild.ts` | What both observed builds share: the option, reading a source, and writing the data file; their range and storing-error checks are `earth/storedValues.ts` |
 | `download.ts` | Downloads a source file into `.cache/` once, checked against its pinned length and SHA-256 |
 | `earth/` | The parts of the build that touch no file: reading TIFF and netCDF, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data files |
 | `time-temperature.ts` | The solver's timings and the simulated Earth's error figures |
+| `time-winds.ts` | The wind model's timings, and how far its solve with the pressure on the 64 grid lies from one wholly on the world's own grid |
 | `update-earth-temperature-baseline.ts` | Writes the Earth temperature baseline afresh |
+| `update-earth-winds-baseline.ts` | Writes the Earth winds baseline afresh |
+| `baselineUpdate.ts` | What both baseline updates share: naming each number of a baseline, saying which moved, and writing the file |
+| `wind-report.ts` | Writes the wind report, and lists the wind models it runs |
+| `tune-winds.ts` | Runs the wind model with its settings changed and prints what each run gives |
+| `tune/` | The parts of the tuning script that touch no file: its command line (`command.ts`), the sweep and the search (`search.ts`), the cases and their temperatures worked out once and the runs on them (`tuning.ts`), the numbers that show each known fault on the Earth (`faults.ts`), and the printout (`text.ts`) |
+| `report/` | The parts of the wind report that touch no file: the cases (`cases.ts`), the maps (`map.ts`), the zonal-mean chart (`chart.ts`), the PNG writer (`png.ts`), the page (`page.ts`), the measures and checks against published studies (`summary.ts`) and the papers' words they are set beside (`literature.ts`), running the models on the cases (`run.ts`), and in `testing/` the XML and PNG readers only its tests use |
 | `run-with-vite.mjs` | Runs a TypeScript script through Vite, so it can import the core |
+| `docs/` | `climate-process.py`, which draws `docs/climate-process.pdf`; see [The climate process diagram](#the-climate-process-diagram) |
 
 ### `public/data/`
 
-The two Earth data files, served beside the page as they are; see [Data](data.md).
+The four Earth data files, served beside the page as they are; see [Data](data.md).

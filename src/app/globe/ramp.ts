@@ -123,6 +123,35 @@ export const DIFFERENCE_RAMP: ColourRamp = {
 };
 
 /**
+ * The ramp the sea-level pressure is drawn with: teal for low pressure,
+ * near white at the middle of the scale, which is centred on the planet's
+ * mean, and brown for high.
+ *
+ * @remarks
+ * Its hues are those of no other ramp, so that a pressure is not read as
+ * any other layer: not the temperature's dark blue, purple, red and pale
+ * yellow of {@link TEMPERATURE_RAMP}, the seasonal range's purples of
+ * {@link SEASONAL_RANGE_RAMP}, nor the blue and red either side of white of
+ * {@link DIFFERENCE_RAMP}. Like the difference's, its seven stops are evenly
+ * spaced and symmetric about the near-white middle, and each side grows
+ * darker away from it, so how far a pressure is from the mean reads from
+ * lightness alone; teal and brown, the two hues, are told apart in the
+ * common colour-vision deficiencies.
+ */
+export const PRESSURE_RAMP: ColourRamp = {
+	name: 'pressure',
+	stops: [
+		{ at: 0, colour: 0x01665e },
+		{ at: 1 / 6, colour: 0x5ab4ac },
+		{ at: 2 / 6, colour: 0xc7eae5 },
+		{ at: 0.5, colour: 0xf5f5f5 },
+		{ at: 4 / 6, colour: 0xf6e8c3 },
+		{ at: 5 / 6, colour: 0xd8b365 },
+		{ at: 1, colour: 0x8c510a },
+	],
+};
+
+/**
  * A range centred on zero, such as a scale of differences that reach as
  * far either way.
  *

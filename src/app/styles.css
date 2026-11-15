@@ -175,6 +175,12 @@ body {
   font-size: var(--font-size-sm);
 }
 
+/* Hidden by the page, as the Winds shown choice is off the measured Earth,
+   which the display set on it would otherwise undo. */
+.field[hidden] {
+  display: none;
+}
+
 .field--check {
   grid-template-columns: auto 1fr;
   gap: var(--space-sm);
@@ -588,7 +594,10 @@ body {
   text-align: end;
 }
 
-/* The note carries its own margin, so its region takes no room while empty. */
+/*
+ * Each note carries its own margin, so its region takes no room while empty,
+ * and two notes shown together stand apart.
+ */
 .planet-readout__note {
   margin: 0;
   margin-block-start: var(--space-sm);
@@ -792,14 +801,88 @@ body {
   accent-color: var(--color-accent);
 }
 
-/* The row along the bottom of the globe's area that the legend and the
-   cursor readout sit in, a small margin in from its edges. The legend comes
-   first and the row runs from right to left, so the legend takes the
-   bottom-right corner and the strip, pushed along by its margin, the left
-   edge. The lines stack upwards, so when the two do not fit side by side the
-   legend keeps the bottom and the strip's line sits directly above it; on
-   one line both stand on the bottom edge. The pointer passes through the
-   row and all it holds to the globe. */
+/* The key to the wind arrows, on the legend's backing, beside the legend
+   or in the corner while it is hidden: a caption, an arrow and its speed
+   on each line, and the status line, worded as the legend's. The arrows
+   are drawn at their size on the globe, one CSS pixel to a pixel. */
+.wind-key {
+  display: grid;
+  flex: none;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  background: var(--color-overlay-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+}
+
+/* Hidden by the page, which the display set on it would otherwise undo. */
+.wind-key[hidden] {
+  display: none;
+}
+
+.wind-key__caption,
+.wind-key__status {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Each arrow stands in a column as wide as the longest, so the speeds line
+   up after them. */
+.wind-key__row {
+  display: grid;
+  grid-template-columns: 2.25rem auto;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.wind-key__arrow {
+  display: block;
+  overflow: visible;
+}
+
+.wind-key__label {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+/* How to read the streaks, in the arrows' place while the winds are drawn
+   as streaks. */
+.wind-key__streaks {
+  margin: 0;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+/* How far the simulated winds are from the observed, on the measured
+   Earth. Each line takes the pointer, though the key does not, so that its
+   tooltip, the figure's exact definition, shows. */
+.wind-key__figure {
+  margin: 0;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+}
+
+/* Left empty rather than hidden when there is nothing to say, as the
+   legend's line is, with its one line kept. */
+.wind-key__status {
+  min-height: 1.4em;
+  color: var(--color-text-muted);
+}
+
+/* The row along the bottom of the globe's area that the legend, the key to
+   the wind arrows and the cursor readout sit in, a small margin in from its
+   edges. The legend comes first, then the key, then the strip, and the row
+   runs from right to left, so the legend takes the bottom-right corner, the
+   key stands to its left, or in the corner while the legend is hidden, and
+   the strip, pushed along by its margin, takes the left edge. The lines
+   stack upwards, so when they do not all fit side by side the legend keeps
+   the bottom and what does not fit sits on a line directly above; on one
+   line all stand on the bottom edge. The pointer passes through the row and
+   all it holds to the globe. */
 .globe-overlays {
   grid-area: 1 / 1;
   display: flex;
@@ -826,8 +909,9 @@ body {
    its size as the values change; in a window narrower than that it is as
    wide as the area allows. Each part has a line of its own and a part with
    nothing to say takes none, so the strip is two lines high in Terrain view
-   and three in Temperature view: its height changes only with what is
-   shown, not with the values. */
+   and three in Temperature view, with one more for the wind while the
+   winds are shown: its height changes only with what is shown, not with
+   the values. */
 .cursor-readout {
   display: flex;
   flex: none;
@@ -856,19 +940,22 @@ body {
    scrolls. */
 .cursor-readout__position,
 .cursor-readout__elevation,
-.cursor-readout__temperature {
+.cursor-readout__temperature,
+.cursor-readout__wind {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-/* The end of the temperature's line, after a middle dot that is hidden
-   with it. */
-.cursor-readout__status {
+/* The end of the temperature's line and of the wind's, each after a middle
+   dot that is hidden with it. */
+.cursor-readout__status,
+.cursor-readout__wind-status {
   color: var(--color-text-muted);
 }
 
-.cursor-readout__status::before {
+.cursor-readout__status::before,
+.cursor-readout__wind-status::before {
   content: " · ";
 }
 

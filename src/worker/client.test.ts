@@ -14,6 +14,7 @@ import {
 	progressMessageOf,
 	temperatureOf,
 } from '../core/testing/temperatureFixtures';
+import { windResultOf } from '../core/testing/windFixtures';
 import { createSimClient } from './client';
 import { createFakeWorker } from './testing/fakeWorker';
 
@@ -290,6 +291,28 @@ describe('request for temperature', () => {
 			result: temperatureOf(1),
 		});
 		await expect(quiet).resolves.toEqual(temperatureOf(1));
+	});
+});
+
+describe('request for winds', () => {
+	it('sends a copy of the temperatures with the world, leaving the caller both, and resolves with the winds', async () => {
+		const worker = createFakeWorker();
+		const client = createSimClient(worker);
+		const world = blank();
+		const temperatures = temperatureOf(1, 4).months;
+
+		const pending = client.request('winds', { world, temperatures });
+
+		expect(worker.postCalls).toEqual([
+			[{ id: 1, kind: 'winds', world, temperatures }],
+		]);
+		const posted = worker.posted[0] as SimRequest<'winds'>;
+		expect(posted.temperatures[0]).not.toBe(temperatures[0]);
+		expect(temperatures[0]?.byteLength).toBe(4 * 4);
+
+		const winds = windResultOf(1, 4);
+		worker.respond({ id: 1, kind: 'winds', ok: true, result: winds });
+		await expect(pending).resolves.toBe(winds);
 	});
 });
 
