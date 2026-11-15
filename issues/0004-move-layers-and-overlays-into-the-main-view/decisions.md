@@ -62,6 +62,9 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - In a window too short for the one info box, the top bar and the corner are drawn above the info region, so no control is ever covered; the box's top tucks under the top bar and its top line may be hidden. The user: "Box tucks under top bar" (2026-11-15)
 - Piece 4 starts. The user: "Start it" (2026-11-15)
 
+- The info box has no winds block: the key's sample arrows ("5 m/s", "10+ m/s"), its "Surface wind" caption and the streaks line ("Faster, longer streaks are stronger winds") go, since arrows and streaks explain themselves and the pointer block gives the wind's speed. The user: "lets get rid of the wind part of the pop up box - its clear what arrows and streaks mean and ther aw speed is visible lower down so that info box i sireelvant" (2026-11-15)
+- The comparison's two wind lines ("Off by … on average", "Direction right on …% of the map") stay, shown only on the untouched Earth while Winds is on, as two plain lines in the box under the legend's figures, with their tooltips. The winds' status and the observed winds' loading and failure lines go on the one status line, as planned. The user: "Keep them as two lines" (2026-11-15)
+
 ## Open
 - None.
 
