@@ -12,7 +12,7 @@ Not included: winds carrying heat (temperature is unchanged by this step), upper
 
 ## Plan
 
-_2026-11-15 · 18 of 19 pieces done (piece 6 dropped, pieces 7 and 14 split, piece 16 added) · now: waiting on a decision (piece 16)_
+_2026-11-15 · 18 of 19 pieces done (piece 6 dropped, pieces 7 and 14 split, piece 16 added) · now: piece 16 in progress_
 
 - [x] **1/15 Observed winds and pressure data** · `69d3619`
   The real Earth's monthly winds and sea-level pressure as two small data files, with readers that take them onto a world's cells.
@@ -51,5 +51,5 @@ _2026-11-15 · 18 of 19 pieces done (piece 6 dropped, pieces 7 and 14 split, pie
   A committed record of the Earth's wind and pressure error figures, with a test that fails if a later change makes them worse.
 - [x] **15/15 Moving streaks** · `7c1cf20`
   Animated streaks flowing with the wind, as a choice beside arrows.
-- [ ] **16 The climate process diagram in the docs** (added 2026-11-14: the user asked for the diagram of the whole climate process to be kept in the repo) · not started
+- [ ] **16 The climate process diagram in the docs** (added 2026-11-14: the user asked for the diagram of the whole climate process to be kept in the repo) · in progress
   A one-page PDF of how the climate will be worked out, with the script that draws it.

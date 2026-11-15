@@ -111,7 +111,7 @@ Step 3 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - The choice of Arrows or Streaks is remembered by the browser, as the speed unit is; Winds itself still starts off. The user: "Remember it" (2026-11-14)
 - While Streaks are on, the wind key keeps its caption, status and figures and swaps its two arrows for "Faster, longer streaks are stronger winds". The user: "Swap arrows for a line (Recommended)" (2026-11-14)
 - Piece 15 approved with both clean-ups fixed (re-wrap the long comment in renderer.ts; reuse one per-frame view object and one camera array). The user, after trying the streaks: "Tried it, approve, fix both" (2026-11-15)
-- Piece 16 is built on Sonnet, as its Model line says; the builder checks every setting's value against the code. The user: "Sonnet (Recommended)" (2026-11-15)
+~~- Piece 16 is built on Sonnet, as its Model line says; the builder checks every setting's value against the code. The user: "Sonnet (Recommended)" (2026-11-15)~~ Superseded the same day: piece 16 is built on Opus, since explaining each setting's effect from the code is reasoning, not transcription. The user: "Start it on Opus (Recommended)" (2026-11-15)
 - Piece 16 is reviewed by correctness (told to compare each setting on the PDF with the code) and docs only; no coverage or security. The user: "Correctness + docs (Recommended)" (2026-11-15)
 - The PDF lists the model settings only; display settings (colour-scale spans, arrow and streak sizes) wait for config.md (roadmap step 3d). The user: "No, model settings only (Recommended)" (2026-11-15)
 - README.md changes only as the plan names: what this issue adds, winds out of "Planned", a docs table row for the diagram. The user: "Only what the plan names (Recommended)" (2026-11-15)
