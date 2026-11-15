@@ -3,13 +3,13 @@
   "slug": "add-winds-layer",
   "title": "Add winds, air pressure and day length",
   "mode": "build",
-  "state": "review",
+  "state": "ready",
   "branch": "claude/add-winds-layer-991a60",
   "base": "main",
   "gh_issue": 5,
   "build_model": "claude-opus-5-5",
   "created": "2026-11-13 07:43",
-  "updated": "2026-11-15 09:10",
+  "updated": "2026-11-15 11:57",
   "done": null,
   "local": [
     {

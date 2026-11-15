@@ -78,3 +78,4 @@
 - 2026-11-13 09:28 · add-winds-layer (0003) · planned → building
 - 2026-11-13 10:56 · add-winds-layer (0003) · PR #6
 - 2026-11-15 09:10 · add-winds-layer (0003) · building → review
+- 2026-11-15 11:57 · add-winds-layer (0003) · review → ready
