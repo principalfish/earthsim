@@ -12,7 +12,7 @@ Not included: any change to the temperature or wind models, a layout for phone-s
 
 ## Plan
 
-_2026-11-15 · 3 of 11 pieces done · now: piece 4 in progress_
+_2026-11-15 · 3 of 11 pieces done · now: waiting on review of piece 4_
 
 - [x] **1/11 The main-view regions, the icons, and the layer and overlay tiles** · `6278b72`
   Icon tiles down the left edge of the globe choose the colour layer and switch Winds, Sunlight and the grid.
@@ -20,7 +20,7 @@ _2026-11-15 · 3 of 11 pieces done · now: piece 4 in progress_
   The view of the year and one Simulated, Observed or Difference control, for the layer and the winds together.
 - [x] **3/11 The month timeline, and the Layers section removed** · `f91b134`
   The month slider and Play along the bottom of the globe; the side panel loses its Layers section.
-- [ ] **4/11 One info box** · in progress
+- [ ] **4/11 One info box** · waiting on you
   The legend, the wind key, one status and the value under the pointer in a single box.
 - [ ] **5/11 Everything worked out after every change, with Pause** · not started
   The climate is solved after every change and when the page opens, with a Pause button for sculpting.
