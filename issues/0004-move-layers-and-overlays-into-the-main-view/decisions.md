@@ -39,6 +39,10 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Manual reviews: all seven proposed are kept, for pieces 1, 2, 3, 4, 5, 9 and 10. The user: "Keep all seven" (2026-11-15)
 
+- The dock's two headings read "Layers" (over Terrain, Temperature, Pressure) and "Overlays" (over Winds, Sunlight, Grid). The user: "Layers and Overlays" (2026-11-15)
+- For manual reviews the user runs their own dev server from the builder's worktree; the planner gives the worktree's path at each review, and the builder leaves no server running. The user: "I'll run my own" (2026-11-15)
+- The builder starts on piece 1. The user: "Start it" (2026-11-15)
+
 ## Open
 - None.
 
