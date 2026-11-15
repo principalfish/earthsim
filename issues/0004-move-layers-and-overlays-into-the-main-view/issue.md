@@ -9,3 +9,30 @@ The climate is now worked out after every change to the world, whatever is on sc
 The browser remembers the layer and toggles between visits. A new Settings section in the side panel sets the units, all metric or all imperial with an override for each quantity, across every read-out and control, and whether winds are drawn as arrows or streaks, which now start as streaks unless the system asks for reduced motion.
 
 Not included: any change to the temperature or wind models, a layout for phone-sized screens, heat carried by winds and the climate loop, and the folder refactor that follows.
+
+## Plan
+
+_2026-11-15 · 0 of 11 pieces done · now: planned, waiting to start_
+
+- [ ] **1/11 The main-view regions, the icons, and the layer and overlay tiles** · not started
+  Icon tiles down the left edge of the globe choose the colour layer and switch Winds, Sunlight and the grid.
+- [ ] **2/11 Show and one comparison control at the top** · not started
+  The view of the year and one Simulated, Observed or Difference control, for the layer and the winds together.
+- [ ] **3/11 The month timeline, and the Layers section removed** · not started
+  The month slider and Play along the bottom of the globe; the side panel loses its Layers section.
+- [ ] **4/11 One info box** · not started
+  The legend, the wind key, one status and the value under the pointer in a single box.
+- [ ] **5/11 Everything worked out after every change, with Pause** · not started
+  The climate is solved after every change and when the page opens, with a Pause button for sculpting.
+- [ ] **6/11 The browser remembers the view** · not started
+  The layer, its view of the year and the three toggles come back as they were left.
+- [ ] **7/11 The Settings section, with arrows or streaks starting on Streaks** · not started
+  A Settings section in the side panel; winds start as streaks unless the system asks for reduced motion.
+- [ ] **8/11 Units: the model and its settings** · not started
+  Metric or Imperial with an override for each quantity, in Settings; wind speed follows it first.
+- [ ] **9/11 Units in the read-outs** · not started
+  The legend, the info box and the Statistics follow the units, with round ticks in each.
+- [ ] **10/11 Units in the controls** · not started
+  The Sea level, brush and New world controls read in the chosen units.
+- [ ] **11/11 The user guide restructured around the main view** · not started
+  The guide and the development notes put in order for the new layout.
