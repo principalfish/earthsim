@@ -12,7 +12,7 @@ Not included: winds carrying heat (temperature is unchanged by this step), upper
 
 ## Plan
 
-_2026-11-15 · 19 of 19 pieces done (piece 6 dropped, pieces 7 and 14 split, piece 16 added) · now: all done, self review 01 fixed; next /publish_
+_2026-11-15 · 19 of 19 pieces done (piece 6 dropped, pieces 7 and 14 split, piece 16 added) · now: PR #6 ready_
 
 - [x] **1/15 Observed winds and pressure data** · `69d3619`
   The real Earth's monthly winds and sea-level pressure as two small data files, with readers that take them onto a world's cells.
