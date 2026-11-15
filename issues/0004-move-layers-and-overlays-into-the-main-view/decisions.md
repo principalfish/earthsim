@@ -43,6 +43,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - For manual reviews the user runs their own dev server from the builder's worktree; the planner gives the worktree's path at each review, and the builder leaves no server running. The user: "I'll run my own" (2026-11-15)
 - The builder starts on piece 1. The user: "Start it" (2026-11-15)
 
+- Piece 1 approved after the user tried it, with the dock made to scroll when the window is too short for it (the builder's option b, over leaving it clipped or dropping to icons). The user: "Tried it, approve, scroll" (2026-11-15)
+
 ## Open
 - None.
 

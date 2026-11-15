@@ -12,9 +12,9 @@ Not included: any change to the temperature or wind models, a layout for phone-s
 
 ## Plan
 
-_2026-11-15 · 0 of 11 pieces done · now: waiting on review of piece 1_
+_2026-11-15 · 0 of 11 pieces done · now: piece 1 approved, being committed_
 
-- [ ] **1/11 The main-view regions, the icons, and the layer and overlay tiles** · waiting on you
+- [ ] **1/11 The main-view regions, the icons, and the layer and overlay tiles** · in progress
   Icon tiles down the left edge of the globe choose the colour layer and switch Winds, Sunlight and the grid.
 - [ ] **2/11 Show and one comparison control at the top** · not started
   The view of the year and one Simulated, Observed or Difference control, for the layer and the winds together.
