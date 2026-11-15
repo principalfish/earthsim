@@ -77,3 +77,4 @@
 - 2026-11-13 09:28 · add-winds-layer (0003) · branch = claude/add-winds-layer-991a60
 - 2026-11-13 09:28 · add-winds-layer (0003) · planned → building
 - 2026-11-13 10:56 · add-winds-layer (0003) · PR #6
+- 2026-11-15 09:10 · add-winds-layer (0003) · building → review
