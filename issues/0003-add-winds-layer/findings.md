@@ -155,10 +155,13 @@ All five checks, then the verifier, on `main...claude/add-winds-layer-991a60` at
 
 | Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
 |-|-|-|-|-|-|-|-|
-| round | correctness | low | defect | verified | open | `src/app/refresh.ts:757` | Switching on Winds or Pressure while the temperature is current waits the 400 ms debounce; "Not calculated yet" shows for about 0.4 s before "Calculating" |
-| round | docs | low | docs | verified | open | `README.md:52` | The scripts line no longer covers baselines, the wind report or tuning |
+| round | correctness | low | defect | verified | fixed | `src/app/refresh.ts:757` | Switching on Winds or Pressure while the temperature is current waits the 400 ms debounce; "Not calculated yet" shows for about 0.4 s before "Calculating" |
+| round | docs | low | docs | verified | fixed | `README.md:52` | The scripts line no longer covers baselines, the wind report or tuning |
 | round | correctness | low | cleanup | verified | skipped | `src/app/refresh.ts:234` | A current answer that arrives while a newer request is held back is dropped and the same solve re-run; the result is still right |
-| round | correctness | low | cleanup | verified | open | `src/app/ui/layerPanel.ts:898` | The simulated winds' summary also averages pressure, which the arrows never use; the Pressure layer averages it again |
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/layerPanel.ts:898` | The simulated winds' summary also averages pressure, which the arrows never use; the Pressure layer averages it again |
 | round | security | - | - | clean | - | - | Clean |
 | round | coverage | - | - | clean | - | - | 97% of 3,123 changed lines; 83 uncovered, all with accepted reasons |
 | round | common-mistakes | - | - | clean | - | - | Clean |
+| re-check | correctness | - | - | clean | - | `src/app/refresh.ts:716`, `src/app/ui/layerPanel.ts:896` | The two fixes only: switching on with a current temperature marks the winds calculating before it returns in every path, and nothing the wait protected is lost; the arrows' annual mean is bit for bit what it was |
+| re-check | docs | - | - | clean | - | `README.md:54` | The sentence covers every script in `docs/development.md` and `package.json`; no page disagrees with the fixes |
+| re-check | other | low | defect | noticed | open | `src/app/refresh.ts:490` | Seen by the builder in a browser, outside the three findings: on a fresh world with no temperature yet, switching on Winds still reads "Not calculated yet" for about 0.4 s, because the temperature's own switch-on waits the same time before it asks; for the user to decide |
