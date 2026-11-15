@@ -14,3 +14,21 @@
 | round | docs | low | docs | verified | fixed | `src/app/styles.css:904` | The dock's comment did not say that the room kept for the scrollbar starts the regions beside it about 10 px further right in every window (also raised by correctness) |
 | round | correctness | - | - | dropped | - | `src/app/styles.css:912` | A wheel over a heading or a gap between tiles zooms the globe instead of scrolling the dock — dropped: intended, only controls take the pointer, and the guide says "over a tile" |
 | round | correctness | - | - | dropped | - | `src/app/styles.css:920` | On overlay-scrollbar platforms the gutter reserves nothing and the scrollbar draws over the padding — dropped: not a real problem; the 10 px shift part is the row above |
+
+## piece 2 · 2026-11-15 · Show and one comparison control at the top
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/topBar.ts:79` | The Show select was taken as `field.children[1]`, relying on the order `createSelectField` builds |
+| round | correctness | low | docs | verified | fixed | `docs/temperature.md:87` | It and two lines of the user guide said a failed observed fetch always goes back to Simulated; one that fails after its layer was left keeps the choice and is tried again on return |
+| round | docs | low | docs | verified | fixed | `src/app/wiring.ts:119` | `PageLayerOptions` was still described as what the Layers section shows and switches on and off |
+| round | docs | low | docs | verified | fixed | `docs/user-guide.md:132` | The opening sentence of "Layers" packed three clauses and was hard to parse |
+| round | correctness | - | - | dropped | - | `src/app/ui/layerPanel.ts:1367` | An old "could not be loaded" line shows again on returning to a layer on Simulated — dropped: consistent with staying on it, and not new |
+| round | docs | - | - | dropped | - | `src/app/ui/viewPanel.ts:83` | Stale comment on what the View section holds — dropped: the diff already rewrote it and it is accurate |
+| round | docs | - | - | dropped | - | `src/app/ui/layerPanel.ts:1463` | Comment on what the layer controls add — dropped: accurate; only the `wiring.ts` part stands |
+| round | docs | - | - | dropped | - | `docs/user-guide.md:34` | "Switching Sunlight or Winds on opens Layers" — dropped: raised for the record, still true |
+| round | coverage | - | - | dropped | - | `src/app/ui/layerPanel.test.ts:4236` | No test ties a real stroke and undo to the source's reset — dropped: the check said no action, and the link predates this piece |
+| re-check | correctness | low | docs | verified | open | `docs/user-guide.md:185` | "Fetched when first needed" still says a failed fetch always goes back to Simulated; the layer's resets only while it is on screen, the winds' only while Winds is on |
+| re-check | correctness | low | docs | verified | open | `docs/user-guide.md:262` | The winds' "Fetched when first needed" says a failed download always goes back to Simulated; it does only while Winds is on |
+| re-check | docs | low | docs | verified | open | `docs/user-guide.md:161` | The Pressure bullet's edited clause is garbled and leaves out what happens when Pressure has been left |
+| re-check | correctness | - | - | dropped | - | `docs/temperature.md:87` | "If Temperature has been left" is exact only for leaving for Pressure — dropped: accurate about the failure; going to Terrain resets through a separate, documented rule |
