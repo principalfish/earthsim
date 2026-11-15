@@ -53,6 +53,10 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 2 approved after the user tried it, with the three standing user-guide wording findings about failed fetches (lines 185, 262, 161) fixed first. The user: "Tried it, fix all" (2026-11-15)
 
+- The timeline's month is a real range input styled as the track, with the twelve month letters as labels above it, hidden from screen readers; clicking a letter sets that month; the input's value text names the month, so the keyboard and screen readers work as today. The user: "Letters over a slider" (2026-11-15)
+- A stored `earth_sim.panel.layers` entry is left in storage and never read (the builder's recommended option; no user decision asked). (2026-11-15)
+- Piece 3 starts. The user: "Start it" (2026-11-15)
+
 ## Open
 - None.
 
