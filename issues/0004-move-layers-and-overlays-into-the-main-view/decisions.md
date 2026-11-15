@@ -37,6 +37,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - Streaks is the starting choice except where the system asks for reduced motion, where it starts on Arrows; either can be chosen in Settings. The user: "Arrows if reduced motion" (2026-11-15)
 - The ledger is complete; the issue and plan follow. The user: "That's everything" (2026-11-15)
 
+- Manual reviews: all seven proposed are kept, for pieces 1, 2, 3, 4, 5, 9 and 10. The user: "Keep all seven" (2026-11-15)
+
 ## Open
 - None.
 
