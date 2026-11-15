@@ -162,7 +162,7 @@ Step 3 planned to prototype two wind models and choose. After the rules prototyp
 - **Real ice sheets:** step 2 only brightens cold surfaces; step 6 replaces that.
 
 ### Open follow-ups, nothing decided
-- A fixed temperature scale option: the scale is fitted to each world, so a frozen planet is drawn in much the same colours as a warm one.
+- Fixed or fitted colour scales, for temperature and pressure: the scales are fitted to each world (temperature chosen 2026-11-11, pressure 2026-11-14), so a frozen planet is drawn in much the same colours as a warm one. Reopened by the user on 2026-11-15 ("i think i settled on dynamic a while ago but now less sure") and left as a follow-up ("leave as a follow up"). Options raised then: a fixed scale; a fixed scale that widens only for a world beyond it, keeping 0 °C at one colour (the planner's recommendation); or a Settings choice between the two. To check first: whether the scale is refitted after each edit, which would shift the colours of untouched places while sculpting.
 - With Sunlight on, the sun can be hard to find in the scene (accepted as it is for now).
 - Terrain speckle on a world wholly at sea level (predates step 2).
 - The build's 500 kB chunk warning (predates step 2).
