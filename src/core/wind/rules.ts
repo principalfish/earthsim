@@ -309,10 +309,13 @@ const DEFAULT_VALUES = {
 	 * low lies near 58°N, it made a ridge 12.5 hPa high within 8° of the low,
 	 * over air only 3 K cooler. Widening it as the low moves out past where
 	 * the subtropical high would be keeps the rise as gentle as a band's,
-	 * reaching the pole, the coolest place on that side, as a high. 0.4 is
-	 * just beyond the simulated Earth's own low, which lies at most 0.40 of a
-	 * cell from the equator, so the Earth's bands are unchanged. Set by hand
-	 * against the tilted case, not against the observed Earth.
+	 * reaching the pole, the coolest place on that side, as a high. On the
+	 * simulated Earth the low as a whole lies at most 0.51 of a cell from the
+	 * equator, where the widened side is still narrower than the band's own,
+	 * so those bands are unchanged. The lows placed by longitude lie up to
+	 * 0.79 of a cell out over hot land from July to September, and there the
+	 * widening acts. Set by hand against the tilted case, not against the
+	 * observed Earth.
 	 */
 	wideSummerFromShare: 0.4,
 

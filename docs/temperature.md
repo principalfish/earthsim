@@ -13,7 +13,7 @@ The temperature is a seasonal energy balance: the year is stepped through month 
 - snow and ice brightening cold surfaces;
 - the greenhouse strength.
 
-There are no winds or ocean currents yet, so the aim is the right broad pattern, not a match to the real Earth.
+There are no ocean currents yet, and the winds do not yet carry heat back into the temperature, so the aim is the right broad pattern, not a match to the real Earth.
 
 ### Finer worlds are solved on a coarser grid
 

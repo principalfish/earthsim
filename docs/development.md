@@ -30,6 +30,28 @@ Requires Node.js and npm. Run `npm install` once.
 - **When a change is meant to move the figures:** run `npm run baseline:temperature`, which rewrites the file and prints what moved, and commit the file with the change.
 - **The winds follow the temperature,** so a change to the temperature model moves the Earth winds baseline too: run `npm run baseline:winds` as well; see [Winds](winds.md#the-earth-winds-baseline).
 
+## The climate process diagram
+
+`docs/climate-process.pdf` is drawn by `scripts/docs/climate-process.py`. Its first page is a diagram of how the climate is to be worked out when every part up to the biomes is built: the loop of temperature, pressure, winds and ocean currents, and what is worked out from its settled state. The pages after it list the settings of the temperature and wind models, each with its value, what it controls, what raising or lowering it does, and where the value comes from.
+
+It needs Python 3 and the `reportlab` library, which the project does not otherwise use, so run it from a throwaway environment outside the repository, `<dir>` being any folder there:
+
+```bash
+python3 -m venv <dir>
+```
+
+```bash
+<dir>/bin/pip install reportlab
+```
+
+```bash
+<dir>/bin/python scripts/docs/climate-process.py docs/climate-process.pdf
+```
+
+- **Re-running it with nothing changed** leaves the PDF byte-identical, so the PDF changes in a commit only when the script does. The committed PDF was drawn with reportlab 5.1.0; another version may write the same pages as different bytes.
+- **The diagram is a design,** mostly of parts not built yet. Redraw it when one of them, once built, changes it.
+- **The settings pages are a dated snapshot,** kept by hand in the script, with the date set once at its top. When a setting is added, removed or changed in `src/core/wind/rules.ts` or `src/core/temperature.ts`, bring the pages up to the code. A future `src/core/config.md` is to become the living list of the settings.
+
 ## Type-checking rules
 
 - The core is compiled without the DOM type library, and the worker with the worker's library in its place. A `document` or `window` reference in either fails `npm run typecheck`.
@@ -108,9 +130,9 @@ It computes from a copy of the world, and its answers depend on the request alon
 | `client.ts` | The page's side of the channel |
 | `testing/` | A stand-in worker for the tests |
 
-### `scripts/`: building the data and the reports
+### `scripts/`: building the data, the reports and the climate diagram
 
-Run with Node, not in the browser.
+Run with Node, not in the browser; `docs/` alone is Python.
 
 | File | What it does |
 |-|-|
@@ -131,6 +153,7 @@ Run with Node, not in the browser.
 | `tune/` | The parts of the tuning script that touch no file: its command line (`command.ts`), the sweep and the search (`search.ts`), the cases and their temperatures worked out once and the runs on them (`tuning.ts`), the numbers that show each known fault on the Earth (`faults.ts`), and the printout (`text.ts`) |
 | `report/` | The parts of the wind report that touch no file: the cases (`cases.ts`), the maps (`map.ts`), the zonal-mean chart (`chart.ts`), the PNG writer (`png.ts`), the page (`page.ts`), the measures and checks against published studies (`summary.ts`) and the papers' words they are set beside (`literature.ts`), running the models on the cases (`run.ts`), and in `testing/` the XML and PNG readers only its tests use |
 | `run-with-vite.mjs` | Runs a TypeScript script through Vite, so it can import the core |
+| `docs/` | `climate-process.py`, which draws `docs/climate-process.pdf`; see [The climate process diagram](#the-climate-process-diagram) |
 
 ### `public/data/`
 
