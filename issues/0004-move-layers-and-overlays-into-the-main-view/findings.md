@@ -67,5 +67,7 @@
 | round | correctness | low | cleanup | verified | fixed | `src/app/styles.css:678` | Two comment blocks not rewrapped |
 | round | security | - | - | dropped | - | `src/app/windUnits.ts:94` | A NaN bearing would read "undefined" — dropped: the function requires a finite bearing, and NaN would come only from a broken wind field, outside this change |
 | round | docs | - | - | dropped | - | `src/app/ui/windKey.ts` | The `windKey` names still say "key" — dropped: optional; the comments say what they do now; a rename is a later cleanup |
-| re-check | correctness | low | test | verified | open | `src/app/ui/cursorReadout.test.ts:904` | Two `it.each` cases still set the removed `month` and `summary` fields, so they now test only what the 'the result' case does |
+| re-check | correctness | low | test | verified | fixed | `src/app/ui/cursorReadout.test.ts:904` | Two `it.each` cases still set the removed `month` and `summary` fields, so they now test only what the 'the result' case does |
 | re-check | correctness | - | - | noticed | - | `src/app/ui/cursorReadout.ts:96` | Doc comments still mention the month or summary the field may be; still true, no change needed |
+| manual | user | low | test | - | fixed | `src/app/ui/cursorReadout.test.ts:904` | The user chose to fix the redundant test cases: "Tried it, fix it" |
+| re-check | coverage | - | - | - | - | `src/app/ui/cursorReadout.test.ts:904` | Light re-check of the test fix: clean |

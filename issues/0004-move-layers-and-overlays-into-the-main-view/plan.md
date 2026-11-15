@@ -160,7 +160,7 @@ Rejected:
 - [x] 1. The main-view regions, the icons, and the layer and overlay tiles
 - [x] 2. Show and one comparison control at the top
 - [x] 3. The month timeline, and the Layers section removed
-- [ ] 4. One info box
+- [x] 4. One info box
 - [ ] 5. Everything worked out after every change, with Pause
 - [ ] 6. The browser remembers the view
 - [ ] 7. The Settings section, with arrows or streaks starting on Streaks
@@ -233,4 +233,4 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - With the wind key and figures gone the box is short enough that at 800x420 it no longer reaches the top bar; the tuck-under rule stays for windows shorter still.
 - Very long second lines (e.g. a difference marked out of date beside a km/h wind) end in an ellipsis at the box's width.
 - One review round over all four changes (correctness, security, coverage, docs): four low cleanups verified and fixed, two dropped; light re-check by correctness. Uncovered changed lines: `src/app/main.ts` (entry point) and `src/app/ui/topBar.ts:83`, both reasons accepted. In `findings.md`.
-
+- The light re-check's test finding (two redundant `it.each` cases in `cursorReadout.test.ts`) fixed on the user's word, "Tried it, fix it"; coverage re-check clean. Committed as `7e3cd2e` and pushed.
