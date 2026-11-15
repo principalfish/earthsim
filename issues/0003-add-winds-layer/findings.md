@@ -148,3 +148,17 @@ Reviewed by correctness and docs only, as the user chose. Correctness ran as two
 
 
 The user's verdict: "Read it, approve, fix both". Both open findings were fixed before the commit, with no further review round.
+
+## review 01 · 2026-11-15 · Self review of the whole branch
+
+All five checks, then the verifier, on `main...claude/add-winds-layer-991a60` at `e9193d9`. The user chose: "Fix 1, 2 and 4 (Recommended)".
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | defect | verified | open | `src/app/refresh.ts:757` | Switching on Winds or Pressure while the temperature is current waits the 400 ms debounce; "Not calculated yet" shows for about 0.4 s before "Calculating" |
+| round | docs | low | docs | verified | open | `README.md:52` | The scripts line no longer covers baselines, the wind report or tuning |
+| round | correctness | low | cleanup | verified | skipped | `src/app/refresh.ts:234` | A current answer that arrives while a newer request is held back is dropped and the same solve re-run; the result is still right |
+| round | correctness | low | cleanup | verified | open | `src/app/ui/layerPanel.ts:898` | The simulated winds' summary also averages pressure, which the arrows never use; the Pressure layer averages it again |
+| round | security | - | - | clean | - | - | Clean |
+| round | coverage | - | - | clean | - | - | 97% of 3,123 changed lines; 83 uncovered, all with accepted reasons |
+| round | common-mistakes | - | - | clean | - | - | Clean |
