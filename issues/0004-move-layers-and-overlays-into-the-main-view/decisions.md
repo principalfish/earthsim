@@ -51,6 +51,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - The builder session runs on Opus (`claude-opus-5-5`) from its next turn; it had inherited Fable (`claude-fable-5-2`) from this chat's model when started. The user: "downgrade the builder to opus" (2026-11-15)
 
+- Piece 2 approved after the user tried it, with the three standing user-guide wording findings about failed fetches (lines 185, 262, 161) fixed first. The user: "Tried it, fix all" (2026-11-15)
+
 ## Open
 - None.
 
