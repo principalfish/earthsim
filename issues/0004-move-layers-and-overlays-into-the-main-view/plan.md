@@ -221,3 +221,11 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - Coverage once failed on a timeout in `scripts/tune/tuning.test.ts` (untouched) while the machine was loaded; rerun alone it passed.
 - Review: one round, five verified findings (one medium layout defect, one naming, three tidying), all fixed; light re-check by correctness. In `findings.md`.
 - Committed as `f91b134` and pushed on the user's approval: "Tried it, approve".
+
+### Piece 4 (2026-11-15), in progress
+
+- Built on claude-opus-5-5. Go-ahead "Start it"; in a window too short for the box it tucks under the top bar ("Box tucks under top bar").
+- The status is ranked by a `state` field added to `LegendContent` and `WindKeyContent`, not by matching wording, so a reworded line cannot be ranked wrongly.
+- The first review round (on the box with its wind key) verified one cleanup (dead wind fallbacks in `main.ts`, `InfoBoxOptions` used only by a test), folded into the user's change.
+- The user then changed the box three times while looking at it: the wind key out, its two figure lines kept ("lets get rid of the wind part of the pop up box"; "Keep them as two lines"); the legend's end labels out; the two lines made one "Wind:" line. The review round on the first of these (comment wording only, folded into the next build) was overtaken by the next two; one round and light re-check cover the whole change.
+- Stopped at a usage limit (2026-11-15) after the round's correctness, security and docs checks on the whole change, before the coverage check. Done: lint, typecheck, 109 files and 3389 tests, build, both baselines unchanged; changed-lines coverage 96% (16 lines: `main.ts` entry point and `topBar.ts:83`, both reasons accepted before). Raised, not yet verified: `src/app/globe/wind.ts:369` comment "The key draws its arrows with this too" (docs); `styles.css:729` legend comment still mentions the end colours' words, `layerPanel.ts:502,554,627` and `wiring.ts:417` lines not rewrapped (correctness); the wind line wraps in a globe area under about 400 px (correctness, info, for the user). Security clean. To resume: the coverage check with the report above, then the verifier, fixes, light re-check, `findings.md`, the six screenshots (four sizes, a solve running, Earth with Observed and Winds on), the review request.
