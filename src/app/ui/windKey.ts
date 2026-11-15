@@ -1,7 +1,8 @@
 /**
- * The key to the wind arrows, laid over the globe while the winds are
- * shown: arrows of a few speeds, drawn as those on the globe are and as
- * long as they are where they face the camera; on the measured Earth, two
+ * The key to the winds, laid over the globe while the winds are shown:
+ * arrows of a few speeds, drawn as those on the globe are and as long as
+ * they are where they face the camera, or while the winds are drawn as
+ * streaks one line saying how to read those; on the measured Earth, two
  * lines saying how far the simulated winds are from the observed; and a
  * line saying where the winds on hand stand, in the words the temperature
  * legend uses.
@@ -21,6 +22,7 @@ import {
 	arrowOutline,
 	arrowShape,
 } from '../globe/wind';
+import { DEFAULT_WIND_STYLE, type WindStyle } from '../globe/windMotion';
 import type { WindsLayer } from '../layers';
 import {
 	convertSpeed,
@@ -39,6 +41,10 @@ export const WIND_KEY_SPEEDS = [ARROW_CAP_SPEED / 2, ARROW_CAP_SPEED] as const;
 
 /** What the key's caption says. */
 export const WIND_KEY_CAPTION = 'Surface wind';
+
+/** What the key says in place of its arrows while the winds are streaks. */
+export const WIND_KEY_STREAKS_TEXT =
+	'Faster, longer streaks are stronger winds';
 
 /** What the key says while the winds are being worked out. */
 export const WINDS_CALCULATING_TEXT = 'Calculating';
@@ -166,6 +172,12 @@ export type WindKey = {
 	 * unit. The arrows stay as they are, drawn for the same speeds.
 	 */
 	setUnit(unit: WindUnit): void;
+	/**
+	 * Shows the key for the winds drawn as arrows, with its arrows, or as
+	 * streaks, with {@link WIND_KEY_STREAKS_TEXT} in their place; the rest
+	 * stays as it is.
+	 */
+	setStyle(style: WindStyle): void;
 };
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
@@ -221,13 +233,19 @@ const drawArrow = (shape: ArrowShape): SVGSVGElement => {
  * tooltip says exactly what its figure is, and neither takes any room
  * while there are no figures. Under them all is the status line, a polite
  * live region rewritten only when its words change, as the legend's is,
- * and kept in place, empty, while there is nothing to say.
+ * and kept in place, empty, while there is nothing to say. While the winds
+ * are drawn as streaks, one line, {@link WIND_KEY_STREAKS_TEXT}, takes the
+ * arrows' place under the caption, and the arrows are not in the key.
  *
  * @param unit - The unit the speeds are written in at first; m/s when left
  * out.
+ * @param style - How the winds are drawn at first; as arrows when left out.
  * @returns The key.
  */
-export const createWindKey = (unit: WindUnit = DEFAULT_WIND_UNIT): WindKey => {
+export const createWindKey = (
+	unit: WindUnit = DEFAULT_WIND_UNIT,
+	style: WindStyle = DEFAULT_WIND_STYLE,
+): WindKey => {
 	const key = createElement('div', 'wind-key');
 	key.hidden = true;
 	const caption = createElement('p', 'wind-key__caption');
@@ -235,6 +253,8 @@ export const createWindKey = (unit: WindUnit = DEFAULT_WIND_UNIT): WindKey => {
 	key.append(caption);
 	/** Each arrow's label, with the speed it is drawn for. */
 	const labels: { readonly speed: number; readonly label: HTMLElement }[] = [];
+	/** Each arrow's row, with the arrow and its label. */
+	const rows: HTMLElement[] = [];
 	for (const speed of WIND_KEY_SPEEDS) {
 		const shape = arrowShape(speed);
 		if (shape === null) {
@@ -245,18 +265,30 @@ export const createWindKey = (unit: WindUnit = DEFAULT_WIND_UNIT): WindKey => {
 		label.textContent = formatSpeed(speed, unit);
 		labels.push({ speed, label });
 		row.append(drawArrow(shape) as unknown as HTMLElement, label);
-		key.append(row);
+		rows.push(row);
 	}
+	const streaks = createElement('p', 'wind-key__streaks');
+	streaks.textContent = WIND_KEY_STREAKS_TEXT;
 	const offBy = createElement('p', 'wind-key__figure');
 	offBy.title = WIND_OFF_BY_TITLE;
 	offBy.hidden = true;
 	const direction = createElement('p', 'wind-key__figure');
 	direction.title = WIND_DIRECTION_TITLE;
 	direction.hidden = true;
-	key.append(offBy, direction);
 	const status = createElement('p', 'wind-key__status');
 	status.setAttribute('aria-live', 'polite');
-	key.append(status);
+	/** Puts in the key what it holds for a way of drawing the winds. */
+	const arrange = (next: WindStyle): void => {
+		key.replaceChildren(
+			caption,
+			...(next === 'streaks' ? [streaks] : rows),
+			offBy,
+			direction,
+			status,
+		);
+	};
+	arrange(style);
+	let shownStyle = style;
 	let shownUnit = unit;
 	/** The figures the key last showed, or null for none. */
 	let figures: WindKeyFigures | null = null;
@@ -292,6 +324,12 @@ export const createWindKey = (unit: WindUnit = DEFAULT_WIND_UNIT): WindKey => {
 				label.textContent = formatSpeed(speed, next);
 			}
 			writeFigures();
+		},
+		setStyle: (next) => {
+			if (next !== shownStyle) {
+				shownStyle = next;
+				arrange(next);
+			}
 		},
 	};
 };

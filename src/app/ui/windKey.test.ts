@@ -27,6 +27,7 @@ import {
 	WIND_DIRECTION_TITLE,
 	WIND_KEY_CAPTION,
 	WIND_KEY_SPEEDS,
+	WIND_KEY_STREAKS_TEXT,
 	WIND_OFF_BY_TITLE,
 	WINDS_CALCULATING_TEXT,
 	WINDS_UNAVAILABLE_TEXT,
@@ -291,5 +292,117 @@ describe('the key’s figures', () => {
 		expect(byClass(element, 'wind-key__figure')[1]?.textContent).toBe(
 			'Direction right on 61% of the map',
 		);
+	});
+});
+
+describe('the key while the winds are streaks', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	/** The classes of what the key holds, in order. */
+	const classesOf = (element: FakeElement) =>
+		element.children.map((child) => child.className);
+
+	const ARROWS_KEY = [
+		'wind-key__caption',
+		'wind-key__row',
+		'wind-key__row',
+		'wind-key__figure',
+		'wind-key__figure',
+		'wind-key__status',
+	];
+
+	const STREAKS_KEY = [
+		'wind-key__caption',
+		'wind-key__streaks',
+		'wind-key__figure',
+		'wind-key__figure',
+		'wind-key__status',
+	];
+
+	it('words the line in the arrows’ place', () => {
+		expect(WIND_KEY_STREAKS_TEXT).toBe(
+			'Faster, longer streaks are stronger winds',
+		);
+	});
+
+	it('starts with one line in place of the arrows, keeping the caption, figures and status', () => {
+		const key = createWindKey('m/s', 'streaks');
+		const element = key.element as unknown as FakeElement;
+		expect(classesOf(element)).toEqual(STREAKS_KEY);
+		expect(oneByClass(element, 'wind-key__streaks').textContent).toBe(
+			WIND_KEY_STREAKS_TEXT,
+		);
+		expect(oneByClass(element, 'wind-key__caption').textContent).toBe(
+			WIND_KEY_CAPTION,
+		);
+		expect(byClass(element, 'wind-key__label')).toEqual([]);
+		key.show({
+			status: WINDS_CALCULATING_TEXT,
+			figures: { rmsVectorDifference: 3.8, directionShare: 0.61 },
+		});
+		expect(oneByClass(element, 'wind-key__status').textContent).toBe(
+			WINDS_CALCULATING_TEXT,
+		);
+		expect(
+			byClass(element, 'wind-key__figure').map((line) => line.textContent),
+		).toEqual([
+			'Off by 3.8 m/s on average',
+			'Direction right on 61% of the map',
+		]);
+	});
+
+	it('swaps the arrows for the line and back when told, keeping what it shows', () => {
+		const key = createWindKey('km/h');
+		const element = key.element as unknown as FakeElement;
+		key.show({
+			status: 'Out of date',
+			figures: { rmsVectorDifference: 3.8, directionShare: 0.61 },
+		});
+		const status = oneByClass(element, 'wind-key__status');
+		key.setStyle('streaks');
+		expect(classesOf(element)).toEqual(STREAKS_KEY);
+		expect(element.hidden).toBe(false);
+		expect(oneByClass(element, 'wind-key__status')).toBe(status);
+		expect(status.textContent).toBe('Out of date');
+		expect(byClass(element, 'wind-key__figure')[0]?.textContent).toBe(
+			'Off by 13.7 km/h on average',
+		);
+		key.setUnit('mph');
+		key.setStyle('arrows');
+		expect(classesOf(element)).toEqual(ARROWS_KEY);
+		expect(
+			byClass(element, 'wind-key__label').map((label) => label.textContent),
+		).toEqual(['11 mph', '22+ mph']);
+		expect(byClass(element, 'wind-key__figure')[0]?.textContent).toBe(
+			'Off by 8.5 mph on average',
+		);
+	});
+
+	it('is just as before with arrows, told so or not', () => {
+		const told = createWindKey();
+		told.setStyle('arrows');
+		expect(classesOf(told.element as unknown as FakeElement)).toEqual(
+			ARROWS_KEY,
+		);
+		const given = createWindKey('m/s', 'arrows');
+		expect(classesOf(given.element as unknown as FakeElement)).toEqual(
+			ARROWS_KEY,
+		);
+		expect(
+			byClass(given.element as unknown as FakeElement, 'wind-key__streaks'),
+		).toEqual([]);
+	});
+
+	it('stays hidden while it has nothing to show, whichever way the winds are drawn', () => {
+		const key = createWindKey();
+		key.setStyle('streaks');
+		expect((key.element as unknown as FakeElement).hidden).toBe(true);
 	});
 });

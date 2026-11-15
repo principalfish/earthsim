@@ -25,6 +25,7 @@ import type { Autosave, AutosaveOptions } from './autosave';
 import type { RotateButton, ViewInput } from './globe/input';
 import type { SunlightStyle } from './globe/material';
 import type { Globe } from './globe/renderer';
+import type { WindStyle } from './globe/windMotion';
 import { createLayerStore, type LayerStore } from './layers';
 import type { ObservedLoader } from './observedData';
 import type { Preferences } from './preferences';
@@ -86,6 +87,8 @@ export type PageGlobe = Pick<
 	| 'setSun'
 	| 'setSunlight'
 	| 'updateElevation'
+	| 'setWindStyle'
+	| 'setPageVisible'
 >;
 
 /** What the page's autosave is made from; the timing is the maker's. */
@@ -139,6 +142,8 @@ export type PageLayerOptions = {
 	readonly onWindSource: (content: WindSourceContent) => void;
 	/** The unit the key to the wind arrows writes its speeds in at first. */
 	readonly windUnit: WindUnit;
+	/** How the winds are drawn at first, which the key to them follows. */
+	readonly windStyle: WindStyle;
 };
 
 /** What the cursor readout reads of the page. */
@@ -230,6 +235,7 @@ export type PageParts = {
 		| 'shown'
 		| 'shownWinds'
 		| 'setWindUnit'
+		| 'setWindStyle'
 		| 'setWindSource'
 	>;
 	/**
@@ -241,9 +247,13 @@ export type PageParts = {
 	) => Pick<CursorReadout, 'invalidate' | 'clear'>;
 	/**
 	 * The page's preferences, remembered by the browser apart from the
-	 * world: the unit wind speeds are written in.
+	 * world: the unit wind speeds are written in, and how the winds are
+	 * drawn.
 	 */
-	readonly preferences: Pick<Preferences, 'windSpeedUnit' | 'setWindSpeedUnit'>;
+	readonly preferences: Pick<
+		Preferences,
+		'windSpeedUnit' | 'setWindSpeedUnit' | 'windStyle' | 'setWindStyle'
+	>;
 	/**
 	 * The panel's Layers section, already in the panel, which ticking the
 	 * Sunlight or the Winds control opens.
@@ -281,6 +291,11 @@ export type PageParts = {
 	 * may never run again.
 	 */
 	readonly onPageHiding: (listener: () => void) => void;
+	/**
+	 * Has a listener called with whether the page is visible, rather than in
+	 * a hidden tab: at once, and whenever that changes.
+	 */
+	readonly onPageVisibility: (listener: (visible: boolean) => void) => void;
 	/** Records an error that the page carries on after. */
 	readonly logError: (error: unknown) => void;
 };
@@ -366,6 +381,15 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * unit chosen in the view controls is remembered by the preferences, and
  * reaches the key, through the layer panel, and the readout at once. It
  * is never saved with the world.
+ *
+ * So is how the winds are drawn, as arrows or as streaks: read once as the
+ * page starts, the globe is told it before the view controls are made, and
+ * the view controls and the key to the winds start in it. A way chosen in
+ * the view controls is remembered by the preferences, and reaches the
+ * globe and then the key, through the layer panel, at once. Winds itself
+ * still starts off. The globe is also told whether the page is visible, as
+ * the page starts and at each change, so that streaks move only while it
+ * is.
  *
  * The view controls' choice of where the wind arrows come from goes to the
  * layer panel, which decides when it is offered, on the measured Earth, and
@@ -565,9 +589,13 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	});
 	/** The unit wind speeds are written in, as last chosen. */
 	let windUnit = parts.preferences.windSpeedUnit();
+	/** How the winds are drawn as the page starts, as last chosen. */
+	const windStyle = parts.preferences.windStyle();
+	globe.setWindStyle(windStyle);
 	const view = parts.createViewPanel({
 		seaLevel: state.world.seaLevel,
 		windUnit,
+		windStyle,
 		onExaggeration: globe.setExaggeration,
 		onSeaLevel: (metres) => {
 			const { world } = state;
@@ -592,6 +620,11 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			if (on) {
 				parts.layersSection.setOpen(true);
 			}
+		},
+		onWindStyle: (style) => {
+			parts.preferences.setWindStyle(style);
+			globe.setWindStyle(style);
+			layerPanel.setWindStyle(style);
 		},
 		onWindUnit: (unit) => {
 			windUnit = unit;
@@ -654,6 +687,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		loadObservedWinds: parts.loadObservedWinds,
 		onWindSource: view.showWindSource,
 		windUnit,
+		windStyle,
 	});
 	const statistics = parts.createStatistics({
 		currentWorld: () => state.world,
@@ -746,6 +780,8 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// A page being hidden or closed may never run again, so what has not
 	// been saved is saved now rather than when its wait is over.
 	parts.onPageHiding(autosave.flush);
+	// Streaks move only on a page that can be seen.
+	parts.onPageVisibility(globe.setPageVisible);
 
 	/**
 	 * Brings back the world that was saved, or opens the dialog that starts

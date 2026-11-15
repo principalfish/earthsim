@@ -3,6 +3,7 @@ import {
 	MAX_DRAWN_SEA_LEVEL_M,
 	MIN_DRAWN_SEA_LEVEL_M,
 } from '../globe/material';
+import type { WindStyle } from '../globe/windMotion';
 import {
 	byClass,
 	createFakeDocument,
@@ -78,6 +79,7 @@ describe('createViewPanel', () => {
 			onGridVisible: (visible) => told.push(`grid ${visible}`),
 			onSunlight: (on) => told.push(`sunlight ${on}`),
 			onWinds: (on) => told.push(`winds ${on}`),
+			onWindStyle: (style) => told.push(`wind style ${style}`),
 			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
 			onWindSource: (source) => told.push(`wind source ${source}`),
 		});
@@ -144,6 +146,7 @@ describe('the Winds checkbox', () => {
 			onGridVisible: (visible) => told.push(`grid ${visible}`),
 			onSunlight: (on) => told.push(`sunlight ${on}`),
 			onWinds: (on) => told.push(`winds ${on}`),
+			onWindStyle: (style) => told.push(`wind style ${style}`),
 			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
 			onWindSource: (source) => told.push(`wind source ${source}`),
 		});
@@ -203,6 +206,7 @@ describe('the Wind speed choice', () => {
 			onGridVisible: () => {},
 			onSunlight: () => {},
 			onWinds: (on) => told.push(`winds ${on}`),
+			onWindStyle: (style) => told.push(`wind style ${style}`),
 			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
 			onWindSource: (source) => told.push(`wind source ${source}`),
 		});
@@ -212,7 +216,7 @@ describe('the Wind speed choice', () => {
 		return { told, section, select };
 	};
 
-	it('comes directly under the Winds shown choice, under the Winds checkbox, labelled Wind speed, offering m/s, km/h and mph', () => {
+	it('comes directly under the Winds shown choice, under Winds drawn as and the Winds checkbox, labelled Wind speed, offering m/s, km/h and mph', () => {
 		const { section, select } = make();
 		const fields = section.children;
 		const winds = fields.findIndex((field) =>
@@ -222,9 +226,12 @@ describe('the Wind speed choice', () => {
 		);
 		expect(
 			byClass(fields[winds + 1] as FakeElement, 'field__select')[0]?.id,
+		).toBe('view-wind-style');
+		expect(
+			byClass(fields[winds + 2] as FakeElement, 'field__select')[0]?.id,
 		).toBe('view-wind-source');
-		expect(fields[winds + 2]?.children).toContain(select);
-		expect(fields).toHaveLength(winds + 3);
+		expect(fields[winds + 3]?.children).toContain(select);
+		expect(fields).toHaveLength(winds + 4);
 		expect(select.id).toBe('view-wind-unit');
 		const label = byClass(section, 'field__label').find(
 			(element) => element.htmlFor === 'view-wind-unit',
@@ -294,6 +301,7 @@ describe('the Winds shown choice', () => {
 			onGridVisible: () => {},
 			onSunlight: () => {},
 			onWinds: (on) => told.push(`winds ${on}`),
+			onWindStyle: (style) => told.push(`wind style ${style}`),
 			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
 			onWindSource: (source) => told.push(`wind source ${source}`),
 		});
@@ -306,7 +314,7 @@ describe('the Winds shown choice', () => {
 		return { told, section, select, field, panel };
 	};
 
-	it('comes directly under the Winds checkbox, above Wind speed, offering Simulated and Observed', () => {
+	it('comes directly under Winds drawn as, under the Winds checkbox, above Wind speed, offering Simulated and Observed', () => {
 		const { section, select } = make();
 		const fields = section.children;
 		const winds = fields.findIndex((field) =>
@@ -314,9 +322,12 @@ describe('the Winds shown choice', () => {
 				(input) => input.id === 'view-winds',
 			),
 		);
-		expect(fields[winds + 1]?.children).toContain(select);
 		expect(
-			byClass(fields[winds + 2] as FakeElement, 'field__select')[0]?.id,
+			byClass(fields[winds + 1] as FakeElement, 'field__select')[0]?.id,
+		).toBe('view-wind-style');
+		expect(fields[winds + 2]?.children).toContain(select);
+		expect(
+			byClass(fields[winds + 3] as FakeElement, 'field__select')[0]?.id,
 		).toBe('view-wind-unit');
 		const label = byClass(section, 'field__label').find(
 			(element) => element.htmlFor === 'view-wind-source',
@@ -352,5 +363,88 @@ describe('the Winds shown choice', () => {
 		select.value = 'simulated';
 		select.fire('change');
 		expect(told).toEqual(['wind source observed', 'wind source simulated']);
+	});
+});
+
+describe('the Winds drawn as choice', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const make = (windStyle?: WindStyle, winds?: boolean) => {
+		const told: string[] = [];
+		const section = fake.createElement('div');
+		createViewPanel(section as unknown as HTMLElement, {
+			seaLevel: 0,
+			winds,
+			windStyle,
+			onExaggeration: () => {},
+			onSeaLevel: () => {},
+			onGridVisible: () => {},
+			onSunlight: () => {},
+			onWinds: (on) => told.push(`winds ${on}`),
+			onWindStyle: (style) => told.push(`wind style ${style}`),
+			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
+			onWindSource: (source) => told.push(`wind source ${source}`),
+		});
+		const select = byClass(section, 'field__select').find(
+			(element) => element.id === 'view-wind-style',
+		) as FakeElement;
+		const field = section.children.find((child) =>
+			child.children.includes(select),
+		) as FakeElement;
+		return { told, section, select, field };
+	};
+
+	it('comes directly under the Winds checkbox, above Winds shown, offering Arrows and Streaks', () => {
+		const { section, select } = make();
+		const fields = section.children;
+		const winds = fields.findIndex((field) =>
+			byClass(field, 'field__checkbox').some(
+				(input) => input.id === 'view-winds',
+			),
+		);
+		expect(fields[winds + 1]?.children).toContain(select);
+		expect(
+			byClass(fields[winds + 2] as FakeElement, 'field__select')[0]?.id,
+		).toBe('view-wind-source');
+		const label = byClass(section, 'field__label').find(
+			(element) => element.htmlFor === 'view-wind-style',
+		);
+		expect(label?.textContent).toBe('Winds drawn as');
+		expect(
+			select.children.map((option) => [option.value, option.textContent]),
+		).toEqual([
+			['arrows', 'Arrows'],
+			['streaks', 'Streaks'],
+		]);
+	});
+
+	it('starts on Arrows, or on the way given', () => {
+		expect(make().select.value).toBe('arrows');
+		expect(make('streaks').select.value).toBe('streaks');
+		expect(make('arrows').select.value).toBe('arrows');
+	});
+
+	it('shows whether or not the winds are shown, telling nothing at first', () => {
+		for (const winds of [false, true]) {
+			const { field, told } = make(undefined, winds);
+			expect(field.hidden).not.toBe(true);
+			expect(told).toEqual([]);
+		}
+	});
+
+	it('reports each way chosen, and the way alone', () => {
+		const { told, select } = make();
+		select.value = 'streaks';
+		select.fire('change');
+		select.value = 'arrows';
+		select.fire('change');
+		expect(told).toEqual(['wind style streaks', 'wind style arrows']);
 	});
 });

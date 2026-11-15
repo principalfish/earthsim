@@ -32,7 +32,11 @@ import { type AppState, createAppState } from './appState';
 import { MAIN_BUTTON, SECONDARY_BUTTON } from './globe/input';
 import { createPanelMemory, panelMemoryKey } from './panelMemory';
 import { PLAYBACK_STEP_MS } from './playback';
-import { createPreferences, WIND_SPEED_UNIT_KEY } from './preferences';
+import {
+	createPreferences,
+	WIND_SPEED_UNIT_KEY,
+	WIND_STYLE_KEY,
+} from './preferences';
 import { TEMPERATURE_DEBOUNCE_MS } from './refresh';
 import { TEMPERATURE_LAYER } from './scalarLayer';
 import type { SculptOptions, StrokeChanges } from './sculpt';
@@ -125,6 +129,12 @@ type Stage = {
 	readonly preferenceStorage: FakeStorage;
 	/** Every sun the globe was given, in order. */
 	readonly suns: Sun[];
+	/** Every way the globe was told to draw the winds, in order. */
+	readonly globeWindStyles: string[];
+	/** Everything the globe was told of whether the page is visible, in order. */
+	readonly globeVisibility: boolean[];
+	/** Says that the page has become visible, or hidden. */
+	setPageVisible(visible: boolean): void;
 	/** Turns or zooms the camera, as the view's input says it does. */
 	moveCamera(): void;
 	/** Presses a key as the page hears it. */
@@ -192,6 +202,8 @@ const createStage = (
 	const saved: World[] = [];
 	const dialogs: NewWorldDialogOptions[] = [];
 	const suns: Sun[] = [];
+	const globeWindStyles: string[] = [];
+	const globeVisibility: boolean[] = [];
 	const state = createAppState({ world, seaLevelRange: SEA_LEVEL_RANGE });
 	let sculptOptions:
 		| Pick<SculptOptions, 'onStrokeEnd' | 'onWorldChange'>
@@ -212,6 +224,7 @@ const createStage = (
 	const preferenceStorage = createFakeStorage(own.preferenceEntries);
 	let keyListener: ((event: ShortcutEvent) => void) | undefined;
 	let hidingListener: (() => void) | undefined;
+	let visibilityListener: ((visible: boolean) => void) | undefined;
 	let answerLoad: ((outcome: LoadOutcome) => void) | undefined;
 	let failLoad: ((error: unknown) => void) | undefined;
 
@@ -265,6 +278,10 @@ const createStage = (
 		shownWinds: null,
 		preferenceStorage,
 		suns,
+		globeWindStyles,
+		globeVisibility,
+		setPageVisible: (visible) =>
+			required(visibilityListener, 'page-visibility listener')(visible),
 		moveCamera: () => required(onCameraMove, 'view input')(),
 		pressKey: (press) => {
 			required(
@@ -300,6 +317,9 @@ const createStage = (
 			},
 			setSunlight: (style) => log.push(`globe.setSunlight ${style}`),
 			updateElevation: () => log.push('globe.updateElevation'),
+			// Recorded apart from the log, which the other tests read whole.
+			setWindStyle: (style) => globeWindStyles.push(style),
+			setPageVisible: (visible) => globeVisibility.push(visible),
 		},
 		createViewInput: (rotateButton, onMove) => {
 			log.push(`createViewInput ${rotateButton}`);
@@ -447,6 +467,7 @@ const createStage = (
 				shown: () => stage.shownTemperature,
 				shownWinds: () => stage.shownWinds,
 				setWindUnit: (unit) => log.push(`layerPanel.setWindUnit ${unit}`),
+				setWindStyle: (style) => log.push(`layerPanel.setWindStyle ${style}`),
 				setWindSource: (source) =>
 					log.push(`layerPanel.setWindSource ${source}`),
 			};
@@ -484,6 +505,10 @@ const createStage = (
 		},
 		onPageHiding: (listener) => {
 			hidingListener = listener;
+		},
+		onPageVisibility: (listener) => {
+			visibilityListener = listener;
+			listener(true);
 		},
 		logError: (error) => errors.push(error),
 	});
@@ -1384,6 +1409,7 @@ describe('the temperature, on its worker', () => {
 							showComparison: () => {},
 							showWindKey: () => {},
 							setWindUnit: () => {},
+							setWindStyle: () => {},
 						};
 					},
 				}),
@@ -1891,6 +1917,7 @@ describe('the cursor readout', () => {
 							showComparison: () => {},
 							showWindKey: () => {},
 							setWindUnit: () => {},
+							setWindStyle: () => {},
 						};
 					},
 				}),
@@ -1995,6 +2022,7 @@ describe('the month on screen', () => {
 							showComparison: () => {},
 							showWindKey: () => {},
 							setWindUnit: () => {},
+							setWindStyle: () => {},
 						};
 					},
 				}),
@@ -2066,6 +2094,7 @@ const createSunStage = async (world?: World) => {
 						showComparison: () => {},
 						showWindKey: () => {},
 						setWindUnit: () => {},
+						setWindStyle: () => {},
 					};
 				},
 			}),
@@ -2371,6 +2400,8 @@ const createWindUnitStage = async (
 	let controls: LayerControlsOptions | undefined;
 	/** Every unit the key was told to write its speeds in, after the first. */
 	const keyUnits: string[] = [];
+	/** Every way the key was told the winds are drawn, after the first. */
+	const keyStyles: string[] = [];
 	const stage = await createStartedStage(undefined, {
 		preferenceEntries,
 		createLayerPanel: (options) =>
@@ -2388,6 +2419,7 @@ const createWindUnitStage = async (
 						showComparison: () => {},
 						showWindKey: () => {},
 						setWindUnit: (unit) => keyUnits.push(unit),
+						setWindStyle: (style) => keyStyles.push(style),
 					};
 				},
 			}),
@@ -2409,6 +2441,7 @@ const createWindUnitStage = async (
 		stage,
 		controls: required(controls, 'layer controls'),
 		keyUnits,
+		keyStyles,
 		arriveWinds,
 	};
 };
@@ -2481,6 +2514,96 @@ describe('the wind speed unit', () => {
 		expect(stage.readoutOptions.windUnit()).toBe('mph');
 		expect(keyUnits).toEqual(['mph']);
 		expect(stage.preferenceStorage.writes).toHaveLength(1);
+	});
+});
+
+describe('how the winds are drawn', () => {
+	it('starts on arrows with nothing stored, in the globe, the view controls and the key', async () => {
+		const { stage, controls } = await createWindUnitStage();
+		expect(stage.globeWindStyles).toEqual(['arrows']);
+		expect(stage.viewPanelOptions.windStyle).toBe('arrows');
+		expect(stage.layerOptions.windStyle).toBe('arrows');
+		expect(controls.windStyle).toBe('arrows');
+	});
+
+	it('starts on the stored way, in the globe, the view controls and the key, with Winds still off', async () => {
+		const { stage, controls, keyStyles } = await createWindUnitStage({
+			[WIND_STYLE_KEY]: 'streaks',
+		});
+		expect(stage.globeWindStyles).toEqual(['streaks']);
+		expect(stage.viewPanelOptions.windStyle).toBe('streaks');
+		expect(controls.windStyle).toBe('streaks');
+		// Started in it, not set to it after another.
+		expect(keyStyles).toEqual([]);
+		expect(stage.preferenceStorage.writes).toEqual([]);
+		expect(stage.viewPanelOptions.winds ?? false).toBe(false);
+		expect(controls.view.winds).toBe(false);
+	});
+
+	it('starts on arrows when the storage holds something else', async () => {
+		const { stage, controls } = await createWindUnitStage({
+			[WIND_STYLE_KEY]: 'lines',
+		});
+		expect(stage.globeWindStyles).toEqual(['arrows']);
+		expect(stage.viewPanelOptions.windStyle).toBe('arrows');
+		expect(controls.windStyle).toBe('arrows');
+	});
+
+	it('stores a way chosen, and gives it to the globe and the key at once', async () => {
+		const { stage, keyStyles } = await createWindUnitStage();
+		stage.viewPanelOptions.onWindStyle('streaks');
+		expect(stage.preferenceStorage.writes).toEqual([
+			[WIND_STYLE_KEY, 'streaks'],
+		]);
+		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks']);
+		expect(keyStyles).toEqual(['streaks']);
+		stage.viewPanelOptions.onWindStyle('arrows');
+		expect(stage.preferenceStorage.writes).toEqual([
+			[WIND_STYLE_KEY, 'streaks'],
+			[WIND_STYLE_KEY, 'arrows'],
+		]);
+		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks', 'arrows']);
+		expect(keyStyles).toEqual(['streaks', 'arrows']);
+	});
+
+	it('tells the layer panel of the way, and nothing else', async () => {
+		const stage = await createStartedStage();
+		stage.viewPanelOptions.onWindStyle('streaks');
+		expect(stage.log).toEqual(['layerPanel.setWindStyle streaks']);
+		expect(stage.readoutCalls).toEqual([]);
+		expect(stage.sectionCalls).toEqual([]);
+	});
+
+	it('writes nothing to the world, marks nothing for saving, and is kept through a new world', async () => {
+		const { stage, keyStyles } = await createWindUnitStage();
+		const before = serializeWorld(stage.state.world);
+		stage.viewPanelOptions.onWindStyle('streaks');
+		expect(serializeWorld(stage.state.world)).toEqual(before);
+		expect(stage.log).not.toContain('autosave.markChanged');
+		stage.state.replaceWorld(createBlankWorld(64));
+		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks']);
+		expect(keyStyles).toEqual(['streaks']);
+		expect(stage.preferenceStorage.writes).toHaveLength(1);
+	});
+});
+
+describe('the page’s visibility', () => {
+	it('tells the globe whether the page is visible as it starts, and at each change', async () => {
+		const stage = await createStartedStage();
+		expect(stage.globeVisibility).toEqual([true]);
+		stage.setPageVisible(false);
+		expect(stage.globeVisibility).toEqual([true, false]);
+		stage.setPageVisible(true);
+		expect(stage.globeVisibility).toEqual([true, false, true]);
+	});
+
+	it('tells nothing else of it', async () => {
+		const stage = await createStartedStage();
+		stage.setPageVisible(false);
+		stage.setPageVisible(true);
+		expect(stage.log).toEqual([]);
+		expect(stage.readoutCalls).toEqual([]);
+		expect(stage.saved).toEqual([]);
 	});
 });
 
@@ -2628,6 +2751,7 @@ describe('the Sunlight control', () => {
 							showComparison: () => {},
 							showWindKey: () => {},
 							setWindUnit: () => {},
+							setWindStyle: () => {},
 						};
 					},
 				}),
@@ -2794,6 +2918,7 @@ describe('the comparison on the measured Earth', () => {
 								),
 							showWindKey: () => {},
 							setWindUnit: () => {},
+							setWindStyle: () => {},
 						};
 					},
 				}),

@@ -197,6 +197,11 @@ if (globe !== null) {
 			});
 			window.addEventListener('pagehide', listener);
 		},
+		onPageVisibility: (listener) => {
+			const tell = (): void => listener(document.visibilityState !== 'hidden');
+			tell();
+			document.addEventListener('visibilitychange', tell);
+		},
 		logError,
 	});
 }

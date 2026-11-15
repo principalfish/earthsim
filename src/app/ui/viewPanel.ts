@@ -1,8 +1,9 @@
 /**
  * The view controls: how much relief is exaggerated, where the sea level
  * is, whether the cell grid is drawn, whether the globe is lit by the sun,
- * whether the winds are shown, on the measured Earth whether they are the
- * simulated or the observed, and the unit their speeds are written in.
+ * whether the winds are shown and whether as arrows or as streaks, on the
+ * measured Earth whether they are the simulated or the observed, and the
+ * unit their speeds are written in.
  */
 
 import {
@@ -12,6 +13,12 @@ import {
 	MIN_DRAWN_SEA_LEVEL_M,
 	MIN_EXAGGERATION,
 } from '../globe/material';
+import {
+	DEFAULT_WIND_STYLE,
+	WIND_STYLE_LABELS,
+	WIND_STYLES,
+	type WindStyle,
+} from '../globe/windMotion';
 import {
 	DEFAULT_WIND_SOURCE,
 	SOURCE_LABELS,
@@ -52,6 +59,8 @@ export type ViewPanelOptions = {
 	readonly sunlight?: boolean;
 	/** Whether the winds start shown; hidden by default. */
 	readonly winds?: boolean;
+	/** How the winds are drawn at first; as arrows by default. */
+	readonly windStyle?: WindStyle;
 	/** The unit wind speeds are written in at first; m/s by default. */
 	readonly windUnit?: WindUnit;
 	/** Called with the new factor when the exaggeration slider moves. */
@@ -64,6 +73,8 @@ export type ViewPanelOptions = {
 	readonly onSunlight: (on: boolean) => void;
 	/** Called when the Winds checkbox is ticked or cleared. */
 	readonly onWinds: (on: boolean) => void;
+	/** Called with the way chosen when another is chosen to draw the winds. */
+	readonly onWindStyle: (style: WindStyle) => void;
 	/** Called with the unit when another is chosen for wind speeds. */
 	readonly onWindUnit: (unit: WindUnit) => void;
 	/** Called with the source when another is chosen for the wind arrows. */
@@ -116,10 +127,12 @@ export const formatMetres = (metres: number): string => {
  * Adds the view controls to the View section of the side panel.
  *
  * @remarks
- * Directly under the Winds checkbox is the Winds shown choice, a
- * drop-down of Simulated and Observed, hidden until it is offered and
- * starting on Simulated; under it, the Wind speed choice is a drop-down,
- * labelled so, shown whether or not the winds are.
+ * Directly under the Winds checkbox is the Winds drawn as choice, a
+ * drop-down of Arrows and Streaks, shown whether or not the winds are;
+ * under it the Winds shown choice, a drop-down of Simulated and Observed,
+ * hidden until it is offered and starting on Simulated; and under that the
+ * Wind speed choice, a drop-down labelled so, shown whether or not the
+ * winds are.
  *
  * @param body - The section's body, to add the controls to, after what it
  * holds.
@@ -186,6 +199,16 @@ export const createViewPanel = (
 			label: 'Winds',
 			checked: options.winds ?? false,
 			onChange: options.onWinds,
+		}),
+		createSelectField({
+			id: 'view-wind-style',
+			label: 'Winds drawn as',
+			choices: WIND_STYLES.map((style) => ({
+				value: style,
+				label: WIND_STYLE_LABELS[style],
+			})),
+			value: options.windStyle ?? DEFAULT_WIND_STYLE,
+			onChange: options.onWindStyle,
 		}),
 		windSource,
 		createSelectField({

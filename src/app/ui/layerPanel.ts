@@ -39,6 +39,7 @@ import {
 import { type ColourRamp, centredRange } from '../globe/ramp';
 import type { Globe } from '../globe/renderer';
 import type { WindField } from '../globe/wind';
+import { DEFAULT_WIND_STYLE, type WindStyle } from '../globe/windMotion';
 import type { LayerStore, SolvedWinds } from '../layers';
 import type { ObservedLoader } from '../observedData';
 import { createPlayback, type PlaybackOptions } from '../playback';
@@ -126,6 +127,11 @@ export type LayerControlsOptions = {
 	 * when left out.
 	 */
 	readonly windUnit?: WindUnit;
+	/**
+	 * How the winds are drawn at first, which the key follows; as arrows
+	 * when left out.
+	 */
+	readonly windStyle?: WindStyle;
 };
 
 /** The layer controls on the page. */
@@ -147,6 +153,11 @@ export type LayerControls = {
 	showComparison(layer: ScalarLayerId, content: ComparisonContent): void;
 	/** Writes the speeds of the key to the wind arrows in another unit. */
 	setWindUnit(unit: WindUnit): void;
+	/**
+	 * Shows the key for the winds drawn another way: its arrows for arrows,
+	 * a line in their place for streaks.
+	 */
+	setWindStyle(style: WindStyle): void;
 };
 
 /** What the layer panel joins. */
@@ -207,6 +218,11 @@ export type LayerPanelOptions = Pick<
 	 * when left out.
 	 */
 	readonly windUnit?: WindUnit;
+	/**
+	 * How the winds are drawn at first, which the key follows; as arrows
+	 * when left out.
+	 */
+	readonly windStyle?: WindStyle;
 };
 
 /** What the globe shows of a computed layer, as the layer panel gave it. */
@@ -334,6 +350,14 @@ export type LayerPanel = {
 	 * @param unit - The unit to write them in.
 	 */
 	setWindUnit(unit: WindUnit): void;
+	/**
+	 * Shows the key for the winds drawn another way, as arrows or as
+	 * streaks; the winds on the globe and what the key says of them stay as
+	 * they are.
+	 *
+	 * @param style - How the winds are drawn.
+	 */
+	setWindStyle(style: WindStyle): void;
 	/**
 	 * Takes where the wind arrows are to come from, as the view controls
 	 * chose it; ignored, the controls put back, while the world is not the
@@ -1238,6 +1262,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		layers: states.map((state) => state.spec),
 		view: view(),
 		windUnit: options.windUnit ?? DEFAULT_WIND_UNIT,
+		windStyle: options.windStyle ?? DEFAULT_WIND_STYLE,
 		onLayer: (next) => {
 			if (next === layer) {
 				return;
@@ -1377,6 +1402,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		shown: () => shownLayer,
 		shownWinds: () => shownWindsState,
 		setWindUnit: (unit) => controls.setWindUnit(unit),
+		setWindStyle: (style) => controls.setWindStyle(style),
 		setWindSource: (next) => {
 			if (next === windSource.source) {
 				return;
@@ -1459,7 +1485,10 @@ export const createLayerControls = (
 	options: LayerControlsOptions,
 ): LayerControls => {
 	const legend = createLegend();
-	const windKey = createWindKey(options.windUnit ?? DEFAULT_WIND_UNIT);
+	const windKey = createWindKey(
+		options.windUnit ?? DEFAULT_WIND_UNIT,
+		options.windStyle ?? DEFAULT_WIND_STYLE,
+	);
 
 	const layerControls = createElement('div', LAYER_CONTROLS_CLASS);
 	const own = options.layers.map((layer) => {
@@ -1539,6 +1568,7 @@ export const createLayerControls = (
 		showLegend: legend.show,
 		showWindKey: windKey.show,
 		setWindUnit: windKey.setUnit,
+		setWindStyle: windKey.setStyle,
 		showView,
 		showComparison: (layer, content) =>
 			own.find((each) => each.layer.id === layer)?.comparison?.show(content),

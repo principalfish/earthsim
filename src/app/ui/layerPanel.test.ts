@@ -26,6 +26,7 @@ import {
 	type ValueRange,
 } from '../globe/ramp';
 import type { WindField } from '../globe/wind';
+import type { WindStyle } from '../globe/windMotion';
 import { createLayerStore, type LayerStore, type SolvedWinds } from '../layers';
 import type { ObservedLoader } from '../observedData';
 import { PLAYBACK_STEP_MS } from '../playback';
@@ -167,8 +168,10 @@ const tickLabels = (legend: LegendContent | null | undefined) =>
  *
  * @param windUnit - The unit the key starts in; the panel's own when left
  * out.
+ * @param windStyle - How the winds are drawn at first; the panel's own when
+ * left out.
  */
-const createStage = (windUnit?: WindUnit) => {
+const createStage = (windUnit?: WindUnit, windStyle?: WindStyle) => {
 	const errors: unknown[] = [];
 	/** What the panel reported as errors of its own. */
 	const reported: unknown[] = [];
@@ -183,6 +186,8 @@ const createStage = (windUnit?: WindUnit) => {
 	const keys: (WindKeyContent | null)[] = [];
 	/** Every unit the key to the arrows was told to write its speeds in. */
 	const keyUnits: WindUnit[] = [];
+	/** Every way the key to the winds was told the winds are drawn. */
+	const keyStyles: WindStyle[] = [];
 	const legends: (LegendContent | null)[] = [];
 	/** What the temperature's comparison controls were told to show. */
 	const comparisons: ComparisonContent[] = [];
@@ -211,6 +216,7 @@ const createStage = (windUnit?: WindUnit) => {
 	const panel: LayerPanel = createLayerPanel({
 		store,
 		windUnit,
+		windStyle,
 		setTimer: timers.setTimer,
 		clearTimer: timers.clearTimer,
 		onView: (view) => told.push(view),
@@ -254,6 +260,7 @@ const createStage = (windUnit?: WindUnit) => {
 					),
 				showWindKey: (content) => keys.push(content),
 				setWindUnit: (unit) => keyUnits.push(unit),
+				setWindStyle: (style) => keyStyles.push(style),
 			};
 		},
 	});
@@ -278,6 +285,7 @@ const createStage = (windUnit?: WindUnit) => {
 		winds,
 		keys,
 		keyUnits,
+		keyStyles,
 		legends,
 		comparisons,
 		pressureComparisons,
@@ -2194,6 +2202,36 @@ describe('createLayerControls', () => {
 		return { controls, chosen, section, place, keyPlace, radios };
 	};
 
+	it('starts the key to the winds as the winds are drawn, and shows it for another way when told', () => {
+		const keyPlace = fake.createElement('div');
+		const controls = createLayerControls(
+			fake.createElement('div') as unknown as HTMLElement,
+			{
+				legend: fake.createElement('div') as unknown as HTMLElement,
+				windKey: keyPlace as unknown as HTMLElement,
+			},
+			{
+				layers: SCALAR_LAYERS,
+				view: DEFAULT_PAGE_VIEW,
+				onLayer: () => {},
+				onSummary: () => {},
+				onMonth: () => {},
+				onPlay: () => {},
+				onSource: () => {},
+				windStyle: 'streaks',
+			},
+		);
+		const key = oneByClass(keyPlace, 'wind-key');
+		expect(byClass(key, 'wind-key__streaks')).toHaveLength(1);
+		expect(byClass(key, 'wind-key__row')).toEqual([]);
+		controls.setWindStyle('arrows');
+		expect(byClass(key, 'wind-key__streaks')).toEqual([]);
+		expect(byClass(key, 'wind-key__row')).toHaveLength(2);
+		const { keyPlace: arrowsPlace } = make();
+		expect(byClass(arrowsPlace, 'wind-key__row')).toHaveLength(2);
+		expect(byClass(arrowsPlace, 'wind-key__streaks')).toEqual([]);
+	});
+
 	it('adds the layer controls with Terrain chosen, and the legend to its own place, hidden', () => {
 		const { section, place, radios } = make();
 		expect(section.children.map((child) => child.className)).toEqual([
@@ -2890,6 +2928,22 @@ describe('createLayerPanel, the winds', () => {
 		expect(stage.winds).toEqual([]);
 	});
 
+	it('starts the key on arrows, or as the winds are drawn, and passes on a change of it alone', () => {
+		expect(createStage().controls.windStyle).toBe('arrows');
+		const stage = createStage(undefined, 'streaks');
+		expect(stage.controls.windStyle).toBe('streaks');
+		arrive(stage, solvedWinds());
+		stage.panel.setWinds(true);
+		const winds = stage.winds.length;
+		const keys = stage.keys.length;
+		stage.panel.setWindStyle('arrows');
+		stage.panel.setWindStyle('streaks');
+		expect(stage.keyStyles).toEqual(['arrows', 'streaks']);
+		// The globe's winds and the key's words are as they were.
+		expect(stage.winds).toHaveLength(winds);
+		expect(stage.keys).toHaveLength(keys);
+	});
+
 	it('keeps the winds for a new world', () => {
 		const stage = windy();
 		stage.controls.onMonth(2);
@@ -3341,6 +3395,7 @@ describe('createLayerPanel, another layer described', () => {
 						comparisons.push([layer, content]),
 					showWindKey: () => {},
 					setWindUnit: () => {},
+					setWindStyle: () => {},
 				};
 			},
 		});

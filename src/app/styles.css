@@ -848,6 +848,14 @@ body {
   color: var(--color-text-muted);
 }
 
+/* How to read the streaks, in the arrows' place while the winds are drawn
+   as streaks. */
+.wind-key__streaks {
+  margin: 0;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
 /* How far the simulated winds are from the observed, on the measured
    Earth. Each line takes the pointer, though the key does not, so that its
    tooltip, the figure's exact definition, shows. */
