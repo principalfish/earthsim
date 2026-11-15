@@ -23,18 +23,18 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Whether the winds are drawn as arrows or streaks is a setting in the settings section too, and it starts on Streaks (it starts on Arrows today). The user: "winds shown as should be nio setting too - defaulting to streaks" (2026-11-15; read as "in settings", and as the Arrows or Streaks choice, since Streaks is one of its two values)
 
+- Layout A: icon tiles always visible down the left edge of the globe's area, the colour layers as one choice and the overlays (Winds, Sunlight, Grid) as toggles below; in a narrow window the labels drop and only the icons stay. Chosen from three drawn mock-ups (A left edge, B along the top, C one tile and a tray). The user: "A, left edge (Recommended)" (2026-11-15)
+- As drawn in the chosen mock-up, and not objected to: Show and the Earth comparison sit beside the layer tiles at the top when Temperature or Pressure is on; Pause is in the top-right corner; the one info box is bottom-right; the month timeline with Play runs along the bottom; the side panel keeps World, View (relief and sea level), Planet, Tools and Statistics, gains Settings and loses Layers. To confirm with the full ledger.
+- Settings is a section of the side panel, opening and closing like the others. The user: "A side-panel section" (2026-11-15)
+- The icons are drawn for the project as small SVGs kept in the repo, with no icon library. The user: "Drawn for the project" (2026-11-15)
+- Local `main` was fast-forwarded to `origin/main` (the merged winds, 302d9d3) on the user's word: "Yes, fast-forward it" (2026-11-15)
+
 ## Open
-- The shape of the layer controls: always-visible icon tiles, or one tile that opens a tray as Google Maps does; and where.
-- The month controls' place: the user leans to the bottom ("maybe at the bottom"). Where the Show choice and the Earth comparison sit beside them.
 - Automatic calculation: where the Pause button sits and what it shows; whether pausing is remembered; what happens when the page opens.
 - The one box: where it sits, and how it lays out the legend, the key, the status and the pointer's values.
 - Units: which quantities (temperature, pressure, wind speed, heights and depths, distances, areas); what imperial means for each; where the override is; whether sliders and the Planet section follow.
-- Where the settings section lives: a section of the side panel, or a button in the main view.
 - Where Winds' Simulated or Observed choice goes (on the untouched Earth only).
-- What is left of the Layers and View sections in the side panel.
-- The icons: drawn for the project, or from an icon library (a new dependency).
 - Narrow windows.
-- Whether local `main` is fast-forwarded to `origin/main` (the merged winds) before a builder branches from it.
 
 ## Assumed
 - Nothing in a world file changes; the browser's remembered choices (open sections, wind unit, arrows or streaks) carry over, and the units join them.
