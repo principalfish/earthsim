@@ -86,7 +86,7 @@ Keep this section current when a step is merged.
 | 3a Core folders by component, page folders by role (refactor, no behaviour change) | Not started; after 3c, before step 4 | |
 | 3d One config.ts for every model's settings, with config.md | Not started; after 3a | |
 | 3b Heat carried by winds, and the climate loop | Not started; after 3a. Could instead open step 5; decide when planned | |
-| 4 Moisture, rainfall and Köppen zones | Not started | |
+| 4 Moisture, rainfall and Köppen zones | Not started. Before planning it, settle fixed or fitted colour scales (see the open follow-ups), since rainfall is the next colour layer | |
 | 5 Ocean currents | Not started | |
 | 6 Ice sheets and sea ice | Not started | |
 | 6b Tune the whole climate loop against the Earth | Not started; after steps 3b, 5 and 6, when every part of the loop is in | |
