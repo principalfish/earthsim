@@ -234,3 +234,11 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - Very long second lines (e.g. a difference marked out of date beside a km/h wind) end in an ellipsis at the box's width.
 - One review round over all four changes (correctness, security, coverage, docs): four low cleanups verified and fixed, two dropped; light re-check by correctness. Uncovered changed lines: `src/app/main.ts` (entry point) and `src/app/ui/topBar.ts:83`, both reasons accepted. In `findings.md`.
 - The light re-check's test finding (two redundant `it.each` cases in `cursorReadout.test.ts`) fixed on the user's word, "Tried it, fix it"; coverage re-check clean. Committed as `7e3cd2e` and pushed.
+
+### Piece 5 (2026-11-16)
+
+- Built on claude-opus-5-5. Go-ahead "Start it"; in a narrow window Pause shows its icon alone, with "Pause" / "Resume" as its tooltip and accessible name.
+- The whole-solve status is its own line (`calculationContent` in `infoBox.ts`), sent by the layer panel on every update whatever is on screen, and ranked with the legend's and the winds' lines by state; `paused` ranks between calculating and out of date. On a calculating tie the calculation's line wins unless the legend's bar knows its fraction, so Temperature shows its years once it can tell how many are left, and "Calculating temperature" before that.
+- Pause tells the temperature scheduler, then the winds', then the layer panel. If the page stays on the blank world a first visit opens on, start-up asks for it once.
+- Timed in headless Edge at 256 (Earth): a fresh open solves in 6.6 s; a 1.8 s stroke keeps its frames under 30 ms with Pause off or on; after a stroke everything is current 3.0 s after letting go; after Resume, 2.5 s; a new world made while paused shows "Paused" and is solved 5.6 s after Resume.
+- One review round (correctness, security, coverage, docs) and a light re-check (correctness, docs). Uncovered changed lines: `src/app/main.ts` (entry point) and `src/app/ui/topBar.ts:83`, both reasons accepted. In `findings.md`.

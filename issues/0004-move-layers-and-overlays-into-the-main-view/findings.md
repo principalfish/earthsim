@@ -71,3 +71,21 @@
 | re-check | correctness | - | - | noticed | - | `src/app/ui/cursorReadout.ts:96` | Doc comments still mention the month or summary the field may be; still true, no change needed |
 | manual | user | low | test | - | fixed | `src/app/ui/cursorReadout.test.ts:904` | The user chose to fix the redundant test cases: "Tried it, fix it" |
 | re-check | coverage | - | - | - | - | `src/app/ui/cursorReadout.test.ts:904` | Light re-check of the test fix: clean |
+
+## piece 5 · 2026-11-16 · Everything worked out after every change, with Pause
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | docs | medium | docs | verified | fixed | `docs/user-guide.md:281` | Still said switching Winds off stops the winds being worked out unless Pressure is on screen; now the winds are worked out after every change and only Pause stops them |
+| round | correctness | low | defect | verified | fixed | `src/app/ui/infoBox.ts:208` | Ties went to the legend, so on Pressure the line read plain "Calculating" with no progress, not "Calculating temperature" and then "Calculating winds" as the guide says; the calculation's line now wins a calculating tie unless the legend's bar knows its fraction |
+| round | correctness | low | defect | verified | open | `src/app/ui/pauseButton.ts:49` | The button changes its name (Pause to Resume) as well as `aria-pressed`, so a screen reader hears "Resume, pressed"; the name and the pressed state were both decided, so it is the user's call |
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/layerPanel.ts:23` | Changed doc-comment lines (also :220, :519) not rewrapped |
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/infoBox.ts:209` | The `{state, status, bar}` shape spelled out inline a third time; now `readonly CalculationContent[]` |
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/infoBox.ts:207` | The `calculation` parameter's default served only the tests; now required |
+| round | docs | - | - | dropped | - | `docs/user-guide.md:192` | The Pressure legend's "Calculating" wording — dropped: matched the code then; the tie finding covers the clash |
+| round | security | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | Clean: 96%, uncovered `main.ts` (entry point) and `topBar.ts:83` (unreachable guard), both reasons accepted |
+| re-check | correctness | - | - | - | - | `src/app/ui/infoBox.ts:206` | The four fixes confirmed correct |
+| re-check | docs | low | docs | verified | open | `docs/temperature.md:62` | The status table's "Calculating, with the years done and a bar" row matches no line the box shows; it shows "Calculating · year N, about M to go" once the years left are known |
+| re-check | correctness | low | cleanup | verified | open | `src/app/ui/legend.ts:429` | `progressLine`'s first-year line and its "year N" line with no estimate can no longer show, since the calculation's "Calculating temperature" wins those ties; its doc still says they are shown |
+| re-check | docs | - | - | dropped | - | `docs/temperature.md:63` | Name the "first year" state in the row — dropped: that line can no longer show |
