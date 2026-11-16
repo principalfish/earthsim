@@ -12,7 +12,7 @@ Not included: any change to the temperature or wind models, a layout for phone-s
 
 ## Plan
 
-_2026-11-16 · 5 of 11 pieces done · now: waiting on a decision (piece 6)_
+_2026-11-16 · 5 of 11 pieces done · now: paused before piece 6_
 
 - [x] **1/11 The main-view regions, the icons, and the layer and overlay tiles** · `6278b72`
   Icon tiles down the left edge of the globe choose the colour layer and switch Winds, Sunlight and the grid.
