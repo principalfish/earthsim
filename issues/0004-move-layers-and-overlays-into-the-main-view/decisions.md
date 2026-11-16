@@ -75,6 +75,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 5 started on the user's go-ahead: "Start it" (2026-11-16). In a narrow window Pause shows its icon alone, with "Pause" / "Resume" as its tooltip and accessible name (the builder's choice, stated in the briefing; the user did not object).
 
+- Piece 5 approved after the user tried it, with three review findings fixed first: (1) Pause keeps its pressed state but its accessible name stays fixed at "Pause"; only the visible word and tooltip change to "Resume" (option b; this refines the narrow-window note above); (2) the status-table row in `docs/temperature.md` reworded to match the box; (3) the two unreachable wordings in `ui/legend.ts` removed. The user: "Tried it, fix all, B" (2026-11-16)
+
 ## Open
 - None.
 
