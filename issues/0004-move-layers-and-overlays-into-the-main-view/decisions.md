@@ -73,6 +73,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 4 approved after the user tried it, with the standing test finding (two redundant cases in `cursorReadout.test.ts`) fixed first. The user: "Tried it, fix it" (2026-11-15)
 
+- Piece 5 started on the user's go-ahead: "Start it" (2026-11-16). In a narrow window Pause shows its icon alone, with "Pause" / "Resume" as its tooltip and accessible name (the builder's choice, stated in the briefing; the user did not object).
+
 ## Open
 - None.
 
