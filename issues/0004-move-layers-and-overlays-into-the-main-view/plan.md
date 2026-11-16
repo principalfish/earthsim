@@ -161,7 +161,7 @@ Rejected:
 - [x] 2. Show and one comparison control at the top
 - [x] 3. The month timeline, and the Layers section removed
 - [x] 4. One info box
-- [ ] 5. Everything worked out after every change, with Pause
+- [x] 5. Everything worked out after every change, with Pause
 - [ ] 6. The browser remembers the view
 - [ ] 7. The Settings section, with arrows or streaks starting on Streaks
 - [ ] 8. Units: the model and its settings
@@ -242,3 +242,4 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - Pause tells the temperature scheduler, then the winds', then the layer panel. If the page stays on the blank world a first visit opens on, start-up asks for it once.
 - Timed in headless Edge at 256 (Earth): a fresh open solves in 6.6 s; a 1.8 s stroke keeps its frames under 30 ms with Pause off or on; after a stroke everything is current 3.0 s after letting go; after Resume, 2.5 s; a new world made while paused shows "Paused" and is solved 5.6 s after Resume.
 - One review round (correctness, security, coverage, docs) and a light re-check (correctness, docs). Uncovered changed lines: `src/app/main.ts` (entry point) and `src/app/ui/topBar.ts:83`, both reasons accepted. In `findings.md`.
+- Approved after the user tried it, with all three open findings fixed: "Tried it, fix all, B". Pause keeps its pressed state and its accessible name stays "Pause"; only the visible word and the tooltip change to "Resume". The status table in `docs/temperature.md` matches the box, and the legend's first-year and no-estimate wordings, which could no longer show, are gone (those cases say "Calculating" with a bar of unknown fraction). Light re-check clean.
