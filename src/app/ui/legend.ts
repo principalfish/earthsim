@@ -87,14 +87,9 @@ export const LEGEND_EMPTY_TEXT = 'Not calculated yet';
 export const LEGEND_OUT_OF_DATE_TEXT = 'Out of date';
 
 /**
- * What the legend says of a calculation that tells its years, as the
- * temperature's does, before its first year is done.
- */
-export const LEGEND_FIRST_YEAR_TEXT = 'Calculating · first year';
-
-/**
  * What the legend says of a calculation under way that tells nothing of how
- * far it has come.
+ * far it has come, or that tells its years but cannot yet tell how many
+ * are left.
  */
 export const LEGEND_CALCULATING_TEXT = 'Calculating';
 
@@ -431,19 +426,18 @@ export const tickPosition = (value: number, range: ValueRange): number =>
  *
  * @param progress - How far the calculation has come, or null before its
  * first year is done.
- * @returns {@link LEGEND_FIRST_YEAR_TEXT} before the first year is done;
- * the years done; and after them how many more are expected, when there is
- * an estimate, or that this year is the last.
+ * @returns The years done and after them how many more are expected, or
+ * that this year is the last, once there is an estimate of the years left;
+ * until then, before the first year is done and while there is no
+ * estimate, {@link LEGEND_CALCULATING_TEXT}, as {@link progressFraction}
+ * then does not know how far it has come either.
  */
 export const progressLine = (progress: TemperatureProgress | null): string => {
-	if (progress === null) {
-		return LEGEND_FIRST_YEAR_TEXT;
+	if (progress === null || progress.estimatedYearsLeft === null) {
+		return LEGEND_CALCULATING_TEXT;
 	}
 	const done = `Calculating · year ${progress.yearsDone}`;
 	const left = progress.estimatedYearsLeft;
-	if (left === null) {
-		return done;
-	}
 	if (left === 0) {
 		return `${done}, finishing`;
 	}
@@ -561,9 +555,10 @@ export type LegendContent = {
  * over the earlier result's scale, which is what the globe then shows, and
  * the layer's words for a result not shown when there is no scale at all.
  * While calculating, a layer that tells its years has the line of
- * {@link progressLine} and a bar of {@link progressFraction}, and any other
- * {@link LEGEND_CALCULATING_TEXT} and a bar that does not know how far it
- * has come. The scale's ticks are at its own step when it has one, written
+ * {@link progressLine} and a bar of {@link progressFraction}, which until
+ * the years left can be told are {@link LEGEND_CALCULATING_TEXT} and a bar
+ * that does not know how far it has come, as any other layer has
+ * throughout. The scale's ticks are at its own step when it has one, written
  * as the source's layer writes them, and it gives the source's error
  * figures in that layer's unit when it has them. Values beyond the ends,
  * which the globe draws in the end colours, are not marked.

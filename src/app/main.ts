@@ -19,6 +19,7 @@ import { createLayerPanel } from './ui/layerPanel';
 import { createMainView } from './ui/mainView';
 import { openNewWorldDialog } from './ui/newWorldDialog';
 import { createPanelSections } from './ui/panelSections';
+import { createPauseButton } from './ui/pauseButton';
 import { createPlanetPanel } from './ui/planetPanel';
 import { createStatsPanel } from './ui/statsPanel';
 import { createTimeline } from './ui/timeline';
@@ -146,6 +147,9 @@ if (globe !== null) {
 			const timeline = createTimeline(options);
 			mainView.timeline.append(timeline.element);
 			return timeline;
+		},
+		createPauseButton: (options) => {
+			mainView.corner.append(createPauseButton(options).element);
 		},
 		createPlanetPanel: (options) =>
 			createPlanetPanel(sections.planet.body, options),

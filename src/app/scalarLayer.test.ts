@@ -64,7 +64,6 @@ describe('the temperature layer', () => {
 		expect(TEMPERATURE_LAYER.yearProgress).toBe(true);
 		expect(TEMPERATURE_LAYER.summaryControlId).toBe('temperature-view');
 		expect(TEMPERATURE_LAYER.sunlightStyle).toBe('line');
-		expect(TEMPERATURE_LAYER.scheduler).toBe('temperature');
 		expect(TEMPERATURE_LAYER.minSpan).toBe(2);
 	});
 
@@ -140,7 +139,6 @@ describe('the pressure layer', () => {
 		expect(PRESSURE_LAYER.yearProgress).toBe(false);
 		expect(PRESSURE_LAYER.summaryControlId).toBe('pressure-view');
 		expect(PRESSURE_LAYER.sunlightStyle).toBe(TEMPERATURE_LAYER.sunlightStyle);
-		expect(PRESSURE_LAYER.scheduler).toBe('winds');
 		expect(PRESSURE_LAYER.minSpan).toBe(10);
 		expect(PRESSURE_LAYER.observed).toBe(PRESSURE_OBSERVED);
 	});

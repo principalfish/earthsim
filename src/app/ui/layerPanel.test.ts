@@ -67,7 +67,14 @@ import {
 	WIND_SOURCES,
 } from '../view';
 import type { ComparisonContent } from './comparison';
-import { createInfoBox, type InfoBox } from './infoBox';
+import {
+	CALCULATING_TEMPERATURE_TEXT,
+	CALCULATING_WINDS_TEXT,
+	type CalculationContent,
+	createInfoBox,
+	type InfoBox,
+	PAUSED_TEXT,
+} from './infoBox';
 import { createLayerPanel, type LayerPanel } from './layerPanel';
 import {
 	cellWeights,
@@ -78,7 +85,6 @@ import {
 	formatFigures,
 	LEGEND_CALCULATING_TEXT,
 	LEGEND_EMPTY_TEXT,
-	LEGEND_FIRST_YEAR_TEXT,
 	LEGEND_OUT_OF_DATE_TEXT,
 	type LegendContent,
 	legendContent,
@@ -163,9 +169,8 @@ const createStage = () => {
 	const reported: unknown[] = [];
 	const store: LayerStore = createLayerStore((error) => errors.push(error));
 	const shown: Shown[] = [];
-	const showing: boolean[] = [];
-	/** What the winds were told of whether they are showing. */
-	const windsShowing: boolean[] = [];
+	/** What was said of the calculation, for the info box's status line. */
+	const calculations: CalculationContent[] = [];
 	/** Every wind field the globe was given, or null for none. */
 	const winds: (WindField | null)[] = [];
 	/** What was said of the winds, for the info box's status line. */
@@ -230,11 +235,10 @@ const createStage = () => {
 				winds.push(field);
 			},
 		},
-		temperature: { setShowing: (next) => showing.push(next) },
-		winds: { setShowing: (next) => windsShowing.push(next) },
 		createControls: () => ({
 			showLegend: (content) => legends.push(content),
 			showWindKey: (content) => keys.push(content),
+			showCalculation: (content) => calculations.push(content),
 		}),
 	});
 	/** Has a result arrive, current, as the scheduler does. */
@@ -247,8 +251,7 @@ const createStage = () => {
 		errors,
 		reported,
 		shown,
-		showing,
-		windsShowing,
+		calculations,
 		winds,
 		keys,
 		legends,
@@ -282,6 +285,8 @@ const createStage = () => {
 		},
 		/** What the key to the wind arrows was last told to show. */
 		lastKey: () => keys.at(-1),
+		/** What was last said of the calculation. */
+		lastCalculation: () => calculations.at(-1),
 		/** Has every report of an error throw this, once the error is taken. */
 		failReports: (error: Error): void => {
 			reportFailure = error;
@@ -290,13 +295,12 @@ const createStage = () => {
 };
 
 describe('createLayerPanel', () => {
-	it('opens on the terrain, asking nothing of the globe or the temperature', () => {
+	it('opens on the terrain, asking nothing of the globe', () => {
 		const stage = createStage();
 		expect(stage.told).toEqual([]);
 		stage.panel.setSunlight(true);
 		expect(stage.told).toEqual([{ ...DEFAULT_PAGE_VIEW, sunlight: true }]);
 		expect(stage.shown).toEqual([]);
-		expect(stage.showing).toEqual([]);
 		expect(stage.legends).toEqual([null]);
 	});
 
@@ -307,10 +311,9 @@ describe('createLayerPanel', () => {
 		expect(stage.legends.every((legend) => legend === null)).toBe(true);
 	});
 
-	it('switches the temperature on when chosen, and says nothing is there yet', () => {
+	it('says nothing is there yet when the temperature is chosen before a result', () => {
 		const stage = createStage();
 		stage.panel.setLayer('temperature');
-		expect(stage.showing).toEqual([true]);
 		expect(stage.shown).toEqual([]);
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
@@ -357,10 +360,9 @@ describe('createLayerPanel', () => {
 			result.months[DEFAULT_MONTH],
 		]);
 		expect(stage.shown[2]?.field).toBe(result.months[DEFAULT_MONTH]);
-		expect(stage.showing).toEqual([true, false, true]);
 	});
 
-	it('goes back to the height colours and switches the temperature off for Terrain', () => {
+	it('goes back to the height colours for Terrain', () => {
 		const stage = createStage();
 		stage.panel.setLayer('temperature');
 		stage.arrive(resultWith());
@@ -370,16 +372,18 @@ describe('createLayerPanel', () => {
 			range: undefined,
 			ramp: undefined,
 		});
-		expect(stage.showing).toEqual([true, false]);
 		expect(stage.lastLegend()).toBeNull();
 	});
 
-	it('asks nothing for a layer chosen again that is already on show', () => {
+	it('changes nothing for a layer chosen again that is already on show', () => {
 		const stage = createStage();
 		stage.panel.setLayer('terrain');
 		stage.panel.setLayer('temperature');
+		const told = stage.told.length;
+		const legends = stage.legends.length;
 		stage.panel.setLayer('temperature');
-		expect(stage.showing).toEqual([true]);
+		expect(stage.told).toHaveLength(told);
+		expect(stage.legends).toHaveLength(legends);
 	});
 
 	it('sends each new result to the globe, on its own range', () => {
@@ -429,7 +433,6 @@ describe('createLayerPanel', () => {
 		const next = resultWith(1);
 		stage.arrive(next);
 		expect(stage.shown.at(-1)?.field).toBe(next.months[DEFAULT_MONTH]);
-		expect(stage.showing).toEqual([true]);
 	});
 
 	it('fits a result afresh that comes again after the store dropped it', () => {
@@ -1045,7 +1048,6 @@ describe('createLayerPanel, under sunlight', () => {
 		});
 		expect(stage.told.at(-1)?.month).toBe(8);
 		expect(stage.shown).toEqual([]);
-		expect(stage.showing).toEqual([]);
 	});
 
 	it('takes the month from the slider in Terrain view', () => {
@@ -1852,14 +1854,14 @@ describe('createLayerPanel, the comparison', () => {
 		expect(stage.panel.shown()?.current).toBe(true);
 
 		stage.panel.setSource('difference');
-		expect(stage.lastLegend()?.status).toBe(LEGEND_FIRST_YEAR_TEXT);
+		expect(stage.lastLegend()?.status).toBe(LEGEND_CALCULATING_TEXT);
 		expect(stage.lastLegend()?.bar).not.toBeNull();
 		expect(stage.panel.shown()).toMatchObject({
 			source: 'difference',
 			current: false,
 		});
 		stage.panel.setSource('simulated');
-		expect(stage.lastLegend()?.status).toBe(LEGEND_FIRST_YEAR_TEXT);
+		expect(stage.lastLegend()?.status).toBe(LEGEND_CALCULATING_TEXT);
 		expect(stage.panel.shown()).toMatchObject({
 			source: 'simulated',
 			current: false,
@@ -1879,7 +1881,7 @@ describe('createLayerPanel, the comparison', () => {
 		// The simulated and the difference keep theirs, marked as before.
 		stage.panel.setSource('difference');
 		expect(stage.lastLegend()?.scale?.figures).not.toBeNull();
-		expect(stage.lastLegend()?.status).toBe(LEGEND_FIRST_YEAR_TEXT);
+		expect(stage.lastLegend()?.status).toBe(LEGEND_CALCULATING_TEXT);
 		stage.panel.setSource('simulated');
 		expect(stage.lastLegend()?.scale?.figures).not.toBeNull();
 		stage.panel.setSource('observed');
@@ -2137,8 +2139,6 @@ describe('the info box over the globe', () => {
 				Promise.reject(new Error('The observed winds are not asked for')),
 			reportError: () => {},
 			globe: { setLayer: () => {}, setWinds: () => {} },
-			temperature: { setShowing: () => {} },
-			winds: { setShowing: () => {} },
 			createControls: () => {
 				box = createInfoBox();
 				return box;
@@ -2161,21 +2161,34 @@ describe('the info box over the globe', () => {
 		};
 	};
 
-	it('starts hidden, with no month, layer, view of the year or source in it', () => {
-		const { root } = make();
-		expect(root.hidden).toBe(true);
+	it('starts with only its status line, saying nothing is calculated yet, and no month, layer, view of the year or source in it', () => {
+		const { root, status, legend } = make();
+		expect(root.hidden).toBe(false);
+		expect(status()).toBe(LEGEND_EMPTY_TEXT);
+		expect(legend.hidden).toBe(true);
 		expect(byClass(root, 'field__range')).toEqual([]);
 		expect(byClass(root, 'segmented__input')).toEqual([]);
 		expect(byClass(root, 'field__select')).toEqual([]);
 		expect(byClass(root, 'comparison')).toEqual([]);
 	});
 
-	it('shows on Temperature and hides on Terrain', () => {
-		const { pickLayer, root, status } = make();
+	/** Has the temperature and then its winds arrive, both current. */
+	const solveAll = (store: LayerStore): void => {
+		store.markCalculating();
+		store.setResult(resultWith(), true);
+		store.markWindsCalculating();
+		store.setWindsResult(solvedWinds(), true);
+	};
+
+	it('shows on Terrain while nothing is calculated yet, and hides there once all is current', () => {
+		const { store, pickLayer, root, status } = make();
 		pickLayer('temperature');
 		expect(root.hidden).toBe(false);
 		expect(status()).toBe(LEGEND_EMPTY_TEXT);
 		pickLayer('terrain');
+		expect(root.hidden).toBe(false);
+		expect(status()).toBe(LEGEND_EMPTY_TEXT);
+		solveAll(store);
 		expect(root.hidden).toBe(true);
 		expect(status()).toBe('');
 	});
@@ -2185,14 +2198,72 @@ describe('the info box over the globe', () => {
 		panel.setWinds(true);
 		expect(root.hidden).toBe(false);
 		expect(status()).toBe(LEGEND_EMPTY_TEXT);
-		store.markWindsCalculating();
-		store.setWindsResult(solvedWinds(), true);
+		solveAll(store);
 		expect(status()).toBe('');
 		expect(root.hidden).toBe(true);
 		store.markWindsOutOfDate();
 		expect(status()).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		panel.setWinds(false);
+		// Out of date whatever is shown: the calculation's line says so.
+		expect(status()).toBe(LEGEND_OUT_OF_DATE_TEXT);
+		store.markWindsCalculating();
+		store.setWindsResult(solvedWinds(), true);
 		expect(root.hidden).toBe(true);
+	});
+
+	it('names the temperature and then the winds while each is calculated on Terrain, the temperature with its progress', () => {
+		const { store, root, status, bar } = make();
+		store.markCalculating();
+		store.setProgress({ ...progressOf(2), estimatedYearsLeft: 2 });
+		expect(root.hidden).toBe(false);
+		expect(status()).toBe(CALCULATING_TEMPERATURE_TEXT);
+		expect(bar.hidden).toBe(false);
+		expect(bar.getAttribute('value')).toBe('0.5');
+
+		store.setResult(resultWith(), true);
+		store.markWindsCalculating();
+		expect(status()).toBe(CALCULATING_WINDS_TEXT);
+		expect(bar.hidden).toBe(false);
+
+		store.setWindsResult(solvedWinds(), true);
+		expect(status()).toBe('');
+		expect(bar.hidden).toBe(true);
+		expect(root.hidden).toBe(true);
+	});
+
+	it('says Paused only while paused with a result that is not current, on any layer', () => {
+		const { store, panel, pickLayer, status } = make();
+		solveAll(store);
+		panel.setPaused(true);
+		expect(status()).toBe('');
+
+		store.markOutOfDate();
+		expect(status()).toBe(PAUSED_TEXT);
+		pickLayer('temperature');
+		expect(status()).toBe(PAUSED_TEXT);
+		pickLayer('pressure');
+		expect(status()).toBe(PAUSED_TEXT);
+		panel.setWinds(true);
+		expect(status()).toBe(PAUSED_TEXT);
+
+		panel.setPaused(false);
+		expect(status()).toBe(LEGEND_OUT_OF_DATE_TEXT);
+		panel.setPaused(true);
+		store.clear();
+		expect(status()).toBe(PAUSED_TEXT);
+		// A calculation left to finish is said as one under way.
+		store.markCalculating();
+		expect(status()).not.toBe(PAUSED_TEXT);
+	});
+
+	it('changes nothing for being told again whether it is paused', () => {
+		const { store, panel, status } = make();
+		store.markOutOfDate();
+		panel.setPaused(false);
+		expect(status()).toBe(LEGEND_EMPTY_TEXT);
+		panel.setPaused(true);
+		panel.setPaused(true);
+		expect(status()).toBe(PAUSED_TEXT);
 	});
 
 	it('follows the calculation', () => {
@@ -2200,6 +2271,9 @@ describe('the info box over the globe', () => {
 		pickLayer('temperature');
 		store.markCalculating();
 		store.setProgress(progressOf(1));
+		expect(status()).toBe(CALCULATING_TEMPERATURE_TEXT);
+		expect(bar.hidden).toBe(false);
+		store.setProgress({ ...progressOf(2), estimatedYearsLeft: 3 });
 		expect(status()).toBe(
 			legendContent(TEMPERATURE_LAYER, store.temperature, null, false).status,
 		);
@@ -2208,6 +2282,8 @@ describe('the info box over the globe', () => {
 
 		const result = resultWith();
 		store.setResult(result, true);
+		store.markWindsCalculating();
+		store.setWindsResult(solvedWinds(), true);
 		expect(status()).toBe('');
 		expect(bar.hidden).toBe(true);
 		expect(legend.hidden).toBe(false);
@@ -2260,16 +2336,14 @@ describe('createLayerPanel, the winds', () => {
 		const stage = createStage();
 		stage.panel.setSunlight(true);
 		expect(stage.told.at(-1)?.winds).toBe(false);
-		expect(stage.windsShowing).toEqual([]);
 		arrive(stage, solvedWinds());
 		expect(stage.winds).toEqual([]);
 		expect(stage.keys.every((key) => key === null)).toBe(true);
 	});
 
-	it('switches the winds on when turned on, telling of it with the view, and says nothing is there yet', () => {
+	it('shows the winds when turned on, telling of it with the view, and says nothing is there yet', () => {
 		const stage = createStage();
 		stage.panel.setWinds(true);
-		expect(stage.windsShowing).toEqual([true]);
 		expect(stage.told.at(-1)).toEqual({ ...DEFAULT_PAGE_VIEW, winds: true });
 		expect(stage.winds).toEqual([]);
 		expect(stage.keys.at(-1)).toEqual({
@@ -2281,7 +2355,6 @@ describe('createLayerPanel, the winds', () => {
 	it('tells nothing for the setting it already has', () => {
 		const stage = createStage();
 		stage.panel.setWinds(false);
-		expect(stage.windsShowing).toEqual([]);
 		expect(stage.told).toEqual([]);
 	});
 
@@ -2405,11 +2478,10 @@ describe('createLayerPanel, the winds', () => {
 		expect(stage.winds.at(-1)).toEqual(monthOf(solved, DEFAULT_MONTH));
 	});
 
-	it('removes the arrows and asks for no winds when turned off, and hides the key', () => {
+	it('removes the arrows when turned off, and hides the key', () => {
 		const stage = windy();
 		arrive(stage, solvedWinds());
 		stage.panel.setWinds(false);
-		expect(stage.windsShowing).toEqual([true, false]);
 		expect(stage.winds.at(-1)).toBeNull();
 		expect(stage.keys.at(-1)).toBeNull();
 		stage.store.setWindsResult(solvedWinds(3), true);
@@ -2540,7 +2612,7 @@ describe('createLayerPanel, the winds', () => {
 			...DEFAULT_PAGE_VIEW,
 			winds: true,
 		});
-		expect(stage.windsShowing).toEqual([true]);
+		expect(stage.told.at(-1)?.winds).toBe(true);
 	});
 });
 
@@ -2919,8 +2991,7 @@ describe('createLayerPanel, another layer described', () => {
 		const store = createLayerStore(() => {});
 		const shown: Shown[] = [];
 		const legends: (LegendContent | null)[] = [];
-		const temperatureShowing: boolean[] = [];
-		const windsShowing: boolean[] = [];
+		const calculations: CalculationContent[] = [];
 		const comparisons: ComparisonContent[] = [];
 		const told: PageView[] = [];
 		const asked: string[] = [];
@@ -2947,13 +3018,12 @@ describe('createLayerPanel, another layer described', () => {
 				},
 				setWinds: () => {},
 			},
-			temperature: { setShowing: (next) => temperatureShowing.push(next) },
-			winds: { setShowing: (next) => windsShowing.push(next) },
 			onView: (view) => told.push(view),
 			onComparison: (content) => comparisons.push(content),
 			createControls: () => ({
 				showLegend: (content) => legends.push(content),
 				showWindKey: () => {},
+				showCalculation: (content) => calculations.push(content),
 			}),
 		});
 		/** Has a year of winds and pressure arrive, current. */
@@ -2967,8 +3037,7 @@ describe('createLayerPanel, another layer described', () => {
 			panel,
 			shown,
 			legends,
-			temperatureShowing,
-			windsShowing,
+			calculations,
 			comparisons,
 			told,
 			asked,
@@ -2986,29 +3055,24 @@ describe('createLayerPanel, another layer described', () => {
 		expect(stage.told).toEqual([{ ...twoLayerView(), sunlight: true }]);
 	});
 
-	it('asks what calculates the layer chosen, the winds here, and gives it back for another', () => {
+	it('says where the calculation stands the same way whichever layer is chosen, and with the Winds tile on or off', () => {
 		const stage = createTwoLayerStage();
-		stage.panel.setLayer(MADE_UP_ID);
-		expect(stage.windsShowing).toEqual([true]);
-		expect(stage.temperatureShowing).toEqual([]);
-		stage.panel.setLayer('temperature');
-		expect(stage.windsShowing).toEqual([true, false]);
-		expect(stage.temperatureShowing).toEqual([true]);
-		stage.panel.setLayer('terrain');
-		expect(stage.temperatureShowing).toEqual([true, false]);
-	});
-
-	it('keeps the winds showing while the Winds tile is on, whatever the layer', () => {
-		const stage = createTwoLayerStage();
-		stage.panel.setWinds(true);
-		stage.panel.setLayer(MADE_UP_ID);
-		stage.panel.setLayer('terrain');
-		expect(stage.windsShowing).toEqual([true]);
-		stage.panel.setLayer(MADE_UP_ID);
-		stage.panel.setWinds(false);
-		expect(stage.windsShowing).toEqual([true]);
-		stage.panel.setLayer('terrain');
-		expect(stage.windsShowing).toEqual([true, false]);
+		stage.store.markCalculating();
+		const calculating = {
+			state: 'calculating',
+			status: CALCULATING_TEMPERATURE_TEXT,
+			bar: { fraction: null },
+		};
+		for (const step of [
+			() => stage.panel.setLayer(MADE_UP_ID),
+			() => stage.panel.setWinds(true),
+			() => stage.panel.setLayer('temperature'),
+			() => stage.panel.setWinds(false),
+			() => stage.panel.setLayer('terrain'),
+		]) {
+			step();
+			expect(stage.calculations.at(-1)).toEqual(calculating);
+		}
 	});
 
 	it('shows its months from where it says, on a scale centred on the year’s mean, in its colours and words', () => {
@@ -3217,31 +3281,36 @@ describe('createLayerPanel, the pressure', () => {
 		expect(stage.told.at(-1)?.summaries.pressure).toBe('annualMean');
 	});
 
-	it('tells the winds they are showing while it is on screen, and the temperature it is not', () => {
+	it('says the winds are being calculated on it, on the Temperature and on Terrain alike, with the Winds tile off', () => {
 		const stage = createStage();
-		stage.panel.setLayer('temperature');
-		expect(stage.showing).toEqual([true]);
-		expect(stage.windsShowing).toEqual([]);
-		stage.panel.setLayer('pressure');
-		expect(stage.showing).toEqual([true, false]);
-		expect(stage.windsShowing).toEqual([true]);
-		stage.panel.setLayer('terrain');
-		expect(stage.windsShowing).toEqual([true, false]);
-		expect(stage.showing).toEqual([true, false]);
+		stage.arrive(resultWith());
+		stage.store.markWindsCalculating();
+		const calculating = {
+			state: 'calculating',
+			status: CALCULATING_WINDS_TEXT,
+			bar: { fraction: null },
+		};
+		for (const layer of ['pressure', 'temperature', 'terrain'] as const) {
+			stage.panel.setLayer(layer);
+			expect(stage.lastCalculation()).toEqual(calculating);
+		}
 	});
 
-	it('leaves the winds showing when it is left with the Winds tile on', () => {
+	it('says the same with the Winds tile on, whichever layer it is left for', () => {
 		const stage = createStage();
 		stage.panel.setWinds(true);
-		stage.panel.setLayer('pressure');
-		stage.panel.setLayer('temperature');
-		stage.panel.setLayer('terrain');
-		expect(stage.windsShowing).toEqual([true]);
-		stage.panel.setLayer('pressure');
-		stage.panel.setWinds(false);
-		expect(stage.windsShowing).toEqual([true]);
-		stage.panel.setLayer('terrain');
-		expect(stage.windsShowing).toEqual([true, false]);
+		stage.arrive(resultWith());
+		stage.store.markWindsCalculating();
+		for (const layer of ['pressure', 'temperature', 'terrain'] as const) {
+			stage.panel.setLayer(layer);
+			expect(stage.lastCalculation()?.status).toBe(CALCULATING_WINDS_TEXT);
+		}
+		stage.store.setWindsResult(solvedWinds(), true);
+		expect(stage.lastCalculation()).toEqual({
+			state: 'current',
+			status: null,
+			bar: null,
+		});
 	});
 
 	it('shows the month’s pressure of the winds’ result, centred on the year’s mean, in its colours and words', () => {

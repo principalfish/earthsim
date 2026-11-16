@@ -844,15 +844,14 @@ const wait = async (harness: TemperatureHarness): Promise<void> => {
 };
 
 /**
- * A harness showing the temperature, whose first request has been answered
- * with a current result.
+ * A harness whose first request, for a new world, has been answered with a
+ * current result.
  */
 const createAnsweredHarness = async (
 	result = temperatureOf(1),
 ): Promise<TemperatureHarness> => {
 	const harness = createTemperatureHarness();
-	harness.scheduler.setShowing(true);
-	await wait(harness);
+	harness.scheduler.refreshNow();
 	harness.asked[0]?.resolve(solved(result));
 	await settle();
 	return harness;
@@ -865,11 +864,50 @@ describe('TEMPERATURE_DEBOUNCE_MS', () => {
 	});
 });
 
-describe('createTemperatureScheduler while the temperature is not showing', () => {
-	it('asks for nothing, however many changes come', async () => {
+describe('createTemperatureScheduler as it starts', () => {
+	it('asks for nothing until it is told of a change', async () => {
+		const harness = createTemperatureHarness();
+		await wait(harness);
+		expect(harness.asked).toHaveLength(0);
+		expect(harness.timers.started()).toBe(0);
+		expect(harness.store.temperature.status).toBe('empty');
+	});
+
+	it('asks after the wait for a change, without being told that anything is on screen', async () => {
 		const harness = createTemperatureHarness();
 		harness.scheduler.refresh();
+		harness.timers.advance(WAIT_MS - 1);
+		await settle();
+		expect(harness.asked).toHaveLength(0);
+
+		harness.timers.advance(1);
+		await settle();
+		expect(harness.asked).toHaveLength(1);
+		expect(harness.asked[0]?.start).toBeUndefined();
+		expect(harness.store.temperature.status).toBe('calculating');
+	});
+
+	it('asks at once for a new world, without being told that anything is on screen', () => {
+		const harness = createTemperatureHarness();
+		harness.scheduler.reset();
+		harness.scheduler.refreshNow();
+		expect(harness.asked).toHaveLength(1);
+		expect(harness.asked[0]?.start).toBeUndefined();
+		expect(harness.store.temperature).toMatchObject({
+			status: 'calculating',
+			result: null,
+		});
+		expect(harness.timers.started()).toBe(0);
+	});
+});
+
+describe('createTemperatureScheduler while paused', () => {
+	it('asks for nothing, however many changes come', async () => {
+		const harness = createTemperatureHarness();
+		harness.scheduler.setRunning(false);
 		harness.scheduler.refresh();
+		harness.scheduler.refresh();
+		harness.scheduler.refreshNow();
 		expect(harness.timers.pending()).toBe(0);
 		await wait(harness);
 		expect(harness.asked).toHaveLength(0);
@@ -878,20 +916,117 @@ describe('createTemperatureScheduler while the temperature is not showing', () =
 
 	it('only marks the result on hand out of date', async () => {
 		const harness = await createAnsweredHarness();
-		harness.scheduler.setShowing(false);
+		harness.scheduler.setRunning(false);
 		harness.scheduler.refresh();
 		await wait(harness);
 		expect(harness.asked).toHaveLength(1);
 		expect(harness.store.temperature.status).toBe('outOfDate');
 	});
+
+	it('only marks the result on hand out of date for a change asked for at once', async () => {
+		const harness = await createAnsweredHarness();
+		harness.scheduler.setRunning(false);
+		harness.scheduler.refreshNow();
+		await wait(harness);
+		expect(harness.asked).toHaveLength(1);
+		expect(harness.store.temperature.status).toBe('outOfDate');
+
+		harness.scheduler.setRunning(true);
+		expect(harness.asked).toHaveLength(2);
+	});
+
+	it('leaves a new world unsolved, with the store empty, until it runs again', async () => {
+		const harness = await createAnsweredHarness();
+		harness.scheduler.setRunning(false);
+		harness.scheduler.reset();
+		harness.scheduler.refreshNow();
+		await wait(harness);
+		expect(harness.asked).toHaveLength(1);
+		expect(harness.store.temperature).toEqual({
+			status: 'empty',
+			result: null,
+			progress: null,
+		});
+
+		harness.scheduler.setRunning(true);
+		expect(harness.asked).toHaveLength(2);
+		expect(harness.asked[1]?.start).toBeUndefined();
+		expect(harness.store.temperature.status).toBe('calculating');
+	});
 });
 
-describe('createTemperatureScheduler switched on', () => {
+describe('createTemperatureScheduler paused', () => {
+	it('cancels a request waiting for the wait to end', async () => {
+		const harness = await createAnsweredHarness();
+		harness.scheduler.refresh();
+		harness.scheduler.setRunning(false);
+		expect(harness.timers.pending()).toBe(0);
+		await wait(harness);
+		expect(harness.asked).toHaveLength(1);
+		expect(harness.store.temperature.status).toBe('outOfDate');
+	});
+
+	it('cancels a request waiting for a stroke, and asks it when run again', async () => {
+		let busy = true;
+		const harness = createTemperatureHarness({ isBusy: () => busy });
+		harness.scheduler.refreshNow();
+		harness.scheduler.setRunning(false);
+		busy = false;
+		await wait(harness);
+		expect(harness.asked).toHaveLength(0);
+
+		harness.scheduler.setRunning(true);
+		expect(harness.asked).toHaveLength(1);
+	});
+
+	it('lets a solve under way finish and keeps its result as current', async () => {
+		const harness = createTemperatureHarness();
+		harness.scheduler.refreshNow();
+		harness.scheduler.setRunning(false);
+
+		const result = temperatureOf(3);
+		harness.asked[0]?.resolve(solved(result));
+		await settle();
+		expect(harness.store.temperature).toMatchObject({
+			status: 'current',
+			result,
+		});
+		harness.scheduler.setRunning(true);
+		await wait(harness);
+		expect(harness.asked).toHaveLength(1);
+	});
+
+	it('keeps that result as out of date if the world changed meanwhile, and asks again from it when run again', async () => {
+		const harness = createTemperatureHarness();
+		harness.scheduler.refreshNow();
+		harness.scheduler.setRunning(false);
+		harness.scheduler.refresh();
+		await wait(harness);
+		expect(harness.asked).toHaveLength(1);
+
+		const result = temperatureOf(3);
+		harness.asked[0]?.resolve(solved(result));
+		await settle();
+		expect(harness.store.temperature).toMatchObject({
+			status: 'outOfDate',
+			result,
+		});
+
+		harness.scheduler.setRunning(true);
+		await wait(harness);
+		expect(harness.asked).toHaveLength(2);
+		expect(harness.asked[1]?.start?.state).toBe(result.state);
+	});
+});
+
+describe('createTemperatureScheduler run again after a pause', () => {
 	it('asks once, at once, with no wait, when there is no result yet', async () => {
 		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.refresh();
+		harness.scheduler.setRunning(true);
 		// Before anything else runs: the temperature never reads as not
-		// calculated once it is switched on.
+		// calculated once the calculation runs again.
 		expect(harness.asked).toHaveLength(1);
 		expect(harness.asked[0]?.start).toBeUndefined();
 		expect(harness.store.temperature).toMatchObject({
@@ -907,7 +1042,9 @@ describe('createTemperatureScheduler switched on', () => {
 	it('waits for a stroke under way, and asks when it is over', async () => {
 		let busy = true;
 		const harness = createTemperatureHarness({ isBusy: () => busy });
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.refresh();
+		harness.scheduler.setRunning(true);
 		expect(harness.asked).toHaveLength(0);
 		await wait(harness);
 		expect(harness.asked).toHaveLength(0);
@@ -917,14 +1054,15 @@ describe('createTemperatureScheduler switched on', () => {
 		expect(harness.asked).toHaveLength(1);
 	});
 
-	it('asks once when the result is out of date, starting from it', async () => {
+	it('asks once for every change made meanwhile, at once, starting from the result out of date', async () => {
 		const first = temperatureOf(1);
 		const harness = await createAnsweredHarness(first);
-		harness.scheduler.setShowing(false);
+		harness.scheduler.setRunning(false);
 		harness.scheduler.refresh();
 		harness.scheduler.refresh();
+		harness.scheduler.refreshNow();
 
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(true);
 		expect(harness.asked).toHaveLength(2);
 		expect(harness.asked[1]?.start).toEqual(startOf(first));
 		await wait(harness);
@@ -932,93 +1070,46 @@ describe('createTemperatureScheduler switched on', () => {
 		expect(harness.asked).toHaveLength(2);
 	});
 
-	it('asks nothing when the result is current', async () => {
+	it('asks nothing when nothing changed meanwhile', async () => {
 		const harness = await createAnsweredHarness();
-		harness.scheduler.setShowing(false);
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.setRunning(true);
 		await wait(harness);
 		expect(harness.asked).toHaveLength(1);
 		expect(harness.store.temperature.status).toBe('current');
 	});
 
-	it('asks nothing more for being told it is showing again', async () => {
+	it('does nothing for being told what is already so', async () => {
 		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(true);
+		await wait(harness);
+		expect(harness.asked).toHaveLength(0);
+
+		harness.scheduler.refreshNow();
+		harness.scheduler.setRunning(true);
+		expect(harness.asked).toHaveLength(1);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.refresh();
 		await wait(harness);
 		expect(harness.asked).toHaveLength(1);
 		expect(harness.timers.started()).toBe(0);
 	});
 
-	it('asks once for being switched on, off and on again in quick succession', async () => {
+	it('asks once for being paused and run again twice in quick succession', async () => {
 		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
-		harness.scheduler.setShowing(false);
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.refresh();
+		harness.scheduler.setRunning(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.setRunning(true);
 		await wait(harness);
 		expect(harness.asked).toHaveLength(1);
 		expect(harness.store.temperature.status).toBe('calculating');
 	});
 });
 
-describe('createTemperatureScheduler switched off', () => {
-	it('cancels a request waiting to be made, and asks it when switched on again', async () => {
-		// Switched on during a stroke, the request waits for the stroke.
-		let busy = true;
-		const harness = createTemperatureHarness({ isBusy: () => busy });
-		harness.scheduler.setShowing(true);
-		harness.scheduler.setShowing(false);
-		busy = false;
-		await wait(harness);
-		expect(harness.asked).toHaveLength(0);
-
-		harness.scheduler.setShowing(true);
-		expect(harness.asked).toHaveLength(1);
-	});
-
-	it('lets a solve under way finish and keeps its result as current', async () => {
-		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
-		await wait(harness);
-		harness.scheduler.setShowing(false);
-
-		const result = temperatureOf(3);
-		harness.asked[0]?.resolve(solved(result));
-		await settle();
-		expect(harness.store.temperature).toMatchObject({
-			status: 'current',
-			result,
-		});
-		harness.scheduler.setShowing(true);
-		await wait(harness);
-		expect(harness.asked).toHaveLength(1);
-	});
-
-	it('keeps that result as out of date if the world changed meanwhile, and asks again from it when switched on', async () => {
-		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
-		await wait(harness);
-		harness.scheduler.setShowing(false);
-		harness.scheduler.refresh();
-		await wait(harness);
-		expect(harness.asked).toHaveLength(1);
-
-		const result = temperatureOf(3);
-		harness.asked[0]?.resolve(solved(result));
-		await settle();
-		expect(harness.store.temperature).toMatchObject({
-			status: 'outOfDate',
-			result,
-		});
-
-		harness.scheduler.setShowing(true);
-		await wait(harness);
-		expect(harness.asked).toHaveLength(2);
-		expect(harness.asked[1]?.start?.state).toBe(result.state);
-	});
-});
-
-describe('createTemperatureScheduler while showing', () => {
+describe('createTemperatureScheduler while running', () => {
 	it('asks once after a run of changes, starting from the last result', async () => {
 		const first = temperatureOf(1);
 		const harness = await createAnsweredHarness(first);
@@ -1056,7 +1147,6 @@ describe('createTemperatureScheduler while showing', () => {
 	it('holds a request during a stroke and makes it once after', async () => {
 		let busy = true;
 		const harness = createTemperatureHarness({ isBusy: () => busy });
-		harness.scheduler.setShowing(true);
 		harness.scheduler.refresh();
 		await wait(harness);
 		await wait(harness);
@@ -1070,8 +1160,7 @@ describe('createTemperatureScheduler while showing', () => {
 
 	it('keeps a result that a later change overtook as out of date, then asks from it', async () => {
 		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
-		await wait(harness);
+		harness.scheduler.refreshNow();
 		harness.scheduler.refresh();
 		const early = temperatureOf(2);
 		harness.asked[0]?.resolve(solved(early));
@@ -1088,8 +1177,7 @@ describe('createTemperatureScheduler while showing', () => {
 
 	it('keeps only the newest result: an overtaken request changes nothing', async () => {
 		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
-		await wait(harness);
+		harness.scheduler.refreshNow();
 		harness.scheduler.refresh();
 		await wait(harness);
 		harness.asked[0]?.resolve({ superseded: true });
@@ -1110,8 +1198,7 @@ describe('createTemperatureScheduler while showing', () => {
 
 	it('keeps the progress of the newest request only', async () => {
 		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
-		await wait(harness);
+		harness.scheduler.refreshNow();
 		harness.asked[0]?.onProgress(progressOf(1));
 		expect(harness.store.temperature.progress).toEqual(progressOf(1));
 
@@ -1145,14 +1232,13 @@ describe('createTemperatureScheduler while showing', () => {
 		expect(harness.asked[2]?.start?.state).toBe(first.state);
 	});
 
-	it('asks again when switched on after a failure', async () => {
+	it('asks again when run again after a failure', async () => {
 		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
-		await wait(harness);
+		harness.scheduler.refreshNow();
 		harness.asked[0]?.reject(new Error('no'));
 		await settle();
-		harness.scheduler.setShowing(false);
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.setRunning(true);
 		await wait(harness);
 		expect(harness.asked).toHaveLength(2);
 	});
@@ -1179,8 +1265,7 @@ describe('createTemperatureScheduler told the world was replaced', () => {
 
 	it('drops the answer and the progress of a request made before, while none is under way', async () => {
 		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
-		await wait(harness);
+		harness.scheduler.refreshNow();
 		harness.scheduler.reset();
 
 		harness.asked[0]?.onProgress(progressOf(3));
@@ -1195,8 +1280,7 @@ describe('createTemperatureScheduler told the world was replaced', () => {
 
 	it('drops the answer and the progress of a request made before, once the next is under way', async () => {
 		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
-		await wait(harness);
+		harness.scheduler.refreshNow();
 		harness.scheduler.reset();
 		harness.scheduler.refresh();
 		await wait(harness);
@@ -1211,24 +1295,22 @@ describe('createTemperatureScheduler told the world was replaced', () => {
 		});
 	});
 
-	it('asks nothing for it while not showing', async () => {
-		const harness = await createAnsweredHarness();
-		harness.scheduler.setShowing(false);
+	it('drops the answer of a solve left to finish while paused, and keeps the store empty', async () => {
+		const harness = createTemperatureHarness();
+		harness.scheduler.refreshNow();
+		harness.scheduler.setRunning(false);
 		harness.scheduler.reset();
-		harness.scheduler.refresh();
-		await wait(harness);
+		harness.scheduler.refreshNow();
+
+		harness.asked[0]?.resolve(solved(temperatureOf(9)));
+		await settle();
 		expect(harness.asked).toHaveLength(1);
 		expect(harness.store.temperature.status).toBe('empty');
-
-		harness.scheduler.setShowing(true);
-		await wait(harness);
-		expect(harness.asked).toHaveLength(2);
-		expect(harness.asked[1]?.start).toBeUndefined();
 	});
 });
 
 describe('createTemperatureScheduler told of a change to ask for at once', () => {
-	it('asks at once while showing, with no wait, starting from the last result', async () => {
+	it('asks at once, with no wait, starting from the last result', async () => {
 		const first = temperatureOf(1);
 		const harness = await createAnsweredHarness(first);
 		const started = harness.timers.started();
@@ -1294,7 +1376,7 @@ describe('createTemperatureScheduler told of a change to ask for at once', () =>
 	it('waits for a stroke under way, as a change does', async () => {
 		let busy = false;
 		const harness = createTemperatureHarness({ isBusy: () => busy });
-		harness.scheduler.setShowing(true);
+		harness.scheduler.refreshNow();
 		expect(harness.asked).toHaveLength(1);
 
 		busy = true;
@@ -1303,18 +1385,6 @@ describe('createTemperatureScheduler told of a change to ask for at once', () =>
 		expect(harness.store.temperature.status).toBe('calculating');
 		busy = false;
 		await wait(harness);
-		expect(harness.asked).toHaveLength(2);
-	});
-
-	it('asks nothing while not showing, and only marks the result out of date', async () => {
-		const harness = await createAnsweredHarness();
-		harness.scheduler.setShowing(false);
-		harness.scheduler.refreshNow();
-		await wait(harness);
-		expect(harness.asked).toHaveLength(1);
-		expect(harness.store.temperature.status).toBe('outOfDate');
-
-		harness.scheduler.setShowing(true);
 		expect(harness.asked).toHaveLength(2);
 	});
 });
@@ -1326,8 +1396,8 @@ describe('createTemperatureScheduler marked unavailable', () => {
 		harness.scheduler.refresh();
 		harness.scheduler.markUnavailable();
 		await wait(harness);
-		harness.scheduler.setShowing(false);
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.setRunning(true);
 		harness.scheduler.refresh();
 		await wait(harness);
 		expect(harness.asked).toHaveLength(1);
@@ -1365,8 +1435,7 @@ describe('createTemperatureScheduler with a store listener that throws', () => {
 
 	it("still drops the old world's answer when it arrives early after a replacement", async () => {
 		const harness = createTemperatureHarness();
-		harness.scheduler.setShowing(true);
-		await wait(harness);
+		harness.scheduler.refreshNow();
 		const failure = throwOn(harness, 'empty');
 
 		harness.scheduler.reset();
@@ -1388,8 +1457,7 @@ describe('createTemperatureScheduler with a store listener that throws', () => {
 	it('still asks for the solve and keeps its result when the listener throws on calculating', async () => {
 		const harness = createTemperatureHarness();
 		const failure = throwOn(harness, 'calculating');
-		harness.scheduler.setShowing(true);
-		await wait(harness);
+		harness.scheduler.refreshNow();
 		expect(harness.asked).toHaveLength(1);
 
 		const result = temperatureOf(2);
@@ -1484,12 +1552,11 @@ const waitWinds = async (harness: WindsHarness): Promise<void> => {
 };
 
 /**
- * A harness showing the winds, with a current temperature whose winds have
- * been asked for and answered.
+ * A harness with a current temperature whose winds have been asked for and
+ * answered.
  */
 const createWindyHarness = async () => {
 	const harness = createWindsHarness();
-	harness.scheduler.setShowing(true);
 	const temperature = temperatureOf(1);
 	await harness.arrive(temperature);
 	const winds = windResultOf(1);
@@ -1498,9 +1565,10 @@ const createWindyHarness = async () => {
 	return { harness, temperature, winds };
 };
 
-describe('createWindsScheduler while the winds are not showing', () => {
+describe('createWindsScheduler while paused', () => {
 	it('asks for nothing, for a new temperature or a change of the day length', async () => {
 		const harness = createWindsHarness();
+		harness.scheduler.setRunning(false);
 		await harness.arrive(temperatureOf(1));
 		harness.setDayLength(30);
 		harness.scheduler.refresh();
@@ -1512,7 +1580,7 @@ describe('createWindsScheduler while the winds are not showing', () => {
 
 	it('only marks the winds on hand out of date for a change of the day length', async () => {
 		const { harness } = await createWindyHarness();
-		harness.scheduler.setShowing(false);
+		harness.scheduler.setRunning(false);
 		harness.setDayLength(30);
 		harness.scheduler.refresh();
 		await waitWinds(harness);
@@ -1522,10 +1590,9 @@ describe('createWindsScheduler while the winds are not showing', () => {
 	});
 });
 
-describe('createWindsScheduler while the winds are showing', () => {
-	it('asks at once when a current temperature arrives, from its months and the world of the moment', async () => {
+describe('createWindsScheduler while running', () => {
+	it('asks at once when a current temperature arrives, from its months and the world of the moment, without being told that anything is on screen', async () => {
 		const harness = createWindsHarness();
-		harness.scheduler.setShowing(true);
 		const temperature = temperatureOf(1);
 		await harness.arrive(temperature);
 
@@ -1581,7 +1648,6 @@ describe('createWindsScheduler while the winds are showing', () => {
 
 	it('puts off a request a new temperature makes while a stroke is under way', async () => {
 		const harness = createWindsHarness();
-		harness.scheduler.setShowing(true);
 		harness.busy = true;
 		await harness.arrive(temperatureOf(1));
 		expect(harness.asked).toHaveLength(0);
@@ -1672,12 +1738,11 @@ describe('createWindsScheduler and the day length', () => {
 describe('createWindsScheduler judging an answer', () => {
 	it('keeps an answer for an older temperature result as out of date', async () => {
 		const harness = createWindsHarness();
-		harness.scheduler.setShowing(true);
 		const first = temperatureOf(1);
 		await harness.arrive(first);
-		// Switched off, so that the newer temperature asks for nothing that
-		// would overtake the first request.
-		harness.scheduler.setShowing(false);
+		// Paused, so that the newer temperature asks for nothing that would
+		// overtake the first request.
+		harness.scheduler.setRunning(false);
 		harness.store.markOutOfDate();
 		await harness.arrive(temperatureOf(2));
 
@@ -1693,7 +1758,6 @@ describe('createWindsScheduler judging an answer', () => {
 
 	it('keeps an answer as out of date when the temperature went out of date while it was worked out', async () => {
 		const harness = createWindsHarness();
-		harness.scheduler.setShowing(true);
 		await harness.arrive(temperatureOf(1));
 		harness.store.markOutOfDate();
 
@@ -1704,7 +1768,6 @@ describe('createWindsScheduler judging an answer', () => {
 
 	it('keeps an answer for an older day length as out of date', async () => {
 		const harness = createWindsHarness();
-		harness.scheduler.setShowing(true);
 		await harness.arrive(temperatureOf(1));
 		harness.setDayLength(30);
 		harness.scheduler.refresh();
@@ -1734,16 +1797,17 @@ describe('createWindsScheduler judging an answer', () => {
 	});
 });
 
-describe('createWindsScheduler switched on', () => {
+describe('createWindsScheduler run again after a pause', () => {
 	it('asks at once, with no wait, when there are no winds for the current temperature', async () => {
 		const harness = createWindsHarness();
+		harness.scheduler.setRunning(false);
 		const temperature = temperatureOf(1);
 		await harness.arrive(temperature);
 		expect(harness.store.winds.status).toBe('empty');
 
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(true);
 		// Before anything else runs: the winds never read as not calculated
-		// once they are switched on.
+		// once the calculation runs again.
 		expect(harness.asked).toHaveLength(1);
 		expect(harness.asked[0]?.temperature).toBe(temperature);
 		expect(harness.store.winds.status).toBe('calculating');
@@ -1753,35 +1817,50 @@ describe('createWindsScheduler switched on', () => {
 		expect(harness.asked).toHaveLength(1);
 	});
 
+	it('asks once, for the newest temperature, when several arrived meanwhile', async () => {
+		const { harness } = await createWindyHarness();
+		harness.scheduler.setRunning(false);
+		harness.store.markOutOfDate();
+		await harness.arrive(temperatureOf(2));
+		harness.store.markOutOfDate();
+		const newest = temperatureOf(3);
+		await harness.arrive(newest);
+
+		harness.scheduler.setRunning(true);
+		await waitWinds(harness);
+		expect(harness.asked).toHaveLength(2);
+		expect(harness.asked[1]?.temperature).toBe(newest);
+	});
+
 	it('asks nothing when the winds on hand are current', async () => {
 		const { harness } = await createWindyHarness();
-		harness.scheduler.setShowing(false);
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.setRunning(true);
 		await waitWinds(harness);
 		expect(harness.asked).toHaveLength(1);
 		expect(harness.store.winds.status).toBe('current');
 	});
 
-	it('asks when the day length changed while they were off and was not changed back', async () => {
+	it('asks when the day length changed while paused and was not changed back', async () => {
 		const { harness } = await createWindyHarness();
-		harness.scheduler.setShowing(false);
+		harness.scheduler.setRunning(false);
 		harness.setDayLength(30);
 		harness.scheduler.refresh();
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(true);
 		await waitWinds(harness);
 		expect(harness.asked).toHaveLength(2);
 	});
 
-	it('marks the winds on hand current again, asking nothing, when the day length changed and changed back while they were off', async () => {
+	it('marks the winds on hand current again, asking nothing, when the day length changed and changed back while paused', async () => {
 		const { harness, winds, temperature } = await createWindyHarness();
-		harness.scheduler.setShowing(false);
+		harness.scheduler.setRunning(false);
 		harness.setDayLength(30);
 		harness.scheduler.refresh();
 		harness.setDayLength(24);
 		harness.scheduler.refresh();
 		expect(harness.store.winds.status).toBe('outOfDate');
 
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(true);
 		expect(harness.store.winds).toEqual({
 			status: 'current',
 			result: { winds, temperature, dayLengthHours: 24 },
@@ -1790,14 +1869,14 @@ describe('createWindsScheduler switched on', () => {
 		expect(harness.asked).toHaveLength(1);
 	});
 
-	it('does the same when switched off during the wait after the change', async () => {
+	it('does the same when paused during the wait after the change', async () => {
 		const { harness } = await createWindyHarness();
 		harness.setDayLength(30);
 		harness.scheduler.refresh();
-		harness.scheduler.setShowing(false);
+		harness.scheduler.setRunning(false);
 		harness.setDayLength(24);
 		harness.scheduler.refresh();
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(true);
 		await waitWinds(harness);
 		expect(harness.asked).toHaveLength(1);
 		expect(harness.store.winds.status).toBe('current');
@@ -1805,23 +1884,21 @@ describe('createWindsScheduler switched on', () => {
 
 	it('asks nothing more, and marks nothing, while winds for things as they are are on their way', async () => {
 		const harness = createWindsHarness();
-		harness.scheduler.setShowing(true);
 		await harness.arrive(temperatureOf(1));
-		harness.scheduler.setShowing(false);
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.setRunning(true);
 		await waitWinds(harness);
 		expect(harness.asked).toHaveLength(1);
 		expect(harness.store.winds.status).toBe('calculating');
 	});
 
-	it('asks again when switched on while winds for an older day length are on their way', async () => {
+	it('asks again when run again while winds for an older day length are on their way', async () => {
 		const harness = createWindsHarness();
-		harness.scheduler.setShowing(true);
 		await harness.arrive(temperatureOf(1));
-		harness.scheduler.setShowing(false);
+		harness.scheduler.setRunning(false);
 		harness.setDayLength(30);
 		harness.scheduler.refresh();
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(true);
 		await waitWinds(harness);
 		// Asked once the request under way is answered, whose answer is
 		// dropped.
@@ -1836,9 +1913,8 @@ describe('createWindsScheduler switched on', () => {
 		});
 	});
 
-	it('asks when switched on during a stroke with winds left calculating by an answer it dropped', async () => {
+	it('asks when run again during a stroke with winds left calculating by an answer it dropped', async () => {
 		const harness = createWindsHarness();
-		harness.scheduler.setShowing(true);
 		await harness.arrive(temperatureOf(1));
 		harness.setDayLength(30);
 		harness.scheduler.refresh();
@@ -1851,8 +1927,8 @@ describe('createWindsScheduler switched on', () => {
 		await settle();
 		expect(harness.store.winds.status).toBe('calculating');
 
-		harness.scheduler.setShowing(false);
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.setRunning(true);
 		harness.busy = false;
 		await waitWinds(harness);
 		expect(harness.asked).toHaveLength(2);
@@ -1864,16 +1940,16 @@ describe('createWindsScheduler switched on', () => {
 
 	it('does nothing for being told what is already so', async () => {
 		const harness = createWindsHarness();
+		harness.scheduler.setRunning(true);
 		await harness.arrive(temperatureOf(1));
-		harness.scheduler.setShowing(true);
 		expect(harness.asked).toHaveLength(1);
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(true);
 		await waitWinds(harness);
 		expect(harness.asked).toHaveLength(1);
 		expect(harness.timers.started()).toBe(0);
 
-		harness.scheduler.setShowing(false);
-		harness.scheduler.setShowing(false);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.setRunning(false);
 		harness.store.markOutOfDate();
 		await harness.arrive(temperatureOf(2));
 		expect(harness.asked).toHaveLength(1);
@@ -1881,7 +1957,8 @@ describe('createWindsScheduler switched on', () => {
 
 	it('with no current temperature, asks only once the temperature arrives, and at once', async () => {
 		const harness = createWindsHarness();
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.setRunning(true);
 		await waitWinds(harness);
 		expect(harness.asked).toHaveLength(0);
 		expect(harness.store.winds.status).toBe('empty');
@@ -1889,25 +1966,25 @@ describe('createWindsScheduler switched on', () => {
 		await harness.arrive(temperatureOf(1));
 		expect(harness.asked).toHaveLength(1);
 	});
+});
 
-	it('when switched off, cancels a request waiting to be made', async () => {
+describe('createWindsScheduler paused', () => {
+	it('cancels a request waiting to be made', async () => {
 		const harness = createWindsHarness();
-		await harness.arrive(temperatureOf(1));
-		// Switched on during a stroke, the request waits for the stroke.
+		// A new temperature during a stroke waits for the stroke.
 		harness.busy = true;
-		harness.scheduler.setShowing(true);
+		await harness.arrive(temperatureOf(1));
 		expect(harness.asked).toHaveLength(0);
-		harness.scheduler.setShowing(false);
+		harness.scheduler.setRunning(false);
 		harness.busy = false;
 		await waitWinds(harness);
 		expect(harness.asked).toHaveLength(0);
 	});
 
-	it('when switched off, lets a solve under way finish and keeps its result as current', async () => {
+	it('lets a solve under way finish and keeps its result as current', async () => {
 		const harness = createWindsHarness();
-		harness.scheduler.setShowing(true);
 		await harness.arrive(temperatureOf(1));
-		harness.scheduler.setShowing(false);
+		harness.scheduler.setRunning(false);
 		harness.asked[0]?.resolve(blown(windResultOf(1)));
 		await settle();
 		expect(harness.store.winds.status).toBe('current');
@@ -1915,7 +1992,7 @@ describe('createWindsScheduler switched on', () => {
 });
 
 describe('createWindsScheduler when things go wrong', () => {
-	it('keeps the winds on hand out of date when a request fails, and asks again when switched on', async () => {
+	it('keeps the winds on hand out of date when a request fails, and asks again when run again', async () => {
 		const { harness, winds } = await createWindyHarness();
 		harness.setDayLength(30);
 		harness.scheduler.refresh();
@@ -1929,10 +2006,10 @@ describe('createWindsScheduler when things go wrong', () => {
 			result: { winds },
 		});
 
-		harness.scheduler.setShowing(false);
+		harness.scheduler.setRunning(false);
 		harness.setDayLength(26);
 		harness.scheduler.refresh();
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(true);
 		await waitWinds(harness);
 		expect(harness.asked).toHaveLength(3);
 	});
@@ -1976,8 +2053,8 @@ describe('createWindsScheduler when things go wrong', () => {
 		expect(harness.store.winds.status).toBe('unavailable');
 		harness.setDayLength(24);
 		harness.scheduler.refresh();
-		harness.scheduler.setShowing(false);
-		harness.scheduler.setShowing(true);
+		harness.scheduler.setRunning(false);
+		harness.scheduler.setRunning(true);
 		await waitWinds(harness);
 		expect(harness.asked).toHaveLength(2);
 		expect(harness.store.winds.status).toBe('unavailable');

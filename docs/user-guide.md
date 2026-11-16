@@ -27,6 +27,16 @@ Along the top of the globe, beside the tiles:
 - **Simulated, Observed, Difference**, on an untouched Earth: where the layer on screen and the winds come from, one choice for both; see [Simulated, observed or difference](#simulated-observed-or-difference).
 - In a narrow window the two take a line each.
 
+## The Pause button
+
+In the top-right corner of the globe. The temperature, and the winds and pressure worked out from it, are worked out again after every change of the world, whatever is on screen, Terrain included: a moment after an edit, and at once for a new world and for the world the page opens on.
+
+- **Pause** stops that, for a slow world or a long run of edits. Edits go on and are saved as ever, but nothing more is worked out; a calculation already under way finishes. The info box's status line says "Paused" while what is on hand is out of date or not calculated yet.
+- **Resume**, as the button reads while paused, with the play icon, works out everything changed meanwhile, once and at once, or nothing if nothing changed.
+- Pause is not saved, and the browser does not remember it: the page always opens unpaused.
+- The statistics are worked out after every change, paused or not.
+- In a narrow window only the icon shows; the tooltip still names it, "Pause" or "Resume".
+
 ## The timeline
 
 Along the bottom of the globe, beside the tiles, while what is shown depends on the month: Temperature or Pressure on **Month**, or Sunlight or Winds on. Otherwise it is hidden.
@@ -41,12 +51,12 @@ Along the bottom of the globe, beside the tiles, while what is shown depends on 
 One box over the bottom-right corner of the globe, above the timeline, describes what is on screen. It holds, from the top, only the parts that apply:
 
 - **The legend,** while Temperature or Pressure is on screen: what is shown, such as "Air temperature in July, °C", its colours with values marked under them, and on an untouched Earth the comparison's figures. Places beyond either end of the scale take its end colours; the legend has no words for them; see [Layers](#layers).
-- **One status line** for the layer and the winds together, saying where their calculation stands. When the two stand differently it says the worse, in this order: unavailable ("Temperature unavailable", "Pressure unavailable", "Winds unavailable"), "Calculating", "Out of date", "Not calculated yet". While the temperature on screen is being worked out it gives the years done, such as "Calculating · year 3, about 2 to go", and a progress bar runs under the line while the layer on screen is being worked out. While everything shown is current the line says nothing, except "Loading observed winds" or "Observed winds could not be loaded" when that is so.
+- **One status line** for the calculation, the layer and the winds together, whatever is on screen: "Calculating temperature", with a progress bar, while the temperature is being worked out, then "Calculating winds", with a bar that does not know how far it has come. When things stand differently it says the worst, in this order: unavailable ("Temperature unavailable", "Pressure unavailable", "Winds unavailable"), calculating, "Paused", "Out of date", "Not calculated yet". "Paused" takes the place of the last two while the [Pause button](#the-pause-button) is pressed. While Temperature is on screen and being worked out it gives the years done instead, such as "Calculating · year 3, about 2 to go", with its bar, once it can tell how many are left. While everything is current the line says nothing, except "Loading observed winds" or "Observed winds could not be loaded" when that is so.
 - **The value under the pointer,** while the pointer is over the globe, under a rule, in two lines: the place, such as `1.7° N, 49.1° E · 4,628 m deep`, and its values, such as `28 °C · 15 mph S`; see [The value under the pointer](#the-value-under-the-pointer).
 
 The box has no key to the arrows or streaks, and no figures of the winds against the observed.
 
-- With Terrain alone and the pointer off the globe there is no box. With Winds on as well, it shows only while the status line has something to say.
+- On Terrain with the pointer off the globe, the box shows only while the status line has something to say, as while the temperature or the winds are being worked out.
 - In a narrow window the box takes the whole width beside the tiles. In a window too short for it, its top tucks under the top bar, whose controls stay in front.
 - The globe can still be turned and sculpted through the box.
 - Screen readers hear the status line once each time it changes, and never the value under the pointer.
@@ -168,7 +178,7 @@ In Temperature view, **Show**, in the top bar, chooses what of the year is on th
 | Warmest month, Coldest month | Each place's own warmest or coldest month, which need not be the same month everywhere |
 | Seasonal range | How far each place's warmest month is above its coldest |
 
-- **The legend,** in the [info box](#the-info-box), says what is shown, such as "Air temperature in July, °C". While a new result is being worked out the box's status line says "Calculating", with the years done and a progress bar.
+- **The legend,** in the [info box](#the-info-box), says what is shown, such as "Air temperature in July, °C". While a new result is being worked out the box's status line says "Calculating temperature", with a progress bar, and then, once it can tell how many years are left, the years done, such as "Calculating · year 3, about 2 to go".
 - **On an untouched Earth,** the comparison in the top bar offers the simulated temperature, the observed one, or the difference between them; see [Simulated, observed or difference](#simulated-observed-or-difference) and [Temperature](temperature.md#earth-comparison).
 - The layer, the view, the month and the comparison's choice are not saved. A new world goes back to July and to Simulated. Each layer keeps its own **Show** while another is on screen.
 
@@ -179,9 +189,9 @@ Pressure view colours the globe by the sea-level pressure of the winds' calculat
 - **Reduced to sea level.** The value is what the pressure would be at sea level at that place, so high ground does not show as low pressure: over a mountain it is the sea-level pressure there, not the thinner air at the summit.
 - **Its colours** run from teal for low pressure, through near white, to brown for high. The near white is the planet's own mean over the whole year and the whole surface, and the scale is the same for every month and for the annual average, so a colour means the same in each as the year plays. The scale is at least 10 hPa wide, and the few places beyond its ends take the end colours.
 - **Show** offers **Month** and **Annual average** only.
-- **The legend** says what is shown, such as "Sea-level pressure in July, hPa" or "Annual average sea-level pressure, hPa". While the winds are being worked out the info box's status line says "Calculating", with no year count, and "Pressure unavailable" if they cannot be.
+- **The legend** says what is shown, such as "Sea-level pressure in July, hPa" or "Annual average sea-level pressure, hPa". While the temperature and then the winds are being worked out the info box's status line says "Calculating temperature" and then "Calculating winds", as on any layer, and "Pressure unavailable" if they cannot be.
 - **The value under the pointer** gives the pressure there, such as `1,018 hPa`, whether by month or on the annual average.
-- **It is worked out with the winds,** from the temperature. Choosing Pressure asks for them even while Winds is off, and the colours appear once they are ready. Winds can be shown over it.
+- **It is worked out with the winds,** from the temperature, after every change whether or not Pressure or Winds is on, so the colours appear as soon as the winds are ready. Winds can be shown over it.
 - **On an untouched Earth,** the comparison in the top bar offers the simulated pressure, the observed one (the mean sea-level pressure of 1981 to 2010), or the difference between them, as for the temperature. The observed pressure is fetched the first time it is needed: when Observed or Difference is chosen on Pressure, or Pressure is chosen while either is on. A line under the choice says "Loading observed pressure" meanwhile, and "Observed pressure could not be loaded" if it fails. The choice then goes back to Simulated when Pressure is still on screen, and the next choice tries again; if Pressure has been left, the choice is kept and the fetch is tried again on coming back to it.
   - **The legend** then says where the field comes from, such as "Observed sea-level pressure in July, hPa" or "Simulated less observed in July, hPa", and gives the mean and the root-mean-square of the simulated less the observed for the month or annual average on screen, in hPa, such as `Mean +1.2 hPa · RMS 4.5 hPa`.
   - **The difference** is drawn from −20 to +20 hPa, marked every 10, in the temperature difference's blue-to-red colours: blue where the simulated pressure is too low, red where it is too high. The scale is the same for every month and the annual average.
@@ -251,13 +261,13 @@ The **Sunlight** tile lights the globe from the sun:
 
 ## Winds
 
-The **Winds** tile draws the surface winds as arrows, or as streaks (see [Arrows or streaks](#arrows-or-streaks)), over whichever colours the globe shows, Terrain, Temperature or Pressure. The winds are worked out from the temperature, so switching Winds on asks for the temperature too, and the arrows appear once both are ready. [Winds](winds.md) explains how they are worked out and how far to trust them.
+The **Winds** tile draws the surface winds as arrows, or as streaks (see [Arrows or streaks](#arrows-or-streaks)), over whichever colours the globe shows, Terrain, Temperature or Pressure. The winds are worked out from the temperature after every change, whether or not Winds is on, and the arrows appear once both are ready. [Winds](winds.md) explains how they are worked out and how far to trust them.
 
 - **Each arrow** points the way the wind blows and stands for the patch of the surface around it: it shows the mean wind of that patch, the winds of its cells averaged as arrows, the larger cells counting for more.
 - **Length and weight** grow with the speed, from 8 pixels just above 0.5 m/s to 26 pixels at 10 m/s, and no further for a stronger wind. A wind below 0.5 m/s is calm and has no arrow.
 - **The same size at every zoom.** The arrows keep their size on the screen. Zooming in brings more of them, closer together on the globe, in steps from about 8° apart to about 2°, so they never crowd one another.
 - **On the relief.** The arrows stand on the raised relief at every exaggeration, and fade out towards the globe's edge, so none show from the far side.
-- **Where the winds stand.** The [info box](#the-info-box)'s status line says "Calculating" while the winds, or the temperature they wait for, are being worked out, "Out of date" after a change they do not yet take in, "Not calculated yet" before the first when nothing is being worked out, and "Winds unavailable" if they cannot be worked out, unless the layer on screen has worse to say.
+- **Where the winds stand.** The [info box](#the-info-box)'s status line says "Calculating temperature" and then "Calculating winds" while the temperature they wait for and then the winds are being worked out, "Out of date" after a change they do not yet take in, "Not calculated yet" before the first when nothing is being worked out, "Paused" instead of either of those while paused, and "Winds unavailable" if they cannot be worked out, unless the layer on screen has worse to say.
 
 Which winds are shown follows the layer's **Show**:
 
@@ -268,7 +278,7 @@ Which winds are shown follows the layer's **Show**:
 | Warmest month, Coldest month, Seasonal range | The month last on screen |
 
 - While new winds are being worked out, the last ones stay on the globe. A new world drops them until its own are ready.
-- Switching Winds off removes the arrows and stops the winds being worked out, unless Pressure is on screen, which needs them.
+- Switching Winds off only removes the arrows: the winds are still worked out after every change, and only the [Pause button](#the-pause-button) stops that.
 - The value under the pointer gives the wind of the place under it; see [The value under the pointer](#the-value-under-the-pointer).
 
 ### Arrows or streaks

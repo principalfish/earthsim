@@ -317,7 +317,8 @@ export type TemperatureServiceOptions<H> = Omit<
 
 /**
  * Starts a simulation worker for the temperature and keeps the store up to
- * date with the world while the temperature is showing.
+ * date with the world while the scheduler is running, as it is unless
+ * paused.
  *
  * @remarks
  * A solve takes seconds, so one that a newer request overtakes is not
@@ -328,7 +329,7 @@ export type TemperatureServiceOptions<H> = Omit<
  * the store keeps the last result, marked out of date.
  *
  * @param options - The worker, the world, the store and the timers.
- * @returns The scheduler, with the temperature not yet showing.
+ * @returns The scheduler, running.
  */
 export const createTemperatureService = <H>(
 	options: TemperatureServiceOptions<H>,
@@ -359,7 +360,8 @@ export const createTemperatureService = <H>(
 
 /**
  * Starts a simulation worker for the winds and keeps the store's winds up
- * to date with its temperature and the world while the winds are showing.
+ * to date with its temperature and the world while the scheduler is
+ * running, as it is unless paused.
  *
  * @remarks
  * Unlike the temperature's, a wind solve is never cut short: the worker is
@@ -378,7 +380,7 @@ export const createTemperatureService = <H>(
  * {@link createWindsScheduler} for the rest.
  *
  * @param options - The worker, the world, the store and the timers.
- * @returns The scheduler, with the winds not yet showing.
+ * @returns The scheduler, running.
  */
 export const createWindsService = <H>(
 	options: TemperatureServiceOptions<H>,

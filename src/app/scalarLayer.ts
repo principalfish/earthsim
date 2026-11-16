@@ -198,8 +198,9 @@ export type ScalarLayerSpec = {
 	readonly notShownText: string;
 	/**
 	 * Whether its calculation tells how far it has come, year by year, as the
-	 * temperature's does: the legend then says which year it is on, and what
-	 * it says before the first year is done.
+	 * temperature's does: the legend then says which year it is on and how
+	 * many are left, once it can tell that, and with its bar how far it has
+	 * come.
 	 */
 	readonly yearProgress: boolean;
 	/**
@@ -221,11 +222,6 @@ export type ScalarLayerSpec = {
 	readonly observed: ObservedComparison | null;
 	/** Reads its result from the store. */
 	readonly read: (store: ScalarLayerStore) => ScalarLayerReading;
-	/**
-	 * What calculates it, and is told it is showing while it is on screen:
-	 * the temperature, or the winds and pressure.
-	 */
-	readonly scheduler: 'temperature' | 'winds';
 	/**
 	 * How the globe is lit over it while the sun lights the globe: with the
 	 * line between day and night drawn over colours shaded as without the
@@ -383,7 +379,6 @@ export const TEMPERATURE_LAYER: ScalarLayerSpec = {
 		months: temperature.result?.months ?? null,
 		progress: temperature.progress,
 	}),
-	scheduler: 'temperature',
 	sunlightStyle: 'line',
 	summaryControlId: 'temperature-view',
 };
@@ -518,7 +513,7 @@ export const windsStatus = (
  * such as `1,018`. On the measured Earth it is compared with the observed
  * sea-level pressure, as {@link PRESSURE_OBSERVED} says. It is read from
  * the store's winds, whose calculation tells nothing of its progress, and
- * is calculated by the winds, so choosing it asks for them; before the
+ * is calculated by the winds; before the
  * first winds it is being calculated while the temperature the winds wait
  * for is, as {@link windsStatus} says. Over it, sunlight is shown as the
  * line between day and night, as over the temperature.
@@ -559,7 +554,6 @@ export const PRESSURE_LAYER: ScalarLayerSpec = {
 		months: winds.result?.winds.pressure ?? null,
 		progress: null,
 	}),
-	scheduler: 'winds',
 	sunlightStyle: 'line',
 	summaryControlId: 'pressure-view',
 };

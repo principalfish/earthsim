@@ -55,6 +55,7 @@ import {
 	type WorldSources,
 	worldFromChoice,
 } from './ui/newWorldDialog';
+import type { PauseButtonOptions } from './ui/pauseButton';
 import type { PlanetPanel, PlanetPanelOptions } from './ui/planetPanel';
 import type { Timeline, TimelineOptions } from './ui/timeline';
 import type { ToolPanel, ToolPanelOptions } from './ui/toolPanel';
@@ -116,23 +117,17 @@ export type PageTemperatureOptions = PageStatisticsOptions & {
 };
 
 /**
- * What the layer panel is given: where the results are kept, what
- * calculates them, the observed data and whom to tell of the view and the
- * comparison. The dock's tiles and the top bar choose what is shown, and
- * the timeline the month on screen and whether the year plays.
+ * What the layer panel is given: where the results are kept, the observed
+ * data and whom to tell of the view and the comparison. The dock's tiles
+ * and the top bar choose what is shown, and the timeline the month on
+ * screen and whether the year plays.
  */
 export type PageLayerOptions = {
-	/** Where the temperature is kept: the store the temperature writes. */
-	readonly store: LayerStore;
-	/** What calculates the temperature, told whether it is showing. */
-	readonly temperature: Pick<TemperatureScheduler, 'setShowing'>;
 	/**
-	 * The switch for the winds: tells what calculates them whether they are
-	 * showing, which also says whether the temperature they need is wanted.
-	 * The layer panel flips it as the dock's Winds tile is pressed and
-	 * released.
+	 * Where the temperature and the winds are kept: the store their
+	 * calculations write.
 	 */
-	readonly winds: Pick<WindsScheduler, 'setShowing'>;
+	readonly store: LayerStore;
 	/**
 	 * Called with the view settings, and whether the year is playing,
 	 * whenever any of them changes.
@@ -222,6 +217,11 @@ export type PageParts = {
 	readonly createTimeline: (
 		options: TimelineOptions,
 	) => Pick<Timeline, 'showView'>;
+	/**
+	 * Lays the Pause button in the corner over the globe, which pauses the
+	 * calculation of the temperature and the winds and resumes it.
+	 */
+	readonly createPauseButton: (options: PauseButtonOptions) => void;
 	/** Adds the planet controls to the panel. */
 	readonly createPlanetPanel: (
 		options: PlanetPanelOptions,
@@ -233,27 +233,27 @@ export type PageParts = {
 	readonly createStatistics: (
 		options: PageStatisticsOptions,
 	) => Pick<RefreshScheduler, 'refresh' | 'reset'>;
-	/** Starts whatever computes the temperature, not yet showing. */
+	/** Starts whatever computes the temperature, running. */
 	readonly createTemperature: (
 		options: PageTemperatureOptions,
 	) => Pick<
 		TemperatureScheduler,
-		'refresh' | 'refreshNow' | 'reset' | 'setShowing'
+		'refresh' | 'refreshNow' | 'reset' | 'setRunning'
 	>;
 	/**
-	 * Starts whatever computes the winds from the temperature, not yet
-	 * showing, on the store the temperature writes.
+	 * Starts whatever computes the winds from the temperature, running, on
+	 * the store the temperature writes.
 	 */
 	readonly createWinds: (
 		options: PageTemperatureOptions,
-	) => Pick<WindsScheduler, 'refresh' | 'reset' | 'setShowing'>;
+	) => Pick<WindsScheduler, 'refresh' | 'reset' | 'setRunning'>;
 	/**
 	 * Adds the layer controls to the panel, which hold the view settings:
-	 * what the globe is coloured by, as the dock chooses it, and so whether
-	 * the temperature is showing, what of each computed layer's year it
-	 * shows and where the layer and the winds come from, as the top bar
-	 * chooses them, and the month on screen and whether the year plays, as
-	 * the timeline chooses them. It starts on {@link DEFAULT_PAGE_VIEW}.
+	 * what the globe is coloured by, as the dock chooses it, what of each
+	 * computed layer's year it shows and where the layer and the winds come
+	 * from, as the top bar chooses them, and the month on screen and whether
+	 * the year plays, as the timeline chooses them. It starts on
+	 * {@link DEFAULT_PAGE_VIEW}.
 	 */
 	readonly createLayerPanel: (
 		options: PageLayerOptions,
@@ -268,6 +268,7 @@ export type PageParts = {
 		| 'setWinds'
 		| 'setMonth'
 		| 'togglePlaying'
+		| 'setPaused'
 		| 'shown'
 		| 'shownWinds'
 	>;
@@ -360,18 +361,22 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * the cell grid's state itself, which goes straight to the globe. The dock
  * and the layer panel are given no list of layers, so both offer every
  * layer in `SCALAR_LAYERS`. The temperature and then the winds, which have
- * nothing of their own in the panel, are made just before the layers,
- * which switch them on and off. The page opens on the height colours with
- * neither showing, so nothing asks for the temperature until it is chosen.
+ * nothing of their own in the panel, are made just before the layers.
  *
- * The temperature is needed while the Temperature layer is chosen or the
- * winds are showing, and is told it is showing while either is so: the
- * winds are worked out from it, so switching them on with no current
- * temperature asks for the temperature, and its result then asks for the
- * winds. The layer panel is handed the switch for the winds, and flips it
- * as the dock's Winds tile is pressed and released: the tile tells the
- * layer panel, which shows the winds on the globe, and offers the month in
- * Terrain view, while it is on; a new world keeps it.
+ * The temperature and the winds are worked out whatever is on screen:
+ * the temperature after every change of the world, and the winds from
+ * each current temperature, so the page opens on the height colours with
+ * both being worked out. The dock's Winds tile tells the layer panel,
+ * which shows the winds on the globe, and offers the month in Terrain
+ * view, while it is on; a new world keeps it.
+ *
+ * The Pause button, made after the layers, stops both: pressed, the
+ * temperature and then the winds are told to stop running, so a request
+ * waiting to be made is cancelled and a solve under way is left to
+ * finish, and the layer panel is told, for the info box to say so;
+ * released, the temperature and then the winds run again, each catching up
+ * at once with the changes made meanwhile, and the layer panel is told.
+ * The page always opens with it released.
  *
  * The date line under the world's description is written as soon as the
  * world controls are made, and follows the world's age and every change of
@@ -436,10 +441,10 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * the layer panel, which stops the year playing, puts July back on screen
  * and is told whether the world is the measured Earth; the date line; the
  * panel's message, which is taken back; the autosave; and last the
- * temperature again, asked for at once if it is showing, with no wait,
- * once every part before it is on the new world. The winds are asked for
- * again by the temperature's next result if they are showing. An edit of
- * the world, which is no new world, keeps the month on screen.
+ * temperature again, asked for at once unless paused, with no wait, once
+ * every part before it is on the new world. The winds are asked for again
+ * by the temperature's next result. An edit of the world, which is no new
+ * world, keeps the month on screen.
  *
  * A committed stroke, an undo, a redo and the sea-level control each ask
  * for the statistics and the temperature again, tell the layer panel
@@ -463,7 +468,9 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * Until the storage has answered, the panel, the globe and the history
  * shortcuts are out of reach and nothing is saved. A change made to the
  * blank world meanwhile would otherwise be saved over the saved world, or
- * be lost when that world arrives.
+ * be lost when that world arrives. Nor is the temperature asked for until
+ * then: the world brought back is asked for as any new world is, and the
+ * blank world, when the page stays on it, once the storage has answered.
  *
  * @param parts - The parts to join.
  * @returns A promise that resolves once the page has started: the saved
@@ -685,28 +692,8 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		isStrokeActive: sculpt.isStrokeActive,
 		store: layers,
 	});
-	/** Whether the Temperature layer is chosen, as the layer panel last said. */
-	let temperatureChosen = false;
-	/** Whether the winds are showing, as last said. */
-	let windsShowing = false;
-	/** Tells the temperature whether anything needs it. */
-	const needTemperature = (): void =>
-		temperature.setShowing(temperatureChosen || windsShowing);
 	const layerPanel = parts.createLayerPanel({
 		store: layers,
-		temperature: {
-			setShowing: (showing) => {
-				temperatureChosen = showing;
-				needTemperature();
-			},
-		},
-		winds: {
-			setShowing: (showing) => {
-				windsShowing = showing;
-				winds.setShowing(showing);
-				needTemperature();
-			},
-		},
 		onView: (next, playing) => {
 			dock.showView(next);
 			topBar.showView(next);
@@ -723,6 +710,13 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		loadObserved: parts.loadObserved,
 		loadObservedWinds: parts.loadObservedWinds,
 		onComparison: topBar.showComparison,
+	});
+	parts.createPauseButton({
+		onPause: (paused) => {
+			temperature.setRunning(!paused);
+			winds.setRunning(!paused);
+			layerPanel.setPaused(paused);
+		},
 	});
 	const statistics = parts.createStatistics({
 		currentWorld: () => state.world,
@@ -845,6 +839,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		if (read.kind === 'loaded' && read.outcome.kind === 'corrupt') {
 			logError(`The saved world cannot be read: ${read.outcome.reason}`);
 		}
+		const blank = state.world;
 		applyStartup(decideStartup(read), {
 			replaceWorld: (world) =>
 				state.replaceWorld(world, { keepSettings: true }),
@@ -853,6 +848,12 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			openDialog: ({ notice }) => openDialog(FIRST_NEW_WORLD_VALUES, notice),
 			logError,
 		});
+		// A world brought back has been asked for as a new world is; the
+		// blank one the page stays on otherwise is asked for here, as any
+		// other world is.
+		if (state.world === blank) {
+			temperature.refreshNow();
+		}
 	};
 	return restoreOrStart();
 };

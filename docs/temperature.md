@@ -41,8 +41,9 @@ The model is calibrated on the Earth, and far from it the results are rough. The
 
 The temperature is worked out in its own worker, so a slow solve never holds up the rest of the page.
 
-- **Only while Temperature is chosen.** Nothing is calculated until it first is. While Terrain is chosen, a change only marks the result out of date.
-- **After every change:** a stroke, undo, redo, a move of the Sea level or a Planet slider, or a new world. It starts a little under half a second after the change, and a change made during a solve stops it and starts a new one.
+- **Whatever is on screen,** Terrain included, so the result is ready when Temperature is chosen.
+- **After every change:** a stroke, undo, redo, a move of the Sea level or a Planet slider, or a new world. It starts a little under half a second after the change, and a change made during a solve stops it and starts a new one. A new world, and the world the page opens on, are asked for at once.
+- **Not while paused.** The [Pause button](user-guide.md#the-pause-button) stops it: a change only marks the result out of date, a new world stays uncalculated, and a solve under way finishes. Resume asks once for everything changed meanwhile.
 - **After a terrain edit it carries on from the last result,** which settles in fewer years.
 - **After a change of sea level or planet it starts afresh,** as it does for a new world.
 
@@ -54,12 +55,14 @@ Terrain edits carry on, but only until the terrain has drifted past a limit sinc
 
 ### What the info box says meanwhile
 
-The status line of the info box, under the legend, says where the result stands, unless the winds, while they are shown, have something worse to say; see the [user guide](user-guide.md#the-info-box).
+The status line of the info box, under the legend, says where the result stands, unless the winds have something worse to say; see the [user guide](user-guide.md#the-info-box). It says so on Terrain too.
 
 | Status line | Meaning |
 |-|-|
-| "Calculating", with the years done and a bar | A new result is on its way; the one before stays on the globe |
+| "Calculating · year 3, about 2 to go", or "Calculating · year 5, finishing", with a bar | A new result is on its way, on Temperature once the years left can be told; the one before stays on the globe |
+| "Calculating temperature", with a bar | The same, said while Temperature is not on screen, and on it until the years left can be told |
 | "Out of date" | The result on the globe no longer describes the world |
+| "Paused" | The result is out of date, or there is none, and the calculation is paused |
 | "Temperature could not be shown" | The globe could not take a current result |
 | "Temperature unavailable" | The worker could not be started |
 

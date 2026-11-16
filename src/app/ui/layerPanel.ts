@@ -9,18 +9,18 @@
  * for a layer's Month view, and in Terrain view too while the globe is lit
  * by the sun or shows the winds, as the timeline chooses them; and what
  * the info box over the globe shows of them: the legend, and where the
- * layer and the winds stand, said on the info box's status line.
+ * calculation, the layer and the winds stand, said on the info box's
+ * status line.
  *
  * Each computed layer is shown as its description, a
  * {@link ScalarLayerSpec}, says: its views of the year, their colours and
  * scales, its wording and its comparison. {@link createLayerPanel} decides
- * what the globe and the info box show, from the view settings and
- * the layer store, and switches each layer's calculation on and off with
- * the layer and the winds' with the dock's Winds tile.
- * The info box, given as {@link LayerControls}, only shows what it is
- * told; the layer is chosen on the dock, and told
- * to the panel by {@link LayerPanel.setLayer}, the view of its year and
- * the source on the top bar, told by {@link LayerPanel.setSummary} and
+ * what the globe and the info box show, from the view settings, the layer
+ * store and whether the calculation is paused; what calculates the layers
+ * runs whatever is shown. The info box, given as {@link LayerControls},
+ * only shows what it is told; the layer is chosen on the dock, and told to
+ * the panel by {@link LayerPanel.setLayer}, the view of its year and the
+ * source on the top bar, told by {@link LayerPanel.setSummary} and
  * {@link LayerPanel.setSource}, and the month and whether the year plays
  * on the timeline, told by {@link LayerPanel.setMonth} and
  * {@link LayerPanel.togglePlaying}.
@@ -41,7 +41,6 @@ import type { WindField } from '../globe/wind';
 import type { LayerStore, SolvedWinds } from '../layers';
 import type { ObservedLoader } from '../observedData';
 import { createPlayback, type PlaybackOptions } from '../playback';
-import type { TemperatureScheduler, WindsScheduler } from '../refresh';
 import {
 	fitSummaryScale,
 	type LayerYear,
@@ -76,6 +75,7 @@ import {
 	windSourceFor,
 } from '../view';
 import type { ComparisonContent } from './comparison';
+import { type CalculationContent, calculationContent } from './infoBox';
 import { type LegendContent, type LegendSource, legendContent } from './legend';
 import {
 	OBSERVED_WINDS_FAILED_TEXT,
@@ -86,7 +86,7 @@ import {
 
 /**
  * What the info box shows of the layer and the winds: the legend, and what
- * is said of the winds on its status line.
+ * is said of the winds and of the calculation on its status line.
  */
 export type LayerControls = {
 	/** Shows a legend, or hides it for null. */
@@ -96,6 +96,8 @@ export type LayerControls = {
 	 * they are not shown.
 	 */
 	showWindKey(content: WindKeyContent | null): void;
+	/** Says where the calculation of the temperature and the winds stands. */
+	showCalculation(content: CalculationContent): void;
 };
 
 /** What the layer panel joins. */
@@ -115,16 +117,6 @@ export type LayerPanelOptions = Pick<
 	 * already.
 	 */
 	readonly globe: Pick<Globe, 'setLayer' | 'setWinds'>;
-	/**
-	 * What calculates the temperature, told whether it is showing: while a
-	 * layer it calculates is on screen.
-	 */
-	readonly temperature: Pick<TemperatureScheduler, 'setShowing'>;
-	/**
-	 * What calculates the winds, told whether they are showing: while the
-	 * dock's Winds tile is on, or a layer they calculate is on screen.
-	 */
-	readonly winds: Pick<WindsScheduler, 'setShowing'>;
 	/** Gives what the info box shows of the layer and the winds. */
 	readonly createControls: () => LayerControls;
 	/**
@@ -225,12 +217,11 @@ export type LayerPanel = {
 	 */
 	setEarth(earth: Resolution | null): void;
 	/**
-	 * Takes the layer the globe is to be coloured by, as the dock chose it,
-	 * and tells what calculates each layer whether it is showing. A layer
-	 * that does not offer the month stops the year playing. A source the
-	 * new view does not offer goes back to Simulated; one it does is kept,
-	 * and what it needs of the new layer is asked for. The layer on screen
-	 * already changes nothing.
+	 * Takes the layer the globe is to be coloured by, as the dock chose it.
+	 * A layer that does not offer the month stops the year playing. A source
+	 * the new view does not offer goes back to Simulated; one it does is
+	 * kept, and what it needs of the new layer is asked for. The layer on
+	 * screen already changes nothing.
 	 *
 	 * @param layer - The layer chosen.
 	 */
@@ -264,8 +255,8 @@ export type LayerPanel = {
 	 */
 	setSunlight(on: boolean): void;
 	/**
-	 * Takes whether the winds are shown, as the dock sets it, and
-	 * tells what calculates them. Turned on in Terrain view, the month is
+	 * Takes whether the winds are shown, as the dock sets it. Turned on in
+	 * Terrain view, the month is
 	 * offered there, as for sunlight; turned off there with sunlight off
 	 * too, it is no longer offered and the year stops playing. Turned
 	 * off, the arrows leave the globe, and a source no longer offered goes
@@ -290,6 +281,14 @@ export type LayerPanel = {
 	 * button asks, or stops it on that month if it is playing.
 	 */
 	togglePlaying(): void;
+	/**
+	 * Takes whether the calculation of the temperature and the winds is
+	 * paused, as the Pause button sets it, for the info box's status line
+	 * to say; saying what is already so changes nothing.
+	 *
+	 * @param paused - Whether it is paused.
+	 */
+	setPaused(paused: boolean): void;
 	/**
 	 * What the globe shows of a computed layer: exactly what it was last
 	 * given, as of the panel's latest update, which follows every change of
@@ -425,10 +424,9 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * calculations, starting on {@link DEFAULT_PAGE_VIEW}.
  *
  * @remarks
- * Choosing a computed layer tells what calculates it, the temperature or
- * the winds as its description says, that it is showing, which asks for
- * it if the result on hand is out of date or there is none, and choosing
- * Terrain tells it it is not. The view settings are the page's: a new
+ * What calculates the layers is not told what is shown: the temperature
+ * and the winds are worked out whatever is on screen, and the panel shows
+ * what is in the store. The view settings are the page's: a new
  * world and a new result keep the layer and each layer's view of its year,
  * and a result keeps the month; {@link LayerPanel.newWorld} is how a new
  * world puts July back on screen. Each layer keeps its own view of the
@@ -517,23 +515,21 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * a summary chosen on the way back to a computed layer.
  *
  * While the winds are shown, as the page says through
- * {@link LayerPanel.setWinds}, the winds are told they are showing, which
- * asks for them, and the globe shows the latest winds result in the store as
- * arrows over whatever colours it shows: in Terrain view and in the Month
- * view the winds of the month on screen, following the year as it plays;
- * while the layer on screen shows its annual average, their annual mean,
- * worked out once for each result, when first shown; and on any other
- * summary the month last on screen. Winds that are out of date or being
- * worked out again stay on the globe until the next arrive; until there is a
- * result there are none, and when the store drops its result, as for a new
- * world, they go. A field is sent to the globe when it arrives or another
- * month or the annual mean is chosen, not again as the status changes.
- * Turned off, the winds are told they are not showing, unless the layer on
- * screen is one they calculate, and the globe is given no winds. While the
- * winds are shown, the info box's status line is given where the store's
- * winds stand, as {@link windKeyContent} words it from {@link windsStatus},
- * the rule the pressure's legend follows, so that it says the winds are
- * being worked out while the temperature they wait for is.
+ * {@link LayerPanel.setWinds}, the globe shows the latest winds result in
+ * the store as arrows over whatever colours it shows: in Terrain view and
+ * in the Month view the winds of the month on screen, following the year
+ * as it plays; while the layer on screen shows its annual average, their
+ * annual mean, worked out once for each result, when first shown; and on
+ * any other summary the month last on screen. Winds that are out of date
+ * or being worked out again stay on the globe until the next arrive; until
+ * there is a result there are none, and when the store drops its result,
+ * as for a new world, they go. A field is sent to the globe when it
+ * arrives or another month or the annual mean is chosen, not again as the
+ * status changes. Turned off, the globe is given no winds. While the winds
+ * are shown, the info box's status line is given where the store's winds
+ * stand, as {@link windKeyContent} words it from {@link windsStatus}, the
+ * rule the pressure's legend follows, so that it says the winds are being
+ * worked out while the temperature they wait for is.
  *
  * While the world is the measured Earth, the arrows follow the source, as
  * {@link windSourceFor} says: the observed winds on Observed, and the
@@ -553,6 +549,15 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * the result's, they need a result to be shown. They are never out of date,
  * so under them the info box's status line says nothing of the store's
  * winds.
+ *
+ * Whatever is shown, the info box's status line is also given where the
+ * calculation stands, as {@link calculationContent} words it from the
+ * store's temperature and winds and whether it is paused, as
+ * {@link LayerPanel.setPaused} last said; it starts unpaused. So it says
+ * the temperature and then the winds are being calculated in Terrain view
+ * too, and that the calculation is paused while it is and a result is not
+ * current. It is given again whenever the legend is, and at each change of
+ * being paused.
  *
  * The legend's scale, ramp, caption and ticks are always those of what the
  * globe shows: what it was last given, or no scale while it shows the height
@@ -574,14 +579,14 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * any other refusal. What is thrown as an observed year arrives goes to
  * `reportError` too.
  *
- * @param options - The store, the layers, the globe, the temperature, the
- * winds, the info box, the timers the year plays by, the observed years'
+ * @param options - The store, the layers, the globe, the info box, the
+ * timers the year plays by, the observed years'
  * and the observed winds' loaders, whom to tell of the view, of the
  * comparison and of an error with no control to hand it back to.
  * @returns The panel.
  */
 export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
-	const { store, globe, temperature, winds } = options;
+	const { store, globe } = options;
 	const states: LayerState[] = (options.layers ?? SCALAR_LAYERS).map(
 		(spec) => ({
 			spec,
@@ -597,10 +602,8 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	let windsOn = DEFAULT_PAGE_VIEW.winds;
 	/** Where the layer on screen and the winds come from. */
 	let source = DEFAULT_PAGE_VIEW.source;
-	/** Whether the temperature was last told it is showing. */
-	let temperatureTold = false;
-	/** Whether the winds were last told they are showing. */
-	let windsTold = false;
+	/** Whether the calculation is paused, as the page last said. */
+	let paused = false;
 	/**
 	 * What has been worked out from the latest winds result, dropped with it.
 	 */
@@ -974,7 +977,13 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		try {
 			updateLayer();
 		} finally {
-			updateWinds();
+			try {
+				updateWinds();
+			} finally {
+				controls.showCalculation(
+					calculationContent(store.temperature, store.winds.status, paused),
+				);
+			}
 		}
 	};
 
@@ -1018,25 +1027,6 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			// status line.
 			message: onScreen()?.message ?? null,
 		});
-	};
-
-	/**
-	 * Tells what calculates the temperature and the winds whether each is
-	 * showing, when that has changed: the one that calculates the layer on
-	 * screen, and the winds while the dock's Winds tile is on.
-	 */
-	const tellShowing = (): void => {
-		const scheduler = onScreen()?.spec.scheduler;
-		const temperatureShowing = scheduler === 'temperature';
-		const windsShowing = windsOn || scheduler === 'winds';
-		if (temperatureShowing !== temperatureTold) {
-			temperatureTold = temperatureShowing;
-			temperature.setShowing(temperatureShowing);
-		}
-		if (windsShowing !== windsTold) {
-			windsTold = windsShowing;
-			winds.setShowing(windsShowing);
-		}
 	};
 
 	/**
@@ -1215,7 +1205,6 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			}
 			keepSourceOffered();
 			requestNeeded();
-			tellShowing();
 			announce();
 			update();
 		},
@@ -1276,7 +1265,6 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			}
 			keepSourceOffered();
 			requestNeeded();
-			tellShowing();
 			announce();
 			update();
 		},
@@ -1304,6 +1292,13 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			} else {
 				playback.play();
 			}
+		},
+		setPaused: (next) => {
+			if (next === paused) {
+				return;
+			}
+			paused = next;
+			update();
 		},
 		shown: () => shownLayer,
 		shownWinds: () => shownWindsState,

@@ -6,6 +6,8 @@ How the surface winds and sea-level pressure are worked out, which planet settin
 
 The winds are worked out from the temperature, a month at a time: first a map of sea-level pressure built by rules, then the wind that follows from it. It is a sketch of the real circulation, meant to be right in kind, not a simulation of the air.
 
+They are worked out again, in a worker of their own, as soon as each new temperature arrives and a moment after a change of the day length, whatever is on screen, and not while the [Pause button](user-guide.md#the-pause-button) is pressed.
+
 ### Bands of pressure
 
 Each month's mean temperature by latitude places a pattern of bands round the planet:

@@ -978,6 +978,59 @@ body {
   }
 }
 
+/* The Pause button in the top-right corner: its icon beside its word, on
+   the backing the info box has, outlined as the page's buttons are and
+   tinted in the accent colour while pressed, as an overlay tile that is on
+   is. It alone takes the pointer, as the corner does not. */
+.pause-button {
+  position: relative;
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  padding: var(--space-xs) var(--space-sm);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+  color: var(--color-text);
+  cursor: pointer;
+  background: var(--color-overlay-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  pointer-events: auto;
+}
+
+.pause-button:hover {
+  background: var(--color-border);
+}
+
+.pause-button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.pause-button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-accent) 25%, var(--color-bg));
+  border-color: var(--color-accent);
+}
+
+/* In a narrow globe's area only its icon shows: the word is hidden from the
+   eye, while the button's accessible name, which is not the word, and its
+   tooltip stay. */
+@container viewport (width < 560px) {
+  .pause-button {
+    padding: var(--space-xs);
+  }
+
+  .pause-button__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+}
+
 /* The timeline along the bottom of the globe's area, beside the dock and
    under the info region, a small gap from it, on the backing the info box
    has: the play button, then the month slider with the months' first

@@ -100,7 +100,6 @@ export const MADE_UP_LAYER: ScalarLayerSpec = {
 		months: winds.result?.winds.pressure ?? null,
 		progress: null,
 	}),
-	scheduler: 'winds',
 	sunlightStyle: 'darkened',
 	summaryControlId: 'made-up-view',
 };

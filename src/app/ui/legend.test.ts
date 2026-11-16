@@ -36,7 +36,6 @@ import {
 	formatTick,
 	LEGEND_CALCULATING_TEXT,
 	LEGEND_EMPTY_TEXT,
-	LEGEND_FIRST_YEAR_TEXT,
 	LEGEND_OUT_OF_DATE_TEXT,
 	legendContent,
 	legendTicks,
@@ -417,14 +416,14 @@ describe('tickPosition', () => {
 });
 
 describe('progressLine and progressFraction', () => {
-	it('say the first year is under way before any progress, with no fraction', () => {
-		expect(progressLine(null)).toBe(LEGEND_FIRST_YEAR_TEXT);
+	it('say only that it is calculating before any progress, with no fraction', () => {
+		expect(progressLine(null)).toBe(LEGEND_CALCULATING_TEXT);
 		expect(progressFraction(null)).toBeNull();
 	});
 
-	it('give the years done alone while there is no estimate', () => {
+	it('say only that it is calculating, not the years done, while there is no estimate', () => {
 		const progress = progressWith(3, null);
-		expect(progressLine(progress)).toBe('Calculating · year 3');
+		expect(progressLine(progress)).toBe(LEGEND_CALCULATING_TEXT);
 		expect(progressFraction(progress)).toBeNull();
 	});
 
@@ -649,7 +648,7 @@ describe('legendContent', () => {
 		expect(content).toEqual({
 			scale: null,
 			state: 'calculating',
-			status: LEGEND_FIRST_YEAR_TEXT,
+			status: LEGEND_CALCULATING_TEXT,
 			bar: { fraction: null },
 		});
 	});

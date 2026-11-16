@@ -103,7 +103,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `appState.ts` | The world being edited, and the ways to replace it or change its planet settings |
 | `sculpt.ts` | Sculpting with the mouse |
 | `undo.ts` | Undo and redo of strokes |
-| `refresh.ts` | When to ask a worker again after the world changes; the winds after each new temperature result and each change of the day length; with `oneAtATime` (statistics, winds) one request at a time, an overtaken answer ignored |
+| `refresh.ts` | When to ask a worker again after the world changes, whatever is on screen; the winds after each new temperature result and each change of the day length; the temperature and the winds stopped while paused and caught up on resuming; with `oneAtATime` (statistics, winds) one request at a time, an overtaken answer ignored |
 | `workerService.ts` | The statistics, temperature and winds services, each on its own worker |
 | `layers.ts` | The computed layers the page holds, the temperature and the winds worked out from it, and whether each is current |
 | `view.ts` | What the globe shows: the layer, each computed layer's part of the year and source, the month, the sunlight and the winds |
@@ -115,7 +115,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `windUnits.ts` | Wind speeds in m/s, km/h and mph, the eight compass points, and a wind in words |
 | `earthData.ts`, `observedData.ts` | Fetching the Earth data files when first needed, the observed years through a description of their file |
 | `globe/` | The renderer, shaders, camera, picking, colour ramps, the wind arrows and the wind streaks (`streaks.ts`: the trails moved along the wind, and their ribbons), when the globe is drawn (`frameLoop.ts`: on demand, or at every frame while animating) and the rule for when the streaks move (`windMotion.ts`) |
-| `ui/` | The regions laid over the globe (`mainView.ts`), the dock of tiles there that choose the layer and switch the overlays (`layerDock.ts`), the top bar beside it with the layer's Show choice and the one comparison control (`topBar.ts`, `comparison.ts`), the timeline along the bottom with the month and Play (`timeline.ts`), the icons drawn for the page (`icons.ts`), the info box in the bottom-right corner (`infoBox.ts`), made of the legend (`legend.ts`), one status line for the layer and the winds (`windKey.ts` words where the winds stand) and the cursor readout (`cursorReadout.ts`), the panel's sections and controls, and the New world dialog |
+| `ui/` | The regions laid over the globe (`mainView.ts`), the dock of tiles there that choose the layer and switch the overlays (`layerDock.ts`), the top bar beside it with the layer's Show choice and the one comparison control (`topBar.ts`, `comparison.ts`), the timeline along the bottom with the month and Play (`timeline.ts`), the icons drawn for the page (`icons.ts`), the Pause button in the top-right corner (`pauseButton.ts`), the info box in the bottom-right corner (`infoBox.ts`), made of the legend (`legend.ts`), one status line for the calculation, the layer and the winds (`windKey.ts` words where the winds stand) and the cursor readout (`cursorReadout.ts`), the panel's sections and controls, and the New world dialog |
 | `styles.css` | The page's styles |
 | `testing/` | Stand-ins for the canvas, document, storage, timers and animation frames, and a made-up layer description, which only the tests use |
 
