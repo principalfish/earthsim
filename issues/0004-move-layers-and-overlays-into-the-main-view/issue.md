@@ -12,7 +12,7 @@ Not included: any change to the temperature or wind models, a layout for phone-s
 
 ## Plan
 
-_2026-11-17 · 12 of 12 pieces done · now: all done, in review_
+_2026-11-17 · 12 of 12 pieces done · now: all done, in review; self review done_
 
 - [x] **1/12 The main-view regions, the icons, and the layer and overlay tiles** · `6278b72`
   Icon tiles down the left edge of the globe choose the colour layer and switch Winds, Sunlight and the grid.
@@ -38,3 +38,5 @@ _2026-11-17 · 12 of 12 pieces done · now: all done, in review_
   Clicking Metric or Imperial sets every unit to that family, clearing any override.
 - [x] **12/12 The user guide restructured around the main view** · `a2f9bd9` (was 11)
   The guide and the development notes put in order for the new layout.
+- [x] **Review fixes (round 1)** · `27316f8`
+  The controls over the globe are out of reach while the saved world loads, and five small doc and test cleanups.
