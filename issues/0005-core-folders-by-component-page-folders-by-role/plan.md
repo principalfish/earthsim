@@ -152,7 +152,7 @@ Rejected:
 - [x] 3. `ui/` split into the main view and the panel
 - [x] 4. The scalar layers split, with the legend's fitting code
 - [x] 5. The globe's material split
-- [ ] 6. The layer panel's types, constants and pure helpers moved out, and its tests split
+- [x] 6. The layer panel's types, constants and pure helpers moved out, and its tests split
 - [ ] 7. The page wiring's types moved out
 
 ## Verification
@@ -183,3 +183,10 @@ Docs: `docs/development.md`'s folder tables follow each piece, and any doc namin
   - Decided by the builder: cross-file `{@link}`s use type-only imports, which leaves a type-only import cycle (`relief.glsl.ts` to `globeMaterial.ts` to `shaders.ts` to `relief.glsl.ts`) that is erased at compile time, so there is no runtime cycle and the module-level setup order is safe. Options: keep it (chosen; the plan allows type imports, and the links to `GlobeUniforms.uElevation` and `ReliefUniforms` are useful), reword the links, or move the uniform types into their own `uniforms.ts` (a structural change for a pure-move issue). Biome's `noImportCycles` is not on.
   - Decided by the builder: `VERTEX_GLSL` and `FRAGMENT_GLSL` were private and are now exported from `shaders.ts` only, because `globeMaterial.ts` needs them; `ELEVATION_GLSL` likewise from its own file. None of the three is in the entry point.
   - Decided by the builder: the three `createGlobeMaterial` describe blocks (plain, data layer, sunlight) went to `globeMaterial.test.ts`; "the sampling of per-cell values" to `relief.glsl.test.ts`; "a data value beyond the range" and "the coastline over a data layer" to `shaders.test.ts`. `index.ts` has no test of its own.
+
+- Piece 6 (2026-11-17): `ui/layerPanel.ts` went from 1,444 to 1,046 lines; `ui/layerPanel/types.ts` (289), `internal.ts` (166) and `figures.ts` (40) hold what moved, unchanged; the five themed test files (core 54 tests, month 40, comparison 42, winds 44, units 20) pass alone and together, the 12 shared helpers are in `testing/layerPanelStage.ts`, and the three `layerCaption` tests are in `layers/scalar/caption.test.ts`. 3623 tests before and after (130 files). Changed-lines coverage 98% over the whole branch, the missing lines being test-helper lines the old test file never ran. Light re-check skipped after the one fix: a doc-comment link reworded to backticks.
+  - Decided by the builder: `differenceOf` and `figuresOf` were inside `createLayerPanel`'s closure but close over nothing of it (they use only their parameters and module-level names), so they move out as plain functions, one tab shallower. The correctness check confirmed that moving them changes no identity or order.
+  - Decided by the builder: two lines in `internal.ts` (`ObservedTexts`, `OBSERVED_STATUS`) are reflowed by Biome once `export` is added; keeping them verbatim would need a separate export list. The code is the same.
+  - Decided by the builder: the file header's `{@link ScalarLayerSpec}` and `{@link LayerControls}` became plain backticks, since Biome counts an import used only in a `{@link}` as unused. Links inside declarations' doc comments use type-only imports as before.
+  - Decided by the builder: theme assignment followed the plan's wording ("the key's wording" stays in the core file although it concerns the wind key); the three `layerCaption` tests merged into the existing `describe('layerCaption')` in `caption.test.ts`, because Biome warns about a duplicate describe title.
+  - The folder-level dependency between `ui/` and `ui/main/` noted at piece 3 is unchanged: the `ShownLayer`/`ShownWinds` types now live in `ui/layerPanel/types.ts`, and `ui/main/cursorReadout.ts` still imports them through `../layerPanel`. Moving them into `ui/main/` would change importers, so it stays a roadmap-level choice.

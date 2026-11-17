@@ -44,3 +44,12 @@
 | round | security | - | - | - | - | - | Clean |
 | round | docs | - | - | - | - | - | Clean (nit, not a finding: the `globe/` row's "material and its shaders" is slightly narrow, since `material/` also holds the data texture, the sunlight and the constants) |
 | round | coverage | - | - | - | - | - | Clean; the two uncovered lines (`testing/glsl.ts` 10 and 23, the test helper's defensive throws) accepted: the old test file never ran them either |
+
+## piece 6 · 2026-11-17 · The layer panel's types, constants and pure helpers moved out, and its tests split
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | docs | low | docs | verified | fixed | `src/app/ui/layerPanel.ts:20` | The file header's `{@link LayerControls}` no longer resolved, since `LayerControls` moved to `layerPanel/types.ts` and is only re-exported; reworded to plain backticks, because Biome counts an import used only in a `{@link}` as unused |
+| round | correctness | - | - | - | - | - | Clean: declarations identical, `differenceOf` and `figuresOf` close over nothing of `createLayerPanel`, the describe and test names identical, no top-level hook lost |
+| round | security | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | Clean; the three uncovered helper lines (`testing/layerPanelStage.ts` 123, 126, 254) accepted: two unused default loader stand-ins and one unreachable throw, identical in the old test file |
