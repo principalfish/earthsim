@@ -20,6 +20,8 @@ The user's brief (2026-11-17): "lets /planner refactor 3a", roadmap step 3a in `
 
 - Tests split along with the source: `material`'s and `scalarLayer`'s tests one file per new source file (shared GLSL helpers to `testing/`); the tests of whatever moves out of `layerPanel` and `wiring` go with it; `layerPanel.test.ts` (4,380 lines) also splits by theme into five files (core, month, comparison, winds, units) with a shared stage helper in `testing/`, the `layerCaption` tests moving to the scalar tests; `wiring.test.ts` stays whole as the guard that the page still starts the same. The user: "sorry yes split tests along source", then "Split by theme (Recommended)" (2026-11-17)
 
+- The builder starts, and with it piece 1 (the core in component folders), with no decisions open and no manual reviews in the plan. The user: "Start it" (2026-11-17)
+
 ## Open
 - None.
 
