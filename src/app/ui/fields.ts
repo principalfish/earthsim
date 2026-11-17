@@ -60,20 +60,15 @@ export type RangeField = {
 	 * slider is next moved, its scale writes the value again.
 	 */
 	setValue(value: number, text?: string): void;
+	/**
+	 * Gives the slider another way of writing its values and rewrites the
+	 * value it shows with it, for a change of the unit it is written in.
+	 * The slider does not move and `onInput` is not called; words given to
+	 * {@link setValue} in place of the value are replaced by its writing.
+	 */
+	setFormat(format: (value: number) => string): void;
 	/** Greys the slider out so that it cannot be moved, or brings it back. */
 	setDisabled(disabled: boolean): void;
-};
-
-/** What a checkbox is built from. */
-export type CheckFieldOptions = {
-	/** The checkbox's `id`, unique on the page. */
-	readonly id: string;
-	/** The text of the checkbox's label. */
-	readonly label: string;
-	/** Whether it starts ticked. */
-	readonly checked: boolean;
-	/** Called when the checkbox is ticked or cleared. */
-	readonly onChange: (checked: boolean) => void;
 };
 
 /** What a button is built from. */
@@ -203,8 +198,11 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 	input.min = String(options.min);
 	input.max = String(options.max);
 	input.step = String(options.step);
+	/** The value last written. */
+	let shown = options.value;
 	/** Writes a value beside the label and as what a screen reader says. */
 	const write = (value: number, text = format(value)): void => {
+		shown = value;
 		output.textContent = text;
 		input.setAttribute('aria-valuetext', text);
 	};
@@ -251,34 +249,15 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 			input.value = String(value);
 			write(value, text);
 		},
+		setFormat: (next) => {
+			format = next;
+			write(shown);
+		},
 		setDisabled: (disabled) => {
 			input.disabled = disabled;
 			field.classList.toggle(DISABLED_CLASS, disabled);
 		},
 	};
-};
-
-/**
- * Creates a labelled checkbox.
- *
- * @param options - The checkbox's starting state, wording and callback.
- * @returns The checkbox with its label, to put in a panel.
- */
-export const createCheckField = (options: CheckFieldOptions): HTMLElement => {
-	const field = createElement('div', 'field field--check');
-
-	const input = createElement('input', 'field__checkbox');
-	input.id = options.id;
-	input.type = 'checkbox';
-	input.checked = options.checked;
-	input.addEventListener('change', () => options.onChange(input.checked));
-
-	const label = createElement('label', 'field__label');
-	label.htmlFor = options.id;
-	label.textContent = options.label;
-
-	field.append(input, label);
-	return field;
 };
 
 /** A drop-down choice, with ways to show another choice and relabel one. */

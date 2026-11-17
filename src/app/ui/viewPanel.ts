@@ -4,7 +4,8 @@
  * and the winds are shown is chosen on the dock over the globe, on the
  * measured Earth whether the winds are the simulated or the observed on
  * the top bar, and how the winds are drawn and the unit of their speeds in
- * the settings.
+ * the settings. The sea level is written in the unit of heights chosen in
+ * the settings, while the slider steps through whole metres underneath.
  */
 
 import {
@@ -14,6 +15,7 @@ import {
 	MIN_DRAWN_SEA_LEVEL_M,
 	MIN_EXAGGERATION,
 } from '../globe/material';
+import { formatQuantity, SYSTEM_UNITS, type UnitOf } from '../units';
 import { createRangeField, type RangeScale } from './fields';
 
 /** The step between sea levels the slider can be set to, in metres. */
@@ -25,6 +27,8 @@ export type ViewPanelOptions = {
 	readonly exaggeration?: number;
 	/** The sea level shown at first, in metres against the datum. */
 	readonly seaLevel: number;
+	/** The unit the sea level is written in at first; metres when left out. */
+	readonly heightUnit?: UnitOf<'height'>;
 	/** Called with the new factor when the exaggeration slider moves. */
 	readonly onExaggeration: (factor: number) => void;
 	/** Called with the new level in metres when the sea-level slider moves. */
@@ -43,6 +47,11 @@ export type ViewPanel = {
 	 * {@link SEA_LEVEL_SLIDER_STEP_M} within the drawn range.
 	 */
 	setSeaLevel(metres: number): void;
+	/**
+	 * Writes the sea level in a unit from now on, and the level shown in it
+	 * at once. The slider does not move and `onSeaLevel` is not called.
+	 */
+	setHeightUnit(unit: UnitOf<'height'>): void;
 };
 
 /**
@@ -54,15 +63,17 @@ export const formatExaggeration = (factor: number): string =>
 	`${Math.round(factor)}×`;
 
 /**
- * A height in metres as the panel shows it, such as `1,250 m` or `−40 m`.
+ * A height in metres as the panel shows it in a unit, such as `1,250 m`,
+ * `−40 m` or `98 ft`.
  *
- * @param metres - The height; rounded to a whole metre.
+ * @param metres - The height, in metres; rounded to a whole one of the
+ * unit once converted.
+ * @param unit - The unit to write it in; metres when left out.
  */
-export const formatMetres = (metres: number): string => {
-	const rounded = Math.round(metres);
-	const digits = Math.abs(rounded).toLocaleString('en-GB');
-	return `${rounded < 0 ? '−' : ''}${digits} m`;
-};
+export const formatMetres = (
+	metres: number,
+	unit: UnitOf<'height'> = SYSTEM_UNITS.metric.height,
+): string => formatQuantity('height', unit, metres, 0);
 
 /**
  * Adds the view controls to the View section of the side panel: the
@@ -77,12 +88,14 @@ export const createViewPanel = (
 	body: HTMLElement,
 	options: ViewPanelOptions,
 ): ViewPanel => {
+	let heightUnit = options.heightUnit ?? SYSTEM_UNITS.metric.height;
+	const format = (metres: number): string => formatMetres(metres, heightUnit);
 	const seaLevelScale = (metres: number): RangeScale => ({
 		min: MIN_DRAWN_SEA_LEVEL_M,
 		max: MAX_DRAWN_SEA_LEVEL_M,
 		step: SEA_LEVEL_SLIDER_STEP_M,
 		value: metres,
-		format: formatMetres,
+		format,
 	});
 	const seaLevel = createRangeField({
 		id: 'view-sea-level',
@@ -106,5 +119,9 @@ export const createViewPanel = (
 	);
 	return {
 		setSeaLevel: (metres) => seaLevel.setScale(seaLevelScale(metres)),
+		setHeightUnit: (unit) => {
+			heightUnit = unit;
+			seaLevel.setFormat(format);
+		},
 	};
 };

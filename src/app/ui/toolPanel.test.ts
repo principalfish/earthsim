@@ -19,6 +19,7 @@ import {
 	findAll,
 	oneByClass,
 } from '../testing/fakeDocument';
+import { type ResolvedUnits, SYSTEM_UNITS, type UnitSystem } from '../units';
 import { createSection } from './section';
 import {
 	BRUSH_RADIUS_SLIDER_STEP_KM,
@@ -33,6 +34,7 @@ import {
 	SMOOTH_SETTING_SLIDER_STEP,
 	strengthScale,
 	TOOL_LABELS,
+	type ToolPanelOptions,
 } from './toolPanel';
 
 describe('formatKm', () => {
@@ -46,6 +48,16 @@ describe('formatKm', () => {
 
 	it('rounds to a whole kilometre', () => {
 		expect(formatKm(149.6)).toBe('150 km');
+	});
+
+	it('writes kilometres as before when given them', () => {
+		expect(formatKm(3000, 'km')).toBe('3,000 km');
+	});
+
+	it('writes whole miles in miles, across the slider’s range', () => {
+		expect(formatKm(MIN_BRUSH_RADIUS_KM, 'mi')).toBe('62 mi');
+		expect(formatKm(DEFAULT_BRUSH_RADIUS_KM, 'mi')).toBe('311 mi');
+		expect(formatKm(MAX_BRUSH_RADIUS_KM, 'mi')).toBe('1,864 mi');
 	});
 });
 
@@ -82,6 +94,19 @@ describe('formatStrength', () => {
 	it('writes the move tool, which has no strength, like raising', () => {
 		expect(formatStrength('move', 5000)).toBe('5,000 m/s');
 	});
+
+	it('writes raising and lowering in feet per second in feet, and in metres per second in metres', () => {
+		expect(formatStrength('raise', MIN_BRUSH_STRENGTH, 'ft')).toBe('328 ft/s');
+		expect(formatStrength('lower', 1000, 'ft')).toBe('3,281 ft/s');
+		expect(formatStrength('move', MAX_BRUSH_STRENGTH, 'ft')).toBe(
+			'16,404 ft/s',
+		);
+		expect(formatStrength('raise', 1000, 'm')).toBe('1,000 m/s');
+	});
+
+	it('writes smoothing as its setting alone in feet too', () => {
+		expect(formatStrength('smooth', 50, 'ft')).toBe('50');
+	});
 });
 
 describe('strengthScale', () => {
@@ -105,6 +130,15 @@ describe('strengthScale', () => {
 		expect(scale.step).toBe(1);
 		expect(scale.value).toBe(72);
 		expect(scale.format(scale.value)).toBe('72');
+	});
+
+	it('writes raising in feet per second when given feet, on the same range', () => {
+		const scale = strengthScale('raise', strengths, 'ft');
+		expect(scale.min).toBe(MIN_BRUSH_STRENGTH);
+		expect(scale.max).toBe(MAX_BRUSH_STRENGTH);
+		expect(scale.step).toBe(BRUSH_STRENGTH_SLIDER_STEP);
+		expect(scale.format(scale.value)).toBe('7,546 ft/s');
+		expect(strengthScale('smooth', strengths, 'ft').format(72)).toBe('72');
 	});
 
 	it('keeps each value while the other is changed', () => {
@@ -209,14 +243,15 @@ describe('createToolPanel', () => {
 		vi.unstubAllGlobals();
 	});
 
-	const make = () => {
+	const make = (units?: ToolPanelOptions['units']) => {
 		const told: string[] = [];
 		const tools = createSection('Tools', {
 			id: 'section-tools',
 			open: false,
 			onToggle: (open) => told.push(`open ${open}`),
 		});
-		const { setHistoryState } = createToolPanel(tools, {
+		const { setHistoryState, setUnits } = createToolPanel(tools, {
+			units,
 			onHistory: (action) => told.push(action),
 			onTool: (tool) => told.push(`tool ${tool}`),
 			onRadius: (km) => told.push(`radius ${km}`),
@@ -238,8 +273,23 @@ describe('createToolPanel', () => {
 		};
 		const shownValue = (id: string): string | null =>
 			byClass(field(id), 'field__value')[0]?.textContent ?? null;
+		/** A slider's value, as shown beside its label and to a screen reader. */
+		const shownBoth = (id: string): (string | null)[] => {
+			const [input] = findAll(field(id), (element) => element.id === id);
+			return [shownValue(id), input?.getAttribute('aria-valuetext') ?? null];
+		};
+		const slider = (id: string): FakeElement => {
+			const [input] = findAll(field(id), (element) => element.id === id);
+			if (input === undefined) {
+				throw new Error(`No slider ${id}`);
+			}
+			return input;
+		};
 		return {
 			told,
+			shownBoth,
+			slider,
+			setUnits,
 			section,
 			tools: byClass(section, 'segmented__input'),
 			field,
@@ -301,6 +351,78 @@ describe('createToolPanel', () => {
 		expect(shownValue('tool-strength')).toBe(
 			formatSmoothSetting(DEFAULT_SMOOTH_SETTING),
 		);
+	});
+
+	it('writes the brush in metric when no units are given, as in metric units', () => {
+		for (const units of [undefined, SYSTEM_UNITS.metric]) {
+			const { shownBoth } = make(units);
+			expect(shownBoth('tool-radius')).toEqual(['500 km', '500 km']);
+			expect(shownBoth('tool-strength')).toEqual(['1,000 m/s', '1,000 m/s']);
+		}
+	});
+
+	it('starts the brush in miles and feet per second in imperial, on sliders that step in kilometres and metres a second', () => {
+		const { shownBoth, slider } = make(SYSTEM_UNITS.imperial);
+		expect(shownBoth('tool-radius')).toEqual(['311 mi', '311 mi']);
+		expect(shownBoth('tool-strength')).toEqual(['3,281 ft/s', '3,281 ft/s']);
+		expect(slider('tool-radius').value).toBe(String(DEFAULT_BRUSH_RADIUS_KM));
+		expect(slider('tool-radius').step).toBe(
+			String(BRUSH_RADIUS_SLIDER_STEP_KM),
+		);
+		expect(slider('tool-strength').value).toBe(String(DEFAULT_BRUSH_STRENGTH));
+	});
+
+	it('rewrites the brush at once in new units, with no slider moved and nothing told', () => {
+		const { shownBoth, slider, setUnits, tools, told } = make();
+		fake.pick(tools[1] as FakeElement);
+		const radius = slider('tool-radius');
+		radius.value = '1250';
+		radius.fire('input');
+		told.length = 0;
+		setUnits(SYSTEM_UNITS.imperial);
+		expect(shownBoth('tool-radius')).toEqual(['777 mi', '777 mi']);
+		expect(shownBoth('tool-strength')).toEqual(['3,281 ft/s', '3,281 ft/s']);
+		expect(radius.value).toBe('1250');
+		expect(slider('tool-strength').value).toBe(String(DEFAULT_BRUSH_STRENGTH));
+		setUnits(SYSTEM_UNITS.metric);
+		expect(shownBoth('tool-radius')).toEqual(['1,250 km', '1,250 km']);
+		expect(shownBoth('tool-strength')).toEqual(['1,000 m/s', '1,000 m/s']);
+		expect(told).toEqual([]);
+	});
+
+	it('keeps the new units as the sliders move and the tool changes', () => {
+		const { shownBoth, slider, setUnits, tools, told } = make();
+		setUnits(SYSTEM_UNITS.imperial);
+		fake.pick(tools[2] as FakeElement);
+		const strength = slider('tool-strength');
+		strength.value = '2000';
+		strength.fire('input');
+		expect(told).toEqual(['tool lower', 'strength 2000']);
+		expect(shownBoth('tool-strength')).toEqual(['6,562 ft/s', '6,562 ft/s']);
+		fake.pick(tools[3] as FakeElement);
+		expect(shownBoth('tool-strength')).toEqual(['50', '50']);
+		fake.pick(tools[1] as FakeElement);
+		expect(shownBoth('tool-strength')).toEqual(['6,562 ft/s', '6,562 ft/s']);
+	});
+
+	it('leaves the smoothing setting as it is through a change of units', () => {
+		const { shownBoth, setUnits, tools } = make();
+		fake.pick(tools[3] as FakeElement);
+		setUnits(SYSTEM_UNITS.imperial);
+		expect(shownBoth('tool-strength')).toEqual(['50', '50']);
+	});
+
+	it('writes the strength in the unit of heights, not of wind speeds', () => {
+		const inKnots = (system: UnitSystem): ResolvedUnits => ({
+			...SYSTEM_UNITS[system],
+			windSpeed: 'knots',
+		});
+		const { shownBoth, setUnits } = make(inKnots('metric'));
+		expect(shownBoth('tool-strength')).toEqual(['1,000 m/s', '1,000 m/s']);
+		setUnits(inKnots('imperial'));
+		expect(shownBoth('tool-strength')).toEqual(['3,281 ft/s', '3,281 ft/s']);
+		setUnits(inKnots('metric'));
+		expect(shownBoth('tool-strength')).toEqual(['1,000 m/s', '1,000 m/s']);
 	});
 
 	it('passes on the radius as its slider moves', () => {

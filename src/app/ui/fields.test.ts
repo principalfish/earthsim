@@ -226,6 +226,28 @@ describe('createRangeField', () => {
 		expect(input.getAttribute('aria-valuetext')).toBe('5 km/h');
 	});
 
+	it('rewrites the value it shows in another way of writing, without moving or passing it on', () => {
+		const { field, input, output, moved } = make();
+		input.value = '7';
+		input.fire('input');
+		field.setFormat((value) => `${value * 2} half-km/h`);
+		expect(input.value).toBe('7');
+		expect(output.textContent).toBe('14 half-km/h');
+		expect(input.getAttribute('aria-valuetext')).toBe('14 half-km/h');
+		expect(moved).toEqual([7]);
+
+		input.value = '2';
+		input.fire('input');
+		expect(output.textContent).toBe('4 half-km/h');
+	});
+
+	it('replaces other words given for a value with the new way of writing it', () => {
+		const { field, output } = make();
+		field.setValue(4, 'about 4.2 km/h');
+		field.setFormat((value) => `${value} mph`);
+		expect(output.textContent).toBe('4 mph');
+	});
+
 	it('has no mark unless given one', () => {
 		const root = make().field.element as unknown as FakeElement;
 		expect(byClass(root, 'field__mark')).toEqual([]);

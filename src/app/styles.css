@@ -185,12 +185,6 @@ body {
   display: none;
 }
 
-.field--check {
-  grid-template-columns: auto 1fr;
-  gap: var(--space-sm);
-  align-items: center;
-}
-
 .field__header {
   display: flex;
   gap: var(--space-sm);
@@ -225,13 +219,6 @@ body {
   height: var(--field-mark-height);
   background: var(--color-text-muted);
   translate: -50% 0;
-}
-
-.field__checkbox {
-  width: 1rem;
-  height: 1rem;
-  margin: 0;
-  accent-color: var(--color-accent);
 }
 
 .field.is-disabled {

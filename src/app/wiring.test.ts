@@ -505,6 +505,8 @@ const createStage = (
 					log.push(
 						`toolPanel.setHistoryState ${history.canUndo} ${history.canRedo}`,
 					),
+				setUnits: (units) =>
+					log.push(`toolPanel.setUnits ${units.height} ${units.distance}`),
 			};
 		},
 		createViewPanel: (options) => {
@@ -512,6 +514,7 @@ const createStage = (
 			viewPanelOptions = options;
 			return {
 				setSeaLevel: (metres) => log.push(`viewPanel.setSeaLevel ${metres}`),
+				setHeightUnit: (unit) => log.push(`viewPanel.setHeightUnit ${unit}`),
 			};
 		},
 		createSettingsPanel: (options) => {
@@ -2920,7 +2923,7 @@ describe('the units', () => {
 		]);
 	});
 
-	it('stores the other quantities’ overrides, and tells the layer panel and the statistics of each', async () => {
+	it('stores the other quantities’ overrides, and tells the layer panel, the statistics, the view panel and the tool panel of each', async () => {
 		const stage = await createStartedStage();
 		expect(stage.layerOptions.units).toEqual(SYSTEM_UNITS.metric);
 		expect(stage.statisticsOptions).toMatchObject({ heightUnit: 'm' });
@@ -2939,13 +2942,17 @@ describe('the units', () => {
 		expect(stage.log).toEqual([
 			`layerPanel.setUnits ${JSON.stringify(fahrenheit)}`,
 			'statistics.setHeightUnit m',
+			'viewPanel.setHeightUnit m',
+			'toolPanel.setUnits m km',
 			`layerPanel.setUnits ${JSON.stringify({ ...fahrenheit, height: 'ft' })}`,
 			'statistics.setHeightUnit ft',
+			'viewPanel.setHeightUnit ft',
+			'toolPanel.setUnits ft km',
 		]);
 		expect(stage.readoutCalls).toEqual(['invalidate', 'invalidate']);
 	});
 
-	it('starts the layer panel and the statistics in the stored units', async () => {
+	it('starts the layer panel, the statistics, the view and tool panels and the New world dialog in the stored units', async () => {
 		const stage = await createStartedStage(undefined, {
 			preferenceEntries: {
 				[UNIT_SYSTEM_KEY]: 'imperial',
@@ -2958,9 +2965,25 @@ describe('the units', () => {
 		});
 		expect(stage.statisticsOptions).toMatchObject({ heightUnit: 'ft' });
 		expect(stage.readoutOptions.units()).toEqual(stage.layerOptions.units);
+		expect(stage.viewPanelOptions.heightUnit).toBe('ft');
+		expect(stage.toolPanelOptions.units).toMatchObject({
+			height: 'ft',
+			distance: 'mi',
+		});
+		stage.worldPanelOptions.onNewWorld();
+		expect(stage.dialogs.at(-1)?.distanceUnit).toBe('mi');
 	});
 
-	it('tells the settings, the layer panel, the statistics and the readout of a change, and nothing of none', async () => {
+	it('opens the New world dialog in the unit of distances chosen at the time', async () => {
+		const stage = await createStartedStage();
+		stage.worldPanelOptions.onNewWorld();
+		expect(stage.dialogs.at(-1)?.distanceUnit).toBe('km');
+		stage.settingsPanelOptions.onUnitOverride('distance', 'mi');
+		stage.worldPanelOptions.onNewWorld();
+		expect(stage.dialogs.at(-1)?.distanceUnit).toBe('mi');
+	});
+
+	it('tells the settings, the layer panel, the statistics, the view and tool panels and the readout of a change, and nothing of none', async () => {
 		const stage = await createStartedStage();
 		stage.settingsPanelOptions.onUnitSystem('metric');
 		stage.settingsPanelOptions.onUnitOverride('pressure', null);
@@ -2971,6 +2994,8 @@ describe('the units', () => {
 		expect(stage.log).toEqual([
 			`layerPanel.setUnits ${JSON.stringify({ ...SYSTEM_UNITS.metric, pressure: 'inHg' })}`,
 			'statistics.setHeightUnit m',
+			'viewPanel.setHeightUnit m',
+			'toolPanel.setUnits m km',
 		]);
 		expect(stage.readoutCalls).toEqual(['invalidate']);
 		expect(stage.settingsUnits).toEqual([
@@ -3029,7 +3054,11 @@ describe('the units', () => {
 			'33',
 			'34',
 		]);
-		expect(stage.log).toEqual(['statistics.setHeightUnit ft']);
+		expect(stage.log).toEqual([
+			'statistics.setHeightUnit ft',
+			'viewPanel.setHeightUnit ft',
+			'toolPanel.setUnits ft mi',
+		]);
 		expect(stage.readoutCalls.at(-1)).toBe('invalidate');
 		expect(
 			describeReadout(

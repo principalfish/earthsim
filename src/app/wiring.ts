@@ -217,11 +217,11 @@ export type PageParts = {
 	/** Adds the tool controls to the panel. */
 	readonly createToolPanel: (
 		options: ToolPanelOptions,
-	) => Pick<ToolPanel, 'setHistoryState'>;
+	) => Pick<ToolPanel, 'setHistoryState' | 'setUnits'>;
 	/** Adds the view controls to the panel. */
 	readonly createViewPanel: (
 		options: ViewPanelOptions,
-	) => Pick<ViewPanel, 'setSeaLevel'>;
+	) => Pick<ViewPanel, 'setSeaLevel' | 'setHeightUnit'>;
 	/**
 	 * Adds the settings to the panel: how the winds are drawn and the
 	 * units, and gives the way to show units chosen.
@@ -459,11 +459,14 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  *
  * The units are a preference of the browser, not part of the world: they
  * are read once, as the page starts, and the settings, the legend, the
- * statistics and the readout start in them. A unit chosen in the settings
- * is remembered by the preferences, and reaches them all at once: the
- * layer panel writes the legend in it, the statistics their heights, and
- * the readout looks again, with no new calculation. They are never saved
- * with the world.
+ * statistics, the readout, the sea level and the brush start in them. A
+ * unit chosen in the settings is remembered by the preferences, and
+ * reaches them all at once: the layer panel writes the legend in it, the
+ * statistics their heights, the view panel the sea level, the tool panel
+ * the brush's radius and strength, and the readout looks again, with no
+ * new calculation and no slider moved. The New world dialog says the size
+ * of a cell in the unit of distances chosen as it opens. They are never
+ * saved with the world.
  *
  * So is how the winds are drawn, as arrows or as streaks: read once as the
  * page starts, the globe is told it before anything else, its world
@@ -609,6 +612,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 				worldFromChoice(choice, { loadEarth: parts.loadEarth }),
 			onWorld: state.replaceWorld,
 			notice,
+			distanceUnit: units.units().distance,
 		});
 	};
 	const worldPanel = parts.createWorldPanel({
@@ -656,7 +660,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			}
 		},
 	});
+	/** The units chosen, read once from the preferences. */
+	const units = createUnitStore(parts.preferences);
 	const tools = parts.createToolPanel({
+		units: units.units(),
 		onHistory: (action) => edits.perform(action),
 		onTool: (tool) => {
 			// The button that turns the globe changes first, so that a
@@ -696,10 +703,9 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			handleHistoryKey(event, edits.perform);
 		}
 	});
-	/** The units chosen, read once from the preferences. */
-	const units = createUnitStore(parts.preferences);
 	const view = parts.createViewPanel({
 		seaLevel: state.world.seaLevel,
+		heightUnit: units.units().height,
 		onExaggeration: globe.setExaggeration,
 		onSeaLevel: (metres) => {
 			const { world } = state;
@@ -813,6 +819,8 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		settings.showUnits(units.choice());
 		layerPanel.setUnits(resolved);
 		statistics.setHeightUnit(resolved.height);
+		view.setHeightUnit(resolved.height);
+		tools.setUnits(resolved);
 		readout.invalidate();
 	});
 	// Told after the layer panel, which brings what the globe shows up to

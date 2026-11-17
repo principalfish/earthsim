@@ -80,7 +80,7 @@ The first visit opens on a blank ocean with the New world dialog showing. **New 
 
 | Option | Choices |
 |-|-|
-| Resolution | 64, 128 or 256 cells along each edge of a cube face: cells of about 150, 75 or 40 km |
+| Resolution | 64, 128 or 256 cells along each edge of a cube face: cells of about 150, 75 or 40 km (about 95, 45 or 25 mi in Imperial) |
 | Start with | A blank ocean, generated continents, or the Earth |
 | Seed (generated only) | A whole number from 0 to 4294967295. Blank picks one at random; **Random** fills one in |
 | Land (generated only) | The share of the surface to make land, 0 to 100% |
@@ -117,8 +117,8 @@ The Tools section chooses what the left mouse button does on the globe.
 | Move | Turns the globe | Left-drag; the wheel zooms |
 | Raise, Lower, Smooth | Sculpts the terrain under the brush | Right-drag; the wheel zooms |
 
-- **Brush radius:** 100 to 3,000 km.
-- **Brush strength:** for Raise and Lower, how fast the ground at the centre of the brush rises or falls, 100 to 5,000 m/s. For Smooth, a setting from 1 (gentlest) to 100. The two are kept separately.
+- **Brush radius:** 100 to 3,000 km (in metric; it follows the units in [Settings](#settings)).
+- **Brush strength:** for Raise and Lower, how fast the ground at the centre of the brush rises or falls, 100 to 5,000 m/s (in metric; it follows the units in [Settings](#settings)). For Smooth, a setting from 1 (gentlest) to 100. The two are kept separately.
 
 ### Undo and redo
 
@@ -136,7 +136,7 @@ The Tools section chooses what the left mouse button does on the globe.
 | Control | Range | What it does |
 |-|-|-|
 | Relief exaggeration | 1× to 100×, starting at 40× | How much taller than true scale the land is drawn. Only the drawing changes |
-| Sea level | −6,000 to 6,000 m in steps of 10 m | Where the sea stands. Raising it floods low ground. It is part of the world |
+| Sea level | −6,000 to 6,000 m in steps of 10 m (in metric; it follows the units in [Settings](#settings)) | Where the sea stands. Raising it floods low ground. It is part of the world |
 
 How the winds are drawn and the unit of their speed are in the [Settings](#settings) section.
 
@@ -327,9 +327,10 @@ What the page writes follows these choices, and changes at once, with no new cal
 - **The legend:** its caption names the unit, such as "Air temperature in July, °F", and its ticks and error figures are in it. Its scale is fitted in the unit, so its ends and ticks are round there: whole degrees in °F and K, and two decimals in inHg, such as `29.70` and `30.00`.
 - **The value under the pointer:** the height or depth, such as `4,049 ft` or `11,155 ft deep`, the value of the layer, such as `65 °F` or `29.92 inHg`, and the wind.
 - **The Statistics:** the highest and deepest points and the two means.
+- **The controls:** the Sea level, in the unit of heights, such as `98 ft`; the brush's radius, in the unit of distances, such as `311 mi`; the brush's strength for Raise and Lower, in the unit of heights a second, such as `3,281 ft/s`; and the New world dialog's cell sizes, in the unit of distances, such as "about 95 mi cells". The sliders still step in metres and kilometres underneath, so the figures beside them are those steps converted and rounded to a whole unit: the Sea level steps read 33 ft, 66 ft, 98 ft and so on. Smoothing's setting has no unit.
 
 A seasonal range and a difference are converted by the unit's size alone: a range of 10 °C reads 18 °F, not 50 °F. Each unit has round settings of its own, chosen rather than converted: the narrowest scale is 2 °C, 4 °F or 2 K, and 10 hPa or 0.3 inHg wide; the seasonal range is marked every 5 °C, 10 °F or 5 K; and the difference runs from −20 to +20 °C marked every 10, −40 to +40 °F every 20, −20 to +20 K every 10, −20 to +20 hPa every 10, or −0.6 to +0.6 inHg every 0.3.
 
-The colours on the globe stay as they are, except that a scale's rounded ends can move them a little, and a difference's colours shift more, since its reach in °F or inHg is not quite that in °C or hPa. The arrows do not change with the unit. The sliders, such as Sea level and the brush's radius, and the Distances choice, do not yet follow the units.
+The colours on the globe stay as they are, except that a scale's rounded ends can move them a little, and a difference's colours shift more, since its reach in °F or inHg is not quite that in °C or hPa. The arrows do not change with the unit, and no slider moves.
 
 A wind speed unit chosen in the earlier Wind speed setting carries over as the wind speed's choice, m/s included, so it stays the same under either system.
