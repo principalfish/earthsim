@@ -150,3 +150,16 @@
 | re-check | docs | low | docs | verified | fixed | `src/app/scalarLayer.ts:462` | `isDifferenceView`'s doc gives the conversion rule as its own reason; the reason is that the view's values are spans |
 | manual | user | low | cleanup | - | fixed | `src/app/scalarLayer.ts:473` | The user chose to fix both: only views fitted from zero count as differences (the `isDifference` flag went), and the doc says their values are spans: "ok approve and fix as you suggest" |
 | re-check | correctness | - | - | - | - | `src/app/scalarLayer.ts:473` | Light re-check of the two fixes: clean |
+
+## piece 10 · 2026-11-17 · Units in the controls
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/fields.ts:281` | `createCheckField` and its type had no caller since the grid checkbox became a dock tile, with their CSS still in place and a new test only keeping them covered; deleted (raised by correctness and coverage, merged) |
+| round | docs | low | docs | verified | fixed | `docs/user-guide.md:83` | The Resolution cell sizes, brush radius and strength (:120-121) and Sea level (:139) were given in metric only; each now notes it follows the units |
+| round | correctness | nit | cleanup | verified | fixed | `src/app/ui/toolPanel.ts:194` | `formatStrength` built its text by hand; now `formatQuantity`, as the radius and sea level do |
+| round | correctness | - | - | dropped | - | `src/app/ui/toolPanel.ts` | `formatKm` and `formatMetres` now write mi and ft too — dropped: they name the unit they take, and the check called them acceptable |
+| round | security | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | 97%: uncovered `main.ts`, `topBar.ts:83` and `renderer.ts`, none touched here, reasons accepted |
+| re-check | docs | - | - | - | - | `docs/user-guide.md:83` | Light re-check of the guide's notes: clean |
+| re-check | correctness | low | cleanup | verified | open | `src/app/ui/viewPanel.test.ts:81` | Two test lines (:81, :109) still look for the `field__checkbox` class, which nothing creates any more; they cannot fail, and the test's claim holds without them |
