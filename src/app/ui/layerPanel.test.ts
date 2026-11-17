@@ -79,7 +79,12 @@ import {
 	weightedMean,
 } from '../testing/scalarLayerFixtures';
 import { settle } from '../testing/settle';
-import type { ComparisonContent } from './comparison';
+import {
+	createLayerPanel,
+	type LayerPanel,
+	type LayerPanelOptions,
+} from './layerPanel';
+import type { ComparisonContent } from './main/comparison';
 import {
 	CALCULATING_TEMPERATURE_TEXT,
 	CALCULATING_WINDS_TEXT,
@@ -87,12 +92,7 @@ import {
 	createInfoBox,
 	type InfoBox,
 	PAUSED_TEXT,
-} from './infoBox';
-import {
-	createLayerPanel,
-	type LayerPanel,
-	type LayerPanelOptions,
-} from './layerPanel';
+} from './main/infoBox';
 import {
 	cellWeights,
 	FIT_TAIL_SHARE,
@@ -105,14 +105,14 @@ import {
 	LEGEND_OUT_OF_DATE_TEXT,
 	type LegendContent,
 	legendContent,
-} from './legend';
+} from './main/legend';
 import {
 	OBSERVED_WINDS_FAILED_TEXT,
 	OBSERVED_WINDS_LOADING_TEXT,
 	WINDS_CALCULATING_TEXT,
 	WINDS_UNAVAILABLE_TEXT,
 	type WindKeyContent,
-} from './windKey';
+} from './main/windKey';
 
 /** What the globe was asked to show: a field, its range and ramp, or none. */
 type Shown = {

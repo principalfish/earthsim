@@ -21,22 +21,22 @@ import {
 } from './saving/storage';
 import { createPanelMemory, reachStorage } from './settings/panelMemory';
 import { createPreferences } from './settings/preferences';
-import { createCursorReadout } from './ui/cursorReadout';
-import { createInfoBox } from './ui/infoBox';
-import { createLayerDock } from './ui/layerDock';
 import { createLayerPanel } from './ui/layerPanel';
-import { createMainView } from './ui/mainView';
-import { openNewWorldDialog } from './ui/newWorldDialog';
-import { createPanelSections } from './ui/panelSections';
-import { createPauseButton } from './ui/pauseButton';
-import { createPlanetPanel } from './ui/planetPanel';
-import { createSettingsPanel } from './ui/settingsPanel';
-import { createStatsPanel } from './ui/statsPanel';
-import { createTimeline } from './ui/timeline';
-import { createToolPanel } from './ui/toolPanel';
-import { createTopBar } from './ui/topBar';
-import { createViewPanel, SEA_LEVEL_SLIDER_STEP_M } from './ui/viewPanel';
-import { createWorldPanel } from './ui/worldPanel';
+import { createCursorReadout } from './ui/main/cursorReadout';
+import { createInfoBox } from './ui/main/infoBox';
+import { createLayerDock } from './ui/main/layerDock';
+import { createMainView } from './ui/main/mainView';
+import { createPauseButton } from './ui/main/pauseButton';
+import { createTimeline } from './ui/main/timeline';
+import { createTopBar } from './ui/main/topBar';
+import { openNewWorldDialog } from './ui/panel/newWorldDialog';
+import { createPanelSections } from './ui/panel/panelSections';
+import { createPlanetPanel } from './ui/panel/planetPanel';
+import { createSettingsPanel } from './ui/panel/settingsPanel';
+import { createStatsPanel } from './ui/panel/statsPanel';
+import { createToolPanel } from './ui/panel/toolPanel';
+import { createViewPanel, SEA_LEVEL_SLIDER_STEP_M } from './ui/panel/viewPanel';
+import { createWorldPanel } from './ui/panel/worldPanel';
 import { startPage } from './wiring';
 
 /** Looks up an element the page markup is required to contain. */

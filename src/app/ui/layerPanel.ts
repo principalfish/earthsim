@@ -82,15 +82,19 @@ import {
 	windSourceFor,
 } from '../layers/view';
 import { type ResolvedUnits, SYSTEM_UNITS } from '../settings/units';
-import type { ComparisonContent } from './comparison';
-import { type CalculationContent, calculationContent } from './infoBox';
-import { type LegendContent, type LegendSource, legendContent } from './legend';
+import type { ComparisonContent } from './main/comparison';
+import { type CalculationContent, calculationContent } from './main/infoBox';
+import {
+	type LegendContent,
+	type LegendSource,
+	legendContent,
+} from './main/legend';
 import {
 	OBSERVED_WINDS_FAILED_TEXT,
 	OBSERVED_WINDS_LOADING_TEXT,
 	type WindKeyContent,
 	windKeyContent,
-} from './windKey';
+} from './main/windKey';
 
 /**
  * What the info box shows of the layer and the winds: the legend, and what

@@ -26,7 +26,7 @@ import {
 	fitRange,
 	fitRangeCentred,
 	legendTicks,
-} from '../ui/legend';
+} from '../ui/main/legend';
 import { createLayerStore } from './layers';
 import { loadObservedPressure, loadObservedTemperature } from './observedData';
 import {

@@ -67,11 +67,14 @@ import {
 	type ResolvedUnits,
 	type UnitOf,
 } from './settings/units';
-import type { ComparisonContent } from './ui/comparison';
-import type { CursorReadout } from './ui/cursorReadout';
-import { createDateLine } from './ui/dateLine';
-import type { LayerDock, LayerDockOptions } from './ui/layerDock';
 import type { LayerPanel, ShownLayer, ShownWinds } from './ui/layerPanel';
+import type { ComparisonContent } from './ui/main/comparison';
+import type { CursorReadout } from './ui/main/cursorReadout';
+import type { LayerDock, LayerDockOptions } from './ui/main/layerDock';
+import type { PauseButtonOptions } from './ui/main/pauseButton';
+import type { Timeline, TimelineOptions } from './ui/main/timeline';
+import type { TopBar, TopBarOptions } from './ui/main/topBar';
+import { createDateLine } from './ui/panel/dateLine';
 import {
 	FIRST_NEW_WORLD_VALUES,
 	type NewWorldDialogOptions,
@@ -79,22 +82,22 @@ import {
 	newWorldValuesFor,
 	type WorldSources,
 	worldFromChoice,
-} from './ui/newWorldDialog';
-import type { PauseButtonOptions } from './ui/pauseButton';
-import type { PlanetPanel, PlanetPanelOptions } from './ui/planetPanel';
-import type { SettingsPanel, SettingsPanelOptions } from './ui/settingsPanel';
-import type { StatsPanel } from './ui/statsPanel';
-import type { Timeline, TimelineOptions } from './ui/timeline';
-import type { ToolPanel, ToolPanelOptions } from './ui/toolPanel';
-import type { TopBar, TopBarOptions } from './ui/topBar';
-import type { ViewPanel, ViewPanelOptions } from './ui/viewPanel';
+} from './ui/panel/newWorldDialog';
+import type { PlanetPanel, PlanetPanelOptions } from './ui/panel/planetPanel';
+import type {
+	SettingsPanel,
+	SettingsPanelOptions,
+} from './ui/panel/settingsPanel';
+import type { StatsPanel } from './ui/panel/statsPanel';
+import type { ToolPanel, ToolPanelOptions } from './ui/panel/toolPanel';
+import type { ViewPanel, ViewPanelOptions } from './ui/panel/viewPanel';
 import {
 	describeWorld,
 	EXPORT_FAILED_MESSAGE,
 	runImport,
 	type WorldPanel,
 	type WorldPanelOptions,
-} from './ui/worldPanel';
+} from './ui/panel/worldPanel';
 
 /** What the page asks of its globe once the globe exists. */
 export type PageGlobe = Pick<

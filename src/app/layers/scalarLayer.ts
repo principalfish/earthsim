@@ -42,7 +42,7 @@ import {
 	fitRangeFromZero,
 	formatTick,
 	MIN_FITTED_SPAN_C,
-} from '../ui/legend';
+} from '../ui/main/legend';
 import type { LayerStatus, LayerStore } from './layers';
 import {
 	loadObservedPressure,
