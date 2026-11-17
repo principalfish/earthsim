@@ -83,7 +83,7 @@ Keep this section current when a step is merged.
 | 2 Sunlight and seasonal temperature | Done, merged 2026-11-13 | 0002, GitHub #3, PR #4 |
 | 3 Winds | Done 2026-11-15 | 0003, GitHub #5, PR #6 (merged) |
 | 3c Layers in the main view, out of the side panel; also the climate worked out after every change with a Pause (brought forward from 3b), a Settings section and units | Done 2026-11-17 (PR #8 merged at 5627e02) | 0004, GitHub #7 |
-| 3a Core folders by component, page folders by role (refactor, no behaviour change) | Next; before step 4 | |
+| 3a Core folders by component, page folders by role (refactor, no behaviour change) | Built 2026-11-17, in review (PR #10) | 0005, GitHub #9 |
 | 3d One config.ts for every model's settings, with config.md | Not started; after 3a | |
 | 3b Heat carried by winds, and the climate loop | Not started; after 3a. Could instead open step 5; decide when planned | |
 | 4 Moisture, rainfall and Köppen zones | Not started. Before planning it, settle fixed or fitted colour scales (see the open follow-ups), since rainfall is the next colour layer | |
@@ -123,6 +123,7 @@ The user, 2026-11-14: "i think we will do a separate UI piece to bring out layer
   - Unlike the core, the page's files import each other directly, so this touches more import lines; still mechanical.
 - **Worker (`src/worker/`):** left as it is (three small files). Split the handlers into `worker/handlers/` only if `handle.ts` grows unwieldy as layers are added.
 - **Watch file size:** `globe/material.ts` (1,035 lines) and `ui/layerPanel.ts` (1,013) grow with every layer. Step 3's piece 12 (scalar layers made general) is where to keep a new layer a data entry rather than more code in them.
+- **Follow-up, from issue 0005 (2026-11-17):** the deeper splits of `ui/layerPanel.ts` (about 1,046 lines left) and `wiring.ts` (618) were left out of 3a because they change function signatures: the layer and winds targets, the observed-data requests and playback in the panel, and lighting, the new-world listener and start-up restore in the wiring, each passing state explicitly instead of through the closure. Also open from it: `ui/main/cursorReadout.ts` imports `ShownLayer` and `ShownWinds` back from `ui/layerPanel`, a type-only two-way folder dependency, settled by moving those types into `ui/main/`. Plan these before the panel grows with the next layer (step 4).
 - Probably `/quick-build` once the layout is agreed, since it is one mechanical commit; `/planner refactor` if the layout needs discussion.
 
 ### Step 3d: one config.ts for every model's settings, with config.md

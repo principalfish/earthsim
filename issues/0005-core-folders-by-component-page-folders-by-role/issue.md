@@ -10,7 +10,7 @@ Nothing the page does changes. Every test, the build and both Earth baselines mu
 
 ## Plan
 
-_2026-11-17 · 6 of 7 pieces done · now: piece 7 in progress_
+_2026-11-17 · 7 of 7 pieces done · now: all done, in review_
 
 - [x] **1/7 The core in component folders** · `c239ed8`
   The core's files move into grid, world, planet, earth, temperature and wind folders, each model with its own baseline.
@@ -24,5 +24,5 @@ _2026-11-17 · 6 of 7 pieces done · now: piece 7 in progress_
   The globe's shaders, ramps and material setup become a folder of small files, the shader text unchanged.
 - [x] **6/7 The layer panel's types, constants and pure helpers moved out, and its tests split** · `2d4e48e`
   The layer panel loses about 410 lines of types and helpers, and its tests split into five files by theme.
-- [ ] **7/7 The page wiring's types moved out** · in progress
+- [x] **7/7 The page wiring's types moved out** · `fb89e9c`
   The page wiring's types move to a file of their own.
