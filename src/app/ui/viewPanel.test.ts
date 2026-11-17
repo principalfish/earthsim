@@ -3,14 +3,12 @@ import {
 	MAX_DRAWN_SEA_LEVEL_M,
 	MIN_DRAWN_SEA_LEVEL_M,
 } from '../globe/material';
-import type { WindStyle } from '../globe/windMotion';
 import {
 	byClass,
 	createFakeDocument,
 	type FakeDocument,
 	type FakeElement,
 } from '../testing/fakeDocument';
-import type { WindUnit } from '../windUnits';
 import {
 	createViewPanel,
 	formatExaggeration,
@@ -85,173 +83,18 @@ describe('createViewPanel', () => {
 			seaLevel: 0,
 			onExaggeration: (factor) => told.push(`exaggeration ${factor}`),
 			onSeaLevel: (metres) => told.push(`sea level ${metres}`),
-			onWindStyle: (style) => told.push(`wind style ${style}`),
-			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
 		});
 		return { told, section };
 	};
 
-	it('holds the two sliders and the two wind choices, in that order, and no checkbox for the grid, Sunlight or Winds, nor a choice of the winds’ source', () => {
+	it('holds the two sliders alone, in that order: no checkbox for the grid, Sunlight or Winds, nor a choice of the winds’ source, how they are drawn or their unit', () => {
 		const { section, told } = make();
-		expect(fieldIds(section)).toEqual([
-			'view-exaggeration',
-			'view-sea-level',
-			'view-wind-style',
-			'view-wind-unit',
-		]);
+		expect(fieldIds(section)).toEqual(['view-exaggeration', 'view-sea-level']);
 		expect(byClass(section, 'field__checkbox')).toEqual([]);
+		expect(byClass(section, 'field__select')).toEqual([]);
 		expect(
 			byClass(section, 'field__label').map((label) => label.textContent),
-		).toEqual([
-			'Relief exaggeration',
-			'Sea level',
-			'Winds drawn as',
-			'Wind speed',
-		]);
+		).toEqual(['Relief exaggeration', 'Sea level']);
 		expect(told).toEqual([]);
-	});
-});
-
-describe('the Wind speed choice', () => {
-	let fake: FakeDocument;
-	beforeEach(() => {
-		fake = createFakeDocument();
-		vi.stubGlobal('document', fake.document);
-	});
-	afterEach(() => {
-		vi.unstubAllGlobals();
-	});
-
-	const make = (windUnit?: WindUnit) => {
-		const told: string[] = [];
-		const section = fake.createElement('div');
-		createViewPanel(section as unknown as HTMLElement, {
-			seaLevel: 0,
-			windUnit,
-			onExaggeration: () => {},
-			onSeaLevel: () => {},
-			onWindStyle: (style) => told.push(`wind style ${style}`),
-			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
-		});
-		const select = byClass(section, 'field__select').find(
-			(element) => element.id === 'view-wind-unit',
-		) as FakeElement;
-		return { told, section, select };
-	};
-
-	it('comes last, directly under the Winds drawn as choice, labelled Wind speed, offering m/s, km/h and mph', () => {
-		const { section, select } = make();
-		expect(fieldIds(section).slice(-2)).toEqual([
-			'view-wind-style',
-			'view-wind-unit',
-		]);
-		expect(section.children.at(-1)?.children).toContain(select);
-		const label = byClass(section, 'field__label').find(
-			(element) => element.htmlFor === 'view-wind-unit',
-		);
-		expect(label?.textContent).toBe('Wind speed');
-		expect(
-			select.children.map((option) => [option.value, option.textContent]),
-		).toEqual([
-			['m/s', 'm/s'],
-			['km/h', 'km/h'],
-			['mph', 'mph'],
-		]);
-	});
-
-	it('starts on m/s, or on the unit given', () => {
-		expect(make().select.value).toBe('m/s');
-		expect(make('mph').select.value).toBe('mph');
-		expect(make('km/h').select.value).toBe('km/h');
-	});
-
-	it('shows from the start, as every field does', () => {
-		const { select, section } = make();
-		expect(select.hidden).toBe(false);
-		expect(section.children.every((field) => field.hidden !== true)).toBe(true);
-	});
-
-	it('reports each unit chosen, and the unit alone', () => {
-		const { told, select } = make();
-		select.value = 'km/h';
-		select.fire('change');
-		select.value = 'mph';
-		select.fire('change');
-		select.value = 'm/s';
-		select.fire('change');
-		expect(told).toEqual(['wind unit km/h', 'wind unit mph', 'wind unit m/s']);
-	});
-});
-
-describe('the Winds drawn as choice', () => {
-	let fake: FakeDocument;
-	beforeEach(() => {
-		fake = createFakeDocument();
-		vi.stubGlobal('document', fake.document);
-	});
-	afterEach(() => {
-		vi.unstubAllGlobals();
-	});
-
-	const make = (windStyle?: WindStyle) => {
-		const told: string[] = [];
-		const section = fake.createElement('div');
-		createViewPanel(section as unknown as HTMLElement, {
-			seaLevel: 0,
-			windStyle,
-			onExaggeration: () => {},
-			onSeaLevel: () => {},
-			onWindStyle: (style) => told.push(`wind style ${style}`),
-			onWindUnit: (unit) => told.push(`wind unit ${unit}`),
-		});
-		const select = byClass(section, 'field__select').find(
-			(element) => element.id === 'view-wind-style',
-		) as FakeElement;
-		const field = section.children.find((child) =>
-			child.children.includes(select),
-		) as FakeElement;
-		return { told, section, select, field };
-	};
-
-	it('comes directly under the Sea level slider, above Wind speed, offering Arrows and Streaks', () => {
-		const { section, select, field } = make();
-		const at = section.children.indexOf(field);
-		expect(fieldIds(section).slice(at - 1, at + 2)).toEqual([
-			'view-sea-level',
-			'view-wind-style',
-			'view-wind-unit',
-		]);
-		expect(select.id).toBe('view-wind-style');
-		const label = byClass(section, 'field__label').find(
-			(element) => element.htmlFor === 'view-wind-style',
-		);
-		expect(label?.textContent).toBe('Winds drawn as');
-		expect(
-			select.children.map((option) => [option.value, option.textContent]),
-		).toEqual([
-			['arrows', 'Arrows'],
-			['streaks', 'Streaks'],
-		]);
-	});
-
-	it('starts on Arrows, or on the way given', () => {
-		expect(make().select.value).toBe('arrows');
-		expect(make('streaks').select.value).toBe('streaks');
-		expect(make('arrows').select.value).toBe('arrows');
-	});
-
-	it('shows from the start, telling nothing at first', () => {
-		const { field, told } = make();
-		expect(field.hidden).not.toBe(true);
-		expect(told).toEqual([]);
-	});
-
-	it('reports each way chosen, and the way alone', () => {
-		const { told, select } = make();
-		select.value = 'streaks';
-		select.fire('change');
-		select.value = 'arrows';
-		select.fire('change');
-		expect(told).toEqual(['wind style streaks', 'wind style arrows']);
 	});
 });

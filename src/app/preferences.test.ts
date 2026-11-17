@@ -106,8 +106,46 @@ describe('createPreferences, how the winds are drawn', () => {
 		expect(WIND_STYLE_KEY).toBe('earth_sim.preference.windStyle');
 	});
 
-	it('starts on arrows', () => {
-		expect(createPreferences(createFakeStorage()).windStyle()).toBe('arrows');
+	it('starts on streaks', () => {
+		expect(createPreferences(createFakeStorage()).windStyle()).toBe('streaks');
+		expect(
+			createPreferences(createFakeStorage(), {
+				reducedMotion: false,
+			}).windStyle(),
+		).toBe('streaks');
+	});
+
+	it('starts on arrows where the system asks for reduced motion', () => {
+		expect(
+			createPreferences(createFakeStorage(), {
+				reducedMotion: true,
+			}).windStyle(),
+		).toBe('arrows');
+	});
+
+	it.each([
+		[false, 'arrows'],
+		[true, 'streaks'],
+	] as const)(
+		'keeps a stored way over the start, with reduced motion %s',
+		(reducedMotion, style) => {
+			const preferences = createPreferences(
+				createFakeStorage({ [WIND_STYLE_KEY]: style }),
+				{ reducedMotion },
+			);
+			expect(preferences.windStyle()).toBe(style);
+		},
+	);
+
+	it('falls back to arrows with reduced motion when the entry is unreadable', () => {
+		const preferences = createPreferences(
+			createFakeStorage({ [WIND_STYLE_KEY]: 'lines' }),
+			{ reducedMotion: true },
+		);
+		expect(preferences.windStyle()).toBe('arrows');
+		expect(
+			createPreferences(refusingStorage, { reducedMotion: true }).windStyle(),
+		).toBe('arrows');
 	});
 
 	it('remembers each way chosen in one entry, apart from the unit', () => {
@@ -138,17 +176,17 @@ describe('createPreferences, how the winds are drawn', () => {
 	});
 
 	it.each(['', 'Streaks', 'streak', 'lines', 'arrows ', '1'])(
-		'falls back to arrows for an entry of %j',
+		'falls back to streaks for an entry of %j',
 		(entry) => {
 			const preferences = createPreferences(
 				createFakeStorage({ [WIND_STYLE_KEY]: entry }),
 			);
-			expect(preferences.windStyle()).toBe('arrows');
+			expect(preferences.windStyle()).toBe('streaks');
 		},
 	);
 
-	it('falls back to arrows, and no error, from storage that throws on reading', () => {
-		expect(createPreferences(refusingStorage).windStyle()).toBe('arrows');
+	it('falls back to streaks, and no error, from storage that throws on reading', () => {
+		expect(createPreferences(refusingStorage).windStyle()).toBe('streaks');
 	});
 
 	it('carries on, without an error, past storage that throws on writing', () => {
@@ -157,18 +195,18 @@ describe('createPreferences, how the winds are drawn', () => {
 			getItem: storage.getItem,
 			setItem: refusingStorage.setItem,
 		});
-		expect(() => preferences.setWindStyle('streaks')).not.toThrow();
-		expect(preferences.windStyle()).toBe('arrows');
+		expect(() => preferences.setWindStyle('arrows')).not.toThrow();
+		expect(preferences.windStyle()).toBe('streaks');
 		expect(() =>
-			createPreferences(refusingStorage).setWindStyle('streaks'),
+			createPreferences(refusingStorage).setWindStyle('arrows'),
 		).not.toThrow();
 	});
 
-	it('falls back to arrows, and no error, with no storage at all', () => {
+	it('falls back to streaks, and no error, with no storage at all', () => {
 		for (const storage of [null, undefined]) {
 			const preferences = createPreferences(storage);
-			expect(() => preferences.setWindStyle('streaks')).not.toThrow();
-			expect(preferences.windStyle()).toBe('arrows');
+			expect(() => preferences.setWindStyle('arrows')).not.toThrow();
+			expect(preferences.windStyle()).toBe('streaks');
 		}
 	});
 });

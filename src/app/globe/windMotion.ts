@@ -15,8 +15,15 @@ export const WIND_STYLES = ['arrows', 'streaks'] as const;
  */
 export type WindStyle = (typeof WIND_STYLES)[number];
 
-/** How the winds are drawn until another way is chosen. */
-export const DEFAULT_WIND_STYLE: WindStyle = 'arrows';
+/**
+ * How the winds are drawn until another way is chosen: as streaks, or as
+ * arrows, which stand still, where the system asks for reduced motion.
+ *
+ * @param reducedMotion - Whether the system asks for reduced motion, as
+ * `prefers-reduced-motion: reduce` says.
+ */
+export const defaultWindStyle = (reducedMotion: boolean): WindStyle =>
+	reducedMotion ? 'arrows' : 'streaks';
 
 /** The name each way of drawing the winds goes by on the page. */
 export const WIND_STYLE_LABELS: Readonly<Record<WindStyle, string>> = {
@@ -73,14 +80,16 @@ export type WindMotion = {
  * each change of what it decides by.
  *
  * @param frames - What draws the frames.
- * @returns The motion, starting on {@link DEFAULT_WIND_STYLE}, with no winds
- * and the page visible, so not moving.
+ * @param style - How the winds are drawn at first.
+ * @returns The motion, starting on that style, with no winds and the page
+ * visible, so not moving.
  */
 export const createWindMotion = (
 	frames: Pick<FrameScheduler, 'setAnimating'>,
+	style: WindStyle,
 ): WindMotion => {
 	let state: WindMotionState = {
-		style: DEFAULT_WIND_STYLE,
+		style,
 		hasWinds: false,
 		pageVisible: true,
 	};

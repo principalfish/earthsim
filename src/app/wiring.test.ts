@@ -77,6 +77,7 @@ import {
 import { createPanelSections, PANEL_SECTIONS } from './ui/panelSections';
 import type { PauseButtonOptions } from './ui/pauseButton';
 import type { PlanetPanelOptions } from './ui/planetPanel';
+import type { SettingsPanelOptions } from './ui/settingsPanel';
 import type { TimelineOptions } from './ui/timeline';
 import type { ToolPanelOptions } from './ui/toolPanel';
 import { createTopBar, type TopBarOptions } from './ui/topBar';
@@ -135,6 +136,7 @@ type Stage = {
 	readonly autosaveOptions: PageAutosaveOptions;
 	readonly toolPanelOptions: ToolPanelOptions;
 	readonly viewPanelOptions: ViewPanelOptions;
+	readonly settingsPanelOptions: SettingsPanelOptions;
 	readonly dockOptions: LayerDockOptions;
 	/** Every view the stand-in for the dock was told to show, in order. */
 	readonly dockViews: PageView[];
@@ -171,6 +173,11 @@ type Stage = {
 	readonly suns: Sun[];
 	/** Every way the globe was told to draw the winds, in order. */
 	readonly globeWindStyles: string[];
+	/**
+	 * The ways the globe had been told to draw the winds when it was first
+	 * given a world, before which it draws nothing.
+	 */
+	readonly globeWindStylesBeforeWorld: readonly string[];
 	/** Everything the globe was told of whether the page is visible, in order. */
 	readonly globeVisibility: boolean[];
 	/** Says that the page has become visible, or hidden. */
@@ -235,6 +242,8 @@ type StageParts = Partial<
 	 * every write.
 	 */
 	readonly preferencesRefused?: boolean;
+	/** Whether the system asks for reduced motion. */
+	readonly reducedMotion?: boolean;
 };
 
 /** Storage that throws on every read and every write. */
@@ -266,6 +275,8 @@ const createStage = (
 	let autosaveOptions: PageAutosaveOptions | undefined;
 	let toolPanelOptions: ToolPanelOptions | undefined;
 	let viewPanelOptions: ViewPanelOptions | undefined;
+	let settingsPanelOptions: SettingsPanelOptions | undefined;
+	let globeWindStylesBeforeWorld: string[] | undefined;
 	let dockOptions: LayerDockOptions | undefined;
 	const dockViews: PageView[] = [];
 	let topBarOptions: TopBarOptions | undefined;
@@ -317,6 +328,12 @@ const createStage = (
 		},
 		get viewPanelOptions() {
 			return required(viewPanelOptions, 'view panel');
+		},
+		get settingsPanelOptions() {
+			return required(settingsPanelOptions, 'settings panel');
+		},
+		get globeWindStylesBeforeWorld() {
+			return required(globeWindStylesBeforeWorld, 'world on the globe');
 		},
 		get dockOptions() {
 			return required(dockOptions, 'dock');
@@ -386,7 +403,10 @@ const createStage = (
 	const started = startPage({
 		state,
 		globe: {
-			setWorld: (next) => log.push(`globe.setWorld ${describeWorld(next)}`),
+			setWorld: (next) => {
+				globeWindStylesBeforeWorld ??= [...globeWindStyles];
+				log.push(`globe.setWorld ${describeWorld(next)}`);
+			},
 			setSeaLevel: (metres) => log.push(`globe.setSeaLevel ${metres}`),
 			setExaggeration: (factor) => log.push(`globe.setExaggeration ${factor}`),
 			setGridVisible: (visible) => log.push(`globe.setGridVisible ${visible}`),
@@ -484,6 +504,10 @@ const createStage = (
 			return {
 				setSeaLevel: (metres) => log.push(`viewPanel.setSeaLevel ${metres}`),
 			};
+		},
+		createSettingsPanel: (options) => {
+			log.push('createSettingsPanel');
+			settingsPanelOptions = options;
 		},
 		createLayerDock: (options) => {
 			log.push('createLayerDock');
@@ -587,6 +611,7 @@ const createStage = (
 		},
 		preferences: createPreferences(
 			own.preferencesRefused === true ? REFUSING_STORAGE : preferenceStorage,
+			{ reducedMotion: own.reducedMotion },
 		),
 		openNewWorldDialog: (options) => {
 			log.push(`openNewWorldDialog ${options.notice ?? 'no notice'}`);
@@ -671,6 +696,7 @@ describe('startPage', () => {
 			'createAutosave',
 			'createToolPanel',
 			`createViewPanel ${DEFAULT_SEA_LEVEL_M}`,
+			'createSettingsPanel',
 			'createLayerDock',
 			'createTopBar',
 			'createTimeline',
@@ -2711,12 +2737,15 @@ describe('the Winds tile', () => {
  * A started page with the real layer panel, on the terrain.
  *
  * @param preferenceEntries - What the preferences' storage holds at first.
+ * @param reducedMotion - Whether the system asks for reduced motion.
  */
 const createWindUnitStage = async (
 	preferenceEntries?: Readonly<Record<string, string>>,
+	reducedMotion?: boolean,
 ) => {
 	const stage = await createStartedStage(undefined, {
 		preferenceEntries,
+		reducedMotion,
 		createLayerPanel: (options) =>
 			createLayerPanel({
 				...options,
@@ -2751,18 +2780,18 @@ const createWindUnitStage = async (
 };
 
 describe('the wind speed unit', () => {
-	it('starts in m/s with nothing stored, in the view controls and the readout, and tells the layer panel nothing of it', async () => {
+	it('starts in m/s with nothing stored, in the settings and the readout, and tells the layer panel nothing of it', async () => {
 		const { stage } = await createWindUnitStage();
-		expect(stage.viewPanelOptions.windUnit).toBe('m/s');
+		expect(stage.settingsPanelOptions.windUnit).toBe('m/s');
 		expect('windUnit' in stage.layerOptions).toBe(false);
 		expect(stage.readoutOptions.windUnit()).toBe('m/s');
 	});
 
-	it('starts in the stored unit, in the view controls and the readout', async () => {
+	it('starts in the stored unit, in the settings and the readout', async () => {
 		const { stage } = await createWindUnitStage({
 			[WIND_SPEED_UNIT_KEY]: 'mph',
 		});
-		expect(stage.viewPanelOptions.windUnit).toBe('mph');
+		expect(stage.settingsPanelOptions.windUnit).toBe('mph');
 		expect(stage.readoutOptions.windUnit()).toBe('mph');
 		expect(stage.preferenceStorage.writes).toEqual([]);
 	});
@@ -2771,26 +2800,26 @@ describe('the wind speed unit', () => {
 		const { stage } = await createWindUnitStage({
 			[WIND_SPEED_UNIT_KEY]: 'knots',
 		});
-		expect(stage.viewPanelOptions.windUnit).toBe('m/s');
+		expect(stage.settingsPanelOptions.windUnit).toBe('m/s');
 		expect(stage.readoutOptions.windUnit()).toBe('m/s');
 	});
 
 	it('stores a unit chosen, and changes the readout at once', async () => {
 		const { stage } = await createWindUnitStage();
-		stage.viewPanelOptions.onWindUnit('km/h');
+		stage.settingsPanelOptions.onWindUnit('km/h');
 		expect(stage.preferenceStorage.writes).toEqual([
 			[WIND_SPEED_UNIT_KEY, 'km/h'],
 		]);
 		expect(stage.readoutOptions.windUnit()).toBe('km/h');
 		expect(stage.readoutCalls).toEqual(['invalidate']);
-		stage.viewPanelOptions.onWindUnit('mph');
+		stage.settingsPanelOptions.onWindUnit('mph');
 		expect(stage.readoutOptions.windUnit()).toBe('mph');
 		expect(stage.readoutCalls).toEqual(['invalidate', 'invalidate']);
 	});
 
 	it('tells the readout of the unit, and nothing else', async () => {
 		const stage = await createStartedStage();
-		stage.viewPanelOptions.onWindUnit('mph');
+		stage.settingsPanelOptions.onWindUnit('mph');
 		expect(stage.log).toEqual([]);
 		expect(stage.readoutCalls).toEqual(['invalidate']);
 	});
@@ -2798,7 +2827,7 @@ describe('the wind speed unit', () => {
 	it('writes nothing to the world, and marks nothing for saving', async () => {
 		const stage = await createStartedStage();
 		const before = serializeWorld(stage.state.world);
-		stage.viewPanelOptions.onWindUnit('km/h');
+		stage.settingsPanelOptions.onWindUnit('km/h');
 		expect(serializeWorld(stage.state.world)).toEqual(before);
 		expect(stage.log).not.toContain('autosave.markChanged');
 		expect(stage.saved).toEqual([]);
@@ -2807,7 +2836,7 @@ describe('the wind speed unit', () => {
 
 	it('is kept through a new world', async () => {
 		const { stage } = await createWindUnitStage();
-		stage.viewPanelOptions.onWindUnit('mph');
+		stage.settingsPanelOptions.onWindUnit('mph');
 		stage.state.replaceWorld(createBlankWorld(64));
 		expect(stage.readoutOptions.windUnit()).toBe('mph');
 		expect(stage.preferenceStorage.writes).toHaveLength(1);
@@ -2815,50 +2844,82 @@ describe('the wind speed unit', () => {
 });
 
 describe('how the winds are drawn', () => {
-	it('starts on arrows with nothing stored, in the globe and the view controls, and tells the layer panel nothing of it', async () => {
+	it('starts on streaks with nothing stored, in the globe and the settings, and tells the layer panel nothing of it', async () => {
 		const { stage } = await createWindUnitStage();
-		expect(stage.globeWindStyles).toEqual(['arrows']);
-		expect(stage.viewPanelOptions.windStyle).toBe('arrows');
+		expect(stage.globeWindStyles).toEqual(['streaks']);
+		expect(stage.settingsPanelOptions.windStyle).toBe('streaks');
 		expect('windStyle' in stage.layerOptions).toBe(false);
 	});
 
-	it('starts on the stored way, in the globe and the view controls, with Winds still off', async () => {
-		const { stage } = await createWindUnitStage({
-			[WIND_STYLE_KEY]: 'streaks',
-		});
-		expect(stage.globeWindStyles).toEqual(['streaks']);
-		expect(stage.viewPanelOptions.windStyle).toBe('streaks');
+	it('starts on arrows with nothing stored where the system asks for reduced motion', async () => {
+		const { stage } = await createWindUnitStage(undefined, true);
+		expect(stage.globeWindStyles).toEqual(['arrows']);
+		expect(stage.settingsPanelOptions.windStyle).toBe('arrows');
 		expect(stage.preferenceStorage.writes).toEqual([]);
-		expect(stage.dockOptions.view.winds).toBe(false);
-		expect(stage.timelineOptions.view.winds).toBe(false);
 	});
 
-	it('starts on arrows when the storage holds something else', async () => {
+	it.each([
+		['arrows', false],
+		['streaks', true],
+	] as const)(
+		'starts on the stored way, %s, with reduced motion %s, in the globe and the settings, with Winds still off',
+		async (style, reducedMotion) => {
+			const { stage } = await createWindUnitStage(
+				{ [WIND_STYLE_KEY]: style },
+				reducedMotion,
+			);
+			expect(stage.globeWindStyles).toEqual([style]);
+			expect(stage.settingsPanelOptions.windStyle).toBe(style);
+			expect(stage.preferenceStorage.writes).toEqual([]);
+			expect(stage.dockOptions.view.winds).toBe(false);
+			expect(stage.timelineOptions.view.winds).toBe(false);
+		},
+	);
+
+	it('starts on streaks when the storage holds something else', async () => {
 		const { stage } = await createWindUnitStage({
 			[WIND_STYLE_KEY]: 'lines',
 		});
-		expect(stage.globeWindStyles).toEqual(['arrows']);
-		expect(stage.viewPanelOptions.windStyle).toBe('arrows');
+		expect(stage.globeWindStyles).toEqual(['streaks']);
+		expect(stage.settingsPanelOptions.windStyle).toBe('streaks');
 	});
+
+	it.each([
+		[undefined, false, 'streaks'],
+		[undefined, true, 'arrows'],
+		['arrows', false, 'arrows'],
+		['streaks', true, 'streaks'],
+	] as const)(
+		'tells the globe before it is given a world: stored %s, reduced motion %s, %s',
+		(stored, reducedMotion, style) => {
+			const stage = createStage(undefined, {
+				preferenceEntries:
+					stored === undefined ? {} : { [WIND_STYLE_KEY]: stored },
+				reducedMotion,
+			});
+			expect(stage.globeWindStylesBeforeWorld).toEqual([style]);
+			expect(stage.log[0]).toMatch(/^globe\.setWorld /);
+		},
+	);
 
 	it('stores a way chosen, and gives it to the globe at once', async () => {
 		const { stage } = await createWindUnitStage();
-		stage.viewPanelOptions.onWindStyle('streaks');
+		stage.settingsPanelOptions.onWindStyle('arrows');
 		expect(stage.preferenceStorage.writes).toEqual([
-			[WIND_STYLE_KEY, 'streaks'],
-		]);
-		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks']);
-		stage.viewPanelOptions.onWindStyle('arrows');
-		expect(stage.preferenceStorage.writes).toEqual([
-			[WIND_STYLE_KEY, 'streaks'],
 			[WIND_STYLE_KEY, 'arrows'],
 		]);
-		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks', 'arrows']);
+		expect(stage.globeWindStyles).toEqual(['streaks', 'arrows']);
+		stage.settingsPanelOptions.onWindStyle('streaks');
+		expect(stage.preferenceStorage.writes).toEqual([
+			[WIND_STYLE_KEY, 'arrows'],
+			[WIND_STYLE_KEY, 'streaks'],
+		]);
+		expect(stage.globeWindStyles).toEqual(['streaks', 'arrows', 'streaks']);
 	});
 
 	it('tells nothing else of the way: not the layer panel, nor the readout', async () => {
 		const stage = await createStartedStage();
-		stage.viewPanelOptions.onWindStyle('streaks');
+		stage.settingsPanelOptions.onWindStyle('arrows');
 		expect(stage.log).toEqual([]);
 		expect(stage.readoutCalls).toEqual([]);
 	});
@@ -2866,11 +2927,11 @@ describe('how the winds are drawn', () => {
 	it('writes nothing to the world, marks nothing for saving, and is kept through a new world', async () => {
 		const { stage } = await createWindUnitStage();
 		const before = serializeWorld(stage.state.world);
-		stage.viewPanelOptions.onWindStyle('streaks');
+		stage.settingsPanelOptions.onWindStyle('arrows');
 		expect(serializeWorld(stage.state.world)).toEqual(before);
 		expect(stage.log).not.toContain('autosave.markChanged');
 		stage.state.replaceWorld(createBlankWorld(64));
-		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks']);
+		expect(stage.globeWindStyles).toEqual(['streaks', 'arrows']);
 		expect(stage.preferenceStorage.writes).toHaveLength(1);
 	});
 });

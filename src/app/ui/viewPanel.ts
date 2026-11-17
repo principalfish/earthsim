@@ -1,10 +1,10 @@
 /**
- * The view controls: how much relief is exaggerated, where the sea level
- * is, whether the winds are drawn as arrows or as streaks, and the unit
- * their speeds are written in. Whether the cell grid is drawn, the globe
- * is lit by the sun and the winds are shown is chosen on the dock over the
- * globe, and on the measured Earth whether the winds are the simulated or
- * the observed on the top bar.
+ * The view controls: how much relief is exaggerated and where the sea
+ * level is. Whether the cell grid is drawn, the globe is lit by the sun
+ * and the winds are shown is chosen on the dock over the globe, on the
+ * measured Earth whether the winds are the simulated or the observed on
+ * the top bar, and how the winds are drawn and the unit of their speeds in
+ * the settings.
  */
 
 import {
@@ -14,14 +14,7 @@ import {
 	MIN_DRAWN_SEA_LEVEL_M,
 	MIN_EXAGGERATION,
 } from '../globe/material';
-import {
-	DEFAULT_WIND_STYLE,
-	WIND_STYLE_LABELS,
-	WIND_STYLES,
-	type WindStyle,
-} from '../globe/windMotion';
-import { DEFAULT_WIND_UNIT, WIND_UNITS, type WindUnit } from '../windUnits';
-import { createRangeField, createSelectField, type RangeScale } from './fields';
+import { createRangeField, type RangeScale } from './fields';
 
 /** The step between sea levels the slider can be set to, in metres. */
 export const SEA_LEVEL_SLIDER_STEP_M = 10;
@@ -32,18 +25,10 @@ export type ViewPanelOptions = {
 	readonly exaggeration?: number;
 	/** The sea level shown at first, in metres against the datum. */
 	readonly seaLevel: number;
-	/** How the winds are drawn at first; as arrows by default. */
-	readonly windStyle?: WindStyle;
-	/** The unit wind speeds are written in at first; m/s by default. */
-	readonly windUnit?: WindUnit;
 	/** Called with the new factor when the exaggeration slider moves. */
 	readonly onExaggeration: (factor: number) => void;
 	/** Called with the new level in metres when the sea-level slider moves. */
 	readonly onSeaLevel: (metres: number) => void;
-	/** Called with the way chosen when another is chosen to draw the winds. */
-	readonly onWindStyle: (style: WindStyle) => void;
-	/** Called with the unit when another is chosen for wind speeds. */
-	readonly onWindUnit: (unit: WindUnit) => void;
 };
 
 /** The view controls on the page. */
@@ -80,12 +65,8 @@ export const formatMetres = (metres: number): string => {
 };
 
 /**
- * Adds the view controls to the View section of the side panel.
- *
- * @remarks
- * Under the sliders is the Winds drawn as choice, a drop-down of Arrows
- * and Streaks, and under it the Wind speed choice, a drop-down labelled
- * so, both shown whether or not the winds are.
+ * Adds the view controls to the View section of the side panel: the
+ * Relief exaggeration slider, and under it the Sea level slider.
  *
  * @param body - The section's body, to add the controls to, after what it
  * holds.
@@ -122,23 +103,6 @@ export const createViewPanel = (
 			onInput: options.onExaggeration,
 		}).element,
 		seaLevel.element,
-		createSelectField({
-			id: 'view-wind-style',
-			label: 'Winds drawn as',
-			choices: WIND_STYLES.map((style) => ({
-				value: style,
-				label: WIND_STYLE_LABELS[style],
-			})),
-			value: options.windStyle ?? DEFAULT_WIND_STYLE,
-			onChange: options.onWindStyle,
-		}),
-		createSelectField({
-			id: 'view-wind-unit',
-			label: 'Wind speed',
-			choices: WIND_UNITS.map((unit) => ({ value: unit, label: unit })),
-			value: options.windUnit ?? DEFAULT_WIND_UNIT,
-			onChange: options.onWindUnit,
-		}),
 	);
 	return {
 		setSeaLevel: (metres) => seaLevel.setScale(seaLevelScale(metres)),

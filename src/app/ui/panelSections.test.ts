@@ -51,7 +51,7 @@ describe('createPanelSections', () => {
 		return { panel, title, sections, storage, headings, states, button };
 	};
 
-	it('adds the five sections after what the panel holds, in the order World, View, Planet, Tools, Statistics', () => {
+	it('adds the six sections after what the panel holds, in the order World, View, Planet, Tools, Statistics, Settings', () => {
 		const { panel, title, sections, headings } = make();
 		expect(headings()).toEqual([
 			'World',
@@ -59,6 +59,7 @@ describe('createPanelSections', () => {
 			'Planet',
 			'Tools',
 			'Statistics',
+			'Settings',
 		]);
 		expect(panel.children).toEqual([
 			title,
@@ -70,14 +71,16 @@ describe('createPanelSections', () => {
 			expect(body.children).toEqual([]);
 		}
 		expect(sectionBodyId('world')).toBe('section-world');
+		expect(sectionBodyId('settings')).toBe('section-settings');
 	});
 
 	it('opens only World on a first visit, and writes nothing', () => {
 		const { sections, states, storage } = make();
 		expect(FIRST_VISIT_OPEN).toEqual(['world']);
-		expect(states()).toEqual([true, false, false, false, false]);
+		expect(states()).toEqual([true, false, false, false, false, false]);
 		expect(PANEL_SECTIONS.map(({ key }) => sections[key].body.hidden)).toEqual([
 			false,
+			true,
 			true,
 			true,
 			true,
@@ -93,9 +96,10 @@ describe('createPanelSections', () => {
 				[panelMemoryKey('planet')]: 'open',
 				[panelMemoryKey('statistics')]: 'open',
 				[panelMemoryKey('tools')]: 'unreadable',
+				[panelMemoryKey('settings')]: 'open',
 			}),
 		);
-		expect(states()).toEqual([false, false, true, false, true]);
+		expect(states()).toEqual([false, false, true, false, true, true]);
 		expect(storage.writes).toEqual([]);
 	});
 
@@ -113,8 +117,8 @@ describe('createPanelSections', () => {
 		});
 		expect(reads).not.toContain(panelMemoryKey('layers'));
 		expect(headings()).not.toContain('Layers');
-		expect(byClass(panel, 'panel__section')).toHaveLength(5);
-		expect(states()).toEqual([true, false, false, false, false]);
+		expect(byClass(panel, 'panel__section')).toHaveLength(6);
+		expect(states()).toEqual([true, false, false, false, false, false]);
 		expect(storage.writes).toEqual([]);
 		expect(storage.entries.get(panelMemoryKey('layers'))).toBe('open');
 	});
@@ -138,6 +142,7 @@ describe('createPanelSections', () => {
 			false,
 			false,
 			false,
+			false,
 		]);
 		const toggle = oneByClass(
 			sections.view.element as unknown as FakeElement,
@@ -153,17 +158,19 @@ describe('createPanelSections', () => {
 		button('world').fire('click');
 		button('tools').fire('click');
 		button('tools').fire('click');
+		button('settings').fire('click');
 		expect(storage.writes).toEqual([
 			[panelMemoryKey('planet'), 'open'],
 			[panelMemoryKey('world'), 'closed'],
 			[panelMemoryKey('tools'), 'open'],
 			[panelMemoryKey('tools'), 'closed'],
+			[panelMemoryKey('settings'), 'open'],
 		]);
 		const before = states();
 
 		const again = make(createFakeStorage(Object.fromEntries(storage.entries)));
 		expect(again.states()).toEqual(before);
-		expect(before).toEqual([false, false, true, false, false]);
+		expect(before).toEqual([false, false, true, false, false, true]);
 	});
 
 	it('keeps the controls of a closed section working while its body is hidden', () => {

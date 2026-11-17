@@ -21,6 +21,7 @@ import { openNewWorldDialog } from './ui/newWorldDialog';
 import { createPanelSections } from './ui/panelSections';
 import { createPauseButton } from './ui/pauseButton';
 import { createPlanetPanel } from './ui/planetPanel';
+import { createSettingsPanel } from './ui/settingsPanel';
 import { createStatsPanel } from './ui/statsPanel';
 import { createTimeline } from './ui/timeline';
 import { createToolPanel } from './ui/toolPanel';
@@ -61,10 +62,22 @@ const viewport = requireElement('.viewport', HTMLElement);
 
 document.documentElement.dataset.coreVersion = CORE_VERSION;
 
-/** Creates the globe, or explains on the page why there cannot be one. */
+// Reached once for both: the open sections and the preferences are
+// settings of the browser, kept apart from the saved world.
+const browserStorage = reachStorage(() => window.localStorage);
+// Asked once, as the page starts: where the system asks for reduced
+// motion, the winds start as arrows, which stand still, not as streaks.
+const preferences = createPreferences(browserStorage, {
+	reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+});
+
+/**
+ * Creates the globe, drawing the winds as the preferences say from its
+ * first frame, or explains on the page why there cannot be one.
+ */
 const createGlobeOrExplain = (): Globe | null => {
 	try {
-		return createGlobe(canvas);
+		return createGlobe(canvas, preferences.windStyle());
 	} catch (error) {
 		console.error(error);
 		showFailure(
@@ -92,9 +105,6 @@ const logError = (error: unknown): void => console.error(error);
 
 const globe = createGlobeOrExplain();
 if (globe !== null) {
-	// Reached once for both: the open sections and the preferences are
-	// settings of the browser, kept apart from the saved world.
-	const browserStorage = reachStorage(() => window.localStorage);
 	const sections = createPanelSections(
 		panel,
 		createPanelMemory(browserStorage),
@@ -133,6 +143,8 @@ if (globe !== null) {
 			}),
 		createToolPanel: (options) => createToolPanel(sections.tools, options),
 		createViewPanel: (options) => createViewPanel(sections.view.body, options),
+		createSettingsPanel: (options) =>
+			createSettingsPanel(sections.settings.body, options),
 		createLayerDock: (options) => {
 			const dock = createLayerDock(options);
 			mainView.dock.append(dock.element);
@@ -194,7 +206,7 @@ if (globe !== null) {
 				globe,
 				show: infoBox.showReadout,
 			}),
-		preferences: createPreferences(browserStorage),
+		preferences,
 		openNewWorldDialog,
 		loadEarth: loadEarthData,
 		loadObserved: loadLayerObserved,

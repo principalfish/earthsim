@@ -62,6 +62,7 @@ import {
 } from './ui/newWorldDialog';
 import type { PauseButtonOptions } from './ui/pauseButton';
 import type { PlanetPanel, PlanetPanelOptions } from './ui/planetPanel';
+import type { SettingsPanelOptions } from './ui/settingsPanel';
 import type { Timeline, TimelineOptions } from './ui/timeline';
 import type { ToolPanel, ToolPanelOptions } from './ui/toolPanel';
 import type { TopBar, TopBarOptions } from './ui/topBar';
@@ -209,6 +210,11 @@ export type PageParts = {
 	readonly createViewPanel: (
 		options: ViewPanelOptions,
 	) => Pick<ViewPanel, 'setSeaLevel'>;
+	/**
+	 * Adds the settings to the panel: how the winds are drawn and the unit
+	 * of their speeds.
+	 */
+	readonly createSettingsPanel: (options: SettingsPanelOptions) => void;
 	/**
 	 * Lays the dock over the globe, whose tiles choose the layer and switch
 	 * the winds, the sunlight and the cell grid.
@@ -371,15 +377,15 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * The panel's sections are in place before the page starts, in the order
  * the panel shows them, so the parts that fill them can be made in an
  * order of their own: the world controls, the tools, the view controls,
- * the dock, the top bar and the timeline over the globe, the planet
- * controls, the layers and then the statistics. The dock, the top bar and
- * the timeline are shown each change of the view settings the layer panel
- * reports, the timeline with whether the year is playing. The dock's Grid
- * tile goes straight to the globe, and tells the layer panel, which holds
- * it with the rest of the view settings. The dock and the layer panel are
- * given no list of layers, so both offer every layer in `SCALAR_LAYERS`.
- * The temperature and then the winds, which have nothing of their own in
- * the panel, are made just before the layers.
+ * the settings, the dock, the top bar and the timeline over the globe, the
+ * planet controls, the layers and then the statistics. The dock, the top
+ * bar and the timeline are shown each change of the view settings the
+ * layer panel reports, the timeline with whether the year is playing. The
+ * dock's Grid tile goes straight to the globe, and tells the layer panel,
+ * which holds it with the rest of the view settings. The dock and the
+ * layer panel are given no list of layers, so both offer every layer in
+ * `SCALAR_LAYERS`. The temperature and then the winds, which have nothing
+ * of their own in the panel, are made just before the layers.
  *
  * The temperature and the winds are worked out whatever is on screen:
  * the temperature after every change of the world, and the winds from
@@ -431,24 +437,24 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * measured Earth.
  *
  * The unit wind speeds are written in is a preference of the browser, not
- * part of the world: it is read once, as the page starts, and the view
- * controls and the readout start in it. A unit chosen in the view controls
- * is remembered by the preferences, and reaches the readout at once. It is
- * never saved with the world.
+ * part of the world: it is read once, as the page starts, and the settings
+ * and the readout start in it. A unit chosen in the settings is remembered
+ * by the preferences, and reaches the readout at once. It is never saved
+ * with the world.
  *
  * So is how the winds are drawn, as arrows or as streaks: read once as the
- * page starts, the globe is told it before the view controls are made, and
- * the view controls start in it. A way chosen in the view controls is
+ * page starts, the globe is told it before anything else, its world
+ * included, and the settings start in it. A way chosen in the settings is
  * remembered by the preferences, and reaches the globe at once. Winds itself
  * starts as the view settings remember it. The globe is also told whether
  * the page is visible, as the page starts and at each change, so that
  * streaks move only while it is.
  *
- * The view controls' choice of where the wind arrows come from goes to the
- * layer panel, which decides when it is offered, on the measured Earth, and
- * tells the view controls so, with the source it has, each time it shows
- * the view settings; its change of the arrows reaches the readout as any
- * change of the view settings does.
+ * The top bar's comparison control sends the chosen source to the layer
+ * panel, which decides when it is offered, on the measured Earth, and
+ * tells the top bar so, with the source it has, each time it shows the
+ * view settings; a change of source reaches the readout as any change of
+ * the view settings does.
  *
  * A world that replaces the one being edited reaches, in this order: the
  * sculpt controller, which ends a stroke still under way on the old world
@@ -514,6 +520,9 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		isMeasuredEarth(world) ? world.resolution : null;
 	/** Tells the layer panel whether the world, changed, is the measured Earth. */
 	const checkEarth = (): void => layerPanel.setEarth(earthOf(state.world));
+	/** How the winds are drawn as the page starts, as last chosen. */
+	const windStyle = parts.preferences.windStyle();
+	globe.setWindStyle(windStyle);
 	globe.setWorld(state.world);
 	/** The view settings the browser remembers, as last read or written. */
 	let stored = storedView(parts.preferences);
@@ -666,13 +675,8 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	});
 	/** The unit wind speeds are written in, as last chosen. */
 	let windUnit = parts.preferences.windSpeedUnit();
-	/** How the winds are drawn as the page starts, as last chosen. */
-	const windStyle = parts.preferences.windStyle();
-	globe.setWindStyle(windStyle);
 	const view = parts.createViewPanel({
 		seaLevel: state.world.seaLevel,
-		windUnit,
-		windStyle,
 		onExaggeration: globe.setExaggeration,
 		onSeaLevel: (metres) => {
 			const { world } = state;
@@ -684,6 +688,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			autosave.markChanged();
 			readout.invalidate();
 		},
+	});
+	parts.createSettingsPanel({
+		windStyle,
+		windUnit,
 		onWindStyle: (style) => {
 			parts.preferences.setWindStyle(style);
 			globe.setWindStyle(style);

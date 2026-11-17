@@ -12,7 +12,7 @@
  */
 
 import {
-	DEFAULT_WIND_STYLE,
+	defaultWindStyle,
 	isWindStyle,
 	type WindStyle,
 } from './globe/windMotion';
@@ -81,10 +81,10 @@ export type Preferences = {
 	 */
 	setWindSpeedUnit(unit: WindUnit): void;
 	/**
-	 * How the winds are drawn: as last chosen, or {@link DEFAULT_WIND_STYLE},
-	 * arrows, when there is nothing to go by: no storage, storage that
-	 * throws, an entry missing, or one that holds anything but one of the
-	 * ways.
+	 * How the winds are drawn: as last chosen, or {@link defaultWindStyle}
+	 * when there is nothing to go by: no storage, storage that throws, an
+	 * entry missing, or one that holds anything but one of the ways. That
+	 * is streaks, or arrows where the system asks for reduced motion.
 	 */
 	windStyle(): WindStyle;
 	/**
@@ -205,6 +205,12 @@ const writeToggle = (
 	on: boolean,
 ): void => writeEntry(storage, key, on ? ON_ENTRY : OFF_ENTRY);
 
+/** What the system asks of the page, which some preferences start from. */
+export type PreferenceSystem = {
+	/** Whether the system asks for reduced motion; false when left out. */
+	readonly reducedMotion?: boolean;
+};
+
 /**
  * Makes the preferences, kept in the browser's storage as one small entry
  * each.
@@ -216,9 +222,13 @@ const writeToggle = (
  *
  * @param storage - The storage, as the panel memory's `reachStorage`
  * reaches it, or null or undefined for none.
+ * @param system - What the system asks of the page: whether it asks for
+ * reduced motion, as `prefers-reduced-motion: reduce` says; it does not
+ * when this is left out.
  */
 export const createPreferences = (
 	storage: PanelStorage | null | undefined,
+	system: PreferenceSystem = {},
 ): Preferences => ({
 	windSpeedUnit: () => {
 		const entry = readEntry(storage, WIND_SPEED_UNIT_KEY);
@@ -227,7 +237,9 @@ export const createPreferences = (
 	setWindSpeedUnit: (unit) => writeEntry(storage, WIND_SPEED_UNIT_KEY, unit),
 	windStyle: () => {
 		const entry = readEntry(storage, WIND_STYLE_KEY);
-		return isWindStyle(entry) ? entry : DEFAULT_WIND_STYLE;
+		return isWindStyle(entry)
+			? entry
+			: defaultWindStyle(system.reducedMotion === true);
 	},
 	setWindStyle: (style) => writeEntry(storage, WIND_STYLE_KEY, style),
 	layer: () => {

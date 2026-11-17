@@ -64,7 +64,7 @@ The box has no key to the arrows or streaks, and no figures of the winds against
 
 ## The panel
 
-The panel on the right has five sections, in this order: **World, View, Planet, Tools, Statistics**.
+The panel on the right has six sections, in this order: **World, View, Planet, Tools, Statistics, Settings**.
 
 - Each section opens and closes from its heading, by mouse or with Enter or Space.
 - On a first visit only World is open. The browser remembers which sections are open; this is a browser setting, not part of the world.
@@ -137,8 +137,8 @@ The Tools section chooses what the left mouse button does on the globe.
 |-|-|-|
 | Relief exaggeration | 1× to 100×, starting at 40× | How much taller than true scale the land is drawn. Only the drawing changes |
 | Sea level | −6,000 to 6,000 m in steps of 10 m | Where the sea stands. Raising it floods low ground. It is part of the world |
-| Winds drawn as | Arrows or Streaks, starting on Arrows | Whether the winds are drawn as arrows that stand still or as streaks carried along by the wind; see [Arrows or streaks](#arrows-or-streaks). Shown whether or not Winds is on. The browser remembers it, as it does the wind speed unit; it is not saved with the world |
-| Wind speed | m/s, km/h or mph, starting on m/s | The unit the wind under the pointer is written in, in the [info box](#the-info-box). It changes it at once, and does not change the arrows. Shown whether or not Winds is on. The browser remembers it, as it does the open sections; it is not saved with the world |
+
+How the winds are drawn and the unit of their speed are in the [Settings](#settings) section.
 
 ## Planet
 
@@ -284,7 +284,7 @@ Which winds are shown follows the layer's **Show**:
 
 ### Arrows or streaks
 
-**Winds drawn as**, in the View section, draws the winds as **Arrows**, as above, or as **Streaks**: many short trails carried along by the wind and fading behind their heads, as on weather maps.
+**Winds drawn as**, in the [Settings](#settings) section, draws the winds as **Arrows**, as above, or as **Streaks**: many short trails carried along by the wind and fading behind their heads, as on weather maps.
 
 - **Faster and longer where the wind is stronger.** A trail's head moves with the wind where it is, about 15° of arc in three seconds in a 10 m/s wind and half as far in a wind half as strong, so a trail in a 10 m/s wind is about 3° long and one in a gentle wind short. Trails in calm air, below 0.5 m/s, fade out and start again elsewhere.
 - **The same winds as the arrows.** Streaks follow whatever the arrows would show: Simulated or Observed, the month on screen or the year's mean. Playing the year or changing the month changes the winds under the trails, which carry on from where they are.
@@ -292,8 +292,8 @@ Which winds are shown follows the layer's **Show**:
 - **On the relief.** Like the arrows, the streaks lie on the raised relief at every exaggeration, keep their width on the screen, and fade out towards the globe's edge.
 - **The info box** is the same either way.
 - **The page draws continuously only while streaks are moving:** while Streaks is chosen, Winds is on, there are winds to show and the page is visible. Choosing Arrows, switching Winds off or putting the tab in the background stops it, and the page draws only when something changes, as it does with arrows.
-- **Reduced motion.** Streaks are offered even when your system is set to reduce motion, since they move only if you choose them; choosing Arrows stops them.
-- The browser remembers the choice, as it does the open sections and the wind speed unit, and whether Winds was on.
+- **Streaks to start with, or arrows with reduced motion.** On a first visit the winds are drawn as streaks, unless your system is set to reduce motion, when they start as arrows, which stand still. Streaks are still offered then, and move only if you choose them; choosing Arrows stops them.
+- The browser remembers the choice, as it does the open sections and the wind speed unit, and whether Winds was on. A remembered choice is kept whatever your system's setting.
 
 ### Simulated or observed winds
 
@@ -311,3 +311,12 @@ The Statistics section shows how much of the surface is land, the highest and de
 
 - The highest and deepest points are elevations on the scale of the Sea level slider. The two means are measured from the sea level.
 - "Statistics unavailable" means the worker that computes them could not start or failed. The rest of the page keeps working; reload the page to try again.
+
+## Settings
+
+The Settings section holds two choices the browser remembers; neither is saved with the world. It is closed on a first visit.
+
+| Control | Range | What it does |
+|-|-|-|
+| Winds drawn as | Arrows or Streaks, starting on Streaks, or on Arrows when your system is set to reduce motion | Whether the winds are drawn as arrows that stand still or as streaks carried along by the wind; see [Arrows or streaks](#arrows-or-streaks). Shown whether or not Winds is on. A remembered choice is kept |
+| Wind speed | m/s, km/h or mph, starting on m/s | The unit the wind under the pointer is written in, in the [info box](#the-info-box). It changes it at once, and does not change the arrows. Shown whether or not Winds is on |
