@@ -252,3 +252,10 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - `startPage` reads the stored view once, tells the globe the sunlight style and grid first, and starts the date line, dock, top bar, timeline and layer panel on the same view in one synchronous run. In headless Edge the dock showed Pressure from its first frame after a reload, with no Terrain in between.
 - One review round (correctness, security, coverage, docs): two low findings verified and fixed, one dropped. Uncovered changed lines: `src/app/main.ts` (entry point) and `src/app/ui/topBar.ts:83`, both reasons accepted. In `findings.md`.
 - Approved on the user's word with the nit fixed: "Approve, fix it". The guide now says the browser never remembers the month or the comparison.
+
+### Piece 7 (2026-11-17)
+
+- Built on claude-opus-5-5. Go-ahead "Start it"; in Settings "Winds drawn as" comes first, then "Wind speed"; the tests' "reaches the info box" part dropped, since the box no longer shows the wind style or unit.
+- `main.ts` reads `prefers-reduced-motion` once and passes it to `createPreferences(storage, { reducedMotion })`; `preferences.windStyle()` gives the stored style or `defaultWindStyle(reducedMotion)`. The preferences are built before the globe, and `createGlobe(canvas, style)` puts only the streaks or only the arrows in the scene from the start, so the first frame draws the resolved style.
+- Frame times in headless Edge at 256 with Winds on: about 55 fps (median 18 ms, longest 20 ms) with streaks while the opening solve runs; 53 fps with streaks and 52 with arrows once idle; after a stroke with streaks, median 18 ms with one 91 ms frame, when the new winds arrive.
+- One review round (correctness, security, coverage, docs): one low finding verified and fixed (a stale comment in `wiring.ts`), one dropped; light re-check by correctness and docs, clean. Uncovered changed lines: `src/app/main.ts` (entry point), `src/app/ui/topBar.ts:83`, and `src/app/globe/renderer.ts` 315, 384-385, 467 (the WebGL renderer, which has no tests; the start style was checked in a browser). In `findings.md`.

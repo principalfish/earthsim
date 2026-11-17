@@ -104,3 +104,14 @@
 | re-check | correctness | - | - | - | - | `src/app/wiring.ts:380` | Light re-check of the rewrap and the guide's line: clean |
 | re-check | docs | nit | docs | verified | fixed | `docs/user-guide.md:107` | The new line says the browser never remembers "the month" but leaves out the comparison, which the guide's other two places name too; not wrong, less complete |
 | manual | user | nit | docs | - | fixed | `docs/user-guide.md:107` | The user chose to name the comparison too: "Approve, fix it" |
+
+## piece 7 · 2026-11-17 · The Settings section, with Streaks by default
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | docs | verified | fixed | `src/app/wiring.ts:453` | A doc-comment paragraph still said the view controls' choice of where the wind arrows come from goes to the layer panel; the source comes from the top bar's comparison control (raised by correctness and docs, merged) |
+| round | coverage | - | - | dropped | - | `src/app/globe/renderer.ts:384` | The starting branch that puts the streaks or the arrows in the scene is run by no test — dropped: the renderer needs a real WebGL context and the value reaching it is tested; checked in a browser instead, streaks on a first load and arrows under reduced motion |
+| round | security | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | 96%: uncovered `main.ts` (entry point), `topBar.ts:83` (unreachable guard) and `renderer.ts` 315, 384-385, 467 (the WebGL renderer has no tests), all reasons accepted |
+| re-check | correctness | - | - | - | - | `src/app/wiring.ts:453` | Light re-check of the reworded comment: clean |
+| re-check | docs | - | - | - | - | `src/app/wiring.ts:453` | Light re-check of the reworded comment: clean |
