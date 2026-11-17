@@ -12,7 +12,7 @@ Not included: any change to the temperature or wind models, a layout for phone-s
 
 ## Plan
 
-_2026-11-17 · 7 of 11 pieces done · now: waiting on a decision (piece 8)_
+_2026-11-17 · 7 of 11 pieces done · now: piece 8 in progress_
 
 - [x] **1/11 The main-view regions, the icons, and the layer and overlay tiles** · `6278b72`
   Icon tiles down the left edge of the globe choose the colour layer and switch Winds, Sunlight and the grid.
@@ -28,7 +28,7 @@ _2026-11-17 · 7 of 11 pieces done · now: waiting on a decision (piece 8)_
   The layer, its view of the year and the three toggles come back as they were left.
 - [x] **7/11 The Settings section, with arrows or streaks starting on Streaks** · `77d695d`
   A Settings section in the side panel; winds start as streaks unless the system asks for reduced motion.
-- [ ] **8/11 Units: the model and its settings** · not started
+- [ ] **8/11 Units: the model and its settings** · in progress
   Metric or Imperial with an override for each quantity, in Settings; wind speed follows it first.
 - [ ] **9/11 Units in the read-outs** · not started
   The legend, the info box and the Statistics follow the units, with round ticks in each.
