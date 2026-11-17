@@ -162,7 +162,7 @@ Rejected:
 - [x] 3. The month timeline, and the Layers section removed
 - [x] 4. One info box
 - [x] 5. Everything worked out after every change, with Pause
-- [ ] 6. The browser remembers the view
+- [x] 6. The browser remembers the view
 - [ ] 7. The Settings section, with arrows or streaks starting on Streaks
 - [ ] 8. Units: the model and its settings
 - [ ] 9. Units in the read-outs
@@ -251,3 +251,4 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - The grid is now a field of `PageView`, held by the layer panel and shown by the dock; the dock's `gridVisible` option went.
 - `startPage` reads the stored view once, tells the globe the sunlight style and grid first, and starts the date line, dock, top bar, timeline and layer panel on the same view in one synchronous run. In headless Edge the dock showed Pressure from its first frame after a reload, with no Terrain in between.
 - One review round (correctness, security, coverage, docs): two low findings verified and fixed, one dropped. Uncovered changed lines: `src/app/main.ts` (entry point) and `src/app/ui/topBar.ts:83`, both reasons accepted. In `findings.md`.
+- Approved on the user's word with the nit fixed: "Approve, fix it". The guide now says the browser never remembers the month or the comparison.

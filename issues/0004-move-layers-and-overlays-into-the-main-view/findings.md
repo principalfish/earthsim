@@ -102,4 +102,5 @@
 | round | security | - | - | - | - | - | Clean |
 | round | coverage | - | - | - | - | - | Clean: 96%, uncovered `main.ts` (entry point, untouched here) and `topBar.ts:83` (unreachable guard), both reasons accepted |
 | re-check | correctness | - | - | - | - | `src/app/wiring.ts:380` | Light re-check of the rewrap and the guide's line: clean |
-| re-check | docs | nit | docs | verified | open | `docs/user-guide.md:107` | The new line says the browser never remembers "the month" but leaves out the comparison, which the guide's other two places name too; not wrong, less complete |
+| re-check | docs | nit | docs | verified | fixed | `docs/user-guide.md:107` | The new line says the browser never remembers "the month" but leaves out the comparison, which the guide's other two places name too; not wrong, less complete |
+| manual | user | nit | docs | - | fixed | `docs/user-guide.md:107` | The user chose to name the comparison too: "Approve, fix it" |
