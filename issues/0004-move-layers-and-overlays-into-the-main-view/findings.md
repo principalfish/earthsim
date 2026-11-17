@@ -211,6 +211,7 @@
 | round | security | - | - | - | - | - | Clean |
 | round | coverage | - | - | - | - | - | Clean: 97%, 31 uncovered lines with accepted reasons |
 | re-check | common-mistakes | - | - | - | - | `src/app/wiring.test.ts:1677` | Light re-check of the removed stubs: clean |
-| re-check | correctness | low | cleanup | verified | open | `src/app/wiring.ts:530` | The reflowed `startPage` doc left one line at 94 characters among lines of 70 to 75 |
+| re-check | correctness | low | cleanup | verified | fixed | `src/app/wiring.ts:530` | The reflowed `startPage` doc left one line at 94 characters among lines of 70 to 75 |
 | re-check | docs | - | - | dropped | - | `src/app/view.ts:204` | `PageView.winds` says shown "as arrows" — dropped: stale on main already, and this branch does not touch the line |
 | re-check | docs | low | docs | noticed | - | `src/app/view.ts:204` | Noticed: the same line could say "as arrows or as moving streaks", a one-line fix if wanted here |
+| manual | user | low | docs | - | fixed | `src/app/view.ts:204` | The user chose to fix both re-check lines, rewrapping `wiring.ts:530` and saying the winds are shown "as arrows or as moving streaks": "Approve, fix both" |
