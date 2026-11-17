@@ -70,6 +70,7 @@ import {
 	type PageView,
 	type ScalarLayerId,
 	type Source,
+	type StoredView,
 	type Summary,
 	type WindSource,
 	windSourceFor,
@@ -112,6 +113,14 @@ export type LayerPanelOptions = Pick<
 	 * Terrain; {@link SCALAR_LAYERS} when left out.
 	 */
 	readonly layers?: readonly ScalarLayerSpec[];
+	/**
+	 * The view settings it starts on, but for the month and the source,
+	 * which start on {@link DEFAULT_MONTH} and {@link DEFAULT_SOURCE}; those
+	 * of {@link DEFAULT_PAGE_VIEW} when left out. A layer not offered starts
+	 * as Terrain, and a view of the year its layer does not offer as
+	 * {@link DEFAULT_SUMMARY}.
+	 */
+	readonly start?: StoredView;
 	/**
 	 * The globe the layer and the winds are drawn on, showing the world
 	 * already.
@@ -201,8 +210,8 @@ export type LayerPanel = {
 	 * on screen and the source back to {@link DEFAULT_SOURCE}, and forgets
 	 * the observed years, the observed winds and the comparisons of the
 	 * world before.
-	 * The layer, each layer's view of the year, the sunlight and the winds
-	 * are kept.
+	 * The layer, each layer's view of the year, the sunlight, the winds and
+	 * the cell grid are kept.
 	 *
 	 * @param earth - The new world's resolution if it is the measured Earth;
 	 * null if it is not.
@@ -266,6 +275,13 @@ export type LayerPanel = {
 	 * @param on - Whether the winds are shown.
 	 */
 	setWinds(on: boolean): void;
+	/**
+	 * Takes whether the cell grid is drawn, as the dock sets it, for the
+	 * view settings to say; it changes nothing else.
+	 *
+	 * @param on - Whether the cell grid is drawn.
+	 */
+	setGrid(on: boolean): void;
 	/**
 	 * Puts a month on screen, as the timeline chose it; the month on screen
 	 * already changes nothing. While the year plays it carries on from
@@ -421,7 +437,10 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
 
 /**
  * Joins the layer controls to the globe, the layer store and the layers'
- * calculations, starting on {@link DEFAULT_PAGE_VIEW}.
+ * calculations, starting on the view settings given, or on
+ * {@link DEFAULT_PAGE_VIEW}. Like a change of the store, the start shows
+ * on the globe what the view settings choose at once, before anything is
+ * told of the view.
  *
  * @remarks
  * What calculates the layers is not told what is shown: the temperature
@@ -587,19 +606,25 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  */
 export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	const { store, globe } = options;
-	const states: LayerState[] = (options.layers ?? SCALAR_LAYERS).map(
-		(spec) => ({
+	const start = options.start ?? DEFAULT_PAGE_VIEW;
+	const states: LayerState[] = (options.layers ?? SCALAR_LAYERS).map((spec) => {
+		const summary = start.summaries[spec.id];
+		return {
 			spec,
-			summary: DEFAULT_SUMMARY,
+			summary: offersSummary(spec, summary) ? summary : DEFAULT_SUMMARY,
 			derived: null,
 			observed: null,
 			loading: false,
 			message: null,
-		}),
-	);
-	let layer: Layer = DEFAULT_PAGE_VIEW.layer;
-	let sunlight = DEFAULT_PAGE_VIEW.sunlight;
-	let windsOn = DEFAULT_PAGE_VIEW.winds;
+		};
+	});
+	let layer: Layer = states.some((state) => state.spec.id === start.layer)
+		? start.layer
+		: DEFAULT_PAGE_VIEW.layer;
+	let sunlight = start.sunlight;
+	let windsOn = start.winds;
+	/** Whether the cell grid is drawn, as the dock last said. */
+	let grid = start.grid;
 	/** Where the layer on screen and the winds come from. */
 	let source = DEFAULT_PAGE_VIEW.source;
 	/** Whether the calculation is paused, as the page last said. */
@@ -1001,6 +1026,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		month: playback.month,
 		sunlight,
 		winds: windsOn,
+		grid,
 	});
 	/** The sources the comparison control offers for the view and world. */
 	const offered = (): readonly Source[] =>
@@ -1267,6 +1293,13 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			requestNeeded();
 			announce();
 			update();
+		},
+		setGrid: (on) => {
+			if (on === grid) {
+				return;
+			}
+			grid = on;
+			announce();
 		},
 		setEarth: (next) => {
 			if (next === earth) {

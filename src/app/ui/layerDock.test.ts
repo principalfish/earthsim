@@ -52,7 +52,7 @@ describe('createLayerDock', () => {
 	/** A dock on the view given, with the other options given. */
 	const make = (
 		view: Partial<PageView> = {},
-		options: Partial<Pick<LayerDockOptions, 'layers' | 'gridVisible'>> = {},
+		options: Partial<Pick<LayerDockOptions, 'layers'>> = {},
 	) => {
 		const told: string[] = [];
 		const dock = createLayerDock({
@@ -295,16 +295,17 @@ describe('createLayerDock', () => {
 		expect(checked()).toEqual(['Terrain']);
 	});
 
-	it('starts each toggle as given: the winds and the sunlight from the view, the grid from its own option, each off when not given', () => {
+	it('starts each toggle as the view gives it', () => {
 		expect(make().pressed()).toEqual(['false', 'false', 'false']);
-		expect(
-			make({ winds: true, sunlight: true }, { gridVisible: true }).pressed(),
-		).toEqual(['true', 'true', 'true']);
+		expect(make({ winds: true, sunlight: true, grid: true }).pressed()).toEqual(
+			['true', 'true', 'true'],
+		);
 		expect(make({ sunlight: true }).pressed()).toEqual([
 			'false',
 			'true',
 			'false',
 		]);
+		expect(make({ grid: true }).pressed()).toEqual(['false', 'false', 'true']);
 	});
 
 	it('tells of each press of a toggle with its new state, and shows it pressed or not', () => {
@@ -328,10 +329,8 @@ describe('createLayerDock', () => {
 		]);
 	});
 
-	it('shows a view as told, telling nothing and leaving the grid as it is', () => {
-		const { dock, tile, told, checked, pressed, layerTiles } = make();
-		tile('Grid').fire('click');
-		told.length = 0;
+	it('shows a view as told, the grid with the rest, telling nothing', () => {
+		const { dock, told, checked, pressed, layerTiles } = make();
 		dock.showView({
 			...DEFAULT_PAGE_VIEW,
 			layer: 'pressure',
@@ -340,11 +339,20 @@ describe('createLayerDock', () => {
 		});
 		expect(checked()).toEqual(['Pressure']);
 		expect(layerTiles.map((each) => each.tabIndex)).toEqual([-1, -1, 0]);
-		expect(pressed()).toEqual(['true', 'true', 'true']);
-		dock.showView(DEFAULT_PAGE_VIEW);
+		expect(pressed()).toEqual(['true', 'true', 'false']);
+		dock.showView({ ...DEFAULT_PAGE_VIEW, grid: true });
 		expect(checked()).toEqual(['Terrain']);
 		expect(pressed()).toEqual(['false', 'false', 'true']);
+		dock.showView(DEFAULT_PAGE_VIEW);
+		expect(pressed()).toEqual(['false', 'false', 'false']);
 		expect(told).toEqual([]);
+	});
+
+	it('goes on from the grid it was shown', () => {
+		const { dock, tile, told } = make();
+		dock.showView({ ...DEFAULT_PAGE_VIEW, grid: true });
+		tile('Grid').fire('click');
+		expect(told).toEqual(['grid false']);
 	});
 
 	it('goes on from the view it was shown', () => {

@@ -3,8 +3,10 @@
  * the relief exaggeration, they belong to the page, not to the world: they
  * are not saved, and a new world keeps them, all but the month, which a new
  * world sets back to {@link DEFAULT_MONTH}, and the source, which it sets
- * back to {@link DEFAULT_SOURCE}. Whether the globe is lit by the sun and
- * whether the winds are shown are kept with the rest.
+ * back to {@link DEFAULT_SOURCE}. Whether the globe is lit by the sun,
+ * whether the winds are shown and whether the cell grid is drawn are kept
+ * with the rest. All but the month and the source are remembered by the
+ * browser from one visit to the next, as a {@link StoredView}.
  */
 
 /** What the globe can be coloured by. */
@@ -32,6 +34,14 @@ export const isScalarLayer = (layer: Layer): layer is ScalarLayerId =>
 export const SCALAR_LAYER_IDS: readonly ScalarLayerId[] =
 	LAYERS.filter(isScalarLayer);
 
+/**
+ * Whether a value is one of the layers.
+ *
+ * @param value - The value, such as an entry read back from storage.
+ */
+export const isLayer = (value: unknown): value is Layer =>
+	(LAYERS as readonly unknown[]).includes(value);
+
 /** What the globe is coloured by when the page opens. */
 export const DEFAULT_LAYER: Layer = 'terrain';
 
@@ -56,6 +66,14 @@ export const SUMMARIES = [
  * seasonal range, the highest less the lowest.
  */
 export type Summary = (typeof SUMMARIES)[number];
+
+/**
+ * Whether a value is one of the views of the year.
+ *
+ * @param value - The value, such as an entry read back from storage.
+ */
+export const isSummary = (value: unknown): value is Summary =>
+	(SUMMARIES as readonly unknown[]).includes(value);
 
 /**
  * What of its year each layer shows when the page opens: the Month view,
@@ -185,7 +203,17 @@ export type PageView = {
 	readonly sunlight: boolean;
 	/** Whether the winds are shown as arrows over the globe. */
 	readonly winds: boolean;
+	/** Whether the outlines of the grid's cells are drawn over the globe. */
+	readonly grid: boolean;
 };
+
+/**
+ * The view settings the browser remembers from one visit of the page to
+ * the next: all but the month, which a visit starts on
+ * {@link DEFAULT_MONTH}, and the source, which it starts on
+ * {@link DEFAULT_SOURCE}.
+ */
+export type StoredView = Omit<PageView, 'month' | 'source'>;
 
 /** The same value for every computed layer. */
 const forEveryLayer = <T>(value: T): Readonly<Record<ScalarLayerId, T>> =>
@@ -202,6 +230,7 @@ export const DEFAULT_PAGE_VIEW: PageView = {
 	month: DEFAULT_MONTH,
 	sunlight: false,
 	winds: false,
+	grid: false,
 };
 
 /**

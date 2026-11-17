@@ -13,6 +13,7 @@ const temperatureView = (
 	month,
 	sunlight: false,
 	winds: false,
+	grid: false,
 });
 
 describe('formatWorldAge', () => {

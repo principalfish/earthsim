@@ -59,10 +59,13 @@ import { settle } from '../testing/settle';
 import {
 	DEFAULT_MONTH,
 	DEFAULT_PAGE_VIEW,
+	DEFAULT_SOURCE,
+	DEFAULT_SUMMARY,
 	type Layer,
 	type PageView,
 	SOURCES,
 	type Source,
+	type StoredView,
 	type Summary,
 	WIND_SOURCES,
 } from '../view';
@@ -75,7 +78,11 @@ import {
 	type InfoBox,
 	PAUSED_TEXT,
 } from './infoBox';
-import { createLayerPanel, type LayerPanel } from './layerPanel';
+import {
+	createLayerPanel,
+	type LayerPanel,
+	type LayerPanelOptions,
+} from './layerPanel';
 import {
 	cellWeights,
 	FIT_TAIL_SHARE,
@@ -163,7 +170,9 @@ const tickLabels = (legend: LegendContent | null | undefined) =>
 /**
  * The layer panel on a real store, with stand-ins for everything else.
  */
-const createStage = () => {
+const createStage = (
+	own: Partial<Pick<LayerPanelOptions, 'start' | 'layers'>> = {},
+) => {
 	const errors: unknown[] = [];
 	/** What the panel reported as errors of its own. */
 	const reported: unknown[] = [];
@@ -198,6 +207,7 @@ const createStage = () => {
 	/** What reporting an error throws, once it has taken the error, if anything. */
 	let reportFailure: Error | null = null;
 	const panel: LayerPanel = createLayerPanel({
+		...own,
 		store,
 		setTimer: timers.setTimer,
 		clearTimer: timers.clearTimer,
@@ -698,6 +708,116 @@ describe('createLayerPanel', () => {
 	});
 });
 
+describe('createLayerPanel, starting on a stored view', () => {
+	/** A view as the browser may have stored it. */
+	const stored = (view: Partial<StoredView> = {}): StoredView => ({
+		layer: 'temperature',
+		summaries: { temperature: 'annualMean', pressure: 'month' },
+		sunlight: true,
+		winds: true,
+		grid: true,
+		...view,
+	});
+
+	it('starts on the stored layer, views of the year and toggles, with July and Simulated, telling nothing of the view', () => {
+		const stage = createStage({ start: stored() });
+		expect(stage.told).toEqual([]);
+		stage.panel.setSource('simulated');
+		stage.panel.setMonth(3);
+		expect(stage.told).toEqual([
+			{
+				...stored(),
+				month: 3,
+				source: DEFAULT_SOURCE,
+			},
+		]);
+	});
+
+	it('shows on the globe what the stored view chooses, as the same choices made on a default start would', () => {
+		const result = resultWith();
+		const started = createStage({ start: stored() });
+		started.arrive(result);
+		started.store.markWindsCalculating();
+		started.store.setWindsResult(solvedWinds(), true);
+		const chosen = createStage();
+		chosen.panel.setLayer('temperature');
+		chosen.panel.setSummary('temperature', 'annualMean');
+		chosen.panel.setWinds(true);
+		chosen.arrive(result);
+		chosen.store.markWindsCalculating();
+		chosen.store.setWindsResult(solvedWinds(), true);
+		expect(started.shown).toHaveLength(1);
+		expect(started.shown).toEqual(chosen.shown);
+		expect(started.winds.at(-1)).not.toBeNull();
+		expect(started.winds.at(-1)).toEqual(chosen.winds.at(-1));
+		expect(started.lastLegend()).toEqual(chosen.lastLegend());
+	});
+
+	it('starts on Terrain for a stored layer it does not offer', () => {
+		const stage = createStage({
+			start: stored({ layer: 'pressure' }),
+			layers: [TEMPERATURE_LAYER],
+		});
+		stage.panel.setMonth(3);
+		expect(stage.told.at(-1)?.layer).toBe('terrain');
+		stage.arrive(resultWith());
+		expect(stage.shown).toEqual([]);
+	});
+
+	it('starts a layer on the Month view for a stored view of the year it does not offer', () => {
+		const stage = createStage({
+			start: stored({
+				layer: 'pressure',
+				summaries: { temperature: 'range', pressure: 'range' },
+			}),
+		});
+		stage.panel.setMonth(3);
+		expect(stage.told.at(-1)?.summaries).toEqual({
+			temperature: 'range',
+			pressure: DEFAULT_SUMMARY,
+		});
+	});
+
+	it('keeps each layer’s stored view of the year while another is on screen', () => {
+		const stage = createStage({
+			start: stored({
+				summaries: { temperature: 'coldest', pressure: 'annualMean' },
+			}),
+		});
+		stage.panel.setLayer('pressure');
+		stage.panel.setLayer('temperature');
+		expect(stage.told.at(-1)?.summaries).toEqual({
+			temperature: 'coldest',
+			pressure: 'annualMean',
+		});
+	});
+});
+
+describe('createLayerPanel, the cell grid', () => {
+	it('starts off, and tells of the grid with the rest of the view at each change, asking nothing of the globe', () => {
+		const stage = createStage();
+		stage.panel.setGrid(false);
+		expect(stage.told).toEqual([]);
+		stage.panel.setGrid(true);
+		stage.panel.setGrid(true);
+		stage.panel.setGrid(false);
+		expect(stage.told).toEqual([
+			{ ...DEFAULT_PAGE_VIEW, grid: true },
+			DEFAULT_PAGE_VIEW,
+		]);
+		expect(stage.shown).toEqual([]);
+		expect(stage.winds).toEqual([]);
+	});
+
+	it('is kept through a new world', () => {
+		const stage = createStage();
+		stage.panel.setGrid(true);
+		stage.panel.setMonth(2);
+		stage.panel.newWorld(null);
+		expect(stage.told.at(-1)).toEqual({ ...DEFAULT_PAGE_VIEW, grid: true });
+	});
+});
+
 describe('createLayerPanel, the month', () => {
 	it('shows the month the slider is moved to, on the same scale as July', () => {
 		const stage = createStage();
@@ -727,6 +847,7 @@ describe('createLayerPanel, the month', () => {
 			month: 11,
 			sunlight: false,
 			winds: false,
+			grid: false,
 		});
 	});
 
@@ -778,6 +899,7 @@ describe('createLayerPanel, the month', () => {
 				month: 6,
 				sunlight: false,
 				winds: false,
+				grid: false,
 			},
 			playing: false,
 		});
@@ -802,6 +924,7 @@ describe('createLayerPanel, the month', () => {
 				month: 6,
 				sunlight: false,
 				winds: false,
+				grid: false,
 			},
 			playing: false,
 		});
@@ -821,6 +944,7 @@ describe('createLayerPanel, the month', () => {
 			month: DEFAULT_MONTH,
 			sunlight: false,
 			winds: false,
+			grid: false,
 		});
 	});
 });
@@ -850,6 +974,7 @@ describe('createLayerPanel, playing the year', () => {
 				month: 7,
 				sunlight: false,
 				winds: false,
+				grid: false,
 			},
 			playing: true,
 		});
@@ -921,6 +1046,7 @@ describe('createLayerPanel, playing the year', () => {
 				month: 3,
 				sunlight: false,
 				winds: false,
+				grid: false,
 			},
 			playing: true,
 		});
@@ -947,6 +1073,7 @@ describe('createLayerPanel, playing the year', () => {
 				month: 7,
 				sunlight: false,
 				winds: false,
+				grid: false,
 			},
 			playing: false,
 		});
@@ -979,6 +1106,7 @@ describe('createLayerPanel, playing the year', () => {
 				month: 7,
 				sunlight: false,
 				winds: false,
+				grid: false,
 			},
 			playing: false,
 		});
@@ -1058,6 +1186,7 @@ describe('createLayerPanel, under sunlight', () => {
 			month: 1,
 			sunlight: true,
 			winds: false,
+			grid: false,
 		});
 		expect(stage.shown).toEqual([]);
 	});
@@ -1124,6 +1253,7 @@ describe('createLayerPanel, under sunlight', () => {
 			month: 2,
 			sunlight: true,
 			winds: false,
+			grid: false,
 		});
 	});
 

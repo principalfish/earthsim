@@ -30,24 +30,40 @@ import {
 } from '../worker/testing/fakeWorker';
 import { type AppState, createAppState } from './appState';
 import { MAIN_BUTTON, SECONDARY_BUTTON } from './globe/input';
-import { createPanelMemory, panelMemoryKey } from './panelMemory';
+import {
+	createPanelMemory,
+	type PanelStorage,
+	panelMemoryKey,
+} from './panelMemory';
 import { PLAYBACK_STEP_MS } from './playback';
 import {
 	createPreferences,
+	GRID_KEY,
+	LAYER_KEY,
+	OFF_ENTRY,
+	ON_ENTRY,
+	SUNLIGHT_KEY,
+	summaryKey,
 	WIND_SPEED_UNIT_KEY,
 	WIND_STYLE_KEY,
+	WINDS_KEY,
 } from './preferences';
 import { TEMPERATURE_DEBOUNCE_MS } from './refresh';
 import { TEMPERATURE_LAYER } from './scalarLayer';
 import type { SculptOptions, StrokeChanges } from './sculpt';
 import { RESTORE_FAILED_MESSAGE } from './startup';
 import type { LoadOutcome } from './storage';
-import { createFakeDocument, type FakeDocument } from './testing/fakeDocument';
+import {
+	byClass,
+	createFakeDocument,
+	type FakeDocument,
+	type FakeElement,
+} from './testing/fakeDocument';
 import { createFakeStorage, type FakeStorage } from './testing/fakeStorage';
 import { createFakeTimers } from './testing/fakeTimers';
 import { settle } from './testing/settle';
 import type { ComparisonContent } from './ui/comparison';
-import type { LayerDockOptions } from './ui/layerDock';
+import { createLayerDock, type LayerDockOptions } from './ui/layerDock';
 import {
 	createLayerPanel,
 	type ShownLayer,
@@ -63,7 +79,7 @@ import type { PauseButtonOptions } from './ui/pauseButton';
 import type { PlanetPanelOptions } from './ui/planetPanel';
 import type { TimelineOptions } from './ui/timeline';
 import type { ToolPanelOptions } from './ui/toolPanel';
-import type { TopBarOptions } from './ui/topBar';
+import { createTopBar, type TopBarOptions } from './ui/topBar';
 import type { ViewPanelOptions } from './ui/viewPanel';
 import {
 	describeWorld,
@@ -72,7 +88,12 @@ import {
 	type WorldPanelOptions,
 } from './ui/worldPanel';
 import type { ShortcutEvent } from './undo';
-import { DEFAULT_MONTH, DEFAULT_PAGE_VIEW, type PageView } from './view';
+import {
+	DEFAULT_MONTH,
+	DEFAULT_PAGE_VIEW,
+	type PageView,
+	type StoredView,
+} from './view';
 import {
 	type PageAutosaveOptions,
 	type PageLayerOptions,
@@ -209,6 +230,21 @@ type StageParts = Partial<
 > & {
 	/** What the storage of the page's preferences holds at first. */
 	readonly preferenceEntries?: Readonly<Record<string, string>>;
+	/**
+	 * Whether the storage of the page's preferences throws on every read and
+	 * every write.
+	 */
+	readonly preferencesRefused?: boolean;
+};
+
+/** Storage that throws on every read and every write. */
+const REFUSING_STORAGE: PanelStorage = {
+	getItem: () => {
+		throw new Error('Storage is blocked');
+	},
+	setItem: () => {
+		throw new Error('Storage is blocked');
+	},
 };
 
 const createStage = (
@@ -529,6 +565,7 @@ const createStage = (
 				setSource: (source) => log.push(`layerPanel.setSource ${source}`),
 				setSunlight: (on) => log.push(`layerPanel.setSunlight ${on}`),
 				setWinds: (on) => log.push(`layerPanel.setWinds ${on}`),
+				setGrid: (on) => log.push(`layerPanel.setGrid ${on}`),
 				setMonth: (month) => log.push(`layerPanel.setMonth ${month}`),
 				togglePlaying: () => log.push('layerPanel.togglePlaying'),
 				setPaused: (paused) => log.push(`layerPanel.setPaused ${paused}`),
@@ -548,7 +585,9 @@ const createStage = (
 				clear: () => readoutCalls.push('clear'),
 			};
 		},
-		preferences: createPreferences(preferenceStorage),
+		preferences: createPreferences(
+			own.preferencesRefused === true ? REFUSING_STORAGE : preferenceStorage,
+		),
 		openNewWorldDialog: (options) => {
 			log.push(`openNewWorldDialog ${options.notice ?? 'no notice'}`);
 			dialogs.push(options);
@@ -623,6 +662,7 @@ describe('startPage', () => {
 		expect(log).toEqual([
 			`globe.setWorld ${describeWorld(world)}`,
 			'globe.setSun',
+			'globe.setGridVisible false',
 			`createViewInput ${MAIN_BUTTON}`,
 			'createSculpt',
 			`createWorldPanel ${describeWorld(world)}`,
@@ -1060,7 +1100,7 @@ describe('what changes the terrain or the sea level', () => {
 		expect(next.seaLevel).toBe(70);
 	});
 
-	it('the exaggeration and the dock’s Grid tile reach only the globe', async () => {
+	it('the exaggeration reaches only the globe, and the dock’s Grid tile the globe and then the layer panel', async () => {
 		const stage = await createStartedStage();
 		stage.viewPanelOptions.onExaggeration(40);
 		stage.dockOptions.onGrid(true);
@@ -1068,14 +1108,16 @@ describe('what changes the terrain or the sea level', () => {
 		expect(stage.log).toEqual([
 			'globe.setExaggeration 40',
 			'globe.setGridVisible true',
+			'layerPanel.setGrid true',
 			'globe.setGridVisible false',
+			'layerPanel.setGrid false',
 		]);
 	});
 
 	it('the dock starts on the page’s starting view, with the grid hidden', async () => {
 		const stage = await createStartedStage();
 		expect(stage.dockOptions.view).toEqual(DEFAULT_PAGE_VIEW);
-		expect(stage.dockOptions.gridVisible ?? false).toBe(false);
+		expect(stage.dockOptions.view.grid).toBe(false);
 	});
 
 	it('the layer chosen on the dock reaches the layer panel alone', async () => {
@@ -2200,6 +2242,7 @@ describe('the cursor readout', () => {
 				month: 3,
 				sunlight: false,
 				winds: false,
+				grid: false,
 			},
 			false,
 		);
@@ -2276,6 +2319,7 @@ describe('the date line', () => {
 				month: 6,
 				sunlight: false,
 				winds: false,
+				grid: false,
 			},
 			false,
 		);
@@ -2287,6 +2331,7 @@ describe('the date line', () => {
 				month: 7,
 				sunlight: false,
 				winds: false,
+				grid: false,
 			},
 			false,
 		);
@@ -2298,6 +2343,7 @@ describe('the date line', () => {
 				month: 7,
 				sunlight: false,
 				winds: false,
+				grid: false,
 			},
 			false,
 		);
@@ -2309,6 +2355,7 @@ describe('the date line', () => {
 				month: 7,
 				sunlight: false,
 				winds: false,
+				grid: false,
 			},
 			false,
 		);
@@ -2389,6 +2436,7 @@ describe('the month on screen', () => {
 			month: DEFAULT_MONTH,
 			sunlight: false,
 			winds: false,
+			grid: false,
 		});
 		expect(page.stage.log).toContain('worldPanel.setDate Year 0 · July');
 	});
@@ -2459,6 +2507,7 @@ describe('the sun', () => {
 			month: 3,
 			sunlight: false,
 			winds: false,
+			grid: false,
 		};
 		stage.layerOptions.onView(view, false);
 		stage.layerOptions.onView(
@@ -2823,6 +2872,226 @@ describe('how the winds are drawn', () => {
 		stage.state.replaceWorld(createBlankWorld(64));
 		expect(stage.globeWindStyles).toEqual(['arrows', 'streaks']);
 		expect(stage.preferenceStorage.writes).toHaveLength(1);
+	});
+});
+
+/** What the preferences' storage holds for a view left on Temperature. */
+const STORED_ENTRIES: Readonly<Record<string, string>> = {
+	[LAYER_KEY]: 'temperature',
+	[summaryKey('temperature')]: 'annualMean',
+	[summaryKey('pressure')]: 'month',
+	[SUNLIGHT_KEY]: ON_ENTRY,
+	[WINDS_KEY]: ON_ENTRY,
+	[GRID_KEY]: ON_ENTRY,
+};
+
+/** The view settings {@link STORED_ENTRIES} hold. */
+const STORED: StoredView = {
+	layer: 'temperature',
+	summaries: { temperature: 'annualMean', pressure: 'month' },
+	sunlight: true,
+	winds: true,
+	grid: true,
+};
+
+/** The names of the entries the view settings are kept in. */
+const VIEW_KEYS = [
+	LAYER_KEY,
+	summaryKey('temperature'),
+	summaryKey('pressure'),
+	SUNLIGHT_KEY,
+	WINDS_KEY,
+	GRID_KEY,
+];
+
+/**
+ * A page, not yet started, with the real layer panel, whose globe's fields
+ * are recorded.
+ */
+const createStoredViewStage = (own: StageParts = {}) => {
+	const shown: (Float32Array | null)[] = [];
+	const stage = createStage(undefined, {
+		...own,
+		createLayerPanel: (options) =>
+			createLayerPanel({
+				...options,
+				globe: { setLayer: (field) => shown.push(field), setWinds: () => {} },
+				setTimer: () => 0,
+				clearTimer: () => {},
+				reportError: () => {},
+				createControls: () => ({
+					showLegend: () => {},
+					showWindKey: () => {},
+					showCalculation: () => {},
+				}),
+			}),
+	});
+	return { stage, shown };
+};
+
+describe('the view the browser remembers', () => {
+	it('starts every part on the stored view, with July and Simulated, before it shows anything', () => {
+		const { stage } = createStoredViewStage({
+			preferenceEntries: STORED_ENTRIES,
+		});
+		const view: PageView = {
+			...STORED,
+			month: DEFAULT_MONTH,
+			source: 'simulated',
+		};
+		expect(stage.dockOptions.view).toEqual(view);
+		expect(stage.topBarOptions.view).toEqual(view);
+		expect(stage.timelineOptions.view).toEqual(view);
+		expect(stage.layerOptions.start).toEqual(STORED);
+		// The globe is lit and gridded before any part that shows the view
+		// is made.
+		expect(stage.log.slice(0, 5)).toEqual([
+			`globe.setWorld ${describeWorld(stage.state.world)}`,
+			'globe.setSun',
+			`globe.setSunlight ${TEMPERATURE_LAYER.sunlightStyle}`,
+			'globe.setGridVisible true',
+			`createViewInput ${MAIN_BUTTON}`,
+		]);
+		expect(stage.preferenceStorage.writes).toEqual([]);
+	});
+
+	it('has the dock and the top bar show the stored view as they are made', () => {
+		const fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+		try {
+			const { stage } = createStoredViewStage({
+				preferenceEntries: STORED_ENTRIES,
+			});
+			const dock = createLayerDock(stage.dockOptions)
+				.element as unknown as FakeElement;
+			const tiles = byClass(dock, 'layer-tile');
+			expect(tiles.map((tile) => tile.getAttribute('aria-checked'))).toEqual([
+				'false',
+				'true',
+				'false',
+				null,
+				null,
+				null,
+			]);
+			expect(tiles.map((tile) => tile.getAttribute('aria-pressed'))).toEqual([
+				null,
+				null,
+				null,
+				'true',
+				'true',
+				'true',
+			]);
+			const bar = createTopBar(stage.topBarOptions)
+				.element as unknown as FakeElement;
+			const show = byClass(bar, 'field__select').find(
+				(each) => each.id === TEMPERATURE_LAYER.summaryControlId,
+			);
+			expect(show?.value).toBe('annualMean');
+			expect(bar.hidden).toBe(false);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it('shows the stored layer on the globe as the first result arrives, with nothing chosen', async () => {
+		const { stage, shown } = createStoredViewStage({
+			preferenceEntries: STORED_ENTRIES,
+		});
+		stage.answerLoad({ kind: 'empty' });
+		await stage.started;
+		expect(shown).toEqual([]);
+		stage.layerOptions.store.markCalculating();
+		stage.layerOptions.store.setResult(
+			temperatureOf(1, stage.state.world.elevation.length),
+			true,
+		);
+		expect(shown).toHaveLength(1);
+	});
+
+	it('starts on the default view, telling the globe the grid is hidden, with nothing stored', () => {
+		const { stage } = createStoredViewStage();
+		expect(stage.dockOptions.view).toEqual(DEFAULT_PAGE_VIEW);
+		expect(stage.layerOptions.start).toEqual({
+			layer: 'terrain',
+			summaries: { temperature: 'month', pressure: 'month' },
+			sunlight: false,
+			winds: false,
+			grid: false,
+		});
+		expect(stage.log).toContain('globe.setGridVisible false');
+		expect(stage.log.some((line) => line.startsWith('globe.setSunlight'))).toBe(
+			false,
+		);
+	});
+
+	it('starts on the defaults, with no error, from storage that throws, and carries on past it', async () => {
+		const { stage } = createStoredViewStage({ preferencesRefused: true });
+		stage.answerLoad({ kind: 'empty' });
+		await stage.started;
+		expect(stage.dockOptions.view).toEqual(DEFAULT_PAGE_VIEW);
+		expect(() => {
+			stage.dockOptions.onLayer('pressure');
+			stage.dockOptions.onGrid(true);
+		}).not.toThrow();
+		expect(stage.errors).toEqual([]);
+	});
+
+	it('stores each change of the layer, a view of the year and the toggles, once each', async () => {
+		const { stage } = createStoredViewStage();
+		stage.answerLoad({ kind: 'empty' });
+		await stage.started;
+		stage.dockOptions.onLayer('temperature');
+		stage.topBarOptions.onSummary('temperature', 'coldest');
+		stage.dockOptions.onLayer('pressure');
+		stage.topBarOptions.onSummary('pressure', 'annualMean');
+		stage.dockOptions.onLayer('temperature');
+		stage.dockOptions.onSunlight(true);
+		stage.dockOptions.onWinds(true);
+		stage.dockOptions.onGrid(true);
+		stage.dockOptions.onGrid(false);
+		expect(stage.preferenceStorage.writes).toEqual([
+			[LAYER_KEY, 'temperature'],
+			[summaryKey('temperature'), 'coldest'],
+			[LAYER_KEY, 'pressure'],
+			[summaryKey('pressure'), 'annualMean'],
+			[LAYER_KEY, 'temperature'],
+			[SUNLIGHT_KEY, ON_ENTRY],
+			[WINDS_KEY, ON_ENTRY],
+			[GRID_KEY, ON_ENTRY],
+			[GRID_KEY, OFF_ENTRY],
+		]);
+		// Temperature's own view of its year is back with it.
+		expect(stage.topBarViews.at(-1)?.summaries).toEqual({
+			temperature: 'coldest',
+			pressure: 'annualMean',
+		});
+	});
+
+	it('never writes the month or the source, nor anything for a new world', async () => {
+		const { stage } = createStoredViewStage({
+			preferenceEntries: STORED_ENTRIES,
+		});
+		stage.answerLoad({ kind: 'empty' });
+		await stage.started;
+		stage.topBarOptions.onSummary('temperature', 'month');
+		stage.preferenceStorage.writes.length = 0;
+		stage.timelineOptions.onMonth(2);
+		stage.timelineOptions.onPlay();
+		stage.timelineOptions.onPlay();
+		stage.topBarOptions.onSource('observed');
+		stage.state.replaceWorld(createBlankWorld(64));
+		expect(stage.preferenceStorage.writes).toEqual([]);
+		expect(stage.timelineViews.at(-1)?.view).toEqual({
+			...STORED,
+			summaries: { temperature: 'month', pressure: 'month' },
+			month: DEFAULT_MONTH,
+			source: 'simulated',
+		});
+		expect(
+			[...stage.preferenceStorage.entries.keys()].every((key) =>
+				VIEW_KEYS.includes(key),
+			),
+		).toBe(true);
 	});
 });
 

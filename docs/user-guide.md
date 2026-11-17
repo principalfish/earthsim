@@ -8,12 +8,13 @@ A column of tiles down the left edge of the globe chooses what it shows. Each ti
 
 | Tile | What it does |
 |-|-|
-| **Layers:** Terrain, Temperature, Pressure | What the globe is coloured by, one at a time, starting on Terrain; see [Layers](#layers). The chosen tile is outlined |
-| **Overlays:** Winds | Draws the surface winds over the globe, as arrows or streaks, starting off; see [Winds](#winds). Not saved |
-| **Overlays:** Sunlight | Lights the globe from the sun, starting off; see [The sun](#the-sun). Not saved |
-| **Overlays:** Grid | Draws the outlines of the grid's cells, starting off. Not saved |
+| **Layers:** Terrain, Temperature, Pressure | What the globe is coloured by, one at a time, starting on Terrain on a first visit; see [Layers](#layers). The chosen tile is outlined |
+| **Overlays:** Winds | Draws the surface winds over the globe, as arrows or streaks, starting off on a first visit; see [Winds](#winds) |
+| **Overlays:** Sunlight | Lights the globe from the sun, starting off on a first visit; see [The sun](#the-sun) |
+| **Overlays:** Grid | Draws the outlines of the grid's cells, starting off on a first visit |
 
 - Each overlay tile switches on and off by itself, and is outlined while it is on.
+- **The browser remembers the view.** The page reopens on the layer, each layer's **Show** and the overlays it was left with, as it does the open sections; none of them is saved with the world. The month still starts on July and the comparison on Simulated at each visit. Clearing the site's data in the browser puts the view back as on a first visit.
 - From the keyboard, Tab reaches the chosen layer's tile, and the arrow keys move the choice to the next layer or the one before, round from the last to the first. Tab then reaches each overlay tile, which Space or Enter switches.
 - In a narrow window only the icons show; the tooltips still name them.
 - In a window too short for all the tiles the column scrolls: turn the mouse wheel over a tile, or move to a tile with the keyboard.
@@ -103,7 +104,7 @@ Two lines under the World heading describe the world:
 
 **What is saved,** in the browser and in a file: the terrain, resolution, sea level, planet settings, date, and how the world started.
 
-**What is not saved:** the undo history, the camera, the view, layer, month and tool settings, and the temperature, which is worked out again.
+**What is not saved with the world:** the undo history, the camera, the view, layer, month and tool settings, and the temperature, which is worked out again. The browser remembers the layer, each layer's Show and the overlays on its own, as [The tiles over the globe](#the-tiles-over-the-globe) says, but never the month or the comparison.
 
 A file saved before planet settings and dates existed loads with Earth's settings at Year 0.
 
@@ -165,7 +166,7 @@ Under the sliders:
 
 The **Layers** tiles over the globe choose what it is coloured by, and the top bar holds the layer's **Show** choice and, on an untouched Earth, the comparison. The month and **Play** are on the [timeline](#the-timeline).
 
-- **Terrain:** the height colours the page opens on.
+- **Terrain:** the height colours a first visit opens on.
 - **Temperature:** the near-surface air temperature. The relief is still raised and shaded, and the coastline is drawn as a thin line.
 - **Pressure:** the sea-level pressure, in hPa; see [Pressure](#pressure). The relief and the coastline are drawn as in Temperature view.
 
@@ -180,7 +181,7 @@ In Temperature view, **Show**, in the top bar, chooses what of the year is on th
 
 - **The legend,** in the [info box](#the-info-box), says what is shown, such as "Air temperature in July, °C". While a new result is being worked out the box's status line says "Calculating temperature", with a progress bar, and then, once it can tell how many years are left, the years done, such as "Calculating · year 3, about 2 to go".
 - **On an untouched Earth,** the comparison in the top bar offers the simulated temperature, the observed one, or the difference between them; see [Simulated, observed or difference](#simulated-observed-or-difference) and [Temperature](temperature.md#earth-comparison).
-- The layer, the view, the month and the comparison's choice are not saved. A new world goes back to July and to Simulated. Each layer keeps its own **Show** while another is on screen.
+- The layer, the view, the month and the comparison's choice are not saved with the world. The browser remembers the layer and each layer's **Show**, but not the month or the comparison; see [The tiles over the globe](#the-tiles-over-the-globe). A new world goes back to July and to Simulated. Each layer keeps its own **Show** while another is on screen, from one visit to the next too.
 
 ### Pressure
 
@@ -292,7 +293,7 @@ Which winds are shown follows the layer's **Show**:
 - **The info box** is the same either way.
 - **The page draws continuously only while streaks are moving:** while Streaks is chosen, Winds is on, there are winds to show and the page is visible. Choosing Arrows, switching Winds off or putting the tab in the background stops it, and the page draws only when something changes, as it does with arrows.
 - **Reduced motion.** Streaks are offered even when your system is set to reduce motion, since they move only if you choose them; choosing Arrows stops them.
-- The browser remembers the choice, as it does the open sections and the wind speed unit. Winds itself still starts off at each visit.
+- The browser remembers the choice, as it does the open sections and the wind speed unit, and whether Winds was on.
 
 ### Simulated or observed winds
 

@@ -27,7 +27,12 @@ import type { SunlightStyle } from './globe/material';
 import type { Globe } from './globe/renderer';
 import { createLayerStore, type LayerStore } from './layers';
 import type { ObservedLoader } from './observedData';
-import type { Preferences } from './preferences';
+import {
+	type Preferences,
+	storedView,
+	storeView,
+	type ViewPreferences,
+} from './preferences';
 import type {
 	RefreshScheduler,
 	TemperatureScheduler,
@@ -73,7 +78,12 @@ import {
 	handleHistoryKey,
 	type ShortcutEvent,
 } from './undo';
-import { DEFAULT_PAGE_VIEW, type Layer, type PageView } from './view';
+import {
+	DEFAULT_PAGE_VIEW,
+	type Layer,
+	type PageView,
+	type StoredView,
+} from './view';
 import type { WindUnit } from './windUnits';
 
 /** What the page asks of its globe once the globe exists. */
@@ -123,6 +133,11 @@ export type PageTemperatureOptions = PageStatisticsOptions & {
  * screen and whether the year plays.
  */
 export type PageLayerOptions = {
+	/**
+	 * The view settings it starts on, as the preferences remember them; the
+	 * month and the source start as on a first visit.
+	 */
+	readonly start: StoredView;
 	/**
 	 * Where the temperature and the winds are kept: the store their
 	 * calculations write.
@@ -252,8 +267,8 @@ export type PageParts = {
 	 * what the globe is coloured by, as the dock chooses it, what of each
 	 * computed layer's year it shows and where the layer and the winds come
 	 * from, as the top bar chooses them, and the month on screen and whether
-	 * the year plays, as the timeline chooses them. It starts on
-	 * {@link DEFAULT_PAGE_VIEW}.
+	 * the year plays, as the timeline chooses them, and whether the cell
+	 * grid is drawn. It starts on the view settings it is given.
 	 */
 	readonly createLayerPanel: (
 		options: PageLayerOptions,
@@ -266,6 +281,7 @@ export type PageParts = {
 		| 'setSource'
 		| 'setSunlight'
 		| 'setWinds'
+		| 'setGrid'
 		| 'setMonth'
 		| 'togglePlaying'
 		| 'setPaused'
@@ -281,13 +297,14 @@ export type PageParts = {
 	) => Pick<CursorReadout, 'invalidate' | 'clear'>;
 	/**
 	 * The page's preferences, remembered by the browser apart from the
-	 * world: the unit wind speeds are written in, and how the winds are
-	 * drawn.
+	 * world: the unit wind speeds are written in, how the winds are drawn,
+	 * and the view settings but the month and the source.
 	 */
 	readonly preferences: Pick<
 		Preferences,
 		'windSpeedUnit' | 'setWindSpeedUnit' | 'windStyle' | 'setWindStyle'
-	>;
+	> &
+		ViewPreferences;
 	/** Opens the dialog that starts a new world. */
 	readonly openNewWorldDialog: (options: NewWorldDialogOptions) => void;
 	/** Gives the Earth's elevation data, for a world that starts as Earth. */
@@ -357,18 +374,19 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * the dock, the top bar and the timeline over the globe, the planet
  * controls, the layers and then the statistics. The dock, the top bar and
  * the timeline are shown each change of the view settings the layer panel
- * reports, the timeline with whether the year is playing; the dock holds
- * the cell grid's state itself, which goes straight to the globe. The dock
- * and the layer panel are given no list of layers, so both offer every
- * layer in `SCALAR_LAYERS`. The temperature and then the winds, which have
- * nothing of their own in the panel, are made just before the layers.
+ * reports, the timeline with whether the year is playing. The dock's Grid
+ * tile goes straight to the globe, and tells the layer panel, which holds
+ * it with the rest of the view settings. The dock and the layer panel are
+ * given no list of layers, so both offer every layer in `SCALAR_LAYERS`.
+ * The temperature and then the winds, which have nothing of their own in
+ * the panel, are made just before the layers.
  *
  * The temperature and the winds are worked out whatever is on screen:
  * the temperature after every change of the world, and the winds from
- * each current temperature, so the page opens on the height colours with
- * both being worked out. The dock's Winds tile tells the layer panel,
- * which shows the winds on the globe, and offers the month in Terrain
- * view, while it is on; a new world keeps it.
+ * each current temperature, so the page opens on whatever layer it was
+ * left on with both being worked out. The dock's Winds tile tells the
+ * layer panel, which shows the winds on the globe, and offers the month in
+ * Terrain view, while it is on; a new world keeps it.
  *
  * The Pause button, made after the layers, stops both: pressed, the
  * temperature and then the winds are told to stop running, so a request
@@ -422,9 +440,9 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * page starts, the globe is told it before the view controls are made, and
  * the view controls start in it. A way chosen in the view controls is
  * remembered by the preferences, and reaches the globe at once. Winds itself
- * still starts off. The globe is also told whether the page is visible, as
- * the page starts and at each change, so that streaks move only while it
- * is.
+ * starts as the view settings remember it. The globe is also told whether
+ * the page is visible, as the page starts and at each change, so that
+ * streaks move only while it is.
  *
  * The view controls' choice of where the wind arrows come from goes to the
  * layer panel, which decides when it is offered, on the measured Earth, and
@@ -465,6 +483,15 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * overtakes. The planet settings are not part of the history: an undo puts
  * back the last stroke, whatever the planet controls did since.
  *
+ * The view settings but the month and the source are preferences of the
+ * browser too: read once, as the page starts and before any part that
+ * shows them is made, so that the dock, the top bar, the timeline, the
+ * date line and the layer panel all start on them, and the globe is told
+ * how it is lit and whether the cell grid is drawn before anything else
+ * is made. Each change of them the layer panel reports is remembered by
+ * the preferences, one entry for each setting that changed; the month and
+ * the source are never written. A new world keeps them.
+ *
  * Until the storage has answered, the panel, the globe and the history
  * shortcuts are out of reach and nothing is saved. A change made to the
  * blank world meanwhile would otherwise be saved over the saved world, or
@@ -488,8 +515,18 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	/** Tells the layer panel whether the world, changed, is the measured Earth. */
 	const checkEarth = (): void => layerPanel.setEarth(earthOf(state.world));
 	globe.setWorld(state.world);
+	/** The view settings the browser remembers, as last read or written. */
+	let stored = storedView(parts.preferences);
+	/**
+	 * The view settings the page starts on: those the browser remembers,
+	 * with the month and the source of a first visit.
+	 */
+	const startView: PageView = {
+		...DEFAULT_PAGE_VIEW,
+		...stored,
+	};
 	/** The month on screen, as the view settings last said. */
-	let month = DEFAULT_PAGE_VIEW.month;
+	let month = startView.month;
 	/** How many times the sun has been placed, to place it once a world. */
 	let sunPlaced = 0;
 	/** Gives the globe the sun of the month on screen and the world's planet. */
@@ -504,8 +541,8 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	};
 	placeSun();
 	/** What the globe is coloured by, as the view settings last said. */
-	let layer = DEFAULT_PAGE_VIEW.layer;
-	/** How the globe is lit, as it was last told; it starts unlit. */
+	let layer = startView.layer;
+	/** How the globe is lit, as it was last told; the globe starts unlit. */
 	let sunlightStyle: SunlightStyle = 'off';
 	/** Tells the globe how it is lit, if that has changed. */
 	const lightGlobe = (sunlight: boolean): void => {
@@ -515,6 +552,8 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			globe.setSunlight(next);
 		}
 	};
+	lightGlobe(startView.sunlight);
+	globe.setGridVisible(startView.grid);
 	const viewInput = parts.createViewInput(rotateButtonFor(DEFAULT_TOOL), () =>
 		readout.invalidate(),
 	);
@@ -565,7 +604,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	});
 	const date = createDateLine({
 		years: state.world.ageYears,
-		view: DEFAULT_PAGE_VIEW,
+		view: startView,
 		show: worldPanel.setDate,
 	});
 	// One connection for as long as the page lasts, which reading the saved
@@ -656,22 +695,25 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		},
 	});
 	const dock = parts.createLayerDock({
-		view: DEFAULT_PAGE_VIEW,
+		view: startView,
 		onLayer: (next) => layerPanel.setLayer(next),
 		onWinds: (on) => layerPanel.setWinds(on),
 		onSunlight: (on) => {
 			lightGlobe(on);
 			layerPanel.setSunlight(on);
 		},
-		onGrid: globe.setGridVisible,
+		onGrid: (on) => {
+			globe.setGridVisible(on);
+			layerPanel.setGrid(on);
+		},
 	});
 	const topBar = parts.createTopBar({
-		view: DEFAULT_PAGE_VIEW,
+		view: startView,
 		onSummary: (id, summary) => layerPanel.setSummary(id, summary),
 		onSource: (source) => layerPanel.setSource(source),
 	});
 	const timeline = parts.createTimeline({
-		view: DEFAULT_PAGE_VIEW,
+		view: startView,
 		onMonth: (next) => layerPanel.setMonth(next),
 		onPlay: () => layerPanel.togglePlaying(),
 	});
@@ -693,8 +735,11 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		store: layers,
 	});
 	const layerPanel = parts.createLayerPanel({
+		start: stored,
 		store: layers,
 		onView: (next, playing) => {
+			storeView(parts.preferences, stored, next);
+			stored = next;
 			dock.showView(next);
 			topBar.showView(next);
 			timeline.showView(next, playing);

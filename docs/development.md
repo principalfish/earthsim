@@ -111,7 +111,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `playback.ts` | Playing through the year |
 | `storage.ts`, `autosave.ts` | The saved world in IndexedDB, export and import, and when to save |
 | `panelMemory.ts` | Which panel sections are open, remembered by the browser |
-| `preferences.ts` | The page's preferences, remembered by the browser apart from the world: the wind speed unit and whether the winds are drawn as arrows or streaks |
+| `preferences.ts` | The page's preferences, remembered by the browser apart from the world, one `earth_sim.preference.` entry each: the wind speed unit, whether the winds are drawn as arrows or streaks, the layer, each layer's Show, and the Winds, Sunlight and Grid overlays; never the month or the comparison's source |
 | `windUnits.ts` | Wind speeds in m/s, km/h and mph, the eight compass points, and a wind in words |
 | `earthData.ts`, `observedData.ts` | Fetching the Earth data files when first needed, the observed years through a description of their file |
 | `globe/` | The renderer, shaders, camera, picking, colour ramps, the wind arrows and the wind streaks (`streaks.ts`: the trails moved along the wind, and their ribbons), when the globe is drawn (`frameLoop.ts`: on demand, or at every frame while animating) and the rule for when the streaks move (`windMotion.ts`) |

@@ -49,8 +49,6 @@ export type LayerDockOptions = {
 	readonly layers?: readonly Pick<ScalarLayerSpec, 'id' | 'label'>[];
 	/** The view settings shown at first. */
 	readonly view: PageView;
-	/** Whether the cell grid is shown at first; not when left out. */
-	readonly gridVisible?: boolean;
 	/** Called with the layer when another is chosen. */
 	readonly onLayer: (layer: Layer) => void;
 	/** Called with whether the winds are now to be shown. */
@@ -67,8 +65,8 @@ export type LayerDock = {
 	readonly element: HTMLElement;
 	/**
 	 * Shows the view settings: the layer's tile as the one chosen, and the
-	 * Winds and Sunlight tiles on or off as they say. Nothing is called
-	 * back, and the Grid tile is left as it is.
+	 * Winds, Sunlight and Grid tiles on or off as they say. Nothing is
+	 * called back.
 	 */
 	showView(view: PageView): void;
 };
@@ -130,9 +128,8 @@ const createGroup = (
  * the tile already chosen tells nothing.
  *
  * The overlay tiles are toggle buttons, each pressed while what it shows
- * is on, and pressed or released with a click, Space or Enter. The Winds
- * and Sunlight tiles also follow {@link LayerDock.showView}; the Grid
- * tile's state is the dock's own, since nothing else holds it.
+ * is on, and pressed or released with a click, Space or Enter. All three
+ * also follow {@link LayerDock.showView}.
  *
  * Each tile's name is written under its icon, and is the tile's
  * accessible name whether or not the stylesheet shows it, as in a narrow
@@ -230,7 +227,7 @@ export const createLayerDock = (options: LayerDockOptions): LayerDock => {
 	const grid = createToggle(
 		GRID_TILE_LABEL,
 		gridIcon(),
-		options.gridVisible ?? false,
+		options.view.grid,
 		options.onGrid,
 	);
 
@@ -255,6 +252,7 @@ export const createLayerDock = (options: LayerDockOptions): LayerDock => {
 			markLayer();
 			winds.show(view.winds);
 			sunlight.show(view.sunlight);
+			grid.show(view.grid);
 		},
 	};
 };
