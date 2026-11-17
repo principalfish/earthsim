@@ -7,3 +7,22 @@ The core gets one folder per component: grid maths, the world and its editing, t
 The globe's material and the scalar layers' descriptions are split into smaller files behind the same entry points. The layer panel and the page's wiring move out their types, constants and pure helpers; splitting their shared state further is a design change left for later. Tests split along with the code they cover.
 
 Nothing the page does changes. Every test, the build and both Earth baselines must come out the same. The build scripts, the worker and the models' settings are not part of this.
+
+## Plan
+
+_2026-11-17 · 0 of 7 pieces done · now: waiting on a decision (piece 1)_
+
+- [ ] **1/7 The core in component folders** · not started
+  The core's files move into grid, world, planet, earth, temperature and wind folders, each model with its own baseline.
+- [ ] **2/7 The page's top-level files in role folders** · not started
+  The page's files move into editing, saving, layers and settings folders.
+- [ ] **3/7 ui/ split into the main view and the panel** · not started
+  What sits over the globe and the side panel's sections get a folder each.
+- [ ] **4/7 The scalar layers split, with the legend's fitting code** · not started
+  The temperature and pressure layer descriptions become a folder of small files, taking the scale fitting from the legend.
+- [ ] **5/7 The globe's material split** · not started
+  The globe's shaders, ramps and material setup become a folder of small files, the shader text unchanged.
+- [ ] **6/7 The layer panel's types, constants and pure helpers moved out, and its tests split** · not started
+  The layer panel loses about 410 lines of types and helpers, and its tests split into five files by theme.
+- [ ] **7/7 The page wiring's types moved out** · not started
+  The page wiring's types move to a file of their own.
