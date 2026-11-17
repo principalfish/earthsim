@@ -93,3 +93,4 @@
 - 2026-11-15 13:45 · move-layers-and-overlays-into-the-main-view (0004) · PR #8
 - 2026-11-17 18:12 · move-layers-and-overlays-into-the-main-view (0004) · building → review
 - 2026-11-17 18:47 · move-layers-and-overlays-into-the-main-view (0004) · review → ready
+- 2026-11-17 18:47 · move-layers-and-overlays-into-the-main-view (0004) · PR #8 description final
