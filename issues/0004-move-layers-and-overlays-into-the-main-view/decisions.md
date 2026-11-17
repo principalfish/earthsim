@@ -79,6 +79,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 6 started on the user's go-ahead after a pause: "pauise", then "resume" (2026-11-17). Each layer keeps its own stored Show, as the plan says ("each layer's Show"); a new world keeps the chosen layer and resets the month and source, as today.
 
+- Piece 6 approved, with the guide line at `docs/user-guide.md:107` fixed first to "but never the month or the comparison". The user: "Approve, fix it" (2026-11-17). Piece 6 has no manual review in the plan, so no try was needed.
+
 ## Open
 - None.
 
