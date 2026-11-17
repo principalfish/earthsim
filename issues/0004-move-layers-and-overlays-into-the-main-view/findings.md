@@ -196,3 +196,17 @@
 | round | security | - | - | - | - | - | Not run: docs only |
 | round | coverage | - | - | - | - | - | Not run: docs only; 85 links checked, none broken |
 | re-check | correctness | - | - | - | - | `docs/user-guide.md:156` | Light re-check of the four fixes, as correctness and docs: clean |
+
+## review 01 · 2026-11-17
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | defect | verified | open | `src/app/main.ts:224` | `setInert` leaves the main-view controls live while storage loads; Pause then Resume asks for the blank world's temperature |
+| round | docs | low | docs | verified | open | `docs/development.md:109` | The `view.ts` row misses the one source, the grid and `StoredView` |
+| round | common-mistakes | low | cleanup | verified | open | `src/app/wiring.test.ts:1677` | Six dead `setWindUnit` stubs in `createControls` |
+| round | docs | nit | docs | verified | open | `src/app/ui/infoBox.ts:9` | "as before" history wording in the header |
+| round | docs | nit | docs | verified | open | `README.md:14` | Two new bullets too long; one clause ungrammatical |
+| round | docs | nit | docs | noticed | open | `docs/winds.md:108` | Observed winds said to show "as arrows"; streaks follow them too |
+| round | common-mistakes | - | - | dropped | - | `src/app/main.ts:73` | Unguarded `window.matchMedia` — dropped: in every browser the page can run in; no change asked |
+| round | security | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | Clean: 97%, 31 uncovered lines with accepted reasons |
