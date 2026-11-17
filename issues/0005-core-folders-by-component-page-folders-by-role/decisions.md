@@ -28,6 +28,8 @@ The user's brief (2026-11-17): "lets /planner refactor 3a", roadmap step 3a in `
 
 - Piece 2 approved, with the `src/core/` and `src/app/` tables in `docs/development.md` regrouped first so each folder's rows sit together. The user: "Approve, group them" (2026-11-17)
 
+- Piece 3 started, with no decisions open. The user: "Start it" (2026-11-17)
+
 ## Open
 - None.
 
