@@ -94,6 +94,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 9 approved after the user ran it (they reported trying the units in the app: "the instances of km in the raise tool dont show miles when i selet miles", which is piece 10's), with both re-check findings fixed first: (1) `isDifferenceView` counts only views fitted from zero, and the test that accepted a month-style or centred view marked as a difference is flipped; (2) its doc says the values are spans, which convert by scale alone. The user: "ok approve and fix as you suggest" (2026-11-17)
 
+- Piece 10 started on the user's go-ahead, with the builder's two calls as stated in the briefing: the New world hints read "about 95 / 45 / 25 mi cells", rounded to the nearest 5 like the km figures; the brush radius shows whole miles (100–3,000 km in 50 km steps reads about 62–1,864 mi in steps of about 31, so no two steps share a figure). Brush strength follows the height unit (m/s or ft/s of land), not the wind unit. The user: "Start it" (2026-11-17)
+
 ## Open
 - None.
 
