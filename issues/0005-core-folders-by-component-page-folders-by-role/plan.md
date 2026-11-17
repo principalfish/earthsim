@@ -99,7 +99,7 @@ Rejected:
    - Files: everything under `src/app/ui/` and its importers; `docs/development.md` (the `ui/` row).
    - What: Move, with `git mv` and each test with its source:
      - `ui/main/`: `mainView`, `layerDock`, `topBar`, `timeline`, `infoBox`, `pauseButton`, `legend`, `cursorReadout`, `comparison`, `windKey`;
-     - `ui/panel/`: `panelSections`, `section`'s users stay importing it from `ui/`, `worldPanel`, `dateLine` (the date line under the world's description), `viewPanel`, `planetPanel`, `toolPanel`, `statsPanel`, `settingsPanel`, `newWorldDialog`;
+     - `ui/panel/`: `panelSections`, `worldPanel`, `dateLine` (the date line under the world's description), `viewPanel`, `planetPanel`, `toolPanel`, `statsPanel`, `settingsPanel`, `newWorldDialog`;
      - left at `ui/`: `fields`, `icons`, `section`, `layerPanel`.
      Rewrite the imports.
    - Functions: none; import paths only.
