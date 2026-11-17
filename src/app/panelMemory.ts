@@ -54,9 +54,9 @@ export const panelMemoryKey = (id: string): string =>
  *
  * @param get - Reaches the storage, such as `() => window.localStorage`.
  */
-export const reachStorage = (
-	get: () => PanelStorage | null | undefined,
-): PanelStorage | null => {
+export const reachStorage = <S extends PanelStorage>(
+	get: () => S | null | undefined,
+): S | null => {
 	try {
 		return get() ?? null;
 	} catch {

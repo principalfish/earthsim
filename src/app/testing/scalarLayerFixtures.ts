@@ -2,12 +2,13 @@
  * A made-up layer of one value per cell for tests, described as the page
  * describes the temperature but differing from it in everything a
  * description holds: a test that shows it shows that the legend, the
- * readout, the comparison controls and the layer panel follow the
+ * readout, the top bar and the layer panel follow the
  * description and know nothing of the temperature.
  *
  * It is shaped like a sea-level pressure: its months come from the store's
  * winds, it offers the Month and the Annual average alone, its scale is
- * centred on the year's mean by area, its unit is hPa, it has no observed
+ * centred on the year's mean by area, it measures a pressure, written in
+ * whole numbers whatever the unit, it has no observed
  * year to compare with and its calculation tells nothing of its progress.
  */
 
@@ -67,8 +68,8 @@ const meanOf = (months: readonly Float32Array[]): Float32Array => {
 export const MADE_UP_LAYER: ScalarLayerSpec = {
 	id: MADE_UP_ID,
 	label: 'Made-up pressure',
-	unit: 'hPa',
-	formatValue: formatWhole,
+	quantity: 'pressure',
+	formatValue: (value, _unit, signed) => formatWhole(value, signed),
 	formatTick: (value) => `≈${formatWhole(value, false)}`,
 	unavailableText: 'Made-up pressure unavailable',
 	notShownText: 'Made-up pressure could not be shown',
@@ -92,7 +93,7 @@ export const MADE_UP_LAYER: ScalarLayerSpec = {
 		},
 	],
 	summarise: (months) => ({ annualMean: meanOf(months) }),
-	minSpan: 10,
+	minSpan: { hPa: 10, inHg: 0.3 },
 	observed: null,
 	read: ({ winds }) => ({
 		status: winds.status,
@@ -100,7 +101,6 @@ export const MADE_UP_LAYER: ScalarLayerSpec = {
 		months: winds.result?.winds.pressure ?? null,
 		progress: null,
 	}),
-	scheduler: 'winds',
 	sunlightStyle: 'darkened',
 	summaryControlId: 'made-up-view',
 };

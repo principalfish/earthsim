@@ -21,6 +21,7 @@ import {
 	SUPPORTED_RESOLUTIONS,
 	type World,
 } from '../../core/index';
+import { convert, SYSTEM_UNITS, type UnitOf, unitLabel } from '../units';
 import { createButton, createElement, createRangeField } from './fields';
 
 /** The least land the slider can be set to, as a percentage. */
@@ -143,11 +144,42 @@ export const LOADING_EARTH_LABEL = 'Loading Earth…';
 export const EARTH_FAILED_MESSAGE =
 	"Earth's elevation data could not be loaded. Check your connection and try again. The current world has not been changed.";
 
-/** How large a cell of each resolution is, as the dialog says it. */
+/**
+ * How large a cell of each resolution is, roughly, in kilometres: a figure
+ * rounded to the nearest {@link CELL_SIZE_ROUNDING}.
+ */
+export const RESOLUTION_CELL_KM: Readonly<Record<Resolution, number>> = {
+	64: 150,
+	128: 75,
+	256: 40,
+};
+
+/** What a cell size is rounded to the nearest of, in whichever unit. */
+export const CELL_SIZE_ROUNDING = 5;
+
+/**
+ * How large a cell of a resolution is, as the dialog says it in a unit of
+ * distances, such as `about 150 km cells` or `about 95 mi cells`.
+ *
+ * @param resolution - The resolution.
+ * @param unit - The unit to say it in; kilometres when left out.
+ * @returns The size, converted and rounded to the nearest
+ * {@link CELL_SIZE_ROUNDING} of the unit.
+ */
+export const resolutionHint = (
+	resolution: Resolution,
+	unit: UnitOf<'distance'> = SYSTEM_UNITS.metric.distance,
+): string => {
+	const size = convert('distance', unit, RESOLUTION_CELL_KM[resolution]);
+	const rounded = Math.round(size / CELL_SIZE_ROUNDING) * CELL_SIZE_ROUNDING;
+	return `about ${rounded} ${unitLabel('distance', unit)} cells`;
+};
+
+/** How large a cell of each resolution is, as the dialog says it in km. */
 export const RESOLUTION_HINTS: Readonly<Record<Resolution, string>> = {
-	64: 'about 150 km cells',
-	128: 'about 75 km cells',
-	256: 'about 40 km cells',
+	64: resolutionHint(64),
+	128: resolutionHint(128),
+	256: resolutionHint(256),
 };
 
 /** The name each way of starting a world goes by in the dialog. */
@@ -371,6 +403,11 @@ export type NewWorldDialogOptions = {
 	 * nothing is said.
 	 */
 	readonly notice?: string;
+	/**
+	 * The unit the size of a cell is said in; kilometres when left out. The
+	 * units cannot be changed while the dialog is open, since it is modal.
+	 */
+	readonly distanceUnit?: UnitOf<'distance'>;
 	/** Where the dialog is added to the page; the body by default. */
 	readonly parent?: HTMLElement;
 };
@@ -623,7 +660,7 @@ export const openNewWorldDialog = (
 		options: SUPPORTED_RESOLUTIONS.map((supported) => ({
 			value: String(supported),
 			label: String(supported),
-			hint: RESOLUTION_HINTS[supported],
+			hint: resolutionHint(supported, options.distanceUnit),
 		})),
 		value: values.resolution,
 	});

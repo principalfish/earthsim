@@ -18,12 +18,14 @@ import {
 	TEMPERATURE_UNAVAILABLE_TEXT,
 } from '../scalarLayer';
 import {
+	byClass,
 	createFakeDocument,
 	type FakeElement,
 	oneByClass,
 } from '../testing/fakeDocument';
 import { SEVEN_STOP_RAMP, TWO_STOP_RAMP } from '../testing/rampFixtures';
 import { MADE_UP_LAYER } from '../testing/scalarLayerFixtures';
+import { UNITS } from '../units';
 import {
 	cellWeights,
 	createLegend,
@@ -35,14 +37,12 @@ import {
 	formatTick,
 	LEGEND_CALCULATING_TEXT,
 	LEGEND_EMPTY_TEXT,
-	LEGEND_FIRST_YEAR_TEXT,
 	LEGEND_OUT_OF_DATE_TEXT,
 	legendContent,
 	legendTicks,
 	MAX_LEGEND_TICKS,
 	MAX_STEPPED_TICKS,
 	MIN_FITTED_SPAN_C,
-	NOTHING_BEYOND,
 	progressFraction,
 	progressLine,
 	tickPosition,
@@ -68,14 +68,11 @@ describe('fitRange', () => {
 		const months = monthsOf(-40, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 30);
 		months[0]?.set([-40, -52.5]);
 		months[11]?.set([30, 41.5]);
-		expect(fitRange(months, evenly(2))).toEqual({
-			range: { min: -53, max: 42 },
-			beyond: NOTHING_BEYOND,
-		});
+		expect(fitRange(months, evenly(2))).toEqual({ min: -53, max: 42 });
 	});
 
 	it('keeps ends that are whole already', () => {
-		expect(fitRange([Float32Array.of(-10, 30)], evenly(2)).range).toEqual({
+		expect(fitRange([Float32Array.of(-10, 30)], evenly(2))).toEqual({
 			min: -10,
 			max: 30,
 		});
@@ -85,7 +82,7 @@ describe('fitRange', () => {
 		const months = Array.from({ length: 12 }, () =>
 			Float32Array.of(12, 12, 12),
 		);
-		expect(fitRange(months, evenly(3)).range).toEqual({
+		expect(fitRange(months, evenly(3))).toEqual({
 			min: 12 - MIN_FITTED_SPAN_C / 2,
 			max: 12 + MIN_FITTED_SPAN_C / 2,
 		});
@@ -93,20 +90,17 @@ describe('fitRange', () => {
 
 	it('widens a field that varies less than the narrowest span about its middle, then rounds outward', () => {
 		// 5.25 ± 1 is 4.25 to 6.25.
-		expect(fitRange([Float32Array.of(5, 5.5)], evenly(2)).range).toEqual({
+		expect(fitRange([Float32Array.of(5, 5.5)], evenly(2))).toEqual({
 			min: 4,
 			max: 7,
 		});
 	});
 
-	it('leaves out half a percent of the weight at each end, and says values lie beyond', () => {
+	it('leaves out half a percent of the weight at each end', () => {
 		// A thousand cells from 0 to 999: half a percent of them is five.
 		const field = Float32Array.from({ length: 1000 }, (_, cell) => cell);
 		expect(FIT_TAIL_SHARE).toBe(0.005);
-		expect(fitRange([field], evenly(1000))).toEqual({
-			range: { min: 4, max: 995 },
-			beyond: { below: true, above: true },
-		});
+		expect(fitRange([field], evenly(1000))).toEqual({ min: 4, max: 995 });
 	});
 
 	it('weights each cell by the weights given', () => {
@@ -116,16 +110,14 @@ describe('fitRange', () => {
 			cell === 0 ? -100 : 10 + (cell % 10),
 		);
 		const light = fitRange([field], evenly(1000));
-		expect(light.range.min).toBe(10);
-		expect(light.beyond.below).toBe(true);
+		expect(light.min).toBe(10);
 		const weights = evenly(1000);
 		weights[0] = 10;
 		const heavy = fitRange([field], weights);
-		expect(heavy.range.min).toBe(-100);
-		expect(heavy.beyond.below).toBe(false);
+		expect(heavy.min).toBe(-100);
 	});
 
-	it('is not stretched by one tall peak, which is said to lie beyond', () => {
+	it('is not stretched by one tall peak', () => {
 		// One cell of a thousand far colder than the rest in every month.
 		const months = Array.from({ length: 12 }, (_, m) =>
 			Float32Array.from({ length: 1000 }, (_, cell) =>
@@ -137,36 +129,29 @@ describe('fitRange', () => {
 			evenly(999),
 		);
 		const withPeak = fitRange(months, evenly(1000));
-		expect(withPeak.range).toEqual({ min: -30, max: 30 });
-		expect(withPeak.range).toEqual(without.range);
-		expect(withPeak.beyond).toEqual({ below: true, above: false });
+		expect(withPeak).toEqual({ min: -30, max: 30 });
+		expect(withPeak).toEqual(without);
 	});
 
-	it('says values lie beyond only an end they are beyond', () => {
+	it('ends at the highest value when nothing is left out above', () => {
 		// Four cold cells of a thousand are left out; the hot end is the
 		// highest value.
 		const field = Float32Array.from({ length: 1000 }, (_, cell) =>
 			cell < 4 ? -50 : 20 + (cell % 5),
 		);
-		expect(fitRange([field], evenly(1000))).toEqual({
-			range: { min: 20, max: 24 },
-			beyond: { below: true, above: false },
-		});
+		expect(fitRange([field], evenly(1000))).toEqual({ min: 20, max: 24 });
 	});
 
-	it('says nothing lies beyond an end that rounding outward took in', () => {
+	it('rounds the cuts outward to whole degrees', () => {
 		// The low cut is 2.6, the high 7.4; the values left out, 2.5 and
 		// 7.5, are within the whole degrees around them.
 		const field = Float32Array.from({ length: 1000 }, (_, cell) =>
 			cell === 0 ? 2.5 : cell === 999 ? 7.5 : cell < 500 ? 2.6 : 7.4,
 		);
-		expect(fitRange([field], evenly(1000))).toEqual({
-			range: { min: 2, max: 8 },
-			beyond: NOTHING_BEYOND,
-		});
+		expect(fitRange([field], evenly(1000))).toEqual({ min: 2, max: 8 });
 	});
 
-	it('says what lies beyond the range as widened and rounded, not beyond the cuts', () => {
+	it('widens the cuts before rounding them', () => {
 		// The cuts, 10 and 10.5, are widened to 9.25 to 11.25 and rounded to
 		// 9 to 12. The values left out below, at 9.2, are within it; of
 		// those left out above, 11.8 is within it and 60 is beyond.
@@ -181,16 +166,13 @@ describe('fitRange', () => {
 							? 10
 							: 10.5,
 		);
-		expect(fitRange([field], evenly(1000))).toEqual({
-			range: { min: 9, max: 12 },
-			beyond: { below: false, above: true },
-		});
+		expect(fitRange([field], evenly(1000))).toEqual({ min: 9, max: 12 });
 	});
 
 	it('passes over values that are not numbers', () => {
-		expect(
-			fitRange([Float32Array.of(Number.NaN, -10, 10)], evenly(3)).range,
-		).toEqual({ min: -10, max: 10 });
+		expect(fitRange([Float32Array.of(Number.NaN, -10, 10)], evenly(3))).toEqual(
+			{ min: -10, max: 10 },
+		);
 	});
 
 	it('passes over infinite values', () => {
@@ -202,7 +184,7 @@ describe('fitRange', () => {
 				],
 				evenly(2),
 			),
-		).toEqual({ range: { min: -10, max: 10 }, beyond: NOTHING_BEYOND });
+		).toEqual({ min: -10, max: 10 });
 	});
 
 	it('refuses fields with no value to fit', () => {
@@ -258,8 +240,8 @@ describe('cellWeights', () => {
 		for (const cell of cold) {
 			field[cell] = -60;
 		}
-		expect(fitRange([field], cellWeights(grid.cellCount)).range.min).toBe(9);
-		expect(fitRange([field], evenly(grid.cellCount)).range.min).toBe(-60);
+		expect(fitRange([field], cellWeights(grid.cellCount)).min).toBe(9);
+		expect(fitRange([field], evenly(grid.cellCount)).min).toBe(-60);
 	});
 });
 
@@ -435,14 +417,14 @@ describe('tickPosition', () => {
 });
 
 describe('progressLine and progressFraction', () => {
-	it('say the first year is under way before any progress, with no fraction', () => {
-		expect(progressLine(null)).toBe(LEGEND_FIRST_YEAR_TEXT);
+	it('say only that it is calculating before any progress, with no fraction', () => {
+		expect(progressLine(null)).toBe(LEGEND_CALCULATING_TEXT);
 		expect(progressFraction(null)).toBeNull();
 	});
 
-	it('give the years done alone while there is no estimate', () => {
+	it('say only that it is calculating, not the years done, while there is no estimate', () => {
 		const progress = progressWith(3, null);
-		expect(progressLine(progress)).toBe('Calculating · year 3');
+		expect(progressLine(progress)).toBe(LEGEND_CALCULATING_TEXT);
 		expect(progressFraction(progress)).toBeNull();
 	});
 
@@ -505,7 +487,6 @@ describe('legendContent', () => {
 		range: { min: -10, max: 30 },
 		ramp: TEMPERATURE_RAMP,
 		caption: 'Air temperature in July, °C',
-		beyond: NOTHING_BEYOND,
 	};
 	const result = temperatureOf(1);
 	const layerOf = (
@@ -532,10 +513,9 @@ describe('legendContent', () => {
 					{ label: '20', position: 75 },
 					{ label: '30', position: 100 },
 				],
-				below: null,
-				above: null,
 				figures: null,
 			},
+			state: 'current',
 			status: null,
 			bar: null,
 		});
@@ -561,20 +541,19 @@ describe('legendContent', () => {
 		).toBeNull();
 	});
 
-	it('says what the end colours stand for at each end with values beyond it', () => {
-		const ends = (below: boolean, above: boolean) => {
-			const { scale } = legendContent(
-				TEMPERATURE_LAYER,
-				layerOf('current'),
-				{ ...source, beyond: { below, above } },
-				true,
-			);
-			return [scale?.below, scale?.above];
-		};
-		expect(ends(true, true)).toEqual(['−10 and below', '30 and above']);
-		expect(ends(true, false)).toEqual(['−10 and below', null]);
-		expect(ends(false, true)).toEqual([null, '30 and above']);
-		expect(ends(false, false)).toEqual([null, null]);
+	it('has no words for what lies beyond the ends, which take the end colours', () => {
+		const { scale } = legendContent(
+			TEMPERATURE_LAYER,
+			layerOf('current'),
+			source,
+			true,
+		);
+		expect(Object.keys(scale ?? {})).toEqual([
+			'caption',
+			'gradient',
+			'ticks',
+			'figures',
+		]);
 	});
 
 	it('marks the scale at its own step when it has one', () => {
@@ -608,6 +587,7 @@ describe('legendContent', () => {
 			legendContent(TEMPERATURE_LAYER, layerOf('current'), null, false),
 		).toEqual({
 			scale: null,
+			state: 'unavailable',
 			status: TEMPERATURE_NOT_SHOWN_TEXT,
 			bar: null,
 		});
@@ -668,7 +648,8 @@ describe('legendContent', () => {
 		);
 		expect(content).toEqual({
 			scale: null,
-			status: LEGEND_FIRST_YEAR_TEXT,
+			state: 'calculating',
+			status: LEGEND_CALCULATING_TEXT,
 			bar: { fraction: null },
 		});
 	});
@@ -678,6 +659,7 @@ describe('legendContent', () => {
 			legendContent(TEMPERATURE_LAYER, layerOf('empty', false), null, false),
 		).toEqual({
 			scale: null,
+			state: 'empty',
 			status: LEGEND_EMPTY_TEXT,
 			bar: null,
 		});
@@ -710,33 +692,34 @@ describe('fitRangeCentred', () => {
 	it('reaches as far either side of the rounded centre as the further end of the year', () => {
 		const months = [Float32Array.of(1000, 1031), Float32Array.of(1010, 1020)];
 		expect(fitRangeCentred(months, ones(2), 1015.6)).toEqual({
-			range: { min: 1000, max: 1032 },
-			beyond: { below: false, above: false },
+			min: 1000,
+			max: 1032,
 		});
 	});
 
 	it('reaches at least half the smallest span either way, rounded up', () => {
 		const months = [Float32Array.of(1012, 1013)];
-		expect(fitRangeCentred(months, ones(2), 1012, 5).range).toEqual({
+		expect(fitRangeCentred(months, ones(2), 1012, 5)).toEqual({
 			min: 1009,
 			max: 1015,
 		});
-		expect(fitRangeCentred(months, ones(2), 1012).range).toEqual({
+		expect(fitRangeCentred(months, ones(2), 1012)).toEqual({
 			min: 1011,
 			max: 1013,
 		});
 	});
 
-	it('leaves out the tails by area and says what lies beyond', () => {
+	it('leaves out the tails by area', () => {
 		const grid = getGrid(64);
 		const field = new Float32Array(grid.cellCount).fill(0);
 		const smallest = Array.from(grid.areas.keys()).sort(
 			(a, b) => (grid.areas[a] as number) - (grid.areas[b] as number),
 		)[0] as number;
 		field[smallest] = 500;
-		const { range, beyond } = fitRangeCentred([field], grid.areas, 0);
-		expect(range).toEqual({ min: -1, max: 1 });
-		expect(beyond).toEqual({ below: false, above: true });
+		expect(fitRangeCentred([field], grid.areas, 0)).toEqual({
+			min: -1,
+			max: 1,
+		});
 	});
 
 	it('refuses a centre that is not finite', () => {
@@ -751,14 +734,13 @@ describe('legendContent for the pressure', () => {
 		range: { min: 996, max: 1030 },
 		ramp: PRESSURE_RAMP,
 		caption: 'Sea-level pressure in July, hPa',
-		beyond: { below: true, above: true },
 	};
 	const reading = (status: TemperatureLayer['status']) => ({
 		status,
 		progress: null,
 	});
 
-	it('writes its ticks and ends as whole hPa, grouped in thousands', () => {
+	it('writes its ticks as whole hPa, grouped in thousands', () => {
 		const { scale, status } = legendContent(
 			PRESSURE_LAYER,
 			reading('current'),
@@ -774,8 +756,8 @@ describe('legendContent for the pressure', () => {
 			'1,020',
 			'1,030',
 		]);
-		expect(scale?.below).toBe('996 and below');
-		expect(scale?.above).toBe('1,030 and above');
+		expect(scale).not.toHaveProperty('below');
+		expect(scale).not.toHaveProperty('above');
 		expect(scale?.figures).toBeNull();
 	});
 
@@ -793,6 +775,7 @@ describe('legendContent for the pressure', () => {
 			legendContent(PRESSURE_LAYER, reading('calculating'), null, false),
 		).toEqual({
 			scale: null,
+			state: 'calculating',
 			status: 'Calculating',
 			bar: { fraction: null },
 		});
@@ -808,14 +791,13 @@ describe('legendContent for another layer', () => {
 		range: { min: 1000, max: 1030 },
 		ramp: SEVEN_STOP_RAMP,
 		caption: 'Made-up pressure in month 7, hPa',
-		beyond: { below: true, above: true },
 	};
 	const reading = (
 		status: TemperatureLayer['status'],
 		progress: TemperatureProgress | null = null,
 	) => ({ status, progress });
 
-	it('writes the ticks, the ends and the figures as the layer writes them, in its unit', () => {
+	it('writes the ticks and the figures as the layer writes them, in its unit', () => {
 		const { scale } = legendContent(
 			MADE_UP_LAYER,
 			reading('current'),
@@ -830,8 +812,8 @@ describe('legendContent for another layer', () => {
 			'≈1,020',
 			'≈1,030',
 		]);
-		expect(scale?.below).toBe('≈1,000 and below');
-		expect(scale?.above).toBe('≈1,030 and above');
+		expect(scale).not.toHaveProperty('below');
+		expect(scale).not.toHaveProperty('above');
 		expect(scale?.figures).toBe('Mean +1.3 hPa · RMS 2.0 hPa');
 	});
 
@@ -859,7 +841,6 @@ describe('legendContent for another layer', () => {
 			range: { min: -10, max: 30 },
 			ramp: TEMPERATURE_RAMP,
 			caption: 'Air temperature in July, °C',
-			beyond: { below: true, above: true },
 			figures: { meanDifference: 1.26, rmsDifference: 2 },
 		};
 		const kept = legendContent(
@@ -884,7 +865,7 @@ describe('legendContent for another layer', () => {
 			'20',
 			'30',
 		]);
-		expect(kept.scale?.below).toBe('−10 and below');
+		expect(kept.scale).not.toHaveProperty('below');
 		expect(kept.scale?.figures).toBe('Mean +1.3 °C · RMS 2.0 °C');
 		expect(kept.status).toBe(LEGEND_CALCULATING_TEXT);
 		expect(kept.bar).toEqual({ fraction: null });
@@ -906,14 +887,8 @@ describe('createLegend', () => {
 			legend,
 			root,
 			ramp: oneByClass(root, 'legend__ramp'),
-			ends: oneByClass(root, 'legend__ends'),
-			low: oneByClass(root, 'legend__end--low'),
-			high: oneByClass(root, 'legend__end--high'),
 			ticks: oneByClass(root, 'legend__ticks'),
 			figures: oneByClass(root, 'legend__figures'),
-			scale: oneByClass(root, 'legend__scale'),
-			status: oneByClass(root, 'legend__status'),
-			bar: oneByClass(root, 'legend__bar'),
 		};
 	};
 
@@ -924,17 +899,16 @@ describe('createLegend', () => {
 
 	it('writes the caption of the scale it is given, and the next one', () => {
 		const parts = make();
-		const caption = oneByClass(parts.scale, 'legend__caption');
+		const caption = oneByClass(parts.root, 'legend__caption');
 		const show = (text: string): void =>
 			parts.legend.show({
 				scale: {
 					caption: text,
 					gradient: 'g',
 					ticks: [],
-					below: null,
-					above: null,
 					figures: null,
 				},
+				state: 'current',
 				status: null,
 				bar: null,
 			});
@@ -942,12 +916,17 @@ describe('createLegend', () => {
 		expect(caption.textContent).toBe('Air temperature in July, °C');
 		show('Seasonal range, °C');
 		expect(caption.textContent).toBe('Seasonal range, °C');
-		// Hidden with its scale while there is none.
-		parts.legend.show({ scale: null, status: 'x', bar: null });
-		expect(parts.scale.hidden).toBe(true);
+		// Hidden while there is no scale.
+		parts.legend.show({
+			scale: null,
+			state: 'unavailable',
+			status: 'x',
+			bar: null,
+		});
+		expect(parts.root.hidden).toBe(true);
 	});
 
-	it('draws the scale and its ticks, with no status or bar for a current result', () => {
+	it('draws the scale and its ticks, with no status line or bar of its own', () => {
 		const parts = make();
 		parts.legend.show({
 			scale: {
@@ -957,15 +936,13 @@ describe('createLegend', () => {
 					{ label: '−10', position: 0 },
 					{ label: '20', position: 75 },
 				],
-				below: null,
-				above: null,
 				figures: null,
 			},
+			state: 'current',
 			status: null,
 			bar: null,
 		});
 		expect(parts.root.hidden).toBe(false);
-		expect(parts.scale.hidden).toBe(false);
 		expect(parts.ramp.style.background).toBe('linear-gradient(red, blue)');
 		expect(
 			parts.ticks.children.map((tick) => [tick.textContent, tick.style.left]),
@@ -973,74 +950,22 @@ describe('createLegend', () => {
 			['−10', '0%'],
 			['20', '75%'],
 		]);
-		// Left empty, not hidden, so that a screen reader announces what
-		// is written into it next.
-		expect(parts.status.hidden).toBe(false);
-		expect(parts.status.textContent).toBe('');
-		expect(parts.bar.hidden).toBe(true);
+		// The info box says the legend's line, with its bar, on its one
+		// status line.
+		expect(byClass(parts.root, 'legend__status')).toEqual([]);
+		expect(byClass(parts.root, 'legend__bar')).toEqual([]);
+		expect(parts.root.getAttribute('aria-live')).toBeNull();
 	});
 
-	it('keeps its status line in the page as the words come and go', () => {
-		const parts = make();
-		parts.legend.show({ scale: null, status: 'Out of date', bar: null });
-		expect(parts.status.hidden).toBe(false);
-		parts.legend.show({ scale: null, status: null, bar: null });
-		expect(parts.status.hidden).toBe(false);
-		expect(parts.status.textContent).toBe('');
-		expect(parts.status.getAttribute('aria-live')).toBe('polite');
-	});
-
-	it('rewrites its status line only when the words change', () => {
+	it('shows nothing but its scale, hiding while a calculation has none to show', () => {
 		const parts = make();
 		parts.legend.show({
 			scale: null,
-			status: 'year 3',
-			bar: { fraction: 0.2 },
-		});
-		const writes = vi.spyOn(parts.status, 'textContent', 'set');
-		parts.legend.show({
-			scale: null,
-			status: 'year 3',
-			bar: { fraction: 0.4 },
-		});
-		expect(writes).not.toHaveBeenCalled();
-		parts.legend.show({
-			scale: null,
-			status: 'year 4',
-			bar: { fraction: 0.6 },
-		});
-		expect(writes).toHaveBeenCalledTimes(1);
-		expect(parts.status.textContent).toBe('year 4');
-	});
-
-	it('shows the progress line and a bar that knows how far it has come', () => {
-		const parts = make();
-		parts.legend.show({
-			scale: null,
+			state: 'calculating',
 			status: 'year 3',
 			bar: { fraction: 0.6 },
 		});
-		expect(parts.scale.hidden).toBe(true);
-		expect(parts.status.hidden).toBe(false);
-		expect(parts.status.textContent).toBe('year 3');
-		expect(parts.bar.hidden).toBe(false);
-		expect(parts.bar.getAttribute('value')).toBe('0.6');
-	});
-
-	it('draws a bar with no value while how far it has come is not known', () => {
-		const parts = make();
-		parts.legend.show({
-			scale: null,
-			status: 'year 3',
-			bar: { fraction: 0.6 },
-		});
-		parts.legend.show({
-			scale: null,
-			status: 'year 3',
-			bar: { fraction: null },
-		});
-		expect(parts.bar.hidden).toBe(false);
-		expect(parts.bar.getAttribute('value')).toBeNull();
+		expect(parts.root.hidden).toBe(true);
 	});
 
 	it('replaces the ticks of the scale before', () => {
@@ -1051,10 +976,9 @@ describe('createLegend', () => {
 					caption: 'c',
 					gradient: 'g',
 					ticks: labels.map((label, index) => ({ label, position: index })),
-					below: null,
-					above: null,
 					figures: null,
 				},
+				state: 'current',
 				status: null,
 				bar: null,
 			});
@@ -1063,26 +987,7 @@ describe('createLegend', () => {
 		expect(parts.ticks.children.map((tick) => tick.textContent)).toEqual(['4']);
 	});
 
-	/** Shows a scale with the words at its ends given. */
-	const showEnds = (
-		legend: ReturnType<typeof make>['legend'],
-		below: string | null,
-		above: string | null,
-	): void =>
-		legend.show({
-			scale: {
-				caption: 'c',
-				gradient: 'g',
-				ticks: [],
-				below,
-				above,
-				figures: null,
-			},
-			status: null,
-			bar: null,
-		});
-
-	it('writes the error figures on a line of their own under the ends, only while there are some', () => {
+	it('writes the error figures on a line of their own under the ticks, only while there are some', () => {
 		const parts = make();
 		const show = (figures: string | null): void =>
 			parts.legend.show({
@@ -1090,10 +995,9 @@ describe('createLegend', () => {
 					caption: 'c',
 					gradient: 'g',
 					ticks: [],
-					below: '−20 and below',
-					above: '20 and above',
 					figures,
 				},
+				state: 'current',
 				status: null,
 				bar: null,
 			});
@@ -1102,61 +1006,212 @@ describe('createLegend', () => {
 		show('Mean −0.1 °C · RMS 3.9 °C');
 		expect(parts.figures.hidden).toBe(false);
 		expect(parts.figures.textContent).toBe('Mean −0.1 °C · RMS 3.9 °C');
-		expect(parts.scale.children.at(-1)).toBe(parts.figures);
+		expect(parts.root.children.at(-1)).toBe(parts.figures);
 		show(null);
 		expect(parts.figures.hidden).toBe(true);
 		expect(parts.figures.textContent).toBe('');
 	});
 
-	it('writes what the end colours stand for on a line of its own under the ticks', () => {
+	it('holds its caption, ramp, ticks and figures, and no line of words for the ends', () => {
 		const parts = make();
-		showEnds(parts.legend, '−34 and below', '29 and above');
-		expect(parts.scale.children.map((child) => child.className)).toEqual([
+		parts.legend.show({
+			scale: {
+				caption: 'c',
+				gradient: 'g',
+				ticks: [{ label: '−34', position: 0 }],
+				figures: null,
+			},
+			state: 'current',
+			status: null,
+			bar: null,
+		});
+		expect(parts.root.children.map((child) => child.className)).toEqual([
 			'legend__caption',
 			'legend__ramp',
 			'legend__ticks',
-			'legend__ends',
 			'legend__figures',
 		]);
-		expect(parts.ends.hidden).toBe(false);
-		expect(parts.ends.children).toEqual([parts.low, parts.high]);
-		expect([parts.low.hidden, parts.low.textContent]).toEqual([
-			false,
-			'−34 and below',
-		]);
-		expect([parts.high.hidden, parts.high.textContent]).toEqual([
-			false,
-			'29 and above',
-		]);
-	});
-
-	it('shows each end on its own, hiding the other', () => {
-		const parts = make();
-		showEnds(parts.legend, '−34 and below', null);
-		expect(parts.ends.hidden).toBe(false);
-		expect(parts.low.hidden).toBe(false);
-		expect([parts.high.hidden, parts.high.textContent]).toEqual([true, '']);
-		showEnds(parts.legend, null, '29 and above');
-		expect([parts.low.hidden, parts.low.textContent]).toEqual([true, '']);
-		expect([parts.high.hidden, parts.high.textContent]).toEqual([
-			false,
-			'29 and above',
-		]);
-	});
-
-	it('hides the line, keeping no room for it, when neither end has words', () => {
-		const parts = make();
-		showEnds(parts.legend, '−34 and below', '29 and above');
-		showEnds(parts.legend, null, null);
-		expect(parts.ends.hidden).toBe(true);
-		expect(parts.low.textContent).toBe('');
-		expect(parts.high.textContent).toBe('');
+		expect(byClass(parts.root, 'legend__ends')).toEqual([]);
+		expect(byClass(parts.root, 'legend__end')).toEqual([]);
 	});
 
 	it('hides for nothing to show', () => {
 		const parts = make();
-		parts.legend.show({ scale: null, status: 'x', bar: null });
+		parts.legend.show({
+			scale: null,
+			state: 'unavailable',
+			status: 'x',
+			bar: null,
+		});
 		parts.legend.show(null);
 		expect(parts.root.hidden).toBe(true);
+	});
+});
+
+describe('fitting and marking a scale in a unit', () => {
+	const fahrenheit = UNITS.temperature['°F'];
+	const kelvin = UNITS.temperature.K;
+	const inches = UNITS.pressure.inHg;
+
+	it('converts the ends before widening and rounding them, outward to whole numbers', () => {
+		// −10 and 30 °C are 14 and 86 °F, and 263.15 and 303.15 K.
+		const months = [Float32Array.of(-10, 30)];
+		expect(fitRange(months, evenly(2), 4, fahrenheit)).toEqual({
+			min: 14,
+			max: 86,
+		});
+		expect(fitRange(months, evenly(2), 2, kelvin)).toEqual({
+			min: 263,
+			max: 304,
+		});
+		// 12 °C alone is 53.6 °F, widened to 4 °F about it.
+		expect(
+			fitRange([Float32Array.of(12, 12)], evenly(2), 4, fahrenheit),
+		).toEqual({ min: 51, max: 56 });
+	});
+
+	it('rounds the ends outward to the unit’s decimals', () => {
+		// 1000 and 1030 hPa are 29.5299… and 30.4160… inHg.
+		const range = fitRange(
+			[Float32Array.of(1000, 1030)],
+			evenly(2),
+			0.3,
+			inches,
+		);
+		expect(range).toEqual({ min: 29.52, max: 30.42 });
+		// Widened to 0.3 inHg about 1013 hPa, 29.9139… inHg.
+		expect(
+			fitRange([Float32Array.of(1013, 1013)], evenly(2), 0.3, inches),
+		).toEqual({ min: 29.76, max: 30.07 });
+	});
+
+	it('rounds an end on a decimal of the unit to itself, not past it', () => {
+		const exact = { scale: 1, offset: 0, decimals: 2 };
+		expect(
+			fitRange([Float32Array.of(0.5, 0.75)], evenly(2), 0.1, exact),
+		).toEqual({ min: 0.5, max: 0.75 });
+	});
+
+	it('fits sizes from zero by the scale alone', () => {
+		// A range of 10 °C is one of 18 °F, and of 10 K.
+		expect(fitRangeFromZero(Float32Array.of(10, 4), 4, fahrenheit)).toEqual({
+			min: 0,
+			max: 18,
+		});
+		expect(fitRangeFromZero(Float32Array.of(10, 4), 2, kelvin)).toEqual({
+			min: 0,
+			max: 10,
+		});
+		expect(fitRangeFromZero(Float32Array.of(1), 4, fahrenheit)).toEqual({
+			min: 0,
+			max: 4,
+		});
+		expect(fitRangeFromZero(Float32Array.of(10), 0.3, inches)).toEqual({
+			min: 0,
+			max: 0.3,
+		});
+		expect(fitRangeFromZero(Float32Array.of(20), 0.3, inches)).toEqual({
+			min: 0,
+			max: 0.6,
+		});
+	});
+
+	it('centres a scale on the centre in the unit, rounded to its decimals', () => {
+		const months = [Float32Array.of(1000, 1030)];
+		const range = fitRangeCentred(months, evenly(2), 1013.25, 0.3, inches);
+		// 1013.25 hPa is 29.92 inHg; the further end, 1000 hPa, is 0.39
+		// inHg below it, rounded up.
+		expect(range).toEqual({ min: 29.42, max: 30.42 });
+		expect(
+			fitRangeCentred([Float32Array.of(15, 15)], evenly(2), 15, 4, fahrenheit),
+		).toEqual({ min: 57, max: 61 });
+	});
+
+	it('marks a scale at a step with decimals, each tick the nearest number to its decimal', () => {
+		expect(legendTicks(-0.6, 0.6, 0.3, 2)).toEqual([-0.6, -0.3, 0, 0.3, 0.6]);
+		expect(legendTicks(29.4, 30.5, 0.3, 2)).toEqual([29.4, 29.7, 30, 30.3]);
+		expect(legendTicks(0, 49, 5, 2)).toEqual(legendTicks(0, 49, 5));
+		// A step that gives too many falls back on a step of the legend's.
+		expect(legendTicks(29, 30, 0.05, 2)).toEqual(legendTicks(29, 30));
+	});
+
+	it.each([
+		['more decimals than given', 0.25, 1],
+		['decimals that are not whole', 0.3, 1.5],
+		['decimals below zero', 3, -1],
+	])('refuses %s', (_, step, decimals) => {
+		expect(() => legendTicks(0, 1, step, decimals)).toThrow(RangeError);
+	});
+
+	it('writes the error figures to the decimals given', () => {
+		expect(
+			formatFigures(
+				{ meanDifference: 0.0312, rmsDifference: 0.1178 },
+				'inHg',
+				3,
+			),
+		).toBe('Mean +0.031 inHg · RMS 0.118 inHg');
+		expect(
+			formatFigures({ meanDifference: -0.0004, rmsDifference: 0 }, 'inHg', 3),
+		).toBe('Mean 0.000 inHg · RMS 0.000 inHg');
+	});
+
+	it('draws the scale in the source’s unit, its ticks written as the layer writes them there', () => {
+		const content = legendContent(
+			PRESSURE_LAYER,
+			{ status: 'current', progress: null },
+			{
+				range: { min: -0.6, max: 0.6 },
+				ramp: PRESSURE_RAMP,
+				caption: 'Simulated less observed in July, inHg',
+				unit: 'inHg',
+				tickStep: 0.3,
+				figures: { meanDifference: 0.0312, rmsDifference: 0.1178 },
+			},
+			true,
+		);
+		expect(content.scale?.ticks).toEqual([
+			{ label: '−0.60', position: 0 },
+			{ label: '−0.30', position: 25 },
+			{ label: '0.00', position: 50 },
+			{ label: '0.30', position: 75 },
+			{ label: '0.60', position: 100 },
+		]);
+		expect(content.scale?.figures).toBe('Mean +0.031 inHg · RMS 0.118 inHg');
+		const kelvin = legendContent(
+			TEMPERATURE_LAYER,
+			{ status: 'current', progress: null },
+			{
+				range: { min: 239, max: 305 },
+				ramp: TEMPERATURE_RAMP,
+				caption: 'Air temperature in July, K',
+				unit: 'K',
+				figures: { meanDifference: -0.14, rmsDifference: 3.93 },
+			},
+			true,
+		);
+		expect(kelvin.scale?.ticks.map((tick) => tick.label)).toEqual([
+			'240',
+			'260',
+			'280',
+			'300',
+		]);
+		expect(kelvin.scale?.figures).toBe('Mean −0.1 K · RMS 3.9 K');
+	});
+
+	it('refuses a source in a unit of another quantity', () => {
+		expect(() =>
+			legendContent(
+				PRESSURE_LAYER,
+				{ status: 'current', progress: null },
+				{
+					range: { min: 0, max: 10 },
+					ramp: PRESSURE_RAMP,
+					caption: 'Pressure',
+					unit: '°F',
+				},
+				true,
+			),
+		).toThrow(RangeError);
 	});
 });

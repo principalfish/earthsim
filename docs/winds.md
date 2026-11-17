@@ -6,6 +6,8 @@ How the surface winds and sea-level pressure are worked out, which planet settin
 
 The winds are worked out from the temperature, a month at a time: first a map of sea-level pressure built by rules, then the wind that follows from it. It is a sketch of the real circulation, meant to be right in kind, not a simulation of the air.
 
+They are worked out again, in a worker of their own, as soon as each new temperature arrives and a moment after a change of the day length, whatever is on screen, and not while the [Pause button](user-guide.md#the-pause-button) is pressed.
+
 ### Bands of pressure
 
 Each month's mean temperature by latitude places a pattern of bands round the planet:
@@ -103,7 +105,7 @@ With one pattern of bands round the globe, before they varied by longitude, the 
 
 The direction is judged only where the observed wind is at least 1 m/s, 85% of the surface over the year.
 
-The page shows the same comparison on an untouched Earth, at the world's own resolution: Pressure's Observed and Difference, with the mean and RMS pressure difference under the legend, and, once Observed has been chosen under **Winds shown**, the key's two lines, the RMS of the wind's difference as vectors and the share within 45° in direction, for the month on screen or the whole year; see the [user guide](user-guide.md#simulated-or-observed-winds).
+The page shows the same comparison on an untouched Earth, at the world's own resolution: Pressure's Observed and Difference, with the mean and RMS pressure difference under the legend in the pressure's unit from Settings, hPa or inHg, and the observed winds, fetched by choosing Observed or Difference with Winds on, drawn in the chosen style, arrows or streaks, to set beside the simulated; the page gives no wind figures of its own; see the [user guide](user-guide.md#simulated-or-observed-winds).
 
 - **Day lengths from 6 to 96 hours** are trusted, both ends included. Outside them the bands are still worked out and the winds stay finite, at every day length from 3 to 720 hours, but the model was not tuned there and they are rough.
 - **Tilts up to 54°** are trusted, 54° included; above it the winds are rough. 54° is a judgement, not a measurement: about the tilt above which the poles get more sunlight over the year than the equator. Several of the faults under [What it gets wrong](#what-it-gets-wrong) are the worlds tilted 60°.

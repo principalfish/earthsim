@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TEMPERATURE_OBSERVED } from '../scalarLayer';
 import {
 	byClass,
 	createFakeDocument,
@@ -7,8 +6,12 @@ import {
 	type FakeElement,
 	oneByClass,
 } from '../testing/fakeDocument';
-import type { Source } from '../view';
-import { createComparisonControls } from './comparison';
+import { SOURCES, type Source, WIND_SOURCES } from '../view';
+import {
+	COMPARISON_LEGEND,
+	COMPARISON_NAME,
+	createComparisonControls,
+} from './comparison';
 
 describe('createComparisonControls', () => {
 	let fake: FakeDocument;
@@ -25,17 +28,14 @@ describe('createComparisonControls', () => {
 		const container = fake.createElement('div');
 		const controls = createComparisonControls(
 			container as unknown as HTMLElement,
-			{
-				observed: TEMPERATURE_OBSERVED,
-				source,
-				onSource: (next) => chosen.push(next),
-			},
+			{ source, onSource: (next) => chosen.push(next) },
 		);
 		const [root] = container.children as [FakeElement];
 		return {
 			controls,
 			chosen,
 			root,
+			options: byClass(root, 'segmented__option'),
 			inputs: byClass(root, 'segmented__input'),
 			message: oneByClass(root, 'comparison__message'),
 		};
@@ -48,18 +48,18 @@ describe('createComparisonControls', () => {
 		expect(controls.element).toBe(root as unknown as HTMLElement);
 	});
 
-	it('offers the three sources as one group, starting on the one given', () => {
+	it('offers the three sources as one group named Source, starting on the one given', () => {
 		const { root, inputs } = make('difference');
-		expect(oneByClass(root, 'u-visually-hidden').textContent).toBe(
-			'Temperature source',
-		);
+		expect(oneByClass(root, 'u-visually-hidden').textContent).toBe('Source');
+		expect(COMPARISON_LEGEND).toBe('Source');
 		expect(
 			inputs.map((input) => [input.name, input.value, input.checked]),
 		).toEqual([
-			['temperature-source', 'simulated', false],
-			['temperature-source', 'observed', false],
-			['temperature-source', 'difference', true],
+			[COMPARISON_NAME, 'simulated', false],
+			[COMPARISON_NAME, 'observed', false],
+			[COMPARISON_NAME, 'difference', true],
 		]);
+		expect(COMPARISON_NAME).toBe('source');
 		expect(
 			byClass(root, 'segmented__label').map((label) => label.textContent),
 		).toEqual(['Simulated', 'Observed', 'Difference']);
@@ -72,46 +72,48 @@ describe('createComparisonControls', () => {
 		expect(chosen).toEqual(['observed', 'difference']);
 	});
 
-	it('shows what it is told: offered or not, the source and the message', () => {
+	it('shows what it is told: what is offered, the source and the message', () => {
 		const { controls, root, inputs, message, chosen } = make();
 		expect(message.getAttribute('aria-live')).toBe('polite');
-		controls.show({ offered: true, source: 'observed', message: 'Loading' });
+		controls.show({ offered: SOURCES, source: 'observed', message: 'Loading' });
 		expect(root.hidden).toBe(false);
 		expect(inputs.map((input) => input.checked)).toEqual([false, true, false]);
 		expect(message.textContent).toBe('Loading');
-		controls.show({ offered: true, source: 'simulated', message: null });
+		controls.show({ offered: SOURCES, source: 'simulated', message: null });
 		expect(inputs.map((input) => input.checked)).toEqual([true, false, false]);
 		expect(message.textContent).toBe('');
 		expect(message.hidden).toBe(false);
-		controls.show({ offered: false, source: 'simulated', message: null });
+		controls.show({ offered: [], source: 'simulated', message: null });
 		expect(root.hidden).toBe(true);
 		// Showing a source is not choosing one.
 		expect(chosen).toEqual([]);
 	});
 
-	it('is named as the layer’s comparison names it', () => {
-		const container = fake.createElement('div');
-		createComparisonControls(container as unknown as HTMLElement, {
-			observed: {
-				sourceName: 'made-up-source',
-				sourceLegend: 'Made-up source',
-			},
+	it('shows only the sources offered, Simulated and Observed for the winds alone, and all three again after', () => {
+		const { controls, root, options, inputs } = make();
+		controls.show({
+			offered: WIND_SOURCES,
 			source: 'observed',
-			onSource: () => {},
+			message: null,
 		});
-		const [root] = container.children as [FakeElement];
-		expect(oneByClass(root, 'u-visually-hidden').textContent).toBe(
-			'Made-up source',
-		);
-		expect(
-			byClass(root, 'segmented__input').map((input) => [
-				input.name,
-				input.checked,
-			]),
-		).toEqual([
-			['made-up-source', false],
-			['made-up-source', true],
-			['made-up-source', false],
+		expect(root.hidden).toBe(false);
+		expect(options.map((option) => option.hidden)).toEqual([
+			false,
+			false,
+			true,
 		]);
+		expect(inputs.map((input) => input.disabled)).toEqual([false, false, true]);
+		controls.show({ offered: SOURCES, source: 'difference', message: null });
+		expect(options.map((option) => option.hidden)).toEqual([
+			false,
+			false,
+			false,
+		]);
+		expect(inputs.map((input) => input.disabled)).toEqual([
+			false,
+			false,
+			false,
+		]);
+		expect(inputs.map((input) => input.checked)).toEqual([false, false, true]);
 	});
 });

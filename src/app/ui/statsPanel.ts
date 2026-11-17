@@ -4,8 +4,8 @@
  */
 
 import type { TerrainStats } from '../../core/index';
+import { formatQuantity, SYSTEM_UNITS, type UnitOf } from '../units';
 import { createElement } from './fields';
-import { formatMetres } from './viewPanel';
 
 /** One figure of the readout, as it is written on the page. */
 export type StatsFigure = {
@@ -30,6 +30,14 @@ export type StatsPanel = {
 	 * figures, and the note hidden.
 	 */
 	showPending(): void;
+	/**
+	 * Writes the heights and depths in a unit from now on, and those on the
+	 * page in it at once; the unit they are written in already changes
+	 * nothing.
+	 *
+	 * @param unit - The unit.
+	 */
+	setHeightUnit(unit: UnitOf<'height'>): void;
 };
 
 /** What the readout says while it has no statistics for its world yet. */
@@ -70,21 +78,34 @@ export const formatLandFraction = (fraction: number): string => {
 	return `${percent}%`;
 };
 
+/** A unit heights and depths are written in. */
+type HeightUnit = UnitOf<'height'>;
+
+/** A height or depth in metres, written in a unit, such as `−10,994 m`. */
+const formatHeight = (metres: number, unit: HeightUnit): string =>
+	formatQuantity('height', unit, metres);
+
 /** The figures of the readout, in the order they are shown. */
 const FIGURES: readonly {
 	readonly label: string;
-	readonly format: (stats: TerrainStats) => string;
+	readonly format: (stats: TerrainStats, unit: HeightUnit) => string;
 }[] = [
 	{ label: 'Land', format: (stats) => formatLandFraction(stats.landFraction) },
-	{ label: 'Highest point', format: (stats) => formatMetres(stats.highestM) },
-	{ label: 'Deepest point', format: (stats) => formatMetres(stats.deepestM) },
+	{
+		label: 'Highest point',
+		format: (stats, unit) => formatHeight(stats.highestM, unit),
+	},
+	{
+		label: 'Deepest point',
+		format: (stats, unit) => formatHeight(stats.deepestM, unit),
+	},
 	{
 		label: 'Mean land height',
-		format: (stats) => formatMetres(stats.meanLandHeightM),
+		format: (stats, unit) => formatHeight(stats.meanLandHeightM, unit),
 	},
 	{
 		label: 'Mean ocean depth',
-		format: (stats) => formatMetres(stats.meanOceanDepthM),
+		format: (stats, unit) => formatHeight(stats.meanOceanDepthM, unit),
 	},
 ];
 
@@ -96,14 +117,20 @@ const FIGURES: readonly {
  * the datum, the scale the sea level is set on, so that the deepest point
  * of an ocean reads as a negative number and so does the highest point of
  * a world with no land. The two means are distances from the sea level and
- * are never negative.
+ * are never negative. All four are converted to the unit given and written
+ * whole, with their digits grouped in threes.
  *
  * @param stats - The statistics to show.
+ * @param unit - The unit to write the heights and depths in; metres when
+ * left out.
  * @returns Land, highest point, deepest point, mean land height and mean
  * ocean depth, in that order.
  */
-export const statsFigures = (stats: TerrainStats): StatsFigure[] =>
-	FIGURES.map(({ label, format }) => ({ label, value: format(stats) }));
+export const statsFigures = (
+	stats: TerrainStats,
+	unit: HeightUnit = SYSTEM_UNITS.metric.height,
+): StatsFigure[] =>
+	FIGURES.map(({ label, format }) => ({ label, value: format(stats, unit) }));
 
 /**
  * Adds the statistics readout to the Statistics section of the side panel.
@@ -119,13 +146,23 @@ export const statsFigures = (stats: TerrainStats): StatsFigure[] =>
  * moving. Only the values that differ are rewritten, so only those are
  * announced. The note under the figures never changes and is outside the
  * region. The readout is kept up to date while its section is closed, so
- * that it shows the figures of the moment as it opens.
+ * that it shows the figures of the moment as it opens. A change of the
+ * unit of heights rewrites the figures on the page in it at once, from the
+ * statistics last shown.
  *
  * @param body - The section's body, to add the readout to, after what it
  * holds.
+ * @param heightUnit - The unit to write the heights and depths in at
+ * first; metres when left out.
  * @returns The readout.
  */
-export const createStatsPanel = (body: HTMLElement): StatsPanel => {
+export const createStatsPanel = (
+	body: HTMLElement,
+	heightUnit: HeightUnit = SYSTEM_UNITS.metric.height,
+): StatsPanel => {
+	let unit = heightUnit;
+	/** The statistics on the page, or null while there are none. */
+	let shown: TerrainStats | null = null;
 	const region = createElement('div', 'stats');
 	region.setAttribute('aria-live', 'polite');
 
@@ -152,6 +189,7 @@ export const createStatsPanel = (body: HTMLElement): StatsPanel => {
 
 	/** Says something in place of the figures, with the note hidden. */
 	const showStatus = (text: string): void => {
+		shown = null;
 		// Rewritten only if it differs, as the figures are: the same words
 		// set again would be announced again.
 		if (status.textContent !== text) {
@@ -163,17 +201,32 @@ export const createStatsPanel = (body: HTMLElement): StatsPanel => {
 		}
 	};
 
+	/** Writes the figures of some statistics, those that differ alone. */
+	const write = (stats: TerrainStats): void => {
+		statsFigures(stats, unit).forEach((figure, index) => {
+			const value = values[index];
+			if (value !== undefined && value.textContent !== figure.value) {
+				value.textContent = figure.value;
+			}
+		});
+	};
+
 	return {
 		show: (stats) => {
-			statsFigures(stats).forEach((figure, index) => {
-				const value = values[index];
-				if (value !== undefined && value.textContent !== figure.value) {
-					value.textContent = figure.value;
-				}
-			});
+			shown = stats;
+			write(stats);
 			if (list.parentNode !== region) {
 				region.replaceChildren(list);
 				note.hidden = false;
+			}
+		},
+		setHeightUnit: (next) => {
+			if (next === unit) {
+				return;
+			}
+			unit = next;
+			if (shown !== null) {
+				write(shown);
 			}
 		},
 		showUnavailable: () => showStatus(STATS_UNAVAILABLE_TEXT),

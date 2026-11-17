@@ -51,15 +51,15 @@ describe('createPanelSections', () => {
 		return { panel, title, sections, storage, headings, states, button };
 	};
 
-	it('adds the sections after what the panel holds, in the order World, Layers, View, Planet, Tools, Statistics', () => {
+	it('adds the six sections after what the panel holds, in the order World, View, Planet, Tools, Statistics, Settings', () => {
 		const { panel, title, sections, headings } = make();
 		expect(headings()).toEqual([
 			'World',
-			'Layers',
 			'View',
 			'Planet',
 			'Tools',
 			'Statistics',
+			'Settings',
 		]);
 		expect(panel.children).toEqual([
 			title,
@@ -71,6 +71,7 @@ describe('createPanelSections', () => {
 			expect(body.children).toEqual([]);
 		}
 		expect(sectionBodyId('world')).toBe('section-world');
+		expect(sectionBodyId('settings')).toBe('section-settings');
 	});
 
 	it('opens only World on a first visit, and writes nothing', () => {
@@ -95,10 +96,31 @@ describe('createPanelSections', () => {
 				[panelMemoryKey('planet')]: 'open',
 				[panelMemoryKey('statistics')]: 'open',
 				[panelMemoryKey('tools')]: 'unreadable',
+				[panelMemoryKey('settings')]: 'open',
 			}),
 		);
-		expect(states()).toEqual([false, false, false, true, false, true]);
+		expect(states()).toEqual([false, false, true, false, true, true]);
 		expect(storage.writes).toEqual([]);
+	});
+
+	it('reads no entry for the Layers section, which is gone, and opens as without one', () => {
+		const storage = createFakeStorage({
+			[panelMemoryKey('layers')]: 'open',
+		});
+		const reads: string[] = [];
+		const { panel, headings, states } = make({
+			...storage,
+			getItem: (key) => {
+				reads.push(key);
+				return storage.getItem(key);
+			},
+		});
+		expect(reads).not.toContain(panelMemoryKey('layers'));
+		expect(headings()).not.toContain('Layers');
+		expect(byClass(panel, 'panel__section')).toHaveLength(6);
+		expect(states()).toEqual([true, false, false, false, false, false]);
+		expect(storage.writes).toEqual([]);
+		expect(storage.entries.get(panelMemoryKey('layers'))).toBe('open');
 	});
 
 	it('opens as on a first visit when the storage throws', () => {
@@ -132,21 +154,23 @@ describe('createPanelSections', () => {
 
 	it('remembers each click on a heading, for the next visit', () => {
 		const { button, storage, states } = make();
-		button('layers').fire('click');
+		button('planet').fire('click');
 		button('world').fire('click');
 		button('tools').fire('click');
 		button('tools').fire('click');
+		button('settings').fire('click');
 		expect(storage.writes).toEqual([
-			[panelMemoryKey('layers'), 'open'],
+			[panelMemoryKey('planet'), 'open'],
 			[panelMemoryKey('world'), 'closed'],
 			[panelMemoryKey('tools'), 'open'],
 			[panelMemoryKey('tools'), 'closed'],
+			[panelMemoryKey('settings'), 'open'],
 		]);
 		const before = states();
 
 		const again = make(createFakeStorage(Object.fromEntries(storage.entries)));
 		expect(again.states()).toEqual(before);
-		expect(before).toEqual([false, true, false, false, false, false]);
+		expect(before).toEqual([false, false, true, false, false, true]);
 	});
 
 	it('keeps the controls of a closed section working while its body is hidden', () => {

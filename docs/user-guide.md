@@ -1,26 +1,243 @@
 # User guide
 
-Every control on the page. For how the temperature is worked out, see [Temperature](temperature.md); for the winds, [Winds](winds.md).
+Every control on the page. The globe fills the page, with what it shows chosen and described over it, in [the main view](#the-main-view); [the panel](#the-panel) on the right holds the world, the relief and sea level, the planet, the tools, the statistics and the page's settings. For how the temperature is worked out, see [Temperature](temperature.md); for the winds, [Winds](winds.md).
+
+## The main view
+
+### The tiles
+
+A column of tiles down the left edge of the globe chooses what it shows. Each tile is a button with an icon over its name, and its name shows as a tooltip.
+
+| Tile | What it does |
+|-|-|
+| **Layers:** Terrain, Temperature, Pressure | What the globe is coloured by, one at a time, starting on Terrain on a first visit; see [Layers](#layers). The chosen tile is outlined |
+| **Overlays:** Winds | Draws the surface winds over the globe, as arrows or streaks, starting off on a first visit; see [Winds](#winds) |
+| **Overlays:** Sunlight | Lights the globe from the sun, starting off on a first visit; see [The sun](#the-sun) |
+| **Overlays:** Grid | Draws the outlines of the grid's cells, starting off on a first visit |
+
+- Each overlay tile switches on and off by itself, and is outlined while it is on.
+- The page reopens on the layer and the overlays it was left with; see [What the browser remembers](#what-the-browser-remembers).
+- From the keyboard, Tab reaches the chosen layer's tile, and the arrow keys move the choice to the next layer or the one before, round from the last to the first. Tab then reaches each overlay tile, which Space or Enter switches.
+- In a narrow window only the icons show; the tooltips still name them.
+- In a window too short for all the tiles the column scrolls: turn the mouse wheel over a tile, or move to a tile with the keyboard.
+- The globe can still be turned and sculpted anywhere beside the tiles.
+
+### Layers
+
+The **Layers** tiles over the globe choose what it is coloured by, and the top bar holds the layer's **Show** choice and, on an untouched Earth, the comparison. The month and **Play** are on the [timeline](#the-timeline).
+
+- **Terrain:** the height colours a first visit opens on.
+- **Temperature:** the near-surface air temperature. The relief is still raised and shaded, and the coastline is drawn as a thin line.
+- **Pressure:** the sea-level pressure, in hPa; see [Pressure](#pressure). The relief and the coastline are drawn as in Temperature view.
+
+A new world goes back to July and to Simulated. Each layer keeps its own **Show** while another is on screen.
+
+#### Temperature
+
+In Temperature view, **Show**, in the top bar, chooses what of the year is on the globe:
+
+| Show | What it is |
+|-|-|
+| Month | One month, July to start with, picked or played on the [timeline](#the-timeline) |
+| Annual average | The mean of the twelve months |
+| Warmest month, Coldest month | Each place's own warmest or coldest month, which need not be the same month everywhere |
+| Seasonal range | How far each place's warmest month is above its coldest |
+
+- **The legend,** in the [info box](#the-info-box), says what is shown, such as "Air temperature in July, °C". While a new result is being worked out the box's status line says so, with a progress bar.
+- **On an untouched Earth,** the comparison in the top bar offers the simulated temperature, the observed one, or the difference between them; see [Simulated, observed or difference](#simulated-observed-or-difference) and [Temperature](temperature.md#earth-comparison).
+
+#### Pressure
+
+Pressure view colours the globe by the sea-level pressure of the winds' calculation, in hectopascals, for the month on screen.
+
+- **Reduced to sea level.** The value is what the pressure would be at sea level at that place, so high ground does not show as low pressure: over a mountain it is the sea-level pressure there, not the thinner air at the summit.
+- **Its colours** run from teal for low pressure, through near white, to brown for high. The near white is the planet's own mean over the whole year and the whole surface, and the scale is the same for every month and for the annual average, so a colour means the same in each as the year plays. The scale is at least 10 hPa wide, 0.3 inHg in inHg, and the few places beyond its ends take the end colours.
+- **Show** offers **Month** and **Annual average** only.
+- **The legend** says what is shown, such as "Sea-level pressure in July, hPa" or "Annual average sea-level pressure, hPa". While the temperature and then the winds are being worked out the info box's status line says "Calculating temperature" and then "Calculating winds", as on any layer, and "Pressure unavailable" if they cannot be.
+- **The value under the pointer** gives the pressure there, such as `1,018 hPa`, whether by month or on the annual average.
+- **It is worked out with the winds,** from the temperature, after every change whether or not Pressure or Winds is on, so the colours appear as soon as the winds are ready. Winds can be shown over it.
+- **On an untouched Earth,** the comparison in the top bar offers the simulated pressure, the observed one (the mean sea-level pressure of 1981 to 2010), or the difference between them, as for the temperature. The observed pressure is fetched the first time it is needed: when Observed or Difference is chosen on Pressure, or Pressure is chosen while either is on. A line under the choice says "Loading observed pressure" meanwhile, and "Observed pressure could not be loaded" if it fails. The choice then goes back to Simulated when Pressure is still on screen, and the next choice tries again; if Pressure has been left, the choice is kept and the fetch is tried again on coming back to it.
+  - **The legend** then says where the field comes from, such as "Observed sea-level pressure in July, hPa" or "Simulated less observed in July, hPa", and gives the mean and the root-mean-square of the simulated less the observed for the month or annual average on screen, in hPa, such as `Mean +1.2 hPa · RMS 4.5 hPa`.
+  - **The difference** is drawn from −20 to +20 hPa, marked every 10, or from −0.6 to +0.6 inHg, marked every 0.3, in the temperature difference's blue-to-red colours: blue where the simulated pressure is too low, red where it is too high. The scale is the same for every month and the annual average.
+  - Any edit of the Earth removes the choice and puts it back on Simulated, and undoing the edit offers it again, as for the temperature.
+
+#### Simulated, observed or difference
+
+On an untouched Earth, one control in the top bar chooses where both the layer on screen and the winds come from. What it offers depends on what is on screen:
+
+| On screen | Offered |
+|-|-|
+| Temperature or Pressure, with Winds on or off | Simulated, Observed, Difference |
+| Terrain with Winds on | Simulated, Observed |
+| Terrain with Winds off | Nothing: the control is hidden |
+
+| Choice | The layer | The winds |
+|-|-|-|
+| Simulated | Simulated | Simulated |
+| Observed | Observed | Observed |
+| Difference | The simulated less the observed | Simulated |
+
+- **It starts on Simulated,** and on any world but the untouched Earth there is no control and everything is simulated.
+- **Kept from layer to layer.** Going from Temperature to Pressure, or back, keeps Observed or Difference. The new layer's observed data is fetched then, if it has not been already: the simulated layer shows meanwhile, with its loading line under the control, and if it cannot be fetched the line says so and the choice goes back to Simulated. A fetch that fails after its layer has been left keeps the choice, and is tried again on coming back to that layer.
+- **Going to Terrain** on Difference puts the choice back on Simulated, as it does on Observed with Winds off; on Observed with Winds on it stays, and the arrows stay observed.
+- **Fetched when first needed.** Choosing Observed or Difference fetches the layer's observed data and, while Winds is on, the observed winds; switching Winds on while either is chosen fetches the winds then. If either cannot be fetched while what it is for is still on screen (the layer, or Winds on), the choice goes back to Simulated and its line says so: the layer's under the control, the winds' on the info box's status line.
+- **Any edit removes the control** and puts everything back on Simulated: a stroke, a change of sea level, a planet setting or a new world. Undoing the edit offers it again, on Simulated.
+
+### Winds
+
+The **Winds** tile draws the surface winds as arrows, or as streaks (see [Arrows or streaks](#arrows-or-streaks)), over whichever colours the globe shows, Terrain, Temperature or Pressure. The winds are worked out from the temperature after every change, whether or not Winds is on, and the arrows appear once both are ready. [Winds](winds.md) explains how they are worked out and how far to trust them.
+
+- **Each arrow** points the way the wind blows and stands for the patch of the surface around it: it shows the mean wind of that patch, the winds of its cells averaged as arrows, the larger cells counting for more.
+- **Length and weight** grow with the speed, from 8 pixels just above 0.5 m/s to 26 pixels at 10 m/s, and no further for a stronger wind. A wind below 0.5 m/s is calm and has no arrow.
+- **The same size at every zoom.** The arrows keep their size on the screen. Zooming in brings more of them, closer together on the globe, in steps from about 8° apart to about 2°, so they never crowd one another.
+- **On the relief.** The arrows stand on the raised relief at every exaggeration, and fade out towards the globe's edge, so none show from the far side.
+- **Where the winds stand.** The [info box](#the-info-box)'s status line says "Calculating temperature" and then "Calculating winds" while the temperature they wait for and then the winds are being worked out, "Out of date" after a change they do not yet take in, "Not calculated yet" before the first when nothing is being worked out, "Paused" instead of either of those while paused, and "Winds unavailable" if they cannot be worked out, unless the layer on screen has worse to say.
+
+Which winds are shown follows the layer's **Show**:
+
+| Shown | Winds |
+|-|-|
+| Terrain, or Temperature or Pressure by month | The month on screen. While Winds is on, the [timeline](#the-timeline) also shows in Terrain view |
+| Annual average | The mean of the twelve months, worked out as arrows, so winds that turn round through the year, such as a monsoon's, largely cancel |
+| Warmest month, Coldest month, Seasonal range | The month last on screen |
+
+- While new winds are being worked out, the last ones stay on the globe. A new world drops them until its own are ready.
+- Switching Winds off only removes the arrows: the winds are still worked out after every change, and only the [Pause button](#the-pause-button) stops that.
+- The value under the pointer gives the wind of the place under it; see [The value under the pointer](#the-value-under-the-pointer).
+
+#### Arrows or streaks
+
+**Winds drawn as**, in the [Settings](#settings) section, draws the winds as **Arrows**, as above, or as **Streaks**: many short trails carried along by the wind and fading behind their heads, as on weather maps.
+
+- **Faster and longer where the wind is stronger.** A trail's head moves with the wind where it is, about 15° of arc in three seconds in a 10 m/s wind and half as far in a wind half as strong, so a trail in a 10 m/s wind is about 3° long and one in a gentle wind short. Trails in calm air, below 0.5 m/s, fade out and start again elsewhere.
+- **The same winds as the arrows.** Streaks follow whatever the arrows would show: Simulated or Observed, the month on screen or the year's mean. Playing the year or changing the month changes the winds under the trails, which carry on from where they are.
+- **Each trail lives a few seconds,** fading in and out, and starts again somewhere else in view; one that passes out of view starts again too. There are more of them when the whole globe is in view and fewer close in, where each is longer on the screen; never more than 3,000.
+- **On the relief.** Like the arrows, the streaks lie on the raised relief at every exaggeration, keep their width on the screen, and fade out towards the globe's edge.
+- **The info box** is the same either way.
+- **The page draws continuously only while streaks are moving:** while Streaks is chosen, Winds is on, there are winds to show and the page is visible. Choosing Arrows, switching Winds off or putting the tab in the background stops it, and the page draws only when something changes, as it does with arrows.
+- **Streaks to start with, or arrows with reduced motion.** On a first visit the winds are drawn as streaks, unless your system is set to reduce motion, when they start as arrows, which stand still. Streaks are still offered then, and move only if you choose them; choosing Arrows stops them.
+- The browser remembers the choice (see [What the browser remembers](#what-the-browser-remembers)), and a remembered choice is kept whatever your system's setting.
+
+#### Simulated or observed winds
+
+On an untouched Earth, the comparison in the top bar also chooses whether the arrows are the simulated winds or the observed Earth's: the mean wind ten metres up for each month of 1981 to 2010, on a 1° grid taken onto the world's cells. Observed shows the observed winds; Simulated and Difference show the simulated ones. On Terrain with Winds on it offers Simulated and Observed; see [Simulated, observed or difference](#simulated-observed-or-difference). On any other world there is no control and the arrows are the simulated winds.
+
+- **Fetched when first needed.** Nothing is downloaded until Observed or Difference is chosen with Winds on, or Winds is switched on while either is chosen. Meanwhile the simulated arrows stay and the info box's status line says "Loading observed winds". If the download fails it says "Observed winds could not be loaded", the choice goes back to Simulated, for the layer too, while Winds is still on, and choosing Observed again tries again. Where the results themselves stand comes first on the status line: while they are out of date or being worked out it says that, and the line about the observed winds shows once they are current.
+- **Which month.** The observed arrows follow the month on screen, and on Annual average they are the mean of the observed year, worked out as arrows as the simulated mean is. They need the simulated winds to be ready, as the observed temperature needs the simulated one.
+- **Any edit removes the choice** and puts the arrows back on Simulated, with the layer: a stroke, a change of sea level, a planet setting or a new world. Undoing the edit offers the choice again, on Simulated; the observed winds already fetched are kept.
+- **Never out of date.** While the observed arrows are shown, the status line says nothing of the simulated winds being worked out again.
+- **No figures on the page.** How far the simulated winds are from the observed is measured for the Earth's baseline (see [Winds](winds.md)), but the page does not show it.
+
+### The sun
+
+The star is drawn in the scene as a glowing disc.
+
+- **Where it is.** It stands over longitude 60° W and moves north and south with the month on screen, almost as far as the axial tilt at midsummer.
+- **Finding it.** The page opens with the sun behind the viewer. It can be seen only from the night side, in the gap between the planet's edge and the edge of the view. Zooming out helps, and near the solstices the view has to be tilted as well as turned.
+- **Its size** is drawn larger than life: 2.7° across for Earth's settings, and from about 0.6° to 9.5° across the sliders. A heavier star or a closer orbit draws it larger.
+- **Its colour** follows its surface temperature, worked out from its brightness and mass: red for a cool star, through orange and yellow to near white for one like the Sun, and blue-white for a hot one. Brightness and mass are separate sliders, so a pairing no real star has gives a colour no real star of that mass has.
+
+The **Sunlight** tile lights the globe from the sun:
+
+- **In Terrain view** the day side is evenly lit and the night side drawn at 30% brightness, with a soft edge between them.
+- **In Temperature and Pressure view** the colours are left alone, since a darkened colour would read as another value. The edge between day and night is drawn as a thin line.
+- While Sunlight is on, the [timeline](#the-timeline) also shows in Terrain view, where it moves the sun through the year.
+
+### The top bar
+
+Along the top of the globe, beside the tiles:
+
+- **Show**, while Temperature or Pressure is on screen: what of that layer's year is on the globe; see [Layers](#layers). It is hidden on Terrain.
+- **Simulated, Observed, Difference**, on an untouched Earth: where the layer on screen and the winds come from, one choice for both; see [Simulated, observed or difference](#simulated-observed-or-difference).
+- In a narrow window the two take a line each.
+
+### The timeline
+
+Along the bottom of the globe, beside the tiles, while what is shown depends on the month: Temperature or Pressure on **Month**, or Terrain with Sunlight or Winds on. Otherwise it is hidden.
+
+- **Play** steps through the year, a month a second, from December round to January; while it plays the button shows **Pause**, which stops it on the month shown. It stops by itself on a new world, and when what is shown no longer depends on the month.
+- **The month** is a slider under the twelve months' first letters, with the month shown boxed; July to start with. Drag the slider or click a letter to pick a month. Picking one while the year plays carries on from there.
+- From the keyboard, Tab reaches **Play**, which a screen reader calls "Play the year" (or "Pause the year" while it plays), and then the slider, which the arrow keys move a month at a time; a screen reader hears the month's name.
+- The globe can still be turned and sculpted between the timeline's controls.
+
+### The Pause button
+
+In the top-right corner of the globe. The temperature, and the winds and pressure worked out from it, are worked out again after every change of the world, whatever is on screen, Terrain included: a moment after an edit, and at once for a new world and for the world the page opens on.
+
+- **Pause** stops that, for a slow world or a long run of edits. Edits go on and are saved as ever, but nothing more is worked out; a calculation already under way finishes. The info box's status line says "Paused" while what is on hand is out of date or not calculated yet.
+- **Resume**, as the button reads while paused, with the play icon, works out everything changed meanwhile, once and at once, or nothing if nothing changed.
+- The page always opens unpaused.
+- The statistics are worked out after every change, paused or not.
+- In a narrow window only the icon shows; the tooltip still names it, "Pause" or "Resume".
+
+### The info box
+
+One box over the bottom-right corner of the globe, above the timeline, describes what is on screen. It holds, from the top, only the parts that apply:
+
+- **The legend,** while Temperature or Pressure is on screen: what is shown, such as "Air temperature in July, °C", its colours with values marked under them, and on an untouched Earth the comparison's figures. Places beyond either end of the scale take its end colours; the legend has no words for them; see [Layers](#layers).
+- **One status line** for the calculation, the layer and the winds together, whatever is on screen: "Calculating temperature", with a progress bar, while the temperature is being worked out, then "Calculating winds", with a bar that does not know how far it has come. When things stand differently it says the worst, in this order: unavailable ("Temperature unavailable", "Pressure unavailable", "Winds unavailable"), calculating, "Paused", "Out of date", "Not calculated yet". "Paused" takes the place of the last two while the [Pause button](#the-pause-button) is pressed. While Temperature is on screen and being worked out it gives the years done instead, such as "Calculating · year 3, about 2 to go", with its bar, once it can tell how many are left. While everything is current the line says nothing, except "Loading observed winds" or "Observed winds could not be loaded" when that is so.
+- **The value under the pointer,** while the pointer is over the globe, under a rule; see [The value under the pointer](#the-value-under-the-pointer).
+
+The box has no key to the arrows or streaks, and no figures of the winds against the observed.
+
+- On Terrain with the pointer off the globe, the box shows only while the status line has something to say, as while the temperature or the winds are being worked out.
+- In a narrow window the box takes the whole width beside the tiles. In a window too short for it, its top tucks under the top bar, whose controls stay in front.
+- The globe can still be turned and sculpted through the box.
+- Screen readers hear the status line once each time it changes, and never the value under the pointer.
+
+#### The value under the pointer
+
+The last part of the info box describes the place under the pointer in two lines, each part apart from the next by a middle dot:
+
+- **The place:** its position, then its elevation from the sea level, such as `27.9° N, 86.9° E · 1,234 m` on land or `1.7° N, 49.1° E · 4,628 m deep` at sea.
+- **Its values:** in Temperature or Pressure view the value of what the globe shows, then, while Winds is on, the wind there, such as `28 °C · 15 mph S`. With only one of the two the line holds that one, such as `7 m/s NE` on Terrain with Winds on or `1,018 hPa` with Winds off; with neither there is no second line.
+
+About the layer's value:
+
+- **No month or summary is named:** the value is the same whatever of the year the globe shows, such as `18 °C` by month, on the annual average or as the seasonal range, which the legend's caption names.
+- **"observed"** or **"difference"** follows it when that is what the globe shows: `21 °C observed`, `+2 °C difference`.
+- **"out of date"** follows it when the result on the globe is not current: `28 °C out of date`.
+
+About the wind:
+
+- **Its speed** is in the wind speed's [unit](#units), as a whole number, and its direction is the point of the compass it blows from, one of N, NE, E, SE, S, SW, W and NW: `15 mph S` blows from the south. On Annual average it is the mean wind of the year.
+- **It is the cell's own wind,** from the same winds the arrows are drawn from, not the mean of an arrow's patch, and it is not capped at 10 m/s as the arrows are.
+- **"calm"** below 0.5 m/s, in every unit, with no direction, where no arrow would be drawn.
+- **"observed"** follows the wind while the arrows are the observed winds: `7 m/s W observed` or `calm observed`. A simulated wind has no mark.
+- **"out of date"** follows the wind, apart from the layer's mark, when the winds on the globe are not current, as while new ones are being worked out.
+- There is no wind while Winds is off, or before the first winds are ready.
+- A line too long for the box is cut short.
+
+It works with any tool, and is hidden while the pointer is off the globe.
 
 ## The panel
 
-The panel on the right has six sections, in this order: **World, Layers, View, Planet, Tools, Statistics**.
+The panel on the right has six sections, in this order:
+
+- **[World](#world):** a new world, and saving and loading it.
+- **[View](#view):** the relief exaggeration and the sea level.
+- **[Planet](#planet):** the planet and its star.
+- **[Tools](#tools):** what the left mouse button does on the globe.
+- **[Statistics](#statistics):** the land and the heights and depths of the terrain.
+- **[Settings](#settings):** how the winds are drawn, and the units.
+
+How the sections behave:
 
 - Each section opens and closes from its heading, by mouse or with Enter or Space.
-- On a first visit only World is open. The browser remembers which sections are open; this is a browser setting, not part of the world.
+- On a first visit only World is open; after that the panel opens as it was left; see [What the browser remembers](#what-the-browser-remembers).
 - While Tools is closed, its heading names the tool chosen, such as `Tools · Raise`.
-- Ticking **Sunlight** or **Winds** opens Layers if it is closed, because that is where their month controls are. Nothing else opens or closes a section by itself.
+- No section opens or closes by itself: switching **Sunlight** or **Winds** on leaves the panel as it is.
 - A closed section's controls are skipped by the Tab key.
 
-## World
+### World
 
-### Making a world
+#### Making a world
 
 The first visit opens on a blank ocean with the New world dialog showing. **New world**, in the World section, brings the dialog back at any time.
 
 | Option | Choices |
 |-|-|
-| Resolution | 64, 128 or 256 cells along each edge of a cube face: cells of about 150, 75 or 40 km |
+| Resolution | 64, 128 or 256 cells along each edge of a cube face: cells of about 150, 75 or 40 km (about 95, 45 or 25 mi in Imperial) |
 | Start with | A blank ocean, generated continents, or the Earth |
 | Seed (generated only) | A whole number from 0 to 4294967295. Blank picks one at random; **Random** fills one in |
 | Land (generated only) | The share of the surface to make land, 0 to 100% |
@@ -35,7 +252,7 @@ Two lines under the World heading describe the world:
 - **How it started**, such as `Generated · 64 · seed 1977 · 30% land` or `Earth · 128`. To get a generated world back, enter the same seed and land.
 - **The date**, such as `Year 0 · July`: the world's age and, where it applies, the month or summary on screen. Ages are rounded down, and large ones are written as `12,345 years`, `2.4 million years` or `4.5 billion years`.
 
-### Saving
+#### Saving
 
 - **Autosave.** The world is saved in the browser about a second after each change, and at once when the page is closed, refreshed or put in the background. Reopening the page brings it back. "Saved" under the World buttons confirms the last save.
 - **"Autosave unavailable"** means the browser would not store the world, as some will not in a private window. The page still works, but the world will not come back.
@@ -44,47 +261,20 @@ Two lines under the World heading describe the world:
 
 **What is saved,** in the browser and in a file: the terrain, resolution, sea level, planet settings, date, and how the world started.
 
-**What is not saved:** the undo history, the camera, the view, layer, month and tool settings, and the temperature, which is worked out again.
+**What is not saved with the world:** the undo history, the camera, the view, layer, month and tool settings, and the temperature, which is worked out again. Some of these the browser remembers on its own; see [What the browser remembers](#what-the-browser-remembers).
 
 A file saved before planet settings and dates existed loads with Earth's settings at Year 0.
 
-## Tools
-
-The Tools section chooses what the left mouse button does on the globe.
-
-| Tool | Left-drag | Turning the globe |
-|-|-|-|
-| Move | Turns the globe | Left-drag; the wheel zooms |
-| Raise, Lower, Smooth | Sculpts the terrain under the brush | Right-drag; the wheel zooms |
-
-- **Brush radius:** 100 to 3,000 km.
-- **Brush strength:** for Raise and Lower, how fast the ground at the centre of the brush rises or falls, 100 to 5,000 m/s. For Smooth, a setting from 1 (gentlest) to 100. The two are kept separately.
-
-### Undo and redo
-
-| Action | Keys |
-|-|-|
-| Undo | Ctrl+Z, or Cmd+Z on a Mac |
-| Redo | Ctrl+Shift+Z or Ctrl+Y, or Cmd+Shift+Z on a Mac |
-
-- Up to the last 100 strokes can be undone, or fewer once they hold about 64 MB between them.
-- A new stroke after an undo discards what could have been redone.
-- **Only the terrain is undone.** The sea level, planet settings, view and tool settings are not part of the history.
-
-## View
+### View
 
 | Control | Range | What it does |
 |-|-|-|
 | Relief exaggeration | 1× to 100×, starting at 40× | How much taller than true scale the land is drawn. Only the drawing changes |
-| Sea level | −6,000 to 6,000 m in steps of 10 m | Where the sea stands. Raising it floods low ground. It is part of the world |
-| Show cell grid | On or off | Draws the outlines of the grid's cells |
-| Sunlight | On or off | Lights the globe from the sun; see [The sun](#the-sun). Not saved |
-| Winds | On or off, starting off | Draws the surface winds over the globe, as arrows or streaks; see [Winds](#winds). Not saved |
-| Winds drawn as | Arrows or Streaks, starting on Arrows | Whether the winds are drawn as arrows that stand still or as streaks carried along by the wind; see [Arrows or streaks](#arrows-or-streaks). Shown whether or not Winds is on. The browser remembers it, as it does the wind speed unit; it is not saved with the world |
-| Winds shown | Simulated or Observed, starting on Simulated | On an untouched Earth only: whether the arrows are the simulated winds or the observed Earth's; see [Simulated or observed winds](#simulated-or-observed-winds). Hidden on any other world |
-| Wind speed | m/s, km/h or mph, starting on m/s | The unit wind speeds are written in, in the strip under the pointer and the key to the arrows. It changes both at once, and does not change the arrows. Shown whether or not Winds is on. The browser remembers it, as it does the open sections; it is not saved with the world |
+| Sea level | −6,000 to 6,000 m in steps of 10 m (in metric; it follows the [units](#units)) | Where the sea stands. Raising it floods low ground. It is part of the world |
 
-## Planet
+How the winds are drawn and the units are in the [Settings](#settings) section.
+
+### Planet
 
 The Planet section sets the planet and its star. The settings are saved with the world. Each slider shows its value, and a mark on its track shows Earth's.
 
@@ -106,135 +296,73 @@ Under the sliders:
 
 **Reset to Earth** puts all six settings back at once. Planet changes are not part of undo. On the Earth, any change of a setting removes the Earth comparison, any day length but 24 hours included, and putting it back brings the comparison back.
 
-## Layers
+### Tools
 
-The Layers section chooses what the globe is coloured by.
+The Tools section chooses what the left mouse button does on the globe.
 
-- **Terrain:** the height colours the page opens on.
-- **Temperature:** the near-surface air temperature. The relief is still raised and shaded, and the coastline is drawn as a thin line.
-- **Pressure:** the sea-level pressure, in hPa; see [Pressure](#pressure). The relief and the coastline are drawn as in Temperature view.
+| Tool | Left-drag | Turning the globe |
+|-|-|-|
+| Move | Turns the globe | Left-drag; the wheel zooms |
+| Raise, Lower, Smooth | Sculpts the terrain under the brush | Right-drag; the wheel zooms |
 
-In Temperature view, **Show** chooses what of the year is on the globe:
+- **Brush radius:** 100 to 3,000 km (in metric; it follows the [units](#units)).
+- **Brush strength:** for Raise and Lower, how fast the ground at the centre of the brush rises or falls, 100 to 5,000 m/s (in metric; it follows the [units](#units)). For Smooth, a setting from 1 (gentlest) to 100. The two are kept separately.
 
-| Show | What it is |
+#### Undo and redo
+
+| Action | Keys |
 |-|-|
-| Month | One month, July to start with. A slider picks the month; **Play** steps through the year, a month a second |
-| Annual average | The mean of the twelve months |
-| Warmest month, Coldest month | Each place's own warmest or coldest month, which need not be the same month everywhere |
-| Seasonal range | How far each place's warmest month is above its coldest |
+| Undo | Ctrl+Z, or Cmd+Z on a Mac |
+| Redo | Ctrl+Shift+Z or Ctrl+Y, or Cmd+Shift+Z on a Mac |
 
-- **The legend** sits over the bottom-right corner of the globe and says what is shown, such as "Air temperature in July, °C". While a new result is being worked out it says "Calculating" with a progress bar.
-- **On an untouched Earth,** a second choice offers the simulated temperature, the observed one, or the difference between them. See [Temperature](temperature.md#earth-comparison).
-- The layer, the view and the month are not saved. A new world goes back to July. Each layer keeps its own **Show** while another is on screen.
+- Up to the last 100 strokes can be undone, or fewer once they hold about 64 MB between them.
+- A new stroke after an undo discards what could have been redone.
+- **Only the terrain is undone.** The sea level, planet settings, view and tool settings are not part of the history.
 
-### Pressure
+### Statistics
 
-Pressure view colours the globe by the sea-level pressure of the winds' calculation, in hectopascals, for the month on screen.
-
-- **Reduced to sea level.** The value is what the pressure would be at sea level at that place, so high ground does not show as low pressure: over a mountain it is the sea-level pressure there, not the thinner air at the summit.
-- **Its colours** run from teal for low pressure, through near white, to brown for high. The near white is the planet's own mean over the whole year and the whole surface, and the scale is the same for every month and for the annual average, so a colour means the same in each as the year plays. The scale is at least 10 hPa wide, and the few places beyond its ends take the end colours.
-- **Show** offers **Month** and **Annual average** only.
-- **The legend** says what is shown, such as "Sea-level pressure in July, hPa" or "Annual average sea-level pressure, hPa". While the winds are being worked out it says "Calculating", with no year count, and "Pressure unavailable" if they cannot be.
-- **The strip under the pointer** gives the pressure there, such as `July 1,018 hPa` or `Annual average 1,013 hPa`.
-- **It is worked out with the winds,** from the temperature. Choosing Pressure asks for them even while Winds is off, and the colours appear once they are ready. Winds can be shown over it.
-- **On an untouched Earth,** a second choice offers the simulated pressure, the observed one (the mean sea-level pressure of 1981 to 2010), or the difference between them, as for the temperature. The observed pressure is fetched the first time Observed or Difference is chosen; a line under the choice says "Loading observed pressure" meanwhile, and "Observed pressure could not be loaded" if it fails, when the choice goes back to Simulated and the next choice tries again.
-  - **The legend** then says where the field comes from, such as "Observed sea-level pressure in July, hPa" or "Simulated less observed in July, hPa", and gives the mean and the root-mean-square of the simulated less the observed for the month or annual average on screen, in hPa, such as `Mean +1.2 hPa · RMS 4.5 hPa`.
-  - **The difference** is drawn from −20 to +20 hPa, marked every 10, in the temperature difference's blue-to-red colours: blue where the simulated pressure is too low, red where it is too high. The scale is the same for every month and the annual average.
-  - Any edit of the Earth removes the choice and puts it back on Simulated, and undoing the edit offers it again, as for the temperature.
-
-### The value under the pointer
-
-A strip at the bottom left of the globe describes the place under the pointer:
-
-- its position, such as `27.9° N, 86.9° E`;
-- its elevation from the sea level, such as `1,234 m` on land or `3,400 m deep` at sea;
-- in Temperature or Pressure view, its value in what the globe shows, such as `July 18 °C`, `Seasonal range 12 °C` or `July 1,018 hPa`, followed by "out of date" when the result on the globe is not current;
-- while Winds is on, on a line of its own, the wind there: its speed in the **Wind speed** unit, as a whole number, and the direction it blows from, one of the eight points of the compass, such as `7 m/s from the north-east`.
-
-About the wind's line:
-
-- **It is the cell's own wind,** from the same winds the arrows are drawn from, not the mean of an arrow's patch, and it is not capped at 10 m/s as the arrows are.
-- **"calm"** below 0.5 m/s, in every unit, where no arrow would be drawn.
-- **On Annual average** it is the mean wind of the year and says so: `Annual average 7 m/s from the north-east`.
-- **"observed"** ends the line while the arrows are the observed winds: `7 m/s from the west observed`, `Annual average 7 m/s from the west observed`, or `calm observed`. A simulated wind has no mark.
-- **"out of date"** follows the wind, apart from the temperature's mark, when the winds on the globe are not current, as while new ones are being worked out.
-- There is no wind line while Winds is off, or before the first winds are ready.
-
-It works with any tool, and is hidden while the pointer is off the globe. In a narrow window it moves above the legend. Screen readers read the legend but not the strip.
-
-## The sun
-
-The star is drawn in the scene as a glowing disc.
-
-- **Where it is.** It stands over longitude 60° W and moves north and south with the month on screen, almost as far as the axial tilt at midsummer.
-- **Finding it.** The page opens with the sun behind the viewer. It can be seen only from the night side, in the gap between the planet's edge and the edge of the view. Zooming out helps, and near the solstices the view has to be tilted as well as turned.
-- **Its size** is drawn larger than life: 2.7° across for Earth's settings, and from about 0.6° to 9.5° across the sliders. A heavier star or a closer orbit draws it larger.
-- **Its colour** follows its surface temperature, worked out from its brightness and mass: red for a cool star, through orange and yellow to near white for one like the Sun, and blue-white for a hot one. Brightness and mass are separate sliders, so a pairing no real star has gives a colour no real star of that mass has.
-
-**Sunlight**, in the View section, lights the globe from the sun:
-
-- **In Terrain view** the day side is evenly lit and the night side drawn at 30% brightness, with a soft edge between them.
-- **In Temperature and Pressure view** the colours are left alone, since a darkened colour would read as another value. The edge between day and night is drawn as a thin line.
-- While Sunlight is on, the month slider and **Play** also show in Terrain view, where they move the sun through the year.
-
-## Winds
-
-**Winds**, in the View section, draws the surface winds as arrows, or as streaks (see [Arrows or streaks](#arrows-or-streaks)), over whichever colours the globe shows, Terrain, Temperature or Pressure. The winds are worked out from the temperature, so ticking Winds asks for the temperature too, and the arrows appear once both are ready. [Winds](winds.md) explains how they are worked out and how far to trust them.
-
-- **Each arrow** points the way the wind blows and stands for the patch of the surface around it: it shows the mean wind of that patch, the winds of its cells averaged as arrows, the larger cells counting for more.
-- **Length and weight** grow with the speed, from 8 pixels just above 0.5 m/s to 26 pixels at 10 m/s, and no further for a stronger wind. A wind below 0.5 m/s is calm and has no arrow.
-- **The same size at every zoom.** The arrows keep their size on the screen. Zooming in brings more of them, closer together on the globe, in steps from about 8° apart to about 2°, so they never crowd one another.
-- **On the relief.** The arrows stand on the raised relief at every exaggeration, and fade out towards the globe's edge, so none show from the far side.
-- **The key** beside the legend shows arrows of 5 m/s and of 10 m/s or more, labelled "10+ m/s", at the size they are drawn on the globe. In km/h they are labelled "18 km/h" and "36+ km/h", and in mph "11 mph" and "22+ mph"; see **Wind speed** in [View](#view). Under them it says "Calculating" while the winds, or the temperature they wait for, are being worked out, "Out of date" after a change they do not yet take in, "Not calculated yet" before the first when nothing is being worked out, and "Winds unavailable" if they cannot be worked out.
-
-Which winds are shown follows the Layers section:
-
-| Shown | Winds |
-|-|-|
-| Terrain, or Temperature or Pressure by month | The month on screen. While Winds is on, the month slider and **Play** also show in Terrain view |
-| Annual average | The mean of the twelve months, worked out as arrows, so winds that turn round through the year, such as a monsoon's, largely cancel |
-| Warmest month, Coldest month, Seasonal range | The month last on screen |
-
-- While new winds are being worked out, the last ones stay on the globe. A new world drops them until its own are ready.
-- Clearing Winds removes the arrows and stops the winds being worked out, unless Pressure is on screen, which needs them.
-- The strip under the pointer gives the wind of the place under it; see [The value under the pointer](#the-value-under-the-pointer).
-
-### Arrows or streaks
-
-**Winds drawn as**, under Winds in the View section, draws the winds as **Arrows**, as above, or as **Streaks**: many short trails carried along by the wind and fading behind their heads, as on weather maps.
-
-- **Faster and longer where the wind is stronger.** A trail's head moves with the wind where it is, about 15° of arc in three seconds in a 10 m/s wind and half as far in a wind half as strong, so a trail in a 10 m/s wind is about 3° long and one in a gentle wind short. Trails in calm air, below 0.5 m/s, fade out and start again elsewhere.
-- **The same winds as the arrows.** Streaks follow whatever the arrows would show: Simulated or Observed, the month on screen or the year's mean. Playing the year or changing the month changes the winds under the trails, which carry on from where they are.
-- **Each trail lives a few seconds,** fading in and out, and starts again somewhere else in view; one that passes out of view starts again too. There are more of them when the whole globe is in view and fewer close in, where each is longer on the screen; never more than 3,000.
-- **On the relief.** Like the arrows, the streaks lie on the raised relief at every exaggeration, keep their width on the screen, and fade out towards the globe's edge.
-- **The key** keeps its caption, its status line and, on an untouched Earth, its two lines of figures, and in place of its arrows says "Faster, longer streaks are stronger winds".
-- **The page draws continuously only while streaks are moving:** while Streaks is chosen, Winds is on, there are winds to show and the page is visible. Choosing Arrows, clearing Winds or putting the tab in the background stops it, and the page draws only when something changes, as it does with arrows.
-- **Reduced motion.** Streaks are offered even when your system is set to reduce motion, since they move only if you choose them; choosing Arrows stops them.
-- The browser remembers the choice, as it does the open sections and the wind speed unit. Winds itself still starts off at each visit.
-
-### Simulated or observed winds
-
-On an untouched Earth, **Winds shown**, under Winds in the View section, chooses whether the arrows are the simulated winds or the observed Earth's: the mean wind ten metres up for each month of 1981 to 2010, on a 1° grid taken onto the world's cells. On any other world it is hidden and the arrows are the simulated winds.
-
-- **Fetched when first chosen.** Nothing is downloaded until Observed is chosen. Meanwhile the simulated arrows stay and the key says "Loading observed winds". If the download fails the key says "Observed winds could not be loaded", the choice goes back to Simulated, and choosing Observed again tries again. Where the winds themselves stand comes first on the key's line: while they are out of date or being worked out it says that, and the line about the observed winds shows once they are current.
-- **Which month.** The observed arrows follow the month on screen, and on Annual average they are the mean of the observed year, worked out as arrows as the simulated mean is. They need the simulated winds to be ready, as the observed temperature needs the simulated one.
-- **Any edit removes the choice** and puts the arrows back on Simulated: a stroke, a change of sea level, a planet setting or a new world. Undoing the edit offers the choice again, on Simulated; the observed winds already fetched are kept.
-- **Never out of date.** While the observed arrows are shown, the key says nothing of the simulated winds being worked out again.
-
-Once the observed winds have been fetched, the key gives two lines under its arrows, whichever is shown, for as long as the world is the untouched Earth:
-
-| Line | What it means |
-|-|-|
-| Off by 3.8 m/s on average | The area-weighted root-mean-square difference between the simulated and the observed wind, as vectors, in the **Wind speed** unit to one decimal, such as `Off by 13.7 km/h on average`. It changes with the unit at once |
-| Direction right on 61% of the map | The share of the surface, where the observed wind is at least 1 m/s, on which the simulated wind points within 45° of the observed, as a whole percentage. A calm simulated wind there counts as pointing wrongly |
-
-- **The month's or the year's.** By month the figures are the month's on screen; on Annual average they are the whole year's, every cell of every month taken together.
-- **The tooltip** of each line gives its exact definition.
-- **While the simulated winds are out of date** the figures stay under the simulated arrows, describing the winds on the globe, and are left off under the observed ones, as the legend does with the temperature's figures.
-
-## Statistics
-
-The Statistics section shows how much of the surface is land, the highest and deepest points, the mean height of the land and the mean depth of the ocean. It follows the terrain and the sea level, a moment after each change.
+The Statistics section shows how much of the surface is land, the highest and deepest points, the mean height of the land and the mean depth of the ocean, in the [unit](#units) of heights and depths. It follows the terrain and the sea level, a moment after each change.
 
 - The highest and deepest points are elevations on the scale of the Sea level slider. The two means are measured from the sea level.
 - "Statistics unavailable" means the worker that computes them could not start or failed. The rest of the page keeps working; reload the page to try again.
+
+### Settings
+
+The Settings section holds how the winds are drawn and the units. The browser remembers both, apart from the world; see [What the browser remembers](#what-the-browser-remembers).
+
+#### Winds drawn as
+
+**Winds drawn as** chooses **Arrows** or **Streaks**, starting on Streaks, or on Arrows when your system is set to reduce motion. It is shown whether or not Winds is on. What each draws is under [Arrows or streaks](#arrows-or-streaks) in Winds.
+
+#### Units
+
+**Metric** or **Imperial**, starting on Metric, chooses the system of units: Metric is °C, hPa, m/s, m and km; Imperial is °F, inHg, mph, ft and mi. Choosing one sets every quantity to that system and clears every override, putting each drop-down below back to As the system. It does so also when you click the one already chosen, or press Space on it.
+
+Under the system, a drop-down for each quantity overrides it:
+
+| Drop-down | Units |
+|-|-|
+| Temperature | °C, °F or K |
+| Pressure | hPa or inHg |
+| Wind speed | m/s, mph, km/h or knots |
+| Heights and depths | m or ft |
+| Distances | km or mi |
+
+Each starts on **As the system**, which names the unit the system gives, such as "As the system (°C)". A unit chosen in one is kept whatever the system, until you next choose Metric or Imperial.
+
+What the page writes follows these choices, and changes at once, with no new calculation:
+
+- **The legend:** its caption names the unit, such as "Air temperature in July, °F", and its ticks and error figures are in it. Its scale is fitted in the unit, so its ends and ticks are round there: whole degrees in °F and K, and two decimals in inHg, such as `29.70` and `30.00`.
+- **The value under the pointer:** the height or depth, such as `4,049 ft` or `11,155 ft deep`, the value of the layer, such as `65 °F` or `29.92 inHg`, and the wind.
+- **The Statistics:** the highest and deepest points and the two means.
+- **The controls:** the Sea level, in the unit of heights, such as `98 ft`; the brush's radius, in the unit of distances, such as `311 mi`; the brush's strength for Raise and Lower, in the unit of heights a second, such as `3,281 ft/s`; and the New world dialog's cell sizes, in the unit of distances, such as "about 95 mi cells". The sliders still step in metres and kilometres underneath, so the figures beside them are those steps converted and rounded to a whole unit: the Sea level steps read 33 ft, 66 ft, 98 ft and so on. Smoothing's setting has no unit.
+
+A seasonal range and a difference are converted by the unit's size alone: a range of 10 °C reads 18 °F, not 50 °F. Each unit has round settings of its own, chosen rather than converted: the narrowest scale is 2 °C, 4 °F or 2 K, and 10 hPa or 0.3 inHg wide; the seasonal range is marked every 5 °C, 10 °F or 5 K; and the difference runs from −20 to +20 °C marked every 10, −40 to +40 °F every 20, −20 to +20 K every 10, −20 to +20 hPa every 10, or −0.6 to +0.6 inHg every 0.3.
+
+The colours on the globe stay as they are, except that a scale's rounded ends can move them a little, and a difference's colours shift more, since its reach in °F or inHg is not quite that in °C or hPa. The arrows do not change with the unit, and no slider moves.
+
+A wind speed unit saved by an older version of the page is kept once as the wind speed's override, m/s included, until you next choose Metric or Imperial.
+
+## What the browser remembers
+
+The browser remembers, from one visit to the next, the layer, each layer's **Show**, the Winds, Sunlight and Grid overlays, which panel sections are open, arrows or streaks, and the units. It never remembers the month, which starts on July, the comparison, which starts on Simulated, or Pause, nor the camera, the relief exaggeration or the tool settings. None of this is saved with the world, and a new or imported world leaves it as it is. Clearing the site's data in the browser puts it all back as on a first visit.

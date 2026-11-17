@@ -64,11 +64,7 @@ import type { ColourRamp, ValueRange } from './ramp';
 import { createWindStreaks } from './streaks';
 import { createSunMaterial, shapeSun, sunPosition } from './sun';
 import { createWindArrows, pixelsPerRadian, type WindField } from './wind';
-import {
-	createWindMotion,
-	DEFAULT_WIND_STYLE,
-	type WindStyle,
-} from './windMotion';
+import { createWindMotion, type WindStyle } from './windMotion';
 
 /** The most device pixels drawn per CSS pixel, to bound the cost per frame. */
 const MAX_PIXEL_RATIO = 2;
@@ -183,7 +179,8 @@ export type Globe = {
 	 */
 	setWinds(field: WindField | null): void;
 	/**
-	 * Draws the winds as arrows or as streaks; it starts on arrows.
+	 * Draws the winds as arrows or as streaks; it starts on the way the
+	 * globe was made with.
 	 *
 	 * @remarks
 	 * While streaks are drawn, the arrows are not, and while there are winds
@@ -310,10 +307,15 @@ const toVector3 = (v: Vec3): Vector3 => new Vector3(v[0], v[1], v[2]);
  *
  * @param canvas - The canvas to draw on. Its size on the page is left to
  * the stylesheet; the drawing follows it.
+ * @param startStyle - How the winds are drawn from the first frame, until
+ * {@link Globe.setWindStyle} says otherwise.
  * @returns The globe.
  * @throws Error if the browser cannot provide a WebGL 2 context.
  */
-export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
+export const createGlobe = (
+	canvas: HTMLCanvasElement,
+	startStyle: WindStyle,
+): Globe => {
 	let renderer: WebGLRenderer;
 	try {
 		renderer = new WebGLRenderer({
@@ -371,7 +373,6 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 	const arrows = createWindArrows(uniforms);
 	arrows.mesh.matrix.copy(mesh.matrix);
 	arrows.mesh.matrixWorldNeedsUpdate = true;
-	scene.add(arrows.mesh);
 
 	// So do the streaks, which are in the scene in the arrows' place while
 	// they are the way the winds are drawn.
@@ -380,7 +381,8 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 		streakMesh.matrix.copy(mesh.matrix);
 		streakMesh.matrixWorldNeedsUpdate = true;
 	}
-	let windStyle: WindStyle = DEFAULT_WIND_STYLE;
+	let windStyle: WindStyle = startStyle;
+	scene.add(...(windStyle === 'streaks' ? streaks.meshes : [arrows.mesh]));
 
 	let cameraState = createCameraState();
 	let elevation: CellTexture | null = null;
@@ -462,7 +464,7 @@ export const createGlobe = (canvas: HTMLCanvasElement): Globe => {
 			render();
 		},
 	});
-	const motion = createWindMotion(frames);
+	const motion = createWindMotion(frames, windStyle);
 
 	const invalidate = (): void => frames.invalidate();
 

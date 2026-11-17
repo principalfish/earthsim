@@ -1,66 +1,69 @@
 /**
- * The comparison controls in the Layers section: where a layer on the globe,
- * such as the temperature, comes from, Simulated, Observed or the
- * Difference of the two, offered only while the world is the measured
- * Earth, with a line for what the page has to say of the observed year.
+ * The comparison control in the top bar over the globe: where the layer on
+ * screen and the winds come from, Simulated, Observed or the Difference of
+ * the two, offered only while the world is the measured Earth, with a line
+ * for what the page has to say of the observed year.
  *
- * The controls only show what they are told and pass on what is chosen;
- * the layer panel decides when they are offered.
+ * The control only shows what it is told and passes on what is chosen; the
+ * layer panel decides what it offers.
  */
 
-import type { ObservedComparison } from '../scalarLayer';
 import { SOURCE_LABELS, SOURCES, type Source } from '../view';
 import { createElement, createSegmentedChoice } from './fields';
 
-/** What the comparison controls show at one moment. */
+/** The name of the comparison's group of radio buttons. */
+export const COMPARISON_NAME = 'source';
+
+/** What a screen reader names the comparison's group by. */
+export const COMPARISON_LEGEND = 'Source';
+
+/** What the comparison control shows at one moment. */
 export type ComparisonContent = {
 	/**
-	 * Whether the choice is offered. While it is not, the controls and
-	 * their line are hidden.
+	 * The sources offered, in the order of {@link SOURCES}. While none is,
+	 * the control and its line are hidden.
 	 */
-	readonly offered: boolean;
+	readonly offered: readonly Source[];
 	/** The source shown as chosen. */
 	readonly source: Source;
 	/** What the line under the choice says, or null for nothing. */
 	readonly message: string | null;
 };
 
-/** What the comparison controls start with and whom they tell of a choice. */
+/** What the comparison control starts with and whom it tells of a choice. */
 export type ComparisonControlsOptions = {
-	/** The layer's comparison, which names the controls. */
-	readonly observed: Pick<ObservedComparison, 'sourceName' | 'sourceLegend'>;
 	/** The source shown as chosen at first. */
 	readonly source: Source;
 	/** Called with the source when another is chosen. */
 	readonly onSource: (source: Source) => void;
 };
 
-/** The comparison controls on the page. */
+/** The comparison control on the page. */
 export type ComparisonControls = {
-	/** The controls, as they were added to the container. */
+	/** The control, as it was added to the container. */
 	readonly element: HTMLElement;
 	/** Shows the content given. */
 	show(content: ComparisonContent): void;
 };
 
 /**
- * Adds the comparison controls to a container, hidden until they are
+ * Adds the comparison control to a container, hidden until something is
  * offered.
  *
  * @remarks
- * The choice is a row of three segments, built like the choice of layer,
- * named as the layer's comparison names it, such as `temperature-source`,
- * whose group a screen reader names by the comparison's words, such as
- * "Temperature source". The line under
- * it is a polite live region, so a screen reader announces a message such
- * as a failed load without the focus moving. It is rewritten only when its
- * words change, and while the controls show it is left empty rather than
- * hidden when there is nothing to say.
+ * The choice is a row of three segments, built like a choice of layer,
+ * named {@link COMPARISON_NAME}, whose group a screen reader names
+ * {@link COMPARISON_LEGEND}. A source not offered has its segment hidden
+ * and out of reach, so that over the terrain with the winds on the row
+ * holds Simulated and Observed alone. The line under it is a polite live
+ * region, so a screen reader announces a message such as a failed load
+ * without the focus moving. It is rewritten only when its words change,
+ * and while the control shows it is left empty rather than hidden when
+ * there is nothing to say.
  *
- * @param container - Where to add the controls, after what it holds.
- * @param options - The layer's comparison, the starting source and whom to
- * tell of a choice.
- * @returns The controls.
+ * @param container - Where to add the control, after what it holds.
+ * @param options - The starting source and whom to tell of a choice.
+ * @returns The control.
  */
 export const createComparisonControls = (
 	container: HTMLElement,
@@ -69,8 +72,8 @@ export const createComparisonControls = (
 	const element = createElement('div', 'comparison');
 	element.hidden = true;
 	const choice = createSegmentedChoice({
-		name: options.observed.sourceName,
-		legend: options.observed.sourceLegend,
+		name: COMPARISON_NAME,
+		legend: COMPARISON_LEGEND,
 		choices: SOURCES.map((value) => ({
 			value,
 			label: SOURCE_LABELS[value],
@@ -86,7 +89,8 @@ export const createComparisonControls = (
 	return {
 		element,
 		show: (content) => {
-			element.hidden = !content.offered;
+			element.hidden = content.offered.length === 0;
+			choice.setOffered(content.offered);
 			choice.setValue(content.source);
 			const text = content.message ?? '';
 			if (message.textContent !== text) {

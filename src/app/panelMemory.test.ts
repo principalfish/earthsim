@@ -30,21 +30,21 @@ describe('createPanelMemory', () => {
 	it('remembers each section as open or closed in an entry of its own', () => {
 		const storage = createFakeStorage();
 		const memory = createPanelMemory(storage);
-		memory.setOpen('layers', true);
+		memory.setOpen('statistics', true);
 		memory.setOpen('world', false);
 		expect(storage.entries).toEqual(
 			new Map([
-				[panelMemoryKey('layers'), OPEN_ENTRY],
+				[panelMemoryKey('statistics'), OPEN_ENTRY],
 				[panelMemoryKey('world'), CLOSED_ENTRY],
 			]),
 		);
-		expect(memory.isOpen('layers', false)).toBe(true);
+		expect(memory.isOpen('statistics', false)).toBe(true);
 		expect(memory.isOpen('world', true)).toBe(false);
 		expect(memory.isOpen('view', true)).toBe(true);
 		expect(memory.isOpen('view', false)).toBe(false);
 
-		memory.setOpen('layers', false);
-		expect(memory.isOpen('layers', true)).toBe(false);
+		memory.setOpen('statistics', false);
+		expect(memory.isOpen('statistics', true)).toBe(false);
 		expect(memory.isOpen('world', true)).toBe(false);
 	});
 
@@ -80,7 +80,7 @@ describe('createPanelMemory', () => {
 	it('gives the fallback, and no error, from storage that throws on reading', () => {
 		const memory = createPanelMemory(refusingStorage);
 		expect(memory.isOpen('world', true)).toBe(true);
-		expect(memory.isOpen('layers', false)).toBe(false);
+		expect(memory.isOpen('statistics', false)).toBe(false);
 	});
 
 	it('carries on, without an error, past storage that throws on writing', () => {
@@ -89,8 +89,8 @@ describe('createPanelMemory', () => {
 			getItem: storage.getItem,
 			setItem: refusingStorage.setItem,
 		});
-		expect(() => memory.setOpen('layers', true)).not.toThrow();
-		expect(memory.isOpen('layers', false)).toBe(false);
+		expect(() => memory.setOpen('statistics', true)).not.toThrow();
+		expect(memory.isOpen('statistics', false)).toBe(false);
 		expect(() =>
 			createPanelMemory(refusingStorage).setOpen('world', false),
 		).not.toThrow();
@@ -99,8 +99,8 @@ describe('createPanelMemory', () => {
 	it('gives the fallback, and no error, with no storage at all', () => {
 		for (const storage of [null, undefined]) {
 			const memory = createPanelMemory(storage);
-			expect(() => memory.setOpen('layers', true)).not.toThrow();
-			expect(memory.isOpen('layers', false)).toBe(false);
+			expect(() => memory.setOpen('statistics', true)).not.toThrow();
+			expect(memory.isOpen('statistics', false)).toBe(false);
 			expect(memory.isOpen('world', true)).toBe(true);
 		}
 	});

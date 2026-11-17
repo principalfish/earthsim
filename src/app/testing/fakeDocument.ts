@@ -18,6 +18,7 @@ export type FakeElement = {
 	};
 	textContent: string | null;
 	hidden: boolean;
+	inert: boolean;
 	id: string;
 	type: string;
 	name: string;
@@ -28,6 +29,7 @@ export type FakeElement = {
 	max: string | number;
 	step: string;
 	title: string;
+	tabIndex: number;
 	/** For a label, the `id` it is for; for an output, its token list. */
 	htmlFor: string | { add(id: string): void };
 	readonly valueAsNumber: number;
@@ -39,10 +41,14 @@ export type FakeElement = {
 	removeAttribute(name: string): void;
 	append(...children: FakeElement[]): void;
 	replaceChildren(...children: FakeElement[]): void;
-	addEventListener(type: string, listener: () => void): void;
+	addEventListener(type: string, listener: (event: never) => void): void;
 	focus(): void;
-	/** Sends the element an event of a type, as the browser would. */
-	fire(type: string): void;
+	/**
+	 * Sends the element an event of a type, as the browser would, with what
+	 * the listeners are to find on it, such as a key pressed; an event with
+	 * nothing on it but a `preventDefault` that does nothing when left out.
+	 */
+	fire(type: string, event?: object): void;
 };
 
 /** The stand-in document and what tests ask of it. */
@@ -56,6 +62,21 @@ export type FakeDocument = {
 	 * of its group are cleared, and it alone is sent `change`.
 	 */
 	pick(radio: FakeElement): void;
+	/**
+	 * Clicks a radio button as the browser does: it is checked and the
+	 * others of its group are cleared, it is sent `click`, and then, only
+	 * if it was not checked before, `change`.
+	 */
+	click(radio: FakeElement): void;
+	/**
+	 * Lets go of a key on an element as Chromium does: it is sent
+	 * `keyup` with the key and a `preventDefault`, and then, for Space on
+	 * a radio button not checked and with the default not stopped, a
+	 * click, as `click` sends one.
+	 *
+	 * @returns Whether a listener stopped the key's default.
+	 */
+	keyUp(element: FakeElement, key: string): boolean;
 };
 
 const createFakeElement = (
@@ -64,7 +85,7 @@ const createFakeElement = (
 	onFocus: (element: FakeElement) => void,
 ): FakeElement => {
 	const attributes = new Map<string, string>();
-	const listeners = new Map<string, (() => void)[]>();
+	const listeners = new Map<string, ((event: object) => void)[]>();
 	let text: string | null = '';
 	let value: string | number = '';
 	const classes = (): string[] =>
@@ -102,6 +123,7 @@ const createFakeElement = (
 			element.children.length = 0;
 		},
 		hidden: false,
+		inert: false,
 		id: '',
 		type: '',
 		name: '',
@@ -118,6 +140,7 @@ const createFakeElement = (
 		max: '',
 		step: '',
 		title: '',
+		tabIndex: 0,
 		htmlFor: { add: () => {} },
 		get valueAsNumber() {
 			return Number(value);
@@ -146,12 +169,15 @@ const createFakeElement = (
 			element.append(...children);
 		},
 		addEventListener: (type, listener) => {
-			listeners.set(type, [...(listeners.get(type) ?? []), listener]);
+			listeners.set(type, [
+				...(listeners.get(type) ?? []),
+				listener as (event: object) => void,
+			]);
 		},
 		focus: () => onFocus(element),
-		fire: (type) => {
+		fire: (type, event = { preventDefault: () => {} }) => {
 			for (const listener of listeners.get(type) ?? []) {
-				listener();
+				listener(event);
 			}
 		},
 	};
@@ -179,7 +205,7 @@ export const createFakeDocument = (): FakeDocument => {
 			return focused;
 		},
 	} as unknown as Document;
-	return {
+	const fake: FakeDocument = {
 		document,
 		createElement,
 		pick: (radio) => {
@@ -190,7 +216,38 @@ export const createFakeDocument = (): FakeDocument => {
 			}
 			radio.fire('change');
 		},
+		click: (radio) => {
+			const wasChecked = radio.checked;
+			for (const other of all) {
+				if (other.type === 'radio' && other.name === radio.name) {
+					other.checked = other === radio;
+				}
+			}
+			radio.fire('click');
+			if (!wasChecked) {
+				radio.fire('change');
+			}
+		},
+		keyUp: (element, key) => {
+			let prevented = false;
+			element.fire('keyup', {
+				key,
+				preventDefault: () => {
+					prevented = true;
+				},
+			});
+			if (
+				key === ' ' &&
+				!prevented &&
+				element.type === 'radio' &&
+				!element.checked
+			) {
+				fake.click(element);
+			}
+			return prevented;
+		},
 	};
+	return fake;
 };
 
 /**

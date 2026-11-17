@@ -1,14 +1,15 @@
 /**
- * The cursor readout: a strip over the globe's bottom-left corner saying
- * what lies under the pointer, such as `27.9° N, 86.9° E`, `8,123 m`, on a
- * computed layer its value, such as `July −18 °C` in Temperature view, and,
- * while the winds are shown, `7 m/s from the north-east`, marked `observed`
- * for the observed winds.
+ * The cursor readout: a block of the info box over the globe saying what
+ * lies under the pointer in two lines: where it is, such as `27.9° N,
+ * 86.9° E · 8,123 m`; and its values, on a computed layer the layer's,
+ * such as `−18 °C` in Temperature view, and, while the winds are shown,
+ * the wind, such as `7 m/s NE`, marked `observed` for the observed winds:
+ * `−18 °C · 7 m/s NE`.
  *
  * The writing is in the pure functions at the top. {@link createCursorReadout}
  * follows the pointer and decides when to look again, and
- * {@link createReadoutStrip} is the strip on the page, which only shows what
- * it is told.
+ * {@link createReadoutBlock} is the block on the page, which only shows
+ * what it is told.
  */
 
 import {
@@ -19,20 +20,25 @@ import {
 	type World,
 } from '../../core/index';
 import type { Globe, WindowPoint } from '../globe/renderer';
-import { type ScalarLayerSpec, summaryOf } from '../scalarLayer';
 import {
-	MONTH_NAMES,
-	type Source,
-	SUMMARY_LABELS,
-	type Summary,
-	type WindSource,
-} from '../view';
+	isDifferenceView,
+	type LayerUnit,
+	metricUnit,
+	type ScalarLayerSpec,
+	summaryOf,
+	toLayerUnit,
+} from '../scalarLayer';
 import {
-	DEFAULT_WIND_UNIT,
+	convert,
 	formatWind,
+	type ResolvedUnits,
+	SYSTEM_UNITS,
+	type UnitOf,
+	unitLabel,
 	type WindUnit,
 	windFromDeg,
-} from '../windUnits';
+} from '../units';
+import type { Source, Summary, WindSource } from '../view';
 import { createElement } from './fields';
 import type { ShownLayer, ShownWinds } from './layerPanel';
 
@@ -80,73 +86,64 @@ export const formatLatLon = (
 
 /**
  * An elevation as the readout writes it, measured from the sea level: on
- * land the height above it, such as `1,234 m`, and at sea the depth below
- * it, such as `3,400 m deep`.
+ * land the height above it, such as `1,234 m` or `4,049 ft`, and at sea the
+ * depth below it, such as `3,400 m deep` or `11,155 ft deep`.
  *
  * @remarks
  * Land is what stands strictly above the sea level, so a place exactly at
- * it is sea: `0 m deep`. Metres are whole, with the digits grouped in
- * threes.
+ * it is sea: `0 m deep`. The height is converted to the unit and written
+ * whole, with the digits grouped in threes.
  *
  * @param heightM - Height above the sea level in metres; negative below it.
+ * @param unit - The unit to write it in; metres when left out.
  */
-export const formatElevation = (heightM: number): string =>
-	heightM > 0
-		? `${groupedWhole(heightM)} m`
-		: `${groupedWhole(heightM)} m deep`;
+export const formatElevation = (
+	heightM: number,
+	unit: UnitOf<'height'> = SYSTEM_UNITS.metric.height,
+): string => {
+	const text = `${groupedWhole(convert('height', unit, heightM))} ${unitLabel('height', unit)}`;
+	return heightM > 0 ? text : `${text} deep`;
+};
 
 /**
- * What the readout calls the field a view of a layer's year shows: the
- * month's name for the Month view, and the view's own name, as the layer
- * names it, for the others.
- *
- * @param layer - The layer's description.
- * @param summary - What of the year is shown.
- * @param month - The month shown, from January at 0; read only for the
- * Month view.
- */
-const fieldName = (
-	layer: ScalarLayerSpec,
-	summary: Summary,
-	month: number,
-): string =>
-	summary === 'month'
-		? (MONTH_NAMES[month] ?? '')
-		: summaryOf(layer, summary).label;
-
-/**
- * A value of a layer's field on screen as the readout writes it, named by
- * what the field is and followed by the layer's unit, such as, for the
- * temperature, `July 18 °C`, `Annual average 14 °C`, `Warmest month
- * 27 °C`, `Coldest month −31 °C` or `Seasonal range 12 °C`; and by where it
- * comes from, when that is not the simulation: `July 21 °C observed`, or
- * `July +2 °C difference` for the simulated less the observed.
+ * A value of a layer's field on screen as the readout writes it, followed
+ * by the unit, such as, for the temperature, `18 °C`, `64 °F` or `−31 °C`,
+ * whatever month or summary of the year the field is; and by where it
+ * comes from, when that is not the simulation: `21 °C observed`, or
+ * `+2 °C difference` for the simulated less the observed.
  *
  * @remarks
- * The value is written as the layer writes it, the temperature's rounded
- * to a whole degree, a half upwards, with its digits grouped in threes and
- * a true minus sign; a value that rounds to zero is `0`, never `−0`. A
- * difference is signed both ways, `+2` above zero and `−3` below, and one
- * that rounds to zero is `0`, never `+0`. The temperature's seasonal range
- * is named as a range, so that it does not read as a temperature: it is
- * the difference between the warmest and the coldest month.
+ * The value is converted to the unit, a difference of simulated less
+ * observed and a view of differences such as the seasonal range by the
+ * unit's scale alone, so that a range of 10 °C reads `18 °F`. It is then
+ * written as the layer writes it, the temperature's rounded to a whole
+ * degree, a half upwards, with its digits grouped in threes and a true
+ * minus sign; a value that rounds to zero is `0`, never `−0`. A difference
+ * is signed both ways, `+2` above zero and `−3` below, and one that rounds
+ * to zero is `0`, never `+0`.
  *
  * @param layer - The layer's description.
- * @param value - The value, in the layer's unit.
- * @param summary - What of the year the field is.
- * @param month - The month the field is for the Month view, from January
- * at 0; read only for that view.
+ * @param value - The value, in the metric unit of the layer's quantity.
  * @param source - Where the field comes from; the simulation when left
  * out.
+ * @param unit - The unit to write it in, one of the layer's quantity; its
+ * metric unit when left out.
+ * @param summary - The view of the year the field is of, one the layer
+ * offers; the Month when left out.
+ * @throws RangeError if the unit is not one of the layer's quantity, or the
+ * layer does not offer the view.
  */
 export const formatLayerValue = (
 	layer: ScalarLayerSpec,
 	value: number,
-	summary: Summary,
-	month: number,
 	source: Source = 'simulated',
+	unit: LayerUnit = metricUnit(layer),
+	summary: Summary = 'month',
 ): string => {
-	const text = `${fieldName(layer, summary, month)} ${layer.formatValue(value, source === 'difference')} ${layer.unit}`;
+	const isDifference =
+		source === 'difference' || isDifferenceView(summaryOf(layer, summary));
+	const converted = toLayerUnit(layer, unit, value, isDifference);
+	const text = `${layer.formatValue(converted, unit, source === 'difference')} ${unitLabel(layer.quantity, unit)}`;
 	return source === 'simulated' ? text : `${text} ${source}`;
 };
 
@@ -154,12 +151,13 @@ export const formatLayerValue = (
 export type ReadoutValue = {
 	/** The layer on screen. */
 	readonly layer: ScalarLayerSpec;
-	/** The value of the field on screen at the place, in the layer's unit. */
-	readonly value: number;
-	/** What of the year the field is. */
+	/** The view of the layer's year on screen. */
 	readonly summary: Summary;
-	/** The month the field is for the Month view, from January at 0. */
-	readonly month: number;
+	/**
+	 * The value of the field on screen at the place, in the metric unit of
+	 * the layer's quantity.
+	 */
+	readonly value: number;
 	/** Where the field comes from. */
 	readonly source: Source;
 	/** Whether the field is the one chosen and up to date. */
@@ -172,14 +170,6 @@ export type ReadoutWind = {
 	readonly east: number;
 	/** The northward wind at the place, in metres a second. */
 	readonly north: number;
-	/** Whether it is the year's mean wind; the month's when not. */
-	readonly annualMean: boolean;
-	/**
-	 * What the year's mean is called on the layer whose view of the year
-	 * the winds follow, as its Annual average is labelled; read only for the
-	 * year's mean wind, and {@link SUMMARY_LABELS}' when left out.
-	 */
-	readonly annualMeanLabel?: string;
 	/** Where the winds come from; the simulation when left out. */
 	readonly source?: WindSource;
 	/** Whether the winds are the ones chosen and up to date. */
@@ -190,13 +180,10 @@ export type ReadoutWind = {
 export const READOUT_OBSERVED_WIND_TEXT = 'observed';
 
 /**
- * A wind as the readout writes it, such as `7 m/s from the north-east`, or
- * `Annual average 7 m/s from the north-east` for the year's mean wind,
- * named as the layer on screen names its value on that view; `calm` below
- * 0.5 m/s, as {@link formatWind} writes it. An observed wind is marked so
- * at the end, as an observed value of a layer is: `7 m/s from the west
- * observed`, `Annual average 7 m/s from the west observed` or `calm
- * observed`.
+ * A wind as the readout writes it, such as `7 m/s NE`, the month's or the
+ * year's mean alike; `calm` below 0.5 m/s, as {@link formatWind} writes it.
+ * An observed wind is marked so at the end, as an observed value of a
+ * layer is: `7 m/s W observed` or `calm observed`.
  *
  * @param wind - The wind.
  * @param unit - The unit to write its speed in.
@@ -210,12 +197,9 @@ export const formatReadoutWind = (
 		windFromDeg(wind.east, wind.north),
 		unit,
 	);
-	const named = wind.annualMean
-		? `${wind.annualMeanLabel ?? SUMMARY_LABELS.annualMean} ${text}`
-		: text;
 	return wind.source === 'observed'
-		? `${named} ${READOUT_OBSERVED_WIND_TEXT}`
-		: named;
+		? `${text} ${READOUT_OBSERVED_WIND_TEXT}`
+		: text;
 };
 
 /** What the readout says of one place. */
@@ -232,7 +216,7 @@ export type ReadoutParts = {
 	readonly wind: ReadoutWind | null;
 };
 
-/** The readout's text, part by part, as the strip shows it. */
+/** The readout's text, part by part, as the block shows it. */
 export type ReadoutText = {
 	/** Where the place is, as {@link formatLatLon} writes it. */
 	readonly position: string;
@@ -261,28 +245,30 @@ export type ReadoutText = {
  * The readout's text for one place.
  *
  * @param parts - What there is to say of the place.
- * @param unit - The unit to write a wind's speed in; m/s when left out.
+ * @param units - The unit to write each quantity in: the elevation in the
+ * height's, the layer's value in its quantity's and the wind's speed in
+ * the wind speed's; metric when left out.
  */
 export const describeReadout = (
 	parts: ReadoutParts,
-	unit: WindUnit = DEFAULT_WIND_UNIT,
+	units: ResolvedUnits = SYSTEM_UNITS.metric,
 ): ReadoutText => {
 	const { value, wind } = parts;
 	return {
 		position: formatLatLon(parts.latitudeDeg, parts.longitudeDeg),
-		elevation: formatElevation(parts.heightM),
+		elevation: formatElevation(parts.heightM, units.height),
 		value:
 			value === null
 				? null
 				: formatLayerValue(
 						value.layer,
 						value.value,
-						value.summary,
-						value.month,
 						value.source,
+						units[value.layer.quantity],
+						value.summary,
 					),
 		status: value === null || value.current ? null : READOUT_OUT_OF_DATE_TEXT,
-		wind: wind === null ? null : formatReadoutWind(wind, unit),
+		wind: wind === null ? null : formatReadoutWind(wind, units.windSpeed),
 		windStatus: wind === null || wind.current ? null : READOUT_OUT_OF_DATE_TEXT,
 	};
 };
@@ -334,9 +320,8 @@ export const readoutPartsAt = (
 			shown !== null && Number.isFinite(value)
 				? {
 						layer: shown.layer,
-						value,
 						summary: shown.summary,
-						month: shown.month,
+						value,
 						source: shown.source,
 						current: shown.current,
 					}
@@ -346,8 +331,6 @@ export const readoutPartsAt = (
 				? {
 						east,
 						north,
-						annualMean: winds.annualMean,
-						annualMeanLabel: winds.annualMeanLabel,
 						source: winds.source,
 						current: winds.current,
 					}
@@ -381,8 +364,8 @@ export type CursorReadoutOptions = {
 	readonly shownLayer: () => ShownLayer | null;
 	/** What the globe shows of the winds, at the time it is asked. */
 	readonly shownWinds: () => ShownWinds | null;
-	/** The unit wind speeds are written in, at the time it is asked. */
-	readonly windUnit: () => WindUnit;
+	/** The unit each quantity is written in, at the time it is asked. */
+	readonly units: () => ResolvedUnits;
 	/** Shows the readout's text, or hides the readout for null. */
 	readonly show: (text: ReadoutText | null) => void;
 };
@@ -392,9 +375,8 @@ export type CursorReadout = {
 	/**
 	 * Says that what lies under the pointer may have changed though the
 	 * pointer has not moved: the terrain, the sea level, the world, the
-	 * camera, the layer or the winds on screen, or the unit wind
-	 * speeds are written in. The readout looks again at the next animation
-	 * frame.
+	 * camera, the layer or the winds on screen, or the units. The readout
+	 * looks again at the next animation frame.
 	 */
 	invalidate(): void;
 	/**
@@ -463,7 +445,7 @@ export const createCursorReadout = (
 							options.shownLayer(),
 							options.shownWinds(),
 						),
-						options.windUnit(),
+						options.units(),
 					),
 		);
 		if (direction !== null && options.isStrokeActive()) {
@@ -530,53 +512,62 @@ export const createCursorReadout = (
 	};
 };
 
-/** The readout strip on the page. */
-export type ReadoutStrip = {
-	/** The strip, added to the place given for it. */
+/** The readout's block on the page. */
+export type ReadoutBlock = {
+	/** The block, to put in the info box. */
 	readonly element: HTMLElement;
-	/** Shows a readout's text, or hides the strip for null. */
+	/** Shows a readout's text, or hides the block for null. */
 	show(text: ReadoutText | null): void;
 };
 
+/** What stands between two parts of a line of the readout's block. */
+export const READOUT_SEPARATOR = ' · ';
+
 /**
- * Adds the readout strip, hidden, to the place given for it.
+ * Creates the readout's block, hidden until it is given text to show.
  *
  * @remarks
- * The strip holds one line for each piece of the text: the position, the
- * elevation, the layer's value and the wind, in that order, each hidden
- * while it has nothing to say. The mark that the value is out of date is
- * the end of the value's line, and the mark that the wind
- * is, the end of the wind's, each hidden while it has nothing to say; the
- * stylesheet puts a middle dot before each. The stylesheet lays the strip
- * over the globe's bottom-left corner, beside or above the legend, out of
- * the pointer's way.
+ * The block holds two lines. The first is the place: its position, then
+ * {@link READOUT_SEPARATOR}, then its elevation. The second is its values:
+ * the layer's value, then the separator, then the wind; with only one of
+ * the two it holds that one alone, and with neither it is hidden. The mark
+ * that the value is out of date follows the value, and the mark that the
+ * wind is follows the wind, each hidden while it has nothing to say; the
+ * stylesheet puts a space before each. A line too long for the block is
+ * cut short with an ellipsis.
  *
- * The strip is for sighted users of a pointer. It is not a live region and
+ * The block is for sighted users of a pointer. It is not a live region and
  * is hidden from assistive technology, since it changes with every
  * movement of the pointer and would otherwise be announced each time.
  *
- * @param container - Where the strip goes, in the row of overlays along the
- * bottom of the globe's area.
- * @returns The strip.
+ * @returns The block.
  */
-export const createReadoutStrip = (container: HTMLElement): ReadoutStrip => {
+export const createReadoutBlock = (): ReadoutBlock => {
 	const element = createElement('div', 'cursor-readout');
 	element.setAttribute('aria-hidden', 'true');
 	element.hidden = true;
+	/** A separator between two parts of a line. */
+	const separator = (): HTMLElement => {
+		const made = createElement('span', 'cursor-readout__separator');
+		made.textContent = READOUT_SEPARATOR;
+		return made;
+	};
+	const place = createElement('div', 'cursor-readout__place');
 	const position = createElement('span', 'cursor-readout__position');
 	const elevation = createElement('span', 'cursor-readout__elevation');
-	// The value's line is classed by the temperature's name, the one the
-	// stylesheet gives it, whichever layer it shows.
-	const layerValue = createElement('span', 'cursor-readout__temperature');
+	place.append(position, separator(), elevation);
+	const values = createElement('div', 'cursor-readout__values');
+	const layerValue = createElement('span', 'cursor-readout__layer-value');
 	const value = createElement('span', 'cursor-readout__value');
 	const status = createElement('span', 'cursor-readout__status');
 	layerValue.append(value, status);
+	const between = separator();
 	const wind = createElement('span', 'cursor-readout__wind');
 	const windValue = createElement('span', 'cursor-readout__wind-value');
 	const windStatus = createElement('span', 'cursor-readout__wind-status');
 	wind.append(windValue, windStatus);
-	element.append(position, elevation, layerValue, wind);
-	container.append(element);
+	values.append(layerValue, between, wind);
+	element.append(place, values);
 
 	const write = (part: HTMLElement, text: string | null): void => {
 		part.hidden = text === null;
@@ -592,12 +583,16 @@ export const createReadoutStrip = (container: HTMLElement): ReadoutStrip => {
 			element.hidden = text === null;
 			write(position, text?.position ?? null);
 			write(elevation, text?.elevation ?? null);
-			layerValue.hidden = (text?.value ?? null) === null;
+			const hasValue = (text?.value ?? null) !== null;
+			const hasWind = (text?.wind ?? null) !== null;
+			layerValue.hidden = !hasValue;
 			write(value, text?.value ?? null);
 			write(status, text?.status ?? null);
-			wind.hidden = (text?.wind ?? null) === null;
+			between.hidden = !(hasValue && hasWind);
+			wind.hidden = !hasWind;
 			write(windValue, text?.wind ?? null);
 			write(windStatus, text?.windStatus ?? null);
+			values.hidden = !(hasValue || hasWind);
 		},
 	};
 };

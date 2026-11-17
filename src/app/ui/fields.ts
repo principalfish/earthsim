@@ -34,12 +34,6 @@ export type RangeFieldOptions = RangeScale & {
 	/** Called with the new value whenever the slider moves. */
 	readonly onInput: (value: number) => void;
 	/**
-	 * Whether a screen reader is kept from reading out the value beside the
-	 * label each time it changes, for a slider moved often by the page
-	 * itself; false when left out. The slider still says its value.
-	 */
-	readonly quietValue?: boolean;
-	/**
 	 * A value marked on the track, under the slider, which stays marked
 	 * through a change of scale; none when left out.
 	 */
@@ -66,20 +60,15 @@ export type RangeField = {
 	 * slider is next moved, its scale writes the value again.
 	 */
 	setValue(value: number, text?: string): void;
+	/**
+	 * Gives the slider another way of writing its values and rewrites the
+	 * value it shows with it, for a change of the unit it is written in.
+	 * The slider does not move and `onInput` is not called; words given to
+	 * {@link setValue} in place of the value are replaced by its writing.
+	 */
+	setFormat(format: (value: number) => string): void;
 	/** Greys the slider out so that it cannot be moved, or brings it back. */
 	setDisabled(disabled: boolean): void;
-};
-
-/** What a checkbox is built from. */
-export type CheckFieldOptions = {
-	/** The checkbox's `id`, unique on the page. */
-	readonly id: string;
-	/** The text of the checkbox's label. */
-	readonly label: string;
-	/** Whether it starts ticked. */
-	readonly checked: boolean;
-	/** Called when the checkbox is ticked or cleared. */
-	readonly onChange: (checked: boolean) => void;
 };
 
 /** What a button is built from. */
@@ -114,6 +103,13 @@ export type SegmentedPickerOptions<T extends string> = {
 	readonly value: T;
 	/** Called with the value when another is chosen. */
 	readonly onChange: (value: T) => void;
+	/**
+	 * Called with the value on a click of the segment already chosen, which
+	 * changes nothing and so does not call `onChange`, and on Space let go
+	 * on it, for which browsers send no click. Left out, neither does
+	 * anything.
+	 */
+	readonly onChosenAgain?: (value: T) => void;
 };
 
 /** What a drop-down choice is built from. */
@@ -144,6 +140,18 @@ export const rangeFraction = (
 	max: number,
 ): number => (value - min) / (max - min);
 
+/**
+ * Where the middle of a slider's thumb stands at a point along its range,
+ * as a CSS length from the start of the track: the thumb's middle travels
+ * the track less the thumb's width, `--range-thumb-size`, so it is half
+ * that width in from either end.
+ *
+ * @param fraction - How far along the range the point lies, from 0 at its
+ * lowest to 1 at its highest, as {@link rangeFraction} gives it.
+ */
+export const thumbCentre = (fraction: number): string =>
+	`calc(var(--range-thumb-size) / 2 + (100% - var(--range-thumb-size)) * ${fraction})`;
+
 /** Class a field carries while its control cannot be used. */
 const DISABLED_CLASS = 'is-disabled';
 
@@ -170,8 +178,7 @@ export const createElement = <K extends keyof HTMLElementTagNameMap>(
  * The value as written is also what a screen reader says of the slider, so
  * that it hears "July" or "30%" rather than the bare number. The value
  * beside the label is an `<output>`, which a screen reader reads out
- * whenever it changes unless `quietValue` is set, when it is marked
- * `aria-live="off"`.
+ * whenever it changes.
  *
  * A mark, if there is one, is a short line under the track, centred where
  * the middle of the slider's thumb stands at the value marked. It is
@@ -191,9 +198,6 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 
 	const output = createElement('output', 'field__value');
 	output.htmlFor.add(options.id);
-	if (options.quietValue === true) {
-		output.setAttribute('aria-live', 'off');
-	}
 
 	const input = createElement('input', 'field__range');
 	input.id = options.id;
@@ -201,8 +205,11 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 	input.min = String(options.min);
 	input.max = String(options.max);
 	input.step = String(options.step);
+	/** The value last written. */
+	let shown = options.value;
 	/** Writes a value beside the label and as what a screen reader says. */
 	const write = (value: number, text = format(value)): void => {
+		shown = value;
 		output.textContent = text;
 		input.setAttribute('aria-valuetext', text);
 	};
@@ -226,9 +233,7 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 		mark.title = title;
 		mark.setAttribute('aria-hidden', 'true');
 		placeMark = (min, max) => {
-			// The thumb's middle travels the track less the thumb's width.
-			const fraction = rangeFraction(marked, min, max);
-			mark.style.left = `calc(var(--range-thumb-size) / 2 + (100% - var(--range-thumb-size)) * ${fraction})`;
+			mark.style.left = thumbCentre(rangeFraction(marked, min, max));
 		};
 		placeMark(options.min, options.max);
 		track.append(input, mark);
@@ -251,6 +256,10 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 			input.value = String(value);
 			write(value, text);
 		},
+		setFormat: (next) => {
+			format = next;
+			write(shown);
+		},
 		setDisabled: (disabled) => {
 			input.disabled = disabled;
 			field.classList.toggle(DISABLED_CLASS, disabled);
@@ -258,39 +267,30 @@ export const createRangeField = (options: RangeFieldOptions): RangeField => {
 	};
 };
 
-/**
- * Creates a labelled checkbox.
- *
- * @param options - The checkbox's starting state, wording and callback.
- * @returns The checkbox with its label, to put in a panel.
- */
-export const createCheckField = (options: CheckFieldOptions): HTMLElement => {
-	const field = createElement('div', 'field field--check');
-
-	const input = createElement('input', 'field__checkbox');
-	input.id = options.id;
-	input.type = 'checkbox';
-	input.checked = options.checked;
-	input.addEventListener('change', () => options.onChange(input.checked));
-
-	const label = createElement('label', 'field__label');
-	label.htmlFor = options.id;
-	label.textContent = options.label;
-
-	field.append(input, label);
-	return field;
+/** A drop-down choice, with ways to show another choice and relabel one. */
+export type SelectChoice<T extends string> = {
+	/** The drop-down with its label, to put in a panel. */
+	readonly element: HTMLElement;
+	/** Shows a value as the one chosen, without calling `onChange`. */
+	setValue(value: T): void;
+	/**
+	 * Gives one of the things offered another text; a value not offered
+	 * changes nothing.
+	 */
+	setLabel(value: T, label: string): void;
 };
 
 /**
  * Creates a labelled drop-down choice of one of several things, for
- * choices whose labels are too long or too many for a row of segments.
+ * choices whose labels are too long or too many for a row of segments,
+ * whose choice can be set, and whose labels changed, from outside.
  *
  * @param options - What it offers, the starting choice and the callback.
- * @returns The drop-down with its label, to put in a panel.
+ * @returns The drop-down and the ways to change what it shows.
  */
-export const createSelectField = <T extends string>(
+export const createSelectChoice = <T extends string>(
 	options: SelectFieldOptions<T>,
-): HTMLElement => {
+): SelectChoice<T> => {
 	const field = createElement('div', 'field');
 
 	const label = createElement('label', 'field__label');
@@ -299,10 +299,12 @@ export const createSelectField = <T extends string>(
 
 	const select = createElement('select', 'field__select');
 	select.id = options.id;
+	const optionsByValue = new Map<T, HTMLOptionElement>();
 	for (const choice of options.choices) {
 		const option = createElement('option', 'field__option');
 		option.value = choice.value;
 		option.textContent = choice.label;
+		optionsByValue.set(choice.value, option);
 		select.append(option);
 	}
 	// Once the options are in: a value is chosen from among them.
@@ -317,8 +319,32 @@ export const createSelectField = <T extends string>(
 	});
 
 	field.append(label, select);
-	return field;
+	return {
+		element: field,
+		setValue: (value) => {
+			select.value = value;
+		},
+		setLabel: (value, text) => {
+			const option = optionsByValue.get(value);
+			if (option !== undefined) {
+				option.textContent = text;
+			}
+		},
+	};
 };
+
+/**
+ * Creates a labelled drop-down choice of one of several things.
+ *
+ * @remarks
+ * As {@link createSelectChoice}, for a choice made only on it.
+ *
+ * @param options - What it offers, the starting choice and the callback.
+ * @returns The drop-down with its label, to put in a panel.
+ */
+export const createSelectField = <T extends string>(
+	options: SelectFieldOptions<T>,
+): HTMLElement => createSelectChoice(options).element;
 
 /** A segmented picker, with a way to show another choice made elsewhere. */
 export type SegmentedChoice<T extends string> = {
@@ -329,6 +355,12 @@ export type SegmentedChoice<T extends string> = {
 	 * the picker does not offer leaves no segment chosen.
 	 */
 	setValue(value: T): void;
+	/**
+	 * Offers only the values given, of those it was built with: the other
+	 * segments are hidden and disabled, so neither a click nor the arrow
+	 * keys reach them. Every segment is offered until this is called.
+	 */
+	setOffered(values: readonly T[]): void;
 };
 
 /**
@@ -350,7 +382,15 @@ export const createSegmentedChoice = <T extends string>(
 	const legend = createElement('legend', 'u-visually-hidden');
 	legend.textContent = options.legend;
 	const row = createElement('div', 'segmented__options');
-	const inputs: { readonly value: T; readonly input: HTMLInputElement }[] = [];
+	const inputs: {
+		readonly value: T;
+		readonly option: HTMLLabelElement;
+		readonly input: HTMLInputElement;
+	}[] = [];
+	// The value shown as chosen. A click on a segment checks it before the
+	// click is sent and before its `change`, so a click on any segment
+	// but this one is followed by a `change`, and one on this is not.
+	let current: T = options.value;
 
 	for (const choice of options.choices) {
 		const option = createElement('label', 'segmented__option');
@@ -362,10 +402,29 @@ export const createSegmentedChoice = <T extends string>(
 		input.checked = choice.value === options.value;
 		input.addEventListener('change', () => {
 			if (input.checked) {
+				current = choice.value;
 				options.onChange(choice.value);
 			}
 		});
-		inputs.push({ value: choice.value, input });
+		input.addEventListener('click', () => {
+			if (choice.value === current) {
+				options.onChosenAgain?.(choice.value);
+			}
+		});
+		const { onChosenAgain } = options;
+		if (onChosenAgain) {
+			// Space let go on an unchecked segment is sent a click, which
+			// checks it; on the one already checked it is sent nothing.
+			// Stopping its default keeps a browser that does send that click
+			// from calling back a second time.
+			input.addEventListener('keyup', (event: KeyboardEvent) => {
+				if (event.key === ' ' && input.checked && choice.value === current) {
+					event.preventDefault();
+					onChosenAgain(choice.value);
+				}
+			});
+		}
+		inputs.push({ value: choice.value, option, input });
 
 		const label = createElement('span', 'segmented__label');
 		label.textContent = choice.label;
@@ -378,8 +437,16 @@ export const createSegmentedChoice = <T extends string>(
 	return {
 		element: picker,
 		setValue: (value) => {
+			current = value;
 			for (const entry of inputs) {
 				entry.input.checked = entry.value === value;
+			}
+		},
+		setOffered: (values) => {
+			for (const entry of inputs) {
+				const offered = values.includes(entry.value);
+				entry.option.hidden = !offered;
+				entry.input.disabled = !offered;
 			}
 		},
 	};

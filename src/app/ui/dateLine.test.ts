@@ -9,10 +9,11 @@ const temperatureView = (
 ): PageView => ({
 	layer: 'temperature',
 	summaries: { temperature, pressure: 'month' },
-	sources: { temperature: 'simulated', pressure: 'simulated' },
+	source: 'simulated',
 	month,
 	sunlight: false,
 	winds: false,
+	grid: false,
 });
 
 describe('formatWorldAge', () => {

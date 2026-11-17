@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	computeTerrainStats,
 	createBlankWorld,
@@ -6,6 +6,13 @@ import {
 	type TerrainStats,
 } from '../../core/index';
 import {
+	byClass,
+	createFakeDocument,
+	type FakeDocument,
+	oneByClass,
+} from '../testing/fakeDocument';
+import {
+	createStatsPanel,
 	formatLandFraction,
 	STATS_NOTE_TEXT,
 	STATS_PENDING_TEXT,
@@ -135,5 +142,82 @@ describe('the wording of the readout', () => {
 	it('says what each figure is measured from', () => {
 		expect(STATS_NOTE_TEXT).toContain('elevations');
 		expect(STATS_NOTE_TEXT).toContain('sea level');
+	});
+});
+
+describe('the figures in feet', () => {
+	it('converts the four heights and depths, and leaves the land as it is', () => {
+		expect(statsFigures(stats(), 'ft')).toEqual([
+			{ label: 'Land', value: '29.8%' },
+			{ label: 'Highest point', value: '15,789 ft' },
+			{ label: 'Deepest point', value: '−23,634 ft' },
+			{ label: 'Mean land height', value: '2,665 ft' },
+			{ label: 'Mean ocean depth', value: '12,206 ft' },
+		]);
+		expect(statsFigures(stats(), 'm')).toEqual(statsFigures(stats()));
+	});
+});
+
+describe('createStatsPanel', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	/** The panel on a body of its own, and the values it writes. */
+	const make = (unit?: 'm' | 'ft') => {
+		const body = fake.createElement('div');
+		const panel = createStatsPanel(body as unknown as HTMLElement, unit);
+		const values = () =>
+			byClass(body, 'stats__value').map((value) => value.textContent);
+		return { body, panel, values };
+	};
+
+	it('writes the figures in the unit it starts in, metres when given none', () => {
+		const metres = make();
+		metres.panel.show(stats());
+		expect(metres.values()).toEqual(valuesOf(stats()));
+		const feet = make('ft');
+		feet.panel.show(stats());
+		expect(feet.values()).toEqual(
+			statsFigures(stats(), 'ft').map((figure) => figure.value),
+		);
+	});
+
+	it('rewrites the figures on the page in a new unit at once, and the next in it too', () => {
+		const { panel, values } = make();
+		panel.show(stats());
+		panel.setHeightUnit('ft');
+		expect(values()).toEqual(
+			statsFigures(stats(), 'ft').map((figure) => figure.value),
+		);
+		const next = stats({ highestM: 8848 });
+		panel.show(next);
+		expect(values()[1]).toBe('29,029 ft');
+		panel.setHeightUnit('m');
+		expect(values()).toEqual(valuesOf(next));
+	});
+
+	it('changes nothing for the unit it already has, nor while it has no figures', () => {
+		const { body, panel, values } = make();
+		panel.setHeightUnit('ft');
+		expect(oneByClass(body, 'stats__status').textContent).toBe(
+			STATS_PENDING_TEXT,
+		);
+		panel.show(stats());
+		const before = values();
+		panel.setHeightUnit('ft');
+		expect(values()).toEqual(before);
+		panel.showUnavailable();
+		panel.setHeightUnit('m');
+		expect(oneByClass(body, 'stats__status').textContent).toBe(
+			STATS_UNAVAILABLE_TEXT,
+		);
+		panel.show(stats());
+		expect(values()).toEqual(valuesOf(stats()));
 	});
 });

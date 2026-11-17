@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	BLANK_OCEAN_ELEVATION_M,
 	computeTerrainStats,
@@ -16,6 +16,13 @@ import {
 	SUPPORTED_RESOLUTIONS,
 } from '../../core/index';
 import {
+	byClass,
+	createFakeDocument,
+	type FakeElement,
+} from '../testing/fakeDocument';
+import type { UnitOf } from '../units';
+import {
+	CELL_SIZE_ROUNDING,
 	CONFIRM_LABEL,
 	CREATE_FAILED_MESSAGE,
 	type CreateSteps,
@@ -34,9 +41,12 @@ import {
 	type NewWorldChoice,
 	type NewWorldValues,
 	newWorldValuesFor,
+	openNewWorldDialog,
 	parseNewWorldValues,
+	RESOLUTION_CELL_KM,
 	RESOLUTION_HINTS,
 	RESOLUTION_MESSAGE,
+	resolutionHint,
 	runCreate,
 	SEED_MESSAGE,
 	START_LABELS,
@@ -880,6 +890,31 @@ describe('the wording of the dialog', () => {
 		expect(RESOLUTION_HINTS[64]).toBe('about 150 km cells');
 	});
 
+	it('says the size of a cell in kilometres as it always has', () => {
+		expect(RESOLUTION_HINTS).toEqual({
+			64: 'about 150 km cells',
+			128: 'about 75 km cells',
+			256: 'about 40 km cells',
+		});
+		for (const resolution of SUPPORTED_RESOLUTIONS) {
+			expect(resolutionHint(resolution)).toBe(RESOLUTION_HINTS[resolution]);
+			expect(resolutionHint(resolution, 'km')).toBe(
+				RESOLUTION_HINTS[resolution],
+			);
+		}
+	});
+
+	it('says the size of a cell in miles, rounded to the nearest five as the kilometres are', () => {
+		expect(SUPPORTED_RESOLUTIONS.map((r) => resolutionHint(r, 'mi'))).toEqual([
+			'about 95 mi cells',
+			'about 45 mi cells',
+			'about 25 mi cells',
+		]);
+		for (const km of Object.values(RESOLUTION_CELL_KM)) {
+			expect(km % CELL_SIZE_ROUNDING).toBe(0);
+		}
+	});
+
 	it('names every way of starting a world', () => {
 		expect(START_LABELS).toEqual({
 			blank: 'Blank ocean',
@@ -908,5 +943,53 @@ describe('the wording of the dialog', () => {
 		expect(formatPercent(30)).toBe('30%');
 		expect(formatPercent(0)).toBe('0%');
 		expect(formatPercent(99.6)).toBe('100%');
+	});
+});
+
+describe('the New world dialog’s hints', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	/** The hints the resolutions are offered with, in a dialog opened in a unit. */
+	const hintsIn = (distanceUnit?: UnitOf<'distance'>): (string | null)[] => {
+		const fake = createFakeDocument();
+		vi.stubGlobal('document', {
+			...fake.document,
+			createElement: (tag: string) => {
+				const element = fake.createElement(tag);
+				// The stand-in has no dialogs of its own: this one opens and
+				// closes as nothing.
+				return tag === 'dialog'
+					? Object.assign(element, { showModal: () => {}, close: () => {} })
+					: element;
+			},
+		});
+		const parent = fake.createElement('div');
+		openNewWorldDialog({
+			values: FIRST_NEW_WORLD_VALUES,
+			createWorld: () => createBlankWorld(64),
+			onWorld: () => {},
+			distanceUnit,
+			parent: parent as unknown as HTMLElement,
+		});
+		const [resolution] = byClass(parent, 'choice');
+		return byClass(resolution as FakeElement, 'choice__hint').map(
+			(hint) => hint.textContent,
+		);
+	};
+
+	it('says the sizes in kilometres when no unit is given, and in kilometres', () => {
+		const metric = SUPPORTED_RESOLUTIONS.map((r) => RESOLUTION_HINTS[r]);
+		expect(hintsIn()).toEqual(metric);
+		expect(hintsIn('km')).toEqual(metric);
+	});
+
+	it('says the sizes in miles in miles', () => {
+		expect(hintsIn('mi')).toEqual([
+			'about 95 mi cells',
+			'about 45 mi cells',
+			'about 25 mi cells',
+		]);
 	});
 });

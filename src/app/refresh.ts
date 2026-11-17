@@ -3,13 +3,15 @@
  * while after the last change, however many changes came together.
  *
  * The refresh scheduler does that for any result. The temperature
- * scheduler is built on it: it asks only while the temperature is showing,
- * starts each request from the last completed result, and keeps the
- * result, where it stands against the world and the progress of the
- * calculation under way in the page's layer store. The winds scheduler is
- * built on it too: it asks only while the winds are showing, as soon as
- * each new temperature result arrives and after a change of the day
- * length, and keeps the winds beside the temperature in the store.
+ * scheduler is built on it: it asks after every change of the world while
+ * it is running, as it is unless paused, starts each request from the last
+ * completed result, and keeps the result, where it stands against the
+ * world and the progress of the calculation under way in the page's layer
+ * store. The winds scheduler is built on it too: while it is running it
+ * asks as soon as each new temperature result arrives and after a change
+ * of the day length, and keeps the winds beside the temperature in the
+ * store. Neither asks with anything on screen in mind: the temperature and
+ * the winds are worked out whatever the page shows.
  */
 
 import type {
@@ -353,13 +355,14 @@ export type TemperatureSchedulerOptions<H> = {
 	readonly onError: (error: unknown) => void;
 };
 
-/** Keeps the temperature up to date with the world while it is showing. */
+/** Keeps the temperature up to date with the world while it is running. */
 export type TemperatureScheduler = {
 	/**
 	 * Says that the world has changed. The result on hand is out of date
-	 * from now on. While the temperature is showing, it is asked for again
-	 * once no further change has come for the debounce time, and later if a
-	 * stroke is under way then; while it is not, nothing is asked for.
+	 * from now on. While the scheduler is running, the temperature is asked
+	 * for again once no further change has come for the debounce time, and
+	 * later if a stroke is under way then; while it is not, nothing is
+	 * asked for.
 	 */
 	refresh(): void;
 	/**
@@ -367,7 +370,7 @@ export type TemperatureScheduler = {
 	 * rather than after the debounce time: for a change that is whole when
 	 * it is made, as a new world is, with no run of changes to wait out. A
 	 * wait under way is cancelled; if a stroke is under way, it waits as
-	 * `refresh` does instead. While the temperature is not showing, nothing
+	 * `refresh` does instead. While the scheduler is not running, nothing
 	 * is asked for.
 	 */
 	refreshNow(): void;
@@ -379,13 +382,16 @@ export type TemperatureScheduler = {
 	 */
 	reset(): void;
 	/**
-	 * Says whether the temperature is showing. Switched on, it is asked for
-	 * if the result on hand is out of date or there is none: at once, with
-	 * no debounce time, unless a stroke is under way, which it waits for as
-	 * a change does. Switched off, a request waiting to be made is
-	 * cancelled. Saying what is already so does nothing.
+	 * Says whether the scheduler is running, as it is from the start.
+	 * Stopped, a request waiting to be made is cancelled, and none is made
+	 * until it runs again; a solve already under way is left to finish. Run
+	 * again, the temperature is asked for if the world has changed since
+	 * the last request was made or there has been none: once, whatever the
+	 * changes meanwhile, and at once, with no debounce time, unless a stroke
+	 * is under way, which it waits for as a change does. Saying what is
+	 * already so does nothing.
 	 */
-	setShowing(showing: boolean): void;
+	setRunning(running: boolean): void;
 	/**
 	 * Says that no request can be answered from now on, as when the worker
 	 * is gone: the store is marked unavailable, and nothing is asked for
@@ -395,7 +401,7 @@ export type TemperatureScheduler = {
 };
 
 /**
- * Asks for the temperature again after changes, while it is showing, and
+ * Asks for the temperature again after every change while running, and
  * keeps what comes back in the store.
  *
  * @remarks
@@ -404,15 +410,16 @@ export type TemperatureScheduler = {
  * requests made before `reset` are those of
  * {@link createRefreshScheduler}, which this is built on.
  *
- * A change made while the temperature is not showing asks for nothing: a
- * solve can take seconds, and nobody is looking. The result on hand is
- * marked out of date instead, and the temperature is asked for once when
- * it is switched on again, with no wait: switching on is one change, not
- * a run of them, and a wait would leave the temperature reading as not
- * calculated until it ended. Switching it off while a solve is under way
+ * It runs from the start, so a change asks whatever is on screen. A
+ * change made while it is not running asks for nothing: the result on
+ * hand is marked out of date instead, or the store left empty after
+ * `reset`, and the temperature is asked for once when it runs again, with
+ * no wait: running again is one change, not a run of them, taking in
+ * every change made meanwhile. Stopping it while a solve is under way
  * leaves that solve to finish, since its work is already paid for: its
  * result is kept, as current if nothing has changed since it was asked
- * for and as out of date if something has.
+ * for and as out of date if something has, and running again then asks
+ * nothing unless something has.
  *
  * Each request starts from the last result to be completed, so that a
  * solve after a small edit settles in fewer years: its state and its
@@ -433,13 +440,13 @@ export type TemperatureScheduler = {
  * until the next request is made.
  *
  * @param options - The request, the store, the wait and the timers.
- * @returns The scheduler, with the temperature not showing.
+ * @returns The scheduler, running.
  */
 export const createTemperatureScheduler = <H>(
 	options: TemperatureSchedulerOptions<H>,
 ): TemperatureScheduler => {
 	const { store } = options;
-	let showing = false;
+	let running = true;
 	/**
 	 * Whether the world has changed since the last request was made, or
 	 * there has been none, so that the result on hand, or the one on its
@@ -471,7 +478,7 @@ export const createTemperatureScheduler = <H>(
 		isBusy: options.isBusy,
 		onResult: (result) => store.setResult(result, !stale),
 		onError: (error) => {
-			// Asked for again at the next change, or when it is switched on.
+			// Asked for again at the next change, or when it runs again.
 			stale = true;
 			store.markFailed();
 			options.onError(error);
@@ -483,14 +490,14 @@ export const createTemperatureScheduler = <H>(
 		refresh: () => {
 			stale = true;
 			store.markOutOfDate();
-			if (showing) {
+			if (running) {
 				scheduler.refresh();
 			}
 		},
 		refreshNow: () => {
 			stale = true;
 			store.markOutOfDate();
-			if (showing) {
+			if (running) {
 				scheduler.refreshNow();
 			}
 		},
@@ -499,12 +506,12 @@ export const createTemperatureScheduler = <H>(
 			store.clear();
 			scheduler.reset();
 		},
-		setShowing: (next) => {
-			if (next === showing) {
+		setRunning: (next) => {
+			if (next === running) {
 				return;
 			}
-			showing = next;
-			if (!showing) {
+			running = next;
+			if (!running) {
 				scheduler.cancel();
 			} else if (stale) {
 				scheduler.refreshNow();
@@ -554,14 +561,14 @@ export type WindsSchedulerOptions<H> = {
 
 /**
  * Keeps the winds up to date with the temperature and the day length while
- * they are showing.
+ * it is running.
  */
 export type WindsScheduler = {
 	/**
 	 * Says that the day length has changed. The winds on hand are out of
-	 * date from now on. While they are showing, they are asked for again
-	 * once no further change has come for the debounce time, if the
-	 * temperature is current then; while they are not, nothing is asked for.
+	 * date from now on. While the scheduler is running, they are asked for
+	 * again once no further change has come for the debounce time, if the
+	 * temperature is current then; while it is not, nothing is asked for.
 	 */
 	refresh(): void;
 	/**
@@ -572,21 +579,22 @@ export type WindsScheduler = {
 	 */
 	reset(): void;
 	/**
-	 * Says whether the winds are showing. Switched on, they are asked for if
-	 * there are none for the current temperature and day length, on hand or
-	 * on their way: at once if the temperature is current, and otherwise
-	 * when the temperature they need arrives. Winds on hand that are marked
-	 * out of date but were worked out from the current temperature and day
-	 * length, as after a change since undone, are marked current instead.
-	 * Switched off, a request waiting to be made is cancelled. Saying what
-	 * is already so does nothing.
+	 * Says whether the scheduler is running, as it is from the start. Run
+	 * again, the winds are asked for if there are none for the current
+	 * temperature and day length, on hand or on their way: at once if the
+	 * temperature is current, and otherwise when the temperature they need
+	 * arrives. Winds on hand that are marked out of date but were worked
+	 * out from the current temperature and day length, as after a change
+	 * since undone, are marked current instead. Stopped, a request waiting
+	 * to be made is cancelled, and none is made until it runs again; a
+	 * solve already under way is left to finish. Saying what is already so
+	 * does nothing.
 	 *
 	 * @remarks
 	 * The winds are worked out from the temperature, which this does not
-	 * ask for: whoever switches the winds on also says that the temperature
-	 * is needed.
+	 * ask for: whoever runs the winds again runs the temperature again too.
 	 */
-	setShowing(showing: boolean): void;
+	setRunning(running: boolean): void;
 	/**
 	 * Says that no request can be answered from now on, as when the worker
 	 * is gone: the store marks the winds unavailable, and nothing is asked
@@ -600,7 +608,7 @@ const NOTHING_ASKED = { superseded: true } as const;
 
 /**
  * Asks for the winds whenever what they are worked out from changes, while
- * they are showing, and keeps what comes back in the store.
+ * running, and keeps what comes back in the store.
  *
  * @remarks
  * The winds are worked out from the current temperature result and the
@@ -609,8 +617,10 @@ const NOTHING_ASKED = { superseded: true } as const;
  * current, with no wait: the temperature has already waited for the
  * changes to stop. A change of the day length, which the temperature does
  * not depend on, asks after the debounce time instead, as a change does
- * for the temperature. Switching the winds on with a current temperature
- * asks at once too: it is one change, not a run of them. Nothing is asked
+ * for the temperature. Running again with a current temperature asks at
+ * once too: it is one change, not a run of them. It runs from the start,
+ * so the winds follow every current temperature whatever is on screen,
+ * the winds and the pressure shown or not. Nothing is asked
  * for while the temperature on hand is not current, as after an edit until
  * its next result: that result asks when it comes.
  *
@@ -630,22 +640,22 @@ const NOTHING_ASKED = { superseded: true } as const;
  * temperature and the day length are read together, at the moment the
  * request is sent, and the answer is kept with what was read then.
  * Nothing is asked then during a stroke, without a current temperature or
- * once the winds are switched off. Nor is anything asked when the winds on
+ * once the scheduler is stopped. Nor is anything asked when the winds on
  * hand are current again, as after a change of the day length undone
- * within the wait: they are marked current instead. A change made while
- * the winds are not showing asks for nothing, and switching them off
+ * within the wait: they are marked current instead. A new temperature or
+ * a change made while it is not running asks for nothing, and stopping it
  * leaves a request already made to finish, its result kept and judged as
  * any other.
  *
  * @param options - The request, the world, the store, the wait and the
  * timers.
- * @returns The scheduler, with the winds not showing.
+ * @returns The scheduler, running.
  */
 export const createWindsScheduler = <H>(
 	options: WindsSchedulerOptions<H>,
 ): WindsScheduler => {
 	const { store } = options;
-	let showing = false;
+	let running = true;
 	/**
 	 * What the newest request made was for, or null if there has been none
 	 * since the last failure or replacement of the world.
@@ -716,7 +726,7 @@ export const createWindsScheduler = <H>(
 		oneAtATime: true,
 		onResult: (result) => store.setWindsResult(result, isCurrent(result)),
 		onError: (error) => {
-			// Asked for again at the next change, or when switched on.
+			// Asked for again at the next change, or when it runs again.
 			askedFor = null;
 			store.markWindsFailed();
 			options.onError(error);
@@ -725,14 +735,14 @@ export const createWindsScheduler = <H>(
 	});
 
 	/**
-	 * Asks for the winds on their being switched on. With a current
-	 * temperature it asks at once: switching on is one change, with no run
-	 * of changes to wait out, and a wait would leave the winds reading as
-	 * not calculated until it ended. Without one it waits as a change does,
-	 * and the request made then asks for nothing unless the temperature has
-	 * come meanwhile, whose arrival asks in any case.
+	 * Asks for the winds on running again. With a current temperature it
+	 * asks at once: running again is one change, with no run of changes to
+	 * wait out, and a wait would leave the winds reading as not calculated
+	 * until it ended. Without one it waits as a change does, and the request
+	 * made then asks for nothing unless the temperature has come meanwhile,
+	 * whose arrival asks in any case.
 	 */
-	const askOnShowing = (): void => {
+	const askOnRunning = (): void => {
 		if (currentTemperature() === null) {
 			scheduler.refresh();
 		} else {
@@ -746,7 +756,7 @@ export const createWindsScheduler = <H>(
 			return;
 		}
 		seen = temperature;
-		if (showing) {
+		if (running) {
 			scheduler.refreshNow();
 		}
 	});
@@ -754,7 +764,7 @@ export const createWindsScheduler = <H>(
 	return {
 		refresh: () => {
 			store.markWindsOutOfDate();
-			if (showing) {
+			if (running) {
 				scheduler.refresh();
 			}
 		},
@@ -766,19 +776,19 @@ export const createWindsScheduler = <H>(
 			store.clearWinds();
 			scheduler.reset();
 		},
-		setShowing: (next) => {
-			if (next === showing) {
+		setRunning: (next) => {
+			if (next === running) {
 				return;
 			}
-			showing = next;
-			if (!showing) {
+			running = next;
+			if (!running) {
 				scheduler.cancel();
 				return;
 			}
 			const { status, result } = store.winds;
 			if (status === 'calculating' && awaiting) {
 				if (askedFor === null || !isCurrent(askedFor)) {
-					askOnShowing();
+					askOnRunning();
 				}
 				// Otherwise the answer on its way is for things as they are.
 				return;
@@ -790,7 +800,7 @@ export const createWindsScheduler = <H>(
 				store.setWindsResult(result, true);
 				return;
 			}
-			askOnShowing();
+			askOnRunning();
 		},
 		markUnavailable: scheduler.markUnavailable,
 	};

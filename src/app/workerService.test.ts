@@ -590,19 +590,18 @@ const createTemperature = (workers = createWorkers()) => {
 };
 
 describe('createTemperatureService', () => {
-	it('asks for the temperature once it is showing, and keeps the result', async () => {
+	it('asks for the temperature after the wait for a change, with nothing said to be on screen, and keeps the result', async () => {
 		const temperature = createTemperature();
-		temperature.scheduler.refresh();
-		temperature.wait();
 		expect(temperature.workers.started).toHaveLength(1);
+		temperature.scheduler.refresh();
 		expect(temperature.workers.posted()).toHaveLength(0);
 
-		// The world of the moment the request is made, which is the switching
-		// on, not of the change or of the start.
+		// The world of the moment the request is made, once the wait is over,
+		// not of the change or of the start.
 		const world = blank();
 		world.elevation[0] = 1234;
 		temperature.setWorld(world);
-		temperature.scheduler.setShowing(true);
+		temperature.wait();
 		expect(temperature.workers.posted()).toEqual([
 			{ id: 1, kind: 'temperature', world, start: undefined },
 		]);
@@ -627,7 +626,7 @@ describe('createTemperatureService', () => {
 
 	it('restarts a worker still solving when a newer request overtakes it, and keeps the last result', async () => {
 		const temperature = createTemperature();
-		temperature.scheduler.setShowing(true);
+		temperature.scheduler.refreshNow();
 		temperature.wait();
 		temperature.workers.last().respond(temperatureAnswer(1, 4));
 		await settle();
@@ -665,7 +664,7 @@ describe('createTemperatureService', () => {
 		workers.failNext.push('throw');
 		const temperature = createTemperature(workers);
 		expect(temperature.store.temperature.status).toBe('unavailable');
-		temperature.scheduler.setShowing(true);
+		temperature.scheduler.refreshNow();
 		temperature.wait();
 		expect(workers.started).toHaveLength(0);
 		expect(temperature.logged).toHaveLength(1);
@@ -673,7 +672,7 @@ describe('createTemperatureService', () => {
 
 	it('is unavailable after a worker error, and asks nothing again', async () => {
 		const temperature = createTemperature();
-		temperature.scheduler.setShowing(true);
+		temperature.scheduler.refreshNow();
 		temperature.wait();
 		temperature.workers.last().emit('error');
 		await settle();
@@ -687,7 +686,7 @@ describe('createTemperatureService', () => {
 
 	it('is unavailable when a fresh worker cannot be started', async () => {
 		const temperature = createTemperature();
-		temperature.scheduler.setShowing(true);
+		temperature.scheduler.refreshNow();
 		temperature.wait();
 		temperature.workers.failNext.push('throw');
 		temperature.scheduler.refresh();
@@ -713,7 +712,7 @@ describe('createTemperatureService', () => {
 				years.push(layer.progress.yearsDone);
 			}
 		});
-		temperature.scheduler.setShowing(true);
+		temperature.scheduler.refreshNow();
 		temperature.wait();
 		temperature.workers.last().answer(1);
 		await settle();
@@ -777,7 +776,6 @@ const windsAnswer = (id: number, value: number) => ({
 describe('createWindsService', () => {
 	it('asks for the winds of a new temperature from its months and the world of the moment, and keeps them', async () => {
 		const winds = createWinds();
-		winds.scheduler.setShowing(true);
 		const world = blank();
 		world.elevation[0] = 1234;
 		winds.setWorld(world);
@@ -801,7 +799,6 @@ describe('createWindsService', () => {
 
 	it('leaves an overtaken solve to finish on its worker, ignoring its answer, and asks the same worker next', async () => {
 		const winds = createWinds();
-		winds.scheduler.setShowing(true);
 		await winds.arrive(temperatureOf(1));
 		const newer = temperatureOf(2);
 		await winds.arrive(newer);
@@ -832,7 +829,6 @@ describe('createWindsService', () => {
 
 	it('records a request that fails and keeps no winds', async () => {
 		const winds = createWinds();
-		winds.scheduler.setShowing(true);
 		await winds.arrive(temperatureOf(1));
 		winds.workers.last().respond(simFailure(1, 'winds', 'too calm'));
 		await settle();
@@ -845,7 +841,6 @@ describe('createWindsService', () => {
 		workers.failNext.push('null');
 		const winds = createWinds(workers);
 		expect(winds.store.winds.status).toBe('unavailable');
-		winds.scheduler.setShowing(true);
 		const temperature = temperatureOf(1);
 		await winds.arrive(temperature);
 		winds.timers.advance(TEMPERATURE_DEBOUNCE_MS);
@@ -860,7 +855,6 @@ describe('createWindsService', () => {
 
 	it('is unavailable after a worker error, and asks nothing again', async () => {
 		const winds = createWinds();
-		winds.scheduler.setShowing(true);
 		await winds.arrive(temperatureOf(1));
 		winds.workers.last().emit('error');
 		await settle();
@@ -878,7 +872,6 @@ describe('createWindsService', () => {
 		const winds = createWinds();
 		const world = blank();
 		winds.setWorld(world);
-		winds.scheduler.setShowing(true);
 		const temperature = temperatureOf(1, world.elevation.length);
 		for (const [index, month] of temperature.months.entries()) {
 			month.fill(index);
@@ -900,15 +893,14 @@ describe('createWindsService', () => {
 
 describe('createWindsService with changes while a solve runs', () => {
 	/**
-	 * A winds service showing the winds on a world whose day length the
-	 * test changes in place, as the planet controls do, with its first
+	 * A winds service on a world whose day length the test changes in
+	 * place, as the planet controls do, with its first
 	 * solve, for 24 hours, under way.
 	 */
 	const createRunning = async () => {
 		const winds = createWinds();
 		const world = blank();
 		winds.setWorld(world);
-		winds.scheduler.setShowing(true);
 		await winds.arrive(temperatureOf(1));
 		const setDayLength = (hours: number): void => {
 			world.planet = { ...world.planet, dayLengthHours: hours };
@@ -978,7 +970,7 @@ describe('createWindsService with changes while a solve runs', () => {
 		expect(winds.postedDays()).toHaveLength(3);
 	});
 
-	it('does not either when switched off and on while the solve runs', async () => {
+	it('does not either when paused and resumed while the solve runs', async () => {
 		const winds = await createRunning();
 		winds.setDayLength(30);
 		await winds.wait();
@@ -986,10 +978,10 @@ describe('createWindsService with changes while a solve runs', () => {
 		await winds.answerNewest();
 		await winds.wait();
 		winds.setDayLength(30);
-		winds.scheduler.setShowing(false);
+		winds.scheduler.setRunning(false);
 		await winds.answerNewest();
 		expectHonest(winds);
-		winds.scheduler.setShowing(true);
+		winds.scheduler.setRunning(true);
 		expectHonest(winds);
 		expect(winds.store.winds.status).not.toBe('current');
 
@@ -1035,7 +1027,6 @@ describe('createWindsService with changes while a solve runs', () => {
 			clearTimer: timers.clearTimer,
 			logError: () => {},
 		});
-		scheduler.setShowing(true);
 		store.markCalculating();
 		store.setResult(temperatureOf(1), true);
 		await settle();
@@ -1068,15 +1059,15 @@ describe('createWindsService with changes while a solve runs', () => {
 		expect(store.winds.status).toBe('calculating');
 	});
 
-	it('posts nothing held back once the winds are switched off, or the world replaced', async () => {
-		const hidden = await createRunning();
-		hidden.setDayLength(30);
-		await hidden.wait();
-		hidden.scheduler.setShowing(false);
-		await hidden.answerNewest();
-		await hidden.wait();
-		expect(hidden.postedDays()).toEqual([24]);
-		expect(hidden.store.winds.status).toBe('outOfDate');
+	it('posts nothing held back once paused, or the world replaced', async () => {
+		const paused = await createRunning();
+		paused.setDayLength(30);
+		await paused.wait();
+		paused.scheduler.setRunning(false);
+		await paused.answerNewest();
+		await paused.wait();
+		expect(paused.postedDays()).toEqual([24]);
+		expect(paused.store.winds.status).toBe('outOfDate');
 
 		const replaced = await createRunning();
 		replaced.setDayLength(30);

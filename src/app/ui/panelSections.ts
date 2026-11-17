@@ -9,11 +9,11 @@ import { createSection, type Section } from './section';
 /** The panel's sections, in the order it shows them, which is the tab order. */
 export const PANEL_SECTIONS = [
 	{ key: 'world', title: 'World' },
-	{ key: 'layers', title: 'Layers' },
 	{ key: 'view', title: 'View' },
 	{ key: 'planet', title: 'Planet' },
 	{ key: 'tools', title: 'Tools' },
 	{ key: 'statistics', title: 'Statistics' },
+	{ key: 'settings', title: 'Settings' },
 ] as const;
 
 /** A section of the panel, by its name in the memory. */

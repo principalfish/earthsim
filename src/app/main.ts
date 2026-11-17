@@ -12,14 +12,20 @@ import { createPreferences } from './preferences';
 import { loadLayerObserved } from './scalarLayer';
 import { createSculptController } from './sculpt';
 import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
-import { createCursorReadout, createReadoutStrip } from './ui/cursorReadout';
-import { createGlobeOverlays } from './ui/globeOverlays';
-import { createLayerControls, createLayerPanel } from './ui/layerPanel';
+import { createCursorReadout } from './ui/cursorReadout';
+import { createInfoBox } from './ui/infoBox';
+import { createLayerDock } from './ui/layerDock';
+import { createLayerPanel } from './ui/layerPanel';
+import { createMainView } from './ui/mainView';
 import { openNewWorldDialog } from './ui/newWorldDialog';
 import { createPanelSections } from './ui/panelSections';
+import { createPauseButton } from './ui/pauseButton';
 import { createPlanetPanel } from './ui/planetPanel';
+import { createSettingsPanel } from './ui/settingsPanel';
 import { createStatsPanel } from './ui/statsPanel';
+import { createTimeline } from './ui/timeline';
 import { createToolPanel } from './ui/toolPanel';
+import { createTopBar } from './ui/topBar';
 import { createViewPanel, SEA_LEVEL_SLIDER_STEP_M } from './ui/viewPanel';
 import { createWorldPanel } from './ui/worldPanel';
 import { startPage } from './wiring';
@@ -56,10 +62,22 @@ const viewport = requireElement('.viewport', HTMLElement);
 
 document.documentElement.dataset.coreVersion = CORE_VERSION;
 
-/** Creates the globe, or explains on the page why there cannot be one. */
+// Reached once for both: the open sections and the preferences are
+// settings of the browser, kept apart from the saved world.
+const browserStorage = reachStorage(() => window.localStorage);
+// Asked once, as the page starts: where the system asks for reduced
+// motion, the winds start as arrows, which stand still, not as streaks.
+const preferences = createPreferences(browserStorage, {
+	reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+});
+
+/**
+ * Creates the globe, drawing the winds as the preferences say from its
+ * first frame, or explains on the page why there cannot be one.
+ */
 const createGlobeOrExplain = (): Globe | null => {
 	try {
-		return createGlobe(canvas);
+		return createGlobe(canvas, preferences.windStyle());
 	} catch (error) {
 		console.error(error);
 		showFailure(
@@ -87,14 +105,15 @@ const logError = (error: unknown): void => console.error(error);
 
 const globe = createGlobeOrExplain();
 if (globe !== null) {
-	// Reached once for both: the open sections and the preferences are
-	// settings of the browser, kept apart from the saved world.
-	const browserStorage = reachStorage(() => window.localStorage);
 	const sections = createPanelSections(
 		panel,
 		createPanelMemory(browserStorage),
 	);
-	const overlays = createGlobeOverlays(viewport);
+	const mainView = createMainView(viewport);
+	// Made first, since the layer panel and the cursor readout both show
+	// what they have in it.
+	const infoBox = createInfoBox();
+	mainView.info.append(infoBox.element);
 	void startPage({
 		// The page starts on a blank ocean, which stays until the saved
 		// world, if there is one, has been read. A world keeps its own sea
@@ -124,17 +143,45 @@ if (globe !== null) {
 			}),
 		createToolPanel: (options) => createToolPanel(sections.tools, options),
 		createViewPanel: (options) => createViewPanel(sections.view.body, options),
+		createSettingsPanel: (options) =>
+			createSettingsPanel(sections.settings.body, options),
+		createLayerDock: (options) => {
+			const dock = createLayerDock(options);
+			mainView.dock.append(dock.element);
+			return dock;
+		},
+		createTopBar: (options) => {
+			const bar = createTopBar(options);
+			mainView.topBar.append(bar.element);
+			return bar;
+		},
+		createTimeline: (options) => {
+			const timeline = createTimeline(options);
+			mainView.timeline.append(timeline.element);
+			return timeline;
+		},
+		createPauseButton: (options) => {
+			mainView.corner.append(createPauseButton(options).element);
+		},
 		createPlanetPanel: (options) =>
 			createPlanetPanel(sections.planet.body, options),
-		createStatistics: (options) =>
-			createStatisticsService({
-				...options,
-				createWorker,
-				readout: createStatsPanel(sections.statistics.body),
-				setTimer,
-				clearTimer,
-				logError,
-			}),
+		createStatistics: (options) => {
+			const readout = createStatsPanel(
+				sections.statistics.body,
+				options.heightUnit,
+			);
+			return {
+				...createStatisticsService({
+					...options,
+					createWorker,
+					readout,
+					setTimer,
+					clearTimer,
+					logError,
+				}),
+				setHeightUnit: readout.setHeightUnit,
+			};
+		},
 		createTemperature: (options) =>
 			createTemperatureService({
 				...options,
@@ -158,18 +205,16 @@ if (globe !== null) {
 				setTimer,
 				clearTimer,
 				reportError: logError,
-				createControls: (controls) =>
-					createLayerControls(sections.layers.body, overlays, controls),
+				createControls: () => infoBox,
 			}),
 		createCursorReadout: (options) =>
 			createCursorReadout({
 				...options,
 				canvas,
 				globe,
-				show: createReadoutStrip(overlays.readout).show,
+				show: infoBox.showReadout,
 			}),
-		preferences: createPreferences(browserStorage),
-		layersSection: sections.layers,
+		preferences,
 		openNewWorldDialog,
 		loadEarth: loadEarthData,
 		loadObserved: loadLayerObserved,
@@ -179,6 +224,7 @@ if (globe !== null) {
 		setInert: (inert) => {
 			panel.inert = inert;
 			canvas.inert = inert;
+			mainView.setInert(inert);
 		},
 		isModalOpen: () => document.querySelector(':modal') !== null,
 		onKeyDown: (listener) => window.addEventListener('keydown', listener),

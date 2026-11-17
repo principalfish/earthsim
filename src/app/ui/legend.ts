@@ -1,7 +1,9 @@
 /**
  * The legend of a data layer: its colour ramp with the values marked at
  * round numbers, and a line saying whether what is on the globe describes
- * the world as it is, with the progress of a calculation under way.
+ * the world as it is, with the progress of a calculation under way. The
+ * legend's block in the info box draws the ramp; the box's one status line
+ * says the line, unless the winds have worse to say.
  */
 
 import {
@@ -12,7 +14,13 @@ import {
 	weightedQuantiles,
 } from '../../core/index';
 import { type ColourRamp, rampGradient, type ValueRange } from '../globe/ramp';
-import type { ScalarLayerReading, ScalarLayerSpec } from '../scalarLayer';
+import type { LayerStatus } from '../layers';
+import type {
+	LayerUnit,
+	ScalarLayerReading,
+	ScalarLayerSpec,
+} from '../scalarLayer';
+import { SYSTEM_UNITS, type UnitSpec, unitLabel, unitSpec } from '../units';
 import { createElement } from './fields';
 
 /**
@@ -73,6 +81,37 @@ const tickIndices = (
 	};
 };
 
+/**
+ * The unit a scale is fitted in: how a value converts to it, as
+ * {@link UnitSpec} gives it, and to how many decimals its ends are
+ * rounded.
+ */
+export type ScaleUnit = Pick<UnitSpec, 'scale' | 'offset' | 'decimals'>;
+
+/** Values fitted as they are, to whole numbers. */
+export const AS_GIVEN: ScaleUnit = { scale: 1, offset: 0, decimals: 0 };
+
+/**
+ * A value as a count of steps of a tenth to the power of the decimals,
+ * rounded down: the largest count whose value is at or below it, though
+ * the value times the steps in one rounds up to a whole number.
+ */
+const countDown = (value: number, decimals: number): number => {
+	const factor = 10 ** decimals;
+	const count = Math.floor(value * factor);
+	return count / factor > value ? count - 1 : count;
+};
+
+/**
+ * A value as a count of steps of a tenth to the power of the decimals,
+ * rounded up: the smallest count whose value is at or above it.
+ */
+const countUp = (value: number, decimals: number): number => {
+	const factor = 10 ** decimals;
+	const count = Math.ceil(value * factor);
+	return count / factor < value ? count + 1 : count;
+};
+
 /** What the legend says before there is a result to show. */
 export const LEGEND_EMPTY_TEXT = 'Not calculated yet';
 
@@ -84,35 +123,11 @@ export const LEGEND_EMPTY_TEXT = 'Not calculated yet';
 export const LEGEND_OUT_OF_DATE_TEXT = 'Out of date';
 
 /**
- * What the legend says of a calculation that tells its years, as the
- * temperature's does, before its first year is done.
- */
-export const LEGEND_FIRST_YEAR_TEXT = 'Calculating · first year';
-
-/**
  * What the legend says of a calculation under way that tells nothing of how
- * far it has come.
+ * far it has come, or that tells its years but cannot yet tell how many
+ * are left.
  */
 export const LEGEND_CALCULATING_TEXT = 'Calculating';
-
-/** Whether a field shown on a scale holds values beyond either of its ends. */
-export type ValuesBeyond = {
-	/** Whether some value lies below the scale's low end. */
-	readonly below: boolean;
-	/** Whether some value lies above the scale's high end. */
-	readonly above: boolean;
-};
-
-/** No value beyond either end of a scale. */
-export const NOTHING_BEYOND: ValuesBeyond = { below: false, above: false };
-
-/** A scale fitted to some fields, and whether it leaves values out. */
-export type FittedScale = {
-	/** The range the scale spans. */
-	readonly range: ValueRange;
-	/** Whether the fields hold values beyond either end of the range. */
-	readonly beyond: ValuesBeyond;
-};
 
 /**
  * What each cell of a field counts for when a scale is fitted to it.
@@ -147,20 +162,24 @@ export const cellWeights = (cellCount: number): ArrayLike<number> => {
  * weight, as a cell-month by its cell's area: so a peak or a pole that
  * covers little of the world does not stretch the scale and squeeze the
  * rest into a few colours. Values beyond the ends take the end colours.
- * Before they are rounded, the ends are widened about their middle to the
+ * The ends are converted to the unit given, and the rest is done in it:
+ * before they are rounded, they are widened about their middle to the
  * smallest span if they are closer than that. They are then rounded
- * outward to whole numbers, the low end down and the high end up, so that
- * the legend's words for what lies beyond them are whole numbers.
+ * outward to the unit's decimals, whole numbers for most, the low end down
+ * and the high end up, so that the range holds every value between the
+ * two quantiles.
  *
  * @param months - The fields, such as the twelve months of a year, each one
  * value per cell. Values that are not numbers or are infinite are passed
  * over.
  * @param weights - What each cell counts for, one per cell, as from
  * {@link cellWeights}.
- * @param minSpan - The smallest span of the scale, above zero;
- * {@link MIN_FITTED_SPAN_C} when left out.
- * @returns The range, at least `minSpan` wide with whole ends, and whether
- * any finite value lies below its low end or above its high end.
+ * @param minSpan - The smallest span of the scale, above zero, in the
+ * unit; {@link MIN_FITTED_SPAN_C} when left out.
+ * @param unit - The unit to fit the scale in; the values' own, to whole
+ * numbers, when left out.
+ * @returns The range in the unit, at least `minSpan` wide with ends of the
+ * unit's decimals.
  * @throws RangeError if no field holds a finite value, or a field or the
  * weights are not as {@link weightedQuantiles} takes them.
  */
@@ -168,39 +187,46 @@ export const fitRange = (
 	months: readonly Float32Array[],
 	weights: ArrayLike<number>,
 	minSpan: number = MIN_FITTED_SPAN_C,
-): FittedScale => {
+	unit: ScaleUnit = AS_GIVEN,
+): ValueRange => {
 	const cuts = weightedQuantiles(months, weights, FIT_TAIL_SHARE);
-	let { low, high } = cuts;
+	let low = cuts.low * unit.scale + unit.offset;
+	let high = cuts.high * unit.scale + unit.offset;
 	if (high - low < minSpan) {
 		const middle = (low + high) / 2;
 		low = middle - minSpan / 2;
 		high = middle + minSpan / 2;
 	}
-	const range = { min: Math.floor(low), max: Math.ceil(high) };
+	const factor = 10 ** unit.decimals;
 	return {
-		range,
-		beyond: {
-			below: cuts.lowest < range.min,
-			above: cuts.highest > range.max,
-		},
+		min: countDown(low, unit.decimals) / factor,
+		max: countUp(high, unit.decimals) / factor,
 	};
 };
 
 /**
  * The range a scale of sizes is fitted to, such as the seasonal range: from
- * zero up to the largest value in the field, rounded up to a whole number.
+ * zero up to the largest value in the field, in the unit given, rounded up
+ * to the unit's decimals.
+ *
+ * @remarks
+ * A size is a difference of two values, so it converts by the unit's scale
+ * alone: a range of 10 °C is one of 18 °F.
  *
  * @param field - The values, none below zero.
- * @param minSpan - The smallest span of the scale, above zero;
- * {@link MIN_FITTED_SPAN_C} when left out.
- * @returns From 0 to the largest finite value rounded up to a whole number,
- * or to `minSpan` if that is larger. Values that are not numbers or are
- * infinite are passed over.
+ * @param minSpan - The smallest span of the scale, above zero, in the
+ * unit; {@link MIN_FITTED_SPAN_C} when left out.
+ * @param unit - The unit to fit the scale in; the values' own, to whole
+ * numbers, when left out.
+ * @returns From 0 to the largest finite value in the unit, rounded up to
+ * its decimals, or to `minSpan` if that is larger. Values that are not
+ * numbers or are infinite are passed over.
  * @throws RangeError if the field holds no finite value.
  */
 export const fitRangeFromZero = (
 	field: Float32Array,
 	minSpan: number = MIN_FITTED_SPAN_C,
+	unit: ScaleUnit = AS_GIVEN,
 ): ValueRange => {
 	let max = Number.NEGATIVE_INFINITY;
 	for (const value of field) {
@@ -211,7 +237,9 @@ export const fitRangeFromZero = (
 	if (!Number.isFinite(max)) {
 		throw new RangeError('A scale needs at least one finite value to fit');
 	}
-	return { min: 0, max: Math.max(minSpan, Math.ceil(max)) };
+	const largest =
+		countUp(max * unit.scale, unit.decimals) / 10 ** unit.decimals;
+	return { min: 0, max: Math.max(minSpan, largest) };
 };
 
 /**
@@ -220,24 +248,27 @@ export const fitRangeFromZero = (
  * every month, and spanning the middle 99% of the world by area.
  *
  * @remarks
- * The centre is rounded to a whole number first. The scale then reaches
- * either way as far as the further of the weighted quantiles
- * {@link FIT_TAIL_SHARE} in from either end of every value, as for
- * {@link fitRange}, and at least half the smallest span, rounded up to a
- * whole number, so that its ends are whole numbers too. Values beyond the
- * ends take the end colours.
+ * The centre and the quantiles are converted to the unit given, and the
+ * rest is done in it. The centre is rounded to the unit's decimals first,
+ * a whole number for most. The scale then reaches either way as far as the
+ * further of the weighted quantiles {@link FIT_TAIL_SHARE} in from either
+ * end of every value, as for {@link fitRange}, and at least half the
+ * smallest span, rounded up to the unit's decimals, so that its ends are
+ * of those decimals too. Values beyond the ends take the end colours.
  *
  * @param months - The fields, such as the twelve months of a year, each one
  * value per cell. Values that are not numbers or are infinite are passed
  * over.
  * @param weights - What each cell counts for, one per cell, as from
  * {@link cellWeights}.
- * @param centre - The value the scale is centred on; finite.
- * @param minSpan - The smallest span of the scale, above zero;
- * {@link MIN_FITTED_SPAN_C} when left out.
- * @returns The range, centred on the rounded centre and at least `minSpan`
- * wide, and whether any finite value lies below its low end or above its
- * high end.
+ * @param centre - The value the scale is centred on, in the values' own
+ * unit; finite.
+ * @param minSpan - The smallest span of the scale, above zero, in the
+ * unit; {@link MIN_FITTED_SPAN_C} when left out.
+ * @param unit - The unit to fit the scale in; the values' own, to whole
+ * numbers, when left out.
+ * @returns The range in the unit, centred on the rounded centre and at
+ * least `minSpan` wide.
  * @throws RangeError if the centre is not finite, if no field holds a
  * finite value, or if a field or the weights are not as
  * {@link weightedQuantiles} takes them.
@@ -247,37 +278,48 @@ export const fitRangeCentred = (
 	weights: ArrayLike<number>,
 	centre: number,
 	minSpan: number = MIN_FITTED_SPAN_C,
-): FittedScale => {
+	unit: ScaleUnit = AS_GIVEN,
+): ValueRange => {
 	if (!Number.isFinite(centre)) {
 		throw new RangeError(
 			`A scale must be centred on a finite value; got ${centre}`,
 		);
 	}
 	const cuts = weightedQuantiles(months, weights, FIT_TAIL_SHARE);
-	const middle = Math.round(centre);
-	const reach = Math.ceil(
-		Math.max(middle - cuts.low, cuts.high - middle, minSpan / 2),
+	const { scale, offset, decimals } = unit;
+	const factor = 10 ** decimals;
+	// The centre and the reach are counted in steps of the unit's decimals,
+	// so that the ends are exactly the decimals they are written as.
+	const middleCount = Math.round((centre * scale + offset) * factor);
+	const middle = middleCount / factor;
+	const reachCount = countUp(
+		Math.max(
+			middle - (cuts.low * scale + offset),
+			cuts.high * scale + offset - middle,
+			minSpan / 2,
+		),
+		decimals,
 	);
-	const range = { min: middle - reach, max: middle + reach };
 	return {
-		range,
-		beyond: {
-			below: cuts.lowest < range.min,
-			above: cuts.highest > range.max,
-		},
+		min: (middleCount - reachCount) / factor,
+		max: (middleCount + reachCount) / factor,
 	};
 };
 
 /**
- * The whole multiples of a whole step inside a range, or null for fewer
- * than two of them, more than {@link MAX_STEPPED_TICKS}, or multiples of
- * the step past {@link MAX_TICK_INDEX}, the most counted to for a step
- * chosen as well.
+ * The whole multiples of a step inside a range, or null for fewer than two
+ * of them, more than {@link MAX_STEPPED_TICKS}, or multiples of the step
+ * past {@link MAX_TICK_INDEX}, the most counted to for a step chosen as
+ * well. The step is a whole number of steps of a tenth to the power of the
+ * decimals, `count` of them, and each multiple is worked out from that
+ * count, so that it is the nearest number to its decimal value.
  */
 const steppedTicks = (
 	min: number,
 	max: number,
 	step: number,
+	count: number,
+	decimals: number,
 ): number[] | null => {
 	const { first, last } = tickIndices(min, max, step);
 	if (
@@ -287,9 +329,10 @@ const steppedTicks = (
 	) {
 		return null;
 	}
+	const factor = 10 ** decimals;
 	const ticks: number[] = [];
 	for (let k = first; k <= last; k++) {
-		const tick = k * step;
+		const tick = (k * count) / factor;
 		if (tick >= min && tick <= max) {
 			// Not -0, which would print as such in some places.
 			ticks.push(tick === 0 ? 0 : tick);
@@ -309,8 +352,9 @@ const steppedTicks = (
  * a value that falls on an end of the range is marked.
  *
  * A scale can be given a step of its own instead, such as every 5 degrees
- * for the seasonal range: then the values are the whole multiples of that
- * step inside the range, ends included, so long as there are from two to
+ * for the seasonal range, or every 0.3 inches of mercury with two
+ * decimals: then the values are the whole multiples of that step inside
+ * the range, ends included, so long as there are from two to
  * {@link MAX_STEPPED_TICKS} of them. For a range so wide that the step
  * gives more, or so narrow that it gives fewer than two, the step is set
  * aside and the values are chosen as above.
@@ -325,31 +369,45 @@ const steppedTicks = (
  *
  * @param min - The low end of the scale.
  * @param max - The high end; above `min`.
- * @param step - A step of the scale's own to mark it at, a whole number
- * above zero; left out, the step is chosen as above.
+ * @param step - A step of the scale's own to mark it at, above zero and a
+ * whole number of steps of the last of the decimals, so a whole number for
+ * none; left out, the step is chosen as above.
+ * @param decimals - How many decimals a step given may have, a whole
+ * number from 0; none when left out.
  * @returns The values, lowest first: from two to {@link MAX_LEGEND_TICKS},
  * or to {@link MAX_STEPPED_TICKS} at a step given.
  * @throws RangeError unless both ends are finite and `min` is below `max`,
- * for a step given that is not a whole number above zero, and for a range
- * that cannot be marked at two round values, as above.
+ * for decimals that are not a whole number from 0, for a step given that
+ * is not above zero with no more than the decimals, and for a range that
+ * cannot be marked at two round values, as above.
  */
 export const legendTicks = (
 	min: number,
 	max: number,
 	step?: number,
+	decimals = 0,
 ): number[] => {
 	if (!Number.isFinite(min) || !Number.isFinite(max) || !(min < max)) {
 		throw new RangeError(
 			`A scale must run up from one finite value to another; got ${min} to ${max}`,
 		);
 	}
+	if (!(Number.isSafeInteger(decimals) && decimals >= 0)) {
+		throw new RangeError(
+			`A step's decimals must be a whole number from 0; got ${decimals}`,
+		);
+	}
 	if (step !== undefined) {
-		if (!(Number.isSafeInteger(step) && step > 0)) {
+		const factor = 10 ** decimals;
+		const count = Math.round(step * factor);
+		if (
+			!(Number.isSafeInteger(count) && count > 0 && count / factor === step)
+		) {
 			throw new RangeError(
-				`A step to mark a scale at must be a whole number above zero; got ${step}`,
+				`A step to mark a scale at must be above zero with at most ${decimals} decimals; got ${step}`,
 			);
 		}
-		const ticks = steppedTicks(min, max, step);
+		const ticks = steppedTicks(min, max, step, count, decimals);
 		if (ticks !== null) {
 			return ticks;
 		}
@@ -418,14 +476,15 @@ export const formatTick = (value: number): string => {
 };
 
 /**
- * A difference to one decimal as the legend's error figures write it: a
- * true minus sign below zero, a plus sign above it, and `0.0`, with no
- * sign, for one that rounds to zero.
+ * A difference to so many decimals as the legend's error figures write it:
+ * a true minus sign below zero, a plus sign above it, and no sign for one
+ * that rounds to zero, such as `0.0`.
  */
-const signedTenths = (value: number): string => {
-	const tenths = Math.round(Math.abs(value) * 10);
-	const digits = (tenths / 10).toFixed(1);
-	if (tenths === 0) {
+const signedFixed = (value: number, decimals: number): string => {
+	const factor = 10 ** decimals;
+	const steps = Math.round(Math.abs(value) * factor);
+	const digits = (steps / factor).toFixed(decimals);
+	if (steps === 0) {
 		return digits;
 	}
 	return `${value < 0 ? '−' : '+'}${digits}`;
@@ -436,17 +495,26 @@ const signedTenths = (value: number): string => {
  * writes them under its scale, such as `Mean −0.1 °C · RMS 3.9 °C`.
  *
  * @remarks
- * Both are to one decimal, a half rounded away from zero. The mean
- * difference is signed, `+0.3` above zero and `−0.1` below, and one that
- * rounds to zero is `0.0` with no sign; the root-mean-square difference is
- * never below zero and has no sign.
+ * Both are to one decimal unless others are given, a half rounded away
+ * from zero. The mean difference is signed, `+0.3` above zero and `−0.1`
+ * below, and one that rounds to zero is `0.0` with no sign; the
+ * root-mean-square difference is never below zero and has no sign.
  *
- * @param figures - The mean and root-mean-square difference, in the
- * layer's unit.
- * @param unit - The layer's unit, such as `°C`.
+ * @param figures - The mean and root-mean-square difference, in the unit.
+ * @param unit - The unit, as it is written, such as `°C`.
+ * @param decimals - How many decimals to write; one when left out.
  */
-export const formatFigures = (figures: FieldDifference, unit: string): string =>
-	`Mean ${signedTenths(figures.meanDifference)} ${unit} · RMS ${(Math.round(figures.rmsDifference * 10) / 10).toFixed(1)} ${unit}`;
+export const formatFigures = (
+	figures: FieldDifference,
+	unit: string,
+	decimals = 1,
+): string => {
+	const factor = 10 ** decimals;
+	const rms = (Math.round(figures.rmsDifference * factor) / factor).toFixed(
+		decimals,
+	);
+	return `Mean ${signedFixed(figures.meanDifference, decimals)} ${unit} · RMS ${rms} ${unit}`;
+};
 
 /**
  * Where a value sits along the scale, as a percentage of its length from
@@ -465,19 +533,18 @@ export const tickPosition = (value: number, range: ValueRange): number =>
  *
  * @param progress - How far the calculation has come, or null before its
  * first year is done.
- * @returns {@link LEGEND_FIRST_YEAR_TEXT} before the first year is done;
- * the years done; and after them how many more are expected, when there is
- * an estimate, or that this year is the last.
+ * @returns The years done and after them how many more are expected, or
+ * that this year is the last, once there is an estimate of the years left;
+ * until then, before the first year is done and while there is no
+ * estimate, {@link LEGEND_CALCULATING_TEXT}, as {@link progressFraction}
+ * then does not know how far it has come either.
  */
 export const progressLine = (progress: TemperatureProgress | null): string => {
-	if (progress === null) {
-		return LEGEND_FIRST_YEAR_TEXT;
+	if (progress === null || progress.estimatedYearsLeft === null) {
+		return LEGEND_CALCULATING_TEXT;
 	}
 	const done = `Calculating · year ${progress.yearsDone}`;
 	const left = progress.estimatedYearsLeft;
-	if (left === null) {
-		return done;
-	}
 	if (left === 0) {
 		return `${done}, finishing`;
 	}
@@ -521,43 +588,39 @@ export type LegendScale = {
 	/** The values marked along it. */
 	readonly ticks: readonly LegendTick[];
 	/**
-	 * What the legend says at the scale's low end, such as `−34 and below`,
-	 * when there are values below it that take its first colour; null when
-	 * there are none.
-	 */
-	readonly below: string | null;
-	/**
-	 * What the legend says at the scale's high end, such as `29 and above`,
-	 * when there are values above it that take its last colour; null when
-	 * there are none.
-	 */
-	readonly above: string | null;
-	/**
 	 * The error figures of the field on show against the observed one, as
-	 * {@link formatFigures} writes them, on a line under the ends; null when
-	 * there are none to show.
+	 * {@link formatFigures} writes them, on a line under the values marked;
+	 * null when there are none to show.
 	 */
 	readonly figures: string | null;
 };
 
-/** What the globe shows a layer with, for the legend to draw. */
+/**
+ * What the globe shows a layer with, for the legend to draw, in the unit
+ * the legend writes it in.
+ */
 export type LegendSource = {
-	/** The range the layer is shown on. */
+	/** The range the layer is shown on, in the unit. */
 	readonly range: ValueRange;
 	/** The ramp it is shown with. */
 	readonly ramp: ColourRamp;
 	/** What the field shown measures, with its unit. */
 	readonly caption: string;
-	/** Whether there are values beyond either end of the range. */
-	readonly beyond: ValuesBeyond;
 	/**
-	 * A step of the scale's own to mark it at, as {@link legendTicks} takes
-	 * it; left out, the legend chooses one.
+	 * The unit the scale is written in, one of the layer's quantity: its
+	 * ticks, as the layer writes them in it, and its error figures. Left
+	 * out, the quantity's metric unit.
+	 */
+	readonly unit?: LayerUnit;
+	/**
+	 * A step of the scale's own to mark it at, in the unit, as
+	 * {@link legendTicks} takes it with the unit's decimals; left out, the
+	 * legend chooses one.
 	 */
 	readonly tickStep?: number;
 	/**
-	 * The error figures of the field shown against the observed one, or
-	 * null or left out when there are none to show.
+	 * The error figures of the field shown against the observed one, in the
+	 * unit, or null or left out when there are none to show.
 	 */
 	readonly figures?: FieldDifference | null;
 };
@@ -566,6 +629,13 @@ export type LegendSource = {
 export type LegendContent = {
 	/** The scale of the result on show, or null when there is none. */
 	readonly scale: LegendScale | null;
+	/**
+	 * Where what the legend shows stands, which the line says: `current`
+	 * while it describes the world as it is, `outOfDate` also while the
+	 * globe keeps an earlier result, and `unavailable` also while the globe
+	 * could not take a current one.
+	 */
+	readonly state: LayerStatus;
 	/**
 	 * What the legend says of the result, or null when it describes the
 	 * world as it is.
@@ -593,29 +663,35 @@ export type LegendContent = {
  * result, and not an earlier one it kept when it refused this one. False
  * whenever it shows no scale.
  * @param sourceLayer - The description of the layer the source is of: its
- * unit and how its ticks are written. It differs from `layer` only while
- * the globe keeps a field of another layer, having refused the first field
- * of the one chosen; `layer` when left out.
+ * quantity and how its ticks are written. It differs from `layer` only
+ * while the globe keeps a field of another layer, having refused the first
+ * field of the one chosen; `layer` when left out.
  * @returns The scale whenever the globe shows one, with a line and, while
  * calculating, a bar. A current result has no line while the globe shows
  * it. While the globe does not, the line is {@link LEGEND_OUT_OF_DATE_TEXT}
  * over the earlier result's scale, which is what the globe then shows, and
  * the layer's words for a result not shown when there is no scale at all.
  * While calculating, a layer that tells its years has the line of
- * {@link progressLine} and a bar of {@link progressFraction}, and any other
- * {@link LEGEND_CALCULATING_TEXT} and a bar that does not know how far it
- * has come. The scale's ticks are at its own step when it has one, written
- * as the source's layer writes them, and it says what its end colours
- * stand for at each end that has values beyond it, and gives the source's
- * error figures in that layer's unit when it has them.
+ * {@link progressLine} and a bar of {@link progressFraction}, which until
+ * the years left can be told are {@link LEGEND_CALCULATING_TEXT} and a bar
+ * that does not know how far it has come, as any other layer has
+ * throughout. The scale's ticks are at its own step when it has one, written
+ * in the source's unit as the source's layer writes them, and it gives the
+ * source's error figures in that unit, to one decimal more than the unit's,
+ * when it has them. Values beyond the ends, which the globe draws in the
+ * end colours, are not marked.
+ * @throws RangeError if the source's unit is not one of its layer's
+ * quantity.
  */
 export const legendContent = (
 	layer: ScalarLayerSpec,
 	reading: Pick<ScalarLayerReading, 'status' | 'progress'>,
 	source: LegendSource | null,
 	showsResult: boolean,
-	sourceLayer: Pick<ScalarLayerSpec, 'formatTick' | 'unit'> = layer,
+	sourceLayer: Pick<ScalarLayerSpec, 'formatTick' | 'quantity'> = layer,
 ): LegendContent => {
+	const unit = source?.unit ?? SYSTEM_UNITS.metric[sourceLayer.quantity];
+	const { decimals } = unitSpec(sourceLayer.quantity, unit);
 	const scale =
 		source === null
 			? null
@@ -626,153 +702,130 @@ export const legendContent = (
 						source.range.min,
 						source.range.max,
 						source.tickStep,
+						decimals,
 					).map((value) => ({
-						label: sourceLayer.formatTick(value),
+						label: sourceLayer.formatTick(value, unit),
 						position: tickPosition(value, source.range),
 					})),
-					below: source.beyond.below
-						? `${sourceLayer.formatTick(source.range.min)} and below`
-						: null,
-					above: source.beyond.above
-						? `${sourceLayer.formatTick(source.range.max)} and above`
-						: null,
 					figures:
 						source.figures === undefined || source.figures === null
 							? null
-							: formatFigures(source.figures, sourceLayer.unit),
+							: formatFigures(
+									source.figures,
+									unitLabel(sourceLayer.quantity, unit),
+									decimals + 1,
+								),
 				};
 	switch (reading.status) {
 		case 'current': {
 			if (scale === null) {
-				return { scale, status: layer.notShownText, bar: null };
+				return {
+					scale,
+					state: 'unavailable',
+					status: layer.notShownText,
+					bar: null,
+				};
 			}
-			return {
-				scale,
-				status: showsResult ? null : LEGEND_OUT_OF_DATE_TEXT,
-				bar: null,
-			};
+			return showsResult
+				? { scale, state: 'current', status: null, bar: null }
+				: {
+						scale,
+						state: 'outOfDate',
+						status: LEGEND_OUT_OF_DATE_TEXT,
+						bar: null,
+					};
 		}
 		case 'outOfDate':
-			return { scale, status: LEGEND_OUT_OF_DATE_TEXT, bar: null };
+			return {
+				scale,
+				state: 'outOfDate',
+				status: LEGEND_OUT_OF_DATE_TEXT,
+				bar: null,
+			};
 		case 'calculating':
 			return layer.yearProgress
 				? {
 						scale,
+						state: 'calculating',
 						status: progressLine(reading.progress),
 						bar: { fraction: progressFraction(reading.progress) },
 					}
-				: { scale, status: LEGEND_CALCULATING_TEXT, bar: { fraction: null } };
+				: {
+						scale,
+						state: 'calculating',
+						status: LEGEND_CALCULATING_TEXT,
+						bar: { fraction: null },
+					};
 		case 'unavailable':
-			return { scale, status: layer.unavailableText, bar: null };
+			return {
+				scale,
+				state: 'unavailable',
+				status: layer.unavailableText,
+				bar: null,
+			};
 		case 'empty':
-			return { scale, status: LEGEND_EMPTY_TEXT, bar: null };
+			return { scale, state: 'empty', status: LEGEND_EMPTY_TEXT, bar: null };
 	}
 };
 
-/** The legend on the page. */
+/** The legend's block on the page. */
 export type Legend = {
-	/** The legend, to put in its place over the globe. */
+	/** The block, to put in the info box. */
 	readonly element: HTMLElement;
-	/** Shows the content given, or hides the legend for null. */
+	/**
+	 * Shows the scale of the content given, or hides the block for null and
+	 * while the content has no scale. The content's line and bar are the
+	 * info box's to show.
+	 */
 	show(content: LegendContent | null): void;
 };
 
 /**
- * Creates a legend, hidden until it is given something to show.
+ * Creates the legend's block, hidden until it is given a scale to show.
  *
  * @remarks
- * The status line is a polite live region, so a screen reader announces
- * that the result is out of date or being calculated, without the focus
- * moving. The line is rewritten only when its words change, so the same
- * words are not announced again. While the legend shows, the line is never
- * hidden on its own, only left empty when there is nothing to say, since
- * many screen readers do not announce words written into a region that is
- * hidden at the time; the page keeps room for its line either way. It is
- * hidden only with the whole legend, when the legend is given nothing to
- * show.
- *
  * The caption over the ramp is the scale's own, so it changes with what the
- * scale measures, and is hidden with the scale.
- *
- * What the end colours stand for, such as `−34 and below` and `29 and
- * above`, is on a line of its own under the values marked, each part at its
- * own end, so that it never runs into a value marked near that end. The
- * line, and room for it, is there only while at least one part shows.
+ * scale measures.
  *
  * The error figures, when there are any, are on a line of their own
- * directly under that, and the line, and room for it, is there only while
- * there are.
+ * under the values marked, and the line, and room for it, is there only
+ * while there are.
  *
- * @returns The legend.
+ * @returns The block.
  */
 export const createLegend = (): Legend => {
 	const legend = createElement('div', 'legend');
 	legend.hidden = true;
 
 	const title = createElement('p', 'legend__caption');
-	const scale = createElement('div', 'legend__scale');
 	const ramp = createElement('div', 'legend__ramp');
 	const ticks = createElement('div', 'legend__ticks');
-	const ends = createElement('p', 'legend__ends');
-	const below = createElement('span', 'legend__end legend__end--low');
-	const above = createElement('span', 'legend__end legend__end--high');
-	ends.append(below, above);
 	const figures = createElement('p', 'legend__figures');
 	figures.hidden = true;
-	scale.append(title, ramp, ticks, ends, figures);
-
-	const status = createElement('p', 'legend__status');
-	status.setAttribute('aria-live', 'polite');
-	const bar = createElement('progress', 'legend__bar');
-	bar.max = 1;
-	bar.setAttribute('aria-label', 'Calculation progress');
-
-	legend.append(scale, status, bar);
+	legend.append(title, ramp, ticks, figures);
 
 	return {
 		element: legend,
 		show: (content) => {
-			legend.hidden = content === null;
-			if (content === null) {
+			const scale = content?.scale ?? null;
+			legend.hidden = scale === null;
+			if (scale === null) {
 				return;
 			}
-			scale.hidden = content.scale === null;
-			if (content.scale !== null) {
-				if (title.textContent !== content.scale.caption) {
-					title.textContent = content.scale.caption;
-				}
-				ramp.style.background = content.scale.gradient;
-				ticks.replaceChildren(
-					...content.scale.ticks.map((tick) => {
-						const mark = createElement('span', 'legend__tick');
-						mark.textContent = tick.label;
-						mark.style.left = `${tick.position}%`;
-						return mark;
-					}),
-				);
-				below.textContent = content.scale.below ?? '';
-				below.hidden = content.scale.below === null;
-				above.textContent = content.scale.above ?? '';
-				above.hidden = content.scale.above === null;
-				ends.hidden =
-					content.scale.below === null && content.scale.above === null;
-				figures.textContent = content.scale.figures ?? '';
-				figures.hidden = content.scale.figures === null;
+			if (title.textContent !== scale.caption) {
+				title.textContent = scale.caption;
 			}
-			const text = content.status ?? '';
-			if (status.textContent !== text) {
-				status.textContent = text;
-			}
-			bar.hidden = content.bar === null;
-			if (content.bar !== null) {
-				// A bar without a value is drawn as one that does not know
-				// how far it has come.
-				if (content.bar.fraction === null) {
-					bar.removeAttribute('value');
-				} else {
-					bar.value = content.bar.fraction;
-				}
-			}
+			ramp.style.background = scale.gradient;
+			ticks.replaceChildren(
+				...scale.ticks.map((tick) => {
+					const mark = createElement('span', 'legend__tick');
+					mark.textContent = tick.label;
+					mark.style.left = `${tick.position}%`;
+					return mark;
+				}),
+			);
+			figures.textContent = scale.figures ?? '';
+			figures.hidden = scale.figures === null;
 		},
 	};
 };

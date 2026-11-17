@@ -1,7 +1,7 @@
 /**
  * The layers that colour the globe by one computed value per cell, each as
  * a description: everything the layer panel, the legend, the cursor
- * readout, the comparison controls, the date line and the globe's lighting
+ * readout, the top bar's Show choice, the date line and the globe's lighting
  * need to know of a layer to show it. Each takes a description as data, so
  * that another such layer is added by describing it.
  *
@@ -22,6 +22,7 @@ import {
 	PRESSURE_RAMP,
 	SEASONAL_RANGE_RAMP,
 	TEMPERATURE_RAMP,
+	type ValueRange,
 } from './globe/ramp';
 import type { LayerStatus, LayerStore } from './layers';
 import {
@@ -31,14 +32,23 @@ import {
 } from './observedData';
 import {
 	cellWeights,
-	type FittedScale,
 	fitRange,
 	fitRangeCentred,
 	fitRangeFromZero,
 	formatTick,
 	MIN_FITTED_SPAN_C,
-	NOTHING_BEYOND,
 } from './ui/legend';
+import {
+	convert,
+	convertDifference,
+	formatNumber,
+	type Quantity,
+	type ResolvedUnits,
+	SYSTEM_UNITS,
+	type UnitOf,
+	unitLabel,
+	unitSpec,
+} from './units';
 import {
 	isScalarLayer,
 	type Layer,
@@ -52,6 +62,35 @@ import {
 
 /** The summaries of a year, worked out from its twelve months. */
 export type YearSummary = Exclude<Summary, 'month'>;
+
+/** The quantities the computed layers measure. */
+export type LayerQuantity = Extract<Quantity, 'temperature' | 'pressure'>;
+
+/** A unit of a quantity a computed layer measures, such as `°F` or `inHg`. */
+export type LayerUnit = UnitOf<LayerQuantity>;
+
+/**
+ * A setting of a scale given for each unit of a layer's quantity, such as
+ * its narrowest span: a round number in each unit, chosen for it rather
+ * than converted from another, so that a scale is as round in °F or inHg
+ * as in °C or hPa.
+ */
+export type PerUnit = Readonly<Partial<Record<LayerUnit, number>>>;
+
+/**
+ * A setting in a unit.
+ *
+ * @param setting - The setting, for each unit of a layer's quantity.
+ * @param unit - The unit.
+ * @throws RangeError if the setting gives nothing for the unit.
+ */
+export const inUnit = (setting: PerUnit, unit: LayerUnit): number => {
+	const value = setting[unit];
+	if (value === undefined) {
+		throw new RangeError(`No setting is given in ${unit}`);
+	}
+	return value;
+};
 
 /**
  * The fields of the summaries a layer offers, each one value per cell, as
@@ -115,26 +154,26 @@ export type ScalarSummarySpec = {
 	/** How its scale is fitted. */
 	readonly scale: ScaleFit;
 	/**
-	 * A step of the scale's own to mark the legend at; left out, the legend
-	 * chooses one.
+	 * A step of the scale's own to mark the legend at, in each unit; left
+	 * out, the legend chooses one.
 	 */
-	readonly tickStep?: number;
+	readonly tickStep?: PerUnit;
 };
 
 /** How the difference between simulated and observed is drawn. */
 export type DifferenceScale = {
-	/** How far the scale reaches either side of zero, in the layer's unit. */
-	readonly halfSpan: number;
+	/** How far the scale reaches either side of zero, in each unit. */
+	readonly halfSpan: PerUnit;
 	/** The colours it is drawn in, centred on no difference. */
 	readonly ramp: ColourRamp;
-	/** The step its legend is marked at. */
-	readonly tickStep: number;
+	/** The step its legend is marked at, in each unit. */
+	readonly tickStep: PerUnit;
 };
 
 /**
  * The comparison a layer offers with the observed Earth: what loads the
- * observed year, what the page says of it, the names of its controls and
- * how the difference is drawn.
+ * observed year, what the page says of it and how the difference is
+ * drawn.
  */
 export type ObservedComparison = {
 	/** Loads the observed year on a world's grid from its file. */
@@ -143,10 +182,6 @@ export type ObservedComparison = {
 	readonly loadingText: string;
 	/** What the comparison's line says when it could not be loaded. */
 	readonly failedText: string;
-	/** The name of the choice of source, its radio buttons' group. */
-	readonly sourceName: string;
-	/** What a screen reader names the choice of source by. */
-	readonly sourceLegend: string;
 	/** How the difference is drawn. */
 	readonly difference: DifferenceScale;
 };
@@ -162,7 +197,7 @@ export type ScalarLayerReading = {
 	readonly result: object | null;
 	/**
 	 * The year's twelve months, January first, one value per cell in the
-	 * layer's unit: null exactly when the result is.
+	 * metric unit of the layer's quantity: null exactly when the result is.
 	 */
 	readonly months: readonly Float32Array[] | null;
 	/**
@@ -182,18 +217,32 @@ export type ScalarLayerSpec = {
 	readonly id: ScalarLayerId;
 	/** Its name on the page, in the choice of layer. */
 	readonly label: string;
-	/** The unit of its values, as the legend and the readout write it. */
-	readonly unit: string;
+	/**
+	 * What its values measure. They are held in the quantity's metric unit
+	 * and written in the unit chosen for it.
+	 */
+	readonly quantity: LayerQuantity;
 	/**
 	 * A value as the readout writes it before the unit, such as `−18`.
 	 *
-	 * @param value - The value, in the layer's unit.
+	 * @param value - The value, in the unit.
+	 * @param unit - The unit it is written in, one of the layer's quantity.
 	 * @param signed - Whether a value above zero is written with a plus
 	 * sign, as for a difference.
 	 */
-	readonly formatValue: (value: number, signed: boolean) => string;
-	/** A value marked on the legend's scale as it writes it, such as `−20`. */
-	readonly formatTick: (value: number) => string;
+	readonly formatValue: (
+		value: number,
+		unit: LayerUnit,
+		signed: boolean,
+	) => string;
+	/**
+	 * A value marked on the legend's scale as it writes it, such as `−20`.
+	 *
+	 * @param value - The value, in the unit.
+	 * @param unit - The unit the scale is written in, one of the layer's
+	 * quantity.
+	 */
+	readonly formatTick: (value: number, unit: LayerUnit) => string;
 	/** What the legend says once no result can be calculated. */
 	readonly unavailableText: string;
 	/**
@@ -203,8 +252,9 @@ export type ScalarLayerSpec = {
 	readonly notShownText: string;
 	/**
 	 * Whether its calculation tells how far it has come, year by year, as the
-	 * temperature's does: the legend then says which year it is on, and what
-	 * it says before the first year is done.
+	 * temperature's does: the legend then says which year it is on and how
+	 * many are left, once it can tell that, and with its bar how far it has
+	 * come.
 	 */
 	readonly yearProgress: boolean;
 	/**
@@ -217,8 +267,8 @@ export type ScalarLayerSpec = {
 	 * arrays, one value per cell, for every summary offered but the Month.
 	 */
 	readonly summarise: (months: readonly Float32Array[]) => YearSummaries;
-	/** The narrowest span its scales are fitted to, in its unit. */
-	readonly minSpan: number;
+	/** The narrowest span its scales are fitted to, in each unit. */
+	readonly minSpan: PerUnit;
 	/**
 	 * The comparison it offers with the observed Earth, or null for none: its
 	 * source is then always the simulation.
@@ -226,11 +276,6 @@ export type ScalarLayerSpec = {
 	readonly observed: ObservedComparison | null;
 	/** Reads its result from the store. */
 	readonly read: (store: ScalarLayerStore) => ScalarLayerReading;
-	/**
-	 * What calculates it, and is told it is showing while it is on screen:
-	 * the temperature, or the winds and pressure.
-	 */
-	readonly scheduler: 'temperature' | 'winds';
 	/**
 	 * How the globe is lit over it while the sun lights the globe: with the
 	 * line between day and night drawn over colours shaded as without the
@@ -248,18 +293,62 @@ export type ScalarObservedLoader = (
 	resolution: Resolution,
 ) => Promise<MonthlyTemperature>;
 
-/** The step, in degrees, the seasonal range's legend is marked at. */
+/** The step, in degrees Celsius, the seasonal range's legend is marked at. */
 export const SEASONAL_RANGE_TICK_STEP = 5;
 
 /**
+ * The step the seasonal range's legend is marked at in each unit:
+ * {@link SEASONAL_RANGE_TICK_STEP} degrees Celsius, 10 °F and 5 K.
+ */
+export const SEASONAL_RANGE_TICK_STEPS = {
+	'°C': SEASONAL_RANGE_TICK_STEP,
+	'°F': 10,
+	K: 5,
+} as const satisfies Record<UnitOf<'temperature'>, number>;
+
+/**
+ * The narrowest span the temperature's scales are fitted to in each unit:
+ * {@link MIN_FITTED_SPAN_C} degrees Celsius, 4 °F and 2 K.
+ */
+export const TEMPERATURE_MIN_SPANS = {
+	'°C': MIN_FITTED_SPAN_C,
+	'°F': 4,
+	K: 2,
+} as const satisfies Record<UnitOf<'temperature'>, number>;
+
+/**
  * How far the temperature difference's scale reaches either side of zero,
- * in degrees: the same for every month and summary, the seasonal range's
- * included.
+ * in degrees Celsius: the same for every month and summary, the seasonal
+ * range's included.
  */
 export const DIFFERENCE_HALF_SPAN_C = 20;
 
-/** The step, in degrees, the temperature difference's legend is marked at. */
+/**
+ * How far the temperature difference's scale reaches either side of zero
+ * in each unit: {@link DIFFERENCE_HALF_SPAN_C} degrees Celsius, 40 °F and
+ * 20 K.
+ */
+export const DIFFERENCE_HALF_SPANS = {
+	'°C': DIFFERENCE_HALF_SPAN_C,
+	'°F': 40,
+	K: 20,
+} as const satisfies Record<UnitOf<'temperature'>, number>;
+
+/**
+ * The step, in degrees Celsius, the temperature difference's legend is
+ * marked at.
+ */
 export const DIFFERENCE_TICK_STEP = 10;
+
+/**
+ * The step the temperature difference's legend is marked at in each unit:
+ * {@link DIFFERENCE_TICK_STEP} degrees Celsius, 20 °F and 10 K.
+ */
+export const DIFFERENCE_TICK_STEPS = {
+	'°C': DIFFERENCE_TICK_STEP,
+	'°F': 20,
+	K: 10,
+} as const satisfies Record<UnitOf<'temperature'>, number>;
 
 /** What the comparison's line says while the observed temperature loads. */
 export const OBSERVED_LOADING_TEXT = 'Loading observed temperature';
@@ -285,14 +374,98 @@ export const TEMPERATURE_NOT_SHOWN_TEXT = 'Temperature could not be shown';
  * @param value - The value.
  * @param signed - Whether a value above zero has a plus sign.
  */
-export const formatWhole = (value: number, signed: boolean): string => {
-	// Rounded once, so that the sign and the digits agree: −0.5 rounds to
-	// zero, and is written `0`.
-	const rounded = Math.round(value);
-	const positive = signed && rounded > 0 ? '+' : '';
-	const sign = rounded < 0 ? '−' : positive;
-	return `${sign}${Math.abs(rounded).toLocaleString('en-GB')}`;
+export const formatWhole = (value: number, signed: boolean): string =>
+	formatNumber(value, 0, signed);
+
+/**
+ * Writes a value of a quantity in one of its units, to the unit's
+ * decimals, as {@link formatNumber} writes it: `−18` in °C, `1,018` in hPa
+ * and `30.06` in inHg.
+ *
+ * @param quantity - The quantity.
+ * @returns A writer of a value in a unit of the quantity, which throws a
+ * RangeError for a unit of another.
+ */
+const formatInUnit =
+	(quantity: LayerQuantity) =>
+	(value: number, unit: LayerUnit, signed = false): string =>
+		formatNumber(value, unitSpec(quantity, unit).decimals, signed);
+
+/**
+ * The unit a layer is written in, of those chosen.
+ *
+ * @param layer - The layer's description.
+ * @param units - The unit chosen for each quantity.
+ */
+export const layerUnit = (
+	layer: Pick<ScalarLayerSpec, 'quantity'>,
+	units: ResolvedUnits,
+): LayerUnit => units[layer.quantity];
+
+/**
+ * The metric unit of a layer's quantity, which its values are held in.
+ *
+ * @param layer - The layer's description.
+ */
+export const metricUnit = (
+	layer: Pick<ScalarLayerSpec, 'quantity'>,
+): LayerUnit => SYSTEM_UNITS.metric[layer.quantity];
+
+/**
+ * A value of a layer, held in its quantity's metric unit, in a unit.
+ *
+ * @param layer - The layer's description.
+ * @param unit - The unit, one of the layer's quantity.
+ * @param metricValue - The value.
+ * @param isDifference - Whether it is a difference of two values, which
+ * converts by the unit's scale alone.
+ */
+export const toLayerUnit = (
+	layer: Pick<ScalarLayerSpec, 'quantity'>,
+	unit: LayerUnit,
+	metricValue: number,
+	isDifference: boolean,
+): number =>
+	isDifference
+		? convertDifference(layer.quantity, unit, metricValue)
+		: convert(layer.quantity, unit, metricValue);
+
+/**
+ * A range in a unit as a range of the metric values a layer holds, as the
+ * globe colours them by.
+ *
+ * @param layer - The layer's description.
+ * @param unit - The unit the range is in, one of the layer's quantity.
+ * @param range - The range.
+ * @param isDifference - Whether its values are differences of two values,
+ * which convert by the unit's scale alone.
+ */
+export const metricRange = (
+	layer: Pick<ScalarLayerSpec, 'quantity'>,
+	unit: LayerUnit,
+	range: ValueRange,
+	isDifference: boolean,
+): ValueRange => {
+	const { scale, offset } = unitSpec(layer.quantity, unit);
+	const shift = isDifference ? 0 : offset;
+	return { min: (range.min - shift) / scale, max: (range.max - shift) / scale };
 };
+
+/**
+ * Whether a view's values are differences of its layer's quantity: those
+ * of a view fitted from zero, such as the seasonal range, the warmest
+ * month less the coldest. They are spans of the quantity, not values of
+ * it, so they convert to another unit by its scale alone: a range of
+ * 10 °C is one of 18 °F, not 50 °F. A view fitted end to end or centred
+ * shows values of the quantity, as its scale, fitted over the year's
+ * months, is. Its scale, its legend and the values the globe colours by
+ * all convert as this says.
+ *
+ * @param view - The view of the year.
+ */
+export const isDifferenceView = (
+	view: Pick<ScalarSummarySpec, 'scale'>,
+): boolean => view.scale.kind === 'fromZero';
 
 /** A scale fitted to the whole year, from end to end. */
 const END_TO_END: ScaleFit = { kind: 'endToEnd' };
@@ -315,44 +488,46 @@ const temperatureSummary = (
 
 /**
  * The temperature's comparison with the observed Earth: its observed year
- * from `OBSERVED_DATA_PATH`, and its difference drawn from
- * −{@link DIFFERENCE_HALF_SPAN_C} to {@link DIFFERENCE_HALF_SPAN_C} degrees,
- * marked every {@link DIFFERENCE_TICK_STEP}.
+ * from `OBSERVED_DATA_PATH`, and its difference drawn as far either side of
+ * zero as {@link DIFFERENCE_HALF_SPANS} says for the unit, marked at the
+ * step {@link DIFFERENCE_TICK_STEPS} says: ±20 °C every 10, ±40 °F every 20
+ * or ±20 K every 10.
  */
 export const TEMPERATURE_OBSERVED: ObservedComparison = {
 	load: loadObservedTemperature,
 	loadingText: OBSERVED_LOADING_TEXT,
 	failedText: OBSERVED_FAILED_TEXT,
-	sourceName: 'temperature-source',
-	sourceLegend: 'Temperature source',
 	difference: {
-		halfSpan: DIFFERENCE_HALF_SPAN_C,
+		halfSpan: DIFFERENCE_HALF_SPANS,
 		ramp: DIFFERENCE_RAMP,
-		tickStep: DIFFERENCE_TICK_STEP,
+		tickStep: DIFFERENCE_TICK_STEPS,
 	},
 };
 
 /**
- * The near-surface air temperature, in degrees Celsius.
+ * The near-surface air temperature, held in degrees Celsius.
  *
  * @remarks
  * Its five views are the month on screen, the annual average, the warmest
  * and the coldest month, all four in {@link TEMPERATURE_RAMP} on one scale
  * fitted to the whole year, and the seasonal range, the warmest less the
- * coldest, in {@link SEASONAL_RANGE_RAMP} on a scale of its own from zero,
- * marked every {@link SEASONAL_RANGE_TICK_STEP} degrees. Its scales are at
- * least {@link MIN_FITTED_SPAN_C} wide. On the measured Earth it is compared
- * with the observed temperature, as {@link TEMPERATURE_OBSERVED} says. It is
- * read from the store's temperature, whose calculation tells its years,
- * and is calculated by the temperature. Over it, sunlight is shown as the
- * line between day and night.
+ * coldest, a difference of temperatures, in {@link SEASONAL_RANGE_RAMP} on
+ * a scale of its own from zero, marked at the step
+ * {@link SEASONAL_RANGE_TICK_STEPS} gives the unit. Its scales are at least
+ * as wide as {@link TEMPERATURE_MIN_SPANS} says. Its values and ticks are
+ * whole numbers in every unit, but for a tick of a narrow scale. On the
+ * measured Earth it is compared with the observed temperature, as
+ * {@link TEMPERATURE_OBSERVED} says. It is read from the store's
+ * temperature, whose calculation tells its years, and is calculated by the
+ * temperature. Over it, sunlight is shown as the line between day and
+ * night.
  */
 export const TEMPERATURE_LAYER: ScalarLayerSpec = {
 	id: 'temperature',
 	label: 'Temperature',
-	unit: '°C',
-	formatValue: formatWhole,
-	formatTick,
+	quantity: 'temperature',
+	formatValue: formatInUnit('temperature'),
+	formatTick: (value) => formatTick(value),
 	unavailableText: TEMPERATURE_UNAVAILABLE_TEXT,
 	notShownText: TEMPERATURE_NOT_SHOWN_TEXT,
 	yearProgress: true,
@@ -378,11 +553,11 @@ export const TEMPERATURE_LAYER: ScalarLayerSpec = {
 			comparedSubject: () => ', seasonal range',
 			ramp: SEASONAL_RANGE_RAMP,
 			scale: FROM_ZERO,
-			tickStep: SEASONAL_RANGE_TICK_STEP,
+			tickStep: SEASONAL_RANGE_TICK_STEPS,
 		},
 	],
 	summarise: summariseTemperature,
-	minSpan: MIN_FITTED_SPAN_C,
+	minSpan: TEMPERATURE_MIN_SPANS,
 	observed: TEMPERATURE_OBSERVED,
 	read: ({ temperature }) => ({
 		status: temperature.status,
@@ -390,7 +565,6 @@ export const TEMPERATURE_LAYER: ScalarLayerSpec = {
 		months: temperature.result?.months ?? null,
 		progress: temperature.progress,
 	}),
-	scheduler: 'temperature',
 	sunlightStyle: 'line',
 	summaryControlId: 'temperature-view',
 };
@@ -408,13 +582,41 @@ export const PRESSURE_NOT_SHOWN_TEXT = 'Pressure could not be shown';
 export const MIN_PRESSURE_SPAN_HPA = 10;
 
 /**
+ * The narrowest span the pressure's scale is fitted to in each unit:
+ * {@link MIN_PRESSURE_SPAN_HPA} hectopascals and 0.3 inHg.
+ */
+export const PRESSURE_MIN_SPANS = {
+	hPa: MIN_PRESSURE_SPAN_HPA,
+	inHg: 0.3,
+} as const satisfies Record<UnitOf<'pressure'>, number>;
+
+/**
  * How far the pressure difference's scale reaches either side of zero, in
  * hectopascals: the same for every month and the annual average.
  */
 export const PRESSURE_DIFFERENCE_HALF_SPAN_HPA = 20;
 
+/**
+ * How far the pressure difference's scale reaches either side of zero in
+ * each unit: {@link PRESSURE_DIFFERENCE_HALF_SPAN_HPA} hectopascals and
+ * 0.6 inHg.
+ */
+export const PRESSURE_DIFFERENCE_HALF_SPANS = {
+	hPa: PRESSURE_DIFFERENCE_HALF_SPAN_HPA,
+	inHg: 0.6,
+} as const satisfies Record<UnitOf<'pressure'>, number>;
+
 /** The step, in hectopascals, the pressure difference's legend is marked at. */
 export const PRESSURE_DIFFERENCE_TICK_STEP_HPA = 10;
+
+/**
+ * The step the pressure difference's legend is marked at in each unit:
+ * {@link PRESSURE_DIFFERENCE_TICK_STEP_HPA} hectopascals and 0.3 inHg.
+ */
+export const PRESSURE_DIFFERENCE_TICK_STEPS = {
+	hPa: PRESSURE_DIFFERENCE_TICK_STEP_HPA,
+	inHg: 0.3,
+} as const satisfies Record<UnitOf<'pressure'>, number>;
 
 /** What the comparison's line says while the observed pressure loads. */
 export const OBSERVED_PRESSURE_LOADING_TEXT = 'Loading observed pressure';
@@ -425,22 +627,20 @@ export const OBSERVED_PRESSURE_FAILED_TEXT =
 
 /**
  * The pressure's comparison with the observed Earth: its observed year
- * from `OBSERVED_PRESSURE_PATH`, and its difference drawn from
- * −{@link PRESSURE_DIFFERENCE_HALF_SPAN_HPA} to
- * {@link PRESSURE_DIFFERENCE_HALF_SPAN_HPA} hectopascals, marked every
- * {@link PRESSURE_DIFFERENCE_TICK_STEP_HPA}, in the temperature
- * difference's colours.
+ * from `OBSERVED_PRESSURE_PATH`, and its difference drawn as far either
+ * side of zero as {@link PRESSURE_DIFFERENCE_HALF_SPANS} says for the unit,
+ * marked at the step {@link PRESSURE_DIFFERENCE_TICK_STEPS} says: ±20 hPa
+ * every 10 or ±0.6 inHg every 0.3, in the temperature difference's
+ * colours.
  */
 export const PRESSURE_OBSERVED: ObservedComparison = {
 	load: loadObservedPressure,
 	loadingText: OBSERVED_PRESSURE_LOADING_TEXT,
 	failedText: OBSERVED_PRESSURE_FAILED_TEXT,
-	sourceName: 'pressure-source',
-	sourceLegend: 'Pressure source',
 	difference: {
-		halfSpan: PRESSURE_DIFFERENCE_HALF_SPAN_HPA,
+		halfSpan: PRESSURE_DIFFERENCE_HALF_SPANS,
 		ramp: DIFFERENCE_RAMP,
-		tickStep: PRESSURE_DIFFERENCE_TICK_STEP_HPA,
+		tickStep: PRESSURE_DIFFERENCE_TICK_STEPS,
 	},
 };
 
@@ -494,8 +694,8 @@ const CENTRED_ON_YEAR_MEAN: ScaleFit = {
 
 /**
  * Where the winds and the pressure stand for showing, from where the
- * temperature and the winds do: what the pressure's legend and the key to
- * the wind arrows say.
+ * temperature and the winds do: what the pressure's legend and the info
+ * box's status line say of them.
  *
  * @remarks
  * The winds are worked out from the temperature, and are not asked for
@@ -514,7 +714,7 @@ export const windsStatus = (
 	winds === 'empty' && temperature === 'calculating' ? 'calculating' : winds;
 
 /**
- * The sea-level pressure, in hectopascals, of the winds' calculation.
+ * The sea-level pressure, held in hectopascals, of the winds' calculation.
  *
  * @remarks
  * Its two views are the month on screen and the annual average, the mean
@@ -522,12 +722,13 @@ export const windsStatus = (
  * {@link PRESSURE_RAMP} on one scale centred on the planet's mean over the
  * whole year by area, so that a colour means the same in every month and
  * the near white of the middle is that mean; the far tails are clipped as
- * the centred fit clips them, and the scale is at least
- * {@link MIN_PRESSURE_SPAN_HPA} wide. Values and ticks are whole numbers,
- * such as `1,018`. On the measured Earth it is compared with the observed
+ * the centred fit clips them, and the scale is at least as wide as
+ * {@link PRESSURE_MIN_SPANS} says. Values and ticks are whole numbers in
+ * hectopascals, such as `1,018`, and have two decimals in inHg, such as
+ * `30.06`. On the measured Earth it is compared with the observed
  * sea-level pressure, as {@link PRESSURE_OBSERVED} says. It is read from
  * the store's winds, whose calculation tells nothing of its progress, and
- * is calculated by the winds, so choosing it asks for them; before the
+ * is calculated by the winds; before the
  * first winds it is being calculated while the temperature the winds wait
  * for is, as {@link windsStatus} says. Over it, sunlight is shown as the
  * line between day and night, as over the temperature.
@@ -535,9 +736,9 @@ export const windsStatus = (
 export const PRESSURE_LAYER: ScalarLayerSpec = {
 	id: 'pressure',
 	label: 'Pressure',
-	unit: 'hPa',
-	formatValue: formatWhole,
-	formatTick: (value) => formatWhole(value, false),
+	quantity: 'pressure',
+	formatValue: formatInUnit('pressure'),
+	formatTick: (value, unit) => formatInUnit('pressure')(value, unit),
 	unavailableText: PRESSURE_UNAVAILABLE_TEXT,
 	notShownText: PRESSURE_NOT_SHOWN_TEXT,
 	yearProgress: false,
@@ -560,7 +761,7 @@ export const PRESSURE_LAYER: ScalarLayerSpec = {
 		},
 	],
 	summarise: (months) => ({ annualMean: meanOfMonths(months) }),
-	minSpan: MIN_PRESSURE_SPAN_HPA,
+	minSpan: PRESSURE_MIN_SPANS,
 	observed: PRESSURE_OBSERVED,
 	read: ({ temperature, winds }) => ({
 		status: windsStatus(temperature.status, winds.status),
@@ -568,7 +769,6 @@ export const PRESSURE_LAYER: ScalarLayerSpec = {
 		months: winds.result?.winds.pressure ?? null,
 		progress: null,
 	}),
-	scheduler: 'winds',
 	sunlightStyle: 'line',
 	summaryControlId: 'pressure-view',
 };
@@ -651,35 +851,40 @@ const capitalised = (text: string): string =>
  * Earth, where the field comes from.
  *
  * @param layer - The layer's description, which words what each view
- * shows and gives the unit.
+ * shows.
  * @param summary - What of the year is shown, a view the layer offers.
  * @param month - The month on screen, from January at 0; read only for the
  * Month view.
  * @param source - Where the field shown comes from, when the world is one
  * the comparison is offered for; left out, the caption names no source.
+ * @param unit - The unit the scale is written in, one of the layer's
+ * quantity; its metric unit when left out.
  * @returns For the temperature, such as `Air temperature in July, °C`,
- * `Observed air temperature in July, °C` or `Simulated less observed in
- * July, °C`. The seasonal range's, but for its difference, says that it is
+ * `Observed air temperature in July, °F` or `Simulated less observed in
+ * July, K`. The seasonal range's, but for its difference, says that it is
  * a difference of temperatures.
- * @throws RangeError if the layer does not offer the view.
+ * @throws RangeError if the layer does not offer the view, or the unit is
+ * not one of its quantity.
  */
 export const layerCaption = (
 	layer: ScalarLayerSpec,
 	summary: Summary,
 	month: number,
 	source?: Source,
+	unit: LayerUnit = metricUnit(layer),
 ): string => {
 	const view = summaryOf(layer, summary);
 	const subject = view.subject(month);
+	const label = unitLabel(layer.quantity, unit);
 	switch (source) {
 		case undefined:
-			return `${capitalised(subject)}, ${layer.unit}`;
+			return `${capitalised(subject)}, ${label}`;
 		case 'simulated':
-			return `Simulated ${subject}, ${layer.unit}`;
+			return `Simulated ${subject}, ${label}`;
 		case 'observed':
-			return `Observed ${subject}, ${layer.unit}`;
+			return `Observed ${subject}, ${label}`;
 		case 'difference':
-			return `Simulated less observed${view.comparedSubject(month)}, ${layer.unit}`;
+			return `Simulated less observed${view.comparedSubject(month)}, ${label}`;
 	}
 };
 
@@ -751,50 +956,62 @@ export const yearField = (
 };
 
 /**
- * The scale a view of a layer's year is drawn on, fitted as the view says
- * to one year, or to a simulated and an observed year together, at least
- * the layer's smallest span wide.
+ * The scale a view of a layer's year is drawn on, in a unit, fitted as the
+ * view says to one year, or to a simulated and an observed year together,
+ * at least the layer's smallest span in that unit wide.
  *
  * @remarks
- * A scale fitted end to end or centred is fitted to every month of the
- * years together, each cell weighted by area as {@link cellWeights} gives
- * it. One from zero runs up to the largest of the field's in each year, as
- * {@link fitRangeFromZero} fits it, with nothing beyond it.
+ * The values are converted to the unit first, and the scale is fitted and
+ * rounded in it, so that its ends are round in that unit: whole numbers in
+ * °F and K as in °C, and of two decimals in inHg. A scale fitted end to
+ * end or centred is fitted to every month of the years together, each
+ * cell weighted by area as {@link cellWeights} gives it. One from zero
+ * runs up to the largest of the field's in each year, as
+ * {@link fitRangeFromZero} fits it. The values of a view of differences,
+ * as {@link isDifferenceView} says, are converted by the unit's scale
+ * alone.
  *
  * @param layer - The layer's description.
  * @param view - The view of the year.
  * @param years - The years to fit it to, each on the same grid.
  * @param key - The field the view shows.
+ * @param unit - The unit, one of the layer's quantity; its metric unit
+ * when left out.
+ * @returns The range in the unit; {@link metricRange} gives the values the
+ * globe colours by.
+ * @throws RangeError if the unit is not one of the layer's quantity.
  */
 export const fitSummaryScale = (
 	layer: ScalarLayerSpec,
 	view: ScalarSummarySpec,
 	years: readonly LayerYear[],
 	key: YearFieldKey,
-): FittedScale => {
+	unit: LayerUnit = metricUnit(layer),
+): ValueRange => {
 	const fit = view.scale;
+	const unitOf = unitSpec(layer.quantity, unit);
+	const spec = isDifferenceView(view) ? { ...unitOf, offset: 0 } : unitOf;
+	const minSpan = inUnit(layer.minSpan, unit);
 	if (fit.kind === 'fromZero') {
 		return {
-			range: {
-				min: 0,
-				max: Math.max(
-					...years.map(
-						(year) =>
-							fitRangeFromZero(yearField(layer, year, key), layer.minSpan).max,
-					),
+			min: 0,
+			max: Math.max(
+				...years.map(
+					(year) =>
+						fitRangeFromZero(yearField(layer, year, key), minSpan, spec).max,
 				),
-			},
-			beyond: NOTHING_BEYOND,
+			),
 		};
 	}
 	const months = years.flatMap((year) => year.months);
 	const weights = cellWeights(months[0]?.length ?? 0);
 	return fit.kind === 'endToEnd'
-		? fitRange(months, weights, layer.minSpan)
+		? fitRange(months, weights, minSpan, spec)
 		: fitRangeCentred(
 				months,
 				weights,
 				fit.centre(months, weights),
-				layer.minSpan,
+				minSpan,
+				spec,
 			);
 };

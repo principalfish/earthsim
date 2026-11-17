@@ -9,7 +9,9 @@ It is a static site with no server and no account. The world is saved in the bro
 - **A globe you can sculpt.** Start from a blank ocean, generated continents or the real Earth, then raise, lower and smooth the terrain and move the sea level, with undo and redo.
 - **Planet settings.** Axial tilt, the star's brightness and mass, the orbit's distance, the greenhouse strength and the length of the day, which sets how many bands of wind there are and how wide.
 - **A temperature layer.** Air temperature for each month, or the year's average, warmest month, coldest month and seasonal range, recalculated after every change.
-- **Winds.** The surface winds for each month or the year's average, drawn over the globe as arrows or as moving streaks, with the wind under the pointer in m/s, km/h or mph.
+- **Winds.** The surface winds for each month or the year's average, drawn over the globe as arrows or as moving streaks, with the wind under the pointer.
+- **Controls over the globe.** Tiles, a top bar, a timeline and an info box laid over the globe choose what it shows and say what it means.
+- **Units.** Metric or Imperial in Settings, or a unit of your own for each quantity, used everywhere the page writes a value.
 - **A pressure layer.** The sea-level pressure the winds are worked out from, for each month or the year's average.
 - **The sun.** Drawn in the scene, with an optional day and night side on the globe.
 - **Earth comparison.** On the Earth, the simulated temperature and sea-level pressure beside the observed ones and the difference between them; the simulated winds beside the observed winds.
@@ -34,7 +36,7 @@ Open the address Vite prints. The first visit shows the New world dialog; press 
 
 | Document | What is in it |
 |-|-|
-| [User guide](docs/user-guide.md) | Every control on the page: worlds, tools, view, planet, layers, the sun and the winds |
+| [User guide](docs/user-guide.md) | Every control on the page: the layers, winds, sun, timeline and info box over the globe, then the panel's world, view, planet, tools, statistics and settings, and what the browser remembers |
 | [Temperature](docs/temperature.md) | How the temperature is worked out, when it is recalculated, its colours, and the Earth comparison |
 | [Winds](docs/winds.md) | How the surface winds and sea-level pressure are worked out, which planet settings they read, and how far to trust them |
 | [Climate process](docs/climate-process.pdf) | How the climate is to be worked out, as a diagram, and the settings of the temperature and wind models (PDF) |

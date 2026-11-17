@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getGrid, summariseWinds } from '../core/index';
+import { getGrid, summariseWinds, weightedQuantiles } from '../core/index';
 import { progressOf, temperatureOf } from '../core/testing/temperatureFixtures';
 import {
 	DIFFERENCE_RAMP,
@@ -14,9 +14,14 @@ import {
 	DIFFERENCE_TICK_STEP,
 	fitSummaryScale,
 	formatWhole,
+	inUnit,
+	isDifferenceView,
 	layerCaption,
+	layerUnit,
 	loadLayerObserved,
 	meanOfMonths,
+	metricRange,
+	metricUnit,
 	offersSummary,
 	PRESSURE_DIFFERENCE_HALF_SPAN_HPA,
 	PRESSURE_DIFFERENCE_TICK_STEP_HPA,
@@ -24,15 +29,20 @@ import {
 	PRESSURE_OBSERVED,
 	SCALAR_LAYER_SPECS,
 	SCALAR_LAYERS,
-	SEASONAL_RANGE_TICK_STEP,
+	SEASONAL_RANGE_TICK_STEPS,
 	scalarLayerOf,
 	summaryOf,
 	TEMPERATURE_LAYER,
 	TEMPERATURE_OBSERVED,
+	toLayerUnit,
 	windsStatus,
 	yearField,
 	yearSummaries,
 } from './scalarLayer';
+import {
+	earthLikePressure,
+	earthLikeTemperature,
+} from './testing/earthLikeFixtures';
 import {
 	MADE_UP_LAYER,
 	pressureWinds,
@@ -43,8 +53,9 @@ import {
 	FIT_TAIL_SHARE,
 	fitRange,
 	fitRangeCentred,
-	NOTHING_BEYOND,
+	legendTicks,
 } from './ui/legend';
+import { SYSTEM_UNITS } from './units';
 import {
 	DEFAULT_SUMMARY,
 	LAYERS,
@@ -57,7 +68,7 @@ describe('the temperature layer', () => {
 	it('is the Temperature, in °C, with the temperature’s wording', () => {
 		expect(TEMPERATURE_LAYER.id).toBe('temperature');
 		expect(TEMPERATURE_LAYER.label).toBe('Temperature');
-		expect(TEMPERATURE_LAYER.unit).toBe('°C');
+		expect(TEMPERATURE_LAYER.quantity).toBe('temperature');
 		expect(TEMPERATURE_LAYER.unavailableText).toBe('Temperature unavailable');
 		expect(TEMPERATURE_LAYER.notShownText).toBe(
 			'Temperature could not be shown',
@@ -65,8 +76,7 @@ describe('the temperature layer', () => {
 		expect(TEMPERATURE_LAYER.yearProgress).toBe(true);
 		expect(TEMPERATURE_LAYER.summaryControlId).toBe('temperature-view');
 		expect(TEMPERATURE_LAYER.sunlightStyle).toBe('line');
-		expect(TEMPERATURE_LAYER.scheduler).toBe('temperature');
-		expect(TEMPERATURE_LAYER.minSpan).toBe(2);
+		expect(TEMPERATURE_LAYER.minSpan['°C']).toBe(2);
 	});
 
 	it('offers the five views of the year, by their names, in order', () => {
@@ -88,7 +98,7 @@ describe('the temperature layer', () => {
 			['annualMean', TEMPERATURE_RAMP, 'endToEnd', undefined],
 			['warmest', TEMPERATURE_RAMP, 'endToEnd', undefined],
 			['coldest', TEMPERATURE_RAMP, 'endToEnd', undefined],
-			['range', SEASONAL_RANGE_RAMP, 'fromZero', SEASONAL_RANGE_TICK_STEP],
+			['range', SEASONAL_RANGE_RAMP, 'fromZero', SEASONAL_RANGE_TICK_STEPS],
 		]);
 	});
 
@@ -98,9 +108,11 @@ describe('the temperature layer', () => {
 			load: loadObservedTemperature,
 			loadingText: 'Loading observed temperature',
 			failedText: 'Observed temperature could not be loaded',
-			sourceName: 'temperature-source',
-			sourceLegend: 'Temperature source',
-			difference: { halfSpan: 20, ramp: DIFFERENCE_RAMP, tickStep: 10 },
+			difference: {
+				halfSpan: { '°C': 20, '°F': 40, K: 20 },
+				ramp: DIFFERENCE_RAMP,
+				tickStep: { '°C': 10, '°F': 20, K: 10 },
+			},
 		});
 		expect([DIFFERENCE_HALF_SPAN_C, DIFFERENCE_TICK_STEP]).toEqual([20, 10]);
 	});
@@ -128,8 +140,8 @@ describe('the temperature layer', () => {
 	});
 
 	it('writes its ticks as the legend always has', () => {
-		expect(TEMPERATURE_LAYER.formatTick(-20)).toBe('−20');
-		expect(TEMPERATURE_LAYER.formatTick(14.5)).toBe('14.5');
+		expect(TEMPERATURE_LAYER.formatTick(-20, '°C')).toBe('−20');
+		expect(TEMPERATURE_LAYER.formatTick(14.5, '°C')).toBe('14.5');
 	});
 });
 
@@ -137,14 +149,13 @@ describe('the pressure layer', () => {
 	it('is the Pressure, in hPa, with the pressure’s wording', () => {
 		expect(PRESSURE_LAYER.id).toBe('pressure');
 		expect(PRESSURE_LAYER.label).toBe('Pressure');
-		expect(PRESSURE_LAYER.unit).toBe('hPa');
+		expect(PRESSURE_LAYER.quantity).toBe('pressure');
 		expect(PRESSURE_LAYER.unavailableText).toBe('Pressure unavailable');
 		expect(PRESSURE_LAYER.notShownText).toBe('Pressure could not be shown');
 		expect(PRESSURE_LAYER.yearProgress).toBe(false);
 		expect(PRESSURE_LAYER.summaryControlId).toBe('pressure-view');
 		expect(PRESSURE_LAYER.sunlightStyle).toBe(TEMPERATURE_LAYER.sunlightStyle);
-		expect(PRESSURE_LAYER.scheduler).toBe('winds');
-		expect(PRESSURE_LAYER.minSpan).toBe(10);
+		expect(PRESSURE_LAYER.minSpan.hPa).toBe(10);
 		expect(PRESSURE_LAYER.observed).toBe(PRESSURE_OBSERVED);
 	});
 
@@ -153,9 +164,11 @@ describe('the pressure layer', () => {
 			load: loadObservedPressure,
 			loadingText: 'Loading observed pressure',
 			failedText: 'Observed pressure could not be loaded',
-			sourceName: 'pressure-source',
-			sourceLegend: 'Pressure source',
-			difference: { halfSpan: 20, ramp: DIFFERENCE_RAMP, tickStep: 10 },
+			difference: {
+				halfSpan: { hPa: 20, inHg: 0.6 },
+				ramp: DIFFERENCE_RAMP,
+				tickStep: { hPa: 10, inHg: 0.3 },
+			},
 		});
 		expect(PRESSURE_OBSERVED.difference.ramp).toBe(
 			TEMPERATURE_OBSERVED.difference.ramp,
@@ -215,12 +228,12 @@ describe('the pressure layer', () => {
 	});
 
 	it('writes its values and ticks as whole numbers, grouped, with a true minus and no −0', () => {
-		expect(PRESSURE_LAYER.formatValue(1018.4, false)).toBe('1,018');
-		expect(PRESSURE_LAYER.formatTick(1018)).toBe('1,018');
-		expect(PRESSURE_LAYER.formatTick(996)).toBe('996');
-		expect(PRESSURE_LAYER.formatTick(-4)).toBe('−4');
-		expect(PRESSURE_LAYER.formatTick(-0)).toBe('0');
-		expect(PRESSURE_LAYER.formatValue(-0.2, false)).toBe('0');
+		expect(PRESSURE_LAYER.formatValue(1018.4, 'hPa', false)).toBe('1,018');
+		expect(PRESSURE_LAYER.formatTick(1018, 'hPa')).toBe('1,018');
+		expect(PRESSURE_LAYER.formatTick(996, 'hPa')).toBe('996');
+		expect(PRESSURE_LAYER.formatTick(-4, 'hPa')).toBe('−4');
+		expect(PRESSURE_LAYER.formatTick(-0, 'hPa')).toBe('0');
+		expect(PRESSURE_LAYER.formatValue(-0.2, 'hPa', false)).toBe('0');
 	});
 
 	it('words its captions as sea-level pressure in hPa', () => {
@@ -401,7 +414,7 @@ describe('the pressure layer’s scale', () => {
 		];
 		for (const scale of scales) {
 			expect(scale).toEqual(scales[0]);
-			expect((scale.range.min + scale.range.max) / 2).toBe(centre);
+			expect((scale.min + scale.max) / 2).toBe(centre);
 		}
 		expect(scales[0]).toEqual(
 			fitRangeCentred(months, grid.areas, areaMean(months), 10),
@@ -411,18 +424,12 @@ describe('the pressure layer’s scale', () => {
 	it('is symmetric about the mean and clips the far tails at either end', () => {
 		const months = yearOnGrid();
 		const view = summaryOf(PRESSURE_LAYER, 'month');
-		const { range, beyond } = fitSummaryScale(
-			PRESSURE_LAYER,
-			view,
-			[{ months }],
-			6,
-		);
+		const range = fitSummaryScale(PRESSURE_LAYER, view, [{ months }], 6);
 		const centre = Math.round(areaMean(months));
 		expect(centre - range.min).toBe(range.max - centre);
 		// The tails 300 hPa out do not stretch it; they take the end colours.
 		expect(range.min).toBeGreaterThan(900);
 		expect(range.max).toBeLessThan(1100);
-		expect(beyond).toEqual({ below: true, above: true });
 	});
 
 	it('is never narrower than 10 hPa, for a nearly uniform year', () => {
@@ -430,7 +437,7 @@ describe('the pressure layer’s scale', () => {
 			new Float32Array(grid.cellCount).fill(1013 + 0.01 * m),
 		);
 		const view = summaryOf(PRESSURE_LAYER, 'annualMean');
-		const { range } = fitSummaryScale(
+		const range = fitSummaryScale(
 			PRESSURE_LAYER,
 			view,
 			[{ months }],
@@ -565,15 +572,15 @@ describe('fitSummaryScale', () => {
 			months: months.map((month, m) => month.map((v) => v * (m + 1))),
 		};
 		const own = fitSummaryScale(TEMPERATURE_LAYER, view, [year], 'range');
-		expect(own).toEqual({ range: { min: 0, max: 11 }, beyond: NOTHING_BEYOND });
+		expect(own).toEqual({ min: 0, max: 11 });
 		const shared = fitSummaryScale(
 			TEMPERATURE_LAYER,
 			view,
 			[year, wider],
 			'range',
 		);
-		expect(shared.range.min).toBe(0);
-		expect(shared.range.max).toBeGreaterThan(11);
+		expect(shared.min).toBe(0);
+		expect(shared.max).toBeGreaterThan(11);
 	});
 
 	it('fits a centred view about the centre the layer works out, at least its smallest span', () => {
@@ -585,10 +592,10 @@ describe('fitSummaryScale', () => {
 				pressure.months,
 				cellWeights(2),
 				weightedMean(pressure.months, cellWeights(2)),
-				MADE_UP_LAYER.minSpan,
+				MADE_UP_LAYER.minSpan.hPa,
 			),
 		);
-		expect((scale.range.min + scale.range.max) / 2).toBe(1016);
+		expect((scale.min + scale.max) / 2).toBe(1016);
 	});
 });
 
@@ -606,5 +613,240 @@ describe('loadLayerObserved', () => {
 		await expect(loadLayerObserved(MADE_UP_LAYER, 64)).rejects.toThrow(
 			'no observed year',
 		);
+	});
+});
+
+/** Whether a number is written exactly with no more than two decimals. */
+const hasTwoDecimals = (value: number): boolean =>
+	Number(value.toFixed(2)) === value;
+
+describe('the layers in each unit', () => {
+	it('gives each of its quantity’s units a round setting of its own, not converted', () => {
+		expect(TEMPERATURE_LAYER.minSpan).toEqual({ '°C': 2, '°F': 4, K: 2 });
+		expect(PRESSURE_LAYER.minSpan).toEqual({ hPa: 10, inHg: 0.3 });
+		expect(summaryOf(TEMPERATURE_LAYER, 'range').tickStep).toEqual({
+			'°C': 5,
+			'°F': 10,
+			K: 5,
+		});
+		expect(TEMPERATURE_OBSERVED.difference.halfSpan).toEqual({
+			'°C': 20,
+			'°F': 40,
+			K: 20,
+		});
+		expect(TEMPERATURE_OBSERVED.difference.tickStep).toEqual({
+			'°C': 10,
+			'°F': 20,
+			K: 10,
+		});
+		expect(PRESSURE_OBSERVED.difference.halfSpan).toEqual({
+			hPa: 20,
+			inHg: 0.6,
+		});
+		expect(PRESSURE_OBSERVED.difference.tickStep).toEqual({
+			hPa: 10,
+			inHg: 0.3,
+		});
+	});
+
+	it('reads a setting in a unit, and refuses a unit it gives nothing for', () => {
+		expect(inUnit(TEMPERATURE_LAYER.minSpan, '°F')).toBe(4);
+		expect(inUnit(PRESSURE_LAYER.minSpan, 'inHg')).toBe(0.3);
+		expect(() => inUnit(TEMPERATURE_LAYER.minSpan, 'hPa')).toThrow(RangeError);
+	});
+
+	it('marks only the seasonal range as a view of differences', () => {
+		expect(
+			[...TEMPERATURE_LAYER.summaries, ...PRESSURE_LAYER.summaries]
+				.filter(isDifferenceView)
+				.map((view) => view.id),
+		).toEqual(['range']);
+		expect(isDifferenceView({ scale: { kind: 'fromZero' } })).toBe(true);
+		expect(isDifferenceView({ scale: { kind: 'endToEnd' } })).toBe(false);
+		expect(
+			isDifferenceView({ scale: { kind: 'centred', centre: () => 0 } }),
+		).toBe(false);
+	});
+
+	it('takes its unit from those chosen, and its metric unit from its quantity', () => {
+		const imperial = SYSTEM_UNITS.imperial;
+		expect(layerUnit(TEMPERATURE_LAYER, imperial)).toBe('°F');
+		expect(layerUnit(PRESSURE_LAYER, imperial)).toBe('inHg');
+		expect(metricUnit(TEMPERATURE_LAYER)).toBe('°C');
+		expect(metricUnit(PRESSURE_LAYER)).toBe('hPa');
+	});
+
+	it('converts a value with the offset and a difference by the scale alone', () => {
+		expect(toLayerUnit(TEMPERATURE_LAYER, '°F', 10, false)).toBe(50);
+		expect(toLayerUnit(TEMPERATURE_LAYER, '°F', 10, true)).toBe(18);
+		expect(toLayerUnit(TEMPERATURE_LAYER, 'K', 10, true)).toBe(10);
+		expect(toLayerUnit(TEMPERATURE_LAYER, 'K', 0, false)).toBe(273.15);
+		expect(toLayerUnit(PRESSURE_LAYER, 'hPa', 1013, false)).toBe(1013);
+	});
+
+	it('gives a range in a unit back as the metric values the globe colours by', () => {
+		const fahrenheit = metricRange(
+			TEMPERATURE_LAYER,
+			'°F',
+			{ min: -40, max: 104 },
+			false,
+		);
+		expect(fahrenheit.min).toBeCloseTo(-40, 12);
+		expect(fahrenheit.max).toBeCloseTo(40, 12);
+		expect(
+			metricRange(TEMPERATURE_LAYER, '°F', { min: -36, max: 36 }, true),
+		).toEqual({ min: -20, max: 20 });
+		const kelvin = metricRange(
+			TEMPERATURE_LAYER,
+			'K',
+			{ min: 223, max: 313 },
+			false,
+		);
+		expect(kelvin.min).toBeCloseTo(-50.15, 12);
+		expect(kelvin.max).toBeCloseTo(39.85, 12);
+		const range = { min: -12, max: 31 };
+		expect(metricRange(TEMPERATURE_LAYER, '°C', range, false)).toEqual(range);
+		expect(
+			metricRange(PRESSURE_LAYER, 'inHg', { min: 0, max: 1 }, true).max,
+		).toBeCloseTo(33.8638866667, 9);
+	});
+
+	it('names the unit in the caption', () => {
+		expect(layerCaption(TEMPERATURE_LAYER, 'month', 6, undefined, '°F')).toBe(
+			'Air temperature in July, °F',
+		);
+		expect(layerCaption(TEMPERATURE_LAYER, 'range', 6, 'difference', 'K')).toBe(
+			'Simulated less observed, seasonal range, K',
+		);
+		expect(
+			layerCaption(PRESSURE_LAYER, 'annualMean', 6, 'observed', 'inHg'),
+		).toBe('Observed annual average sea-level pressure, inHg');
+		expect(() =>
+			layerCaption(TEMPERATURE_LAYER, 'month', 6, undefined, 'inHg'),
+		).toThrow(RangeError);
+	});
+
+	it('writes its values and ticks to the unit’s decimals', () => {
+		expect(TEMPERATURE_LAYER.formatValue(64.4, '°F', false)).toBe('64');
+		expect(TEMPERATURE_LAYER.formatValue(3.6, 'K', true)).toBe('+4');
+		expect(TEMPERATURE_LAYER.formatTick(-40, '°F')).toBe('−40');
+		expect(PRESSURE_LAYER.formatValue(29.921, 'inHg', false)).toBe('29.92');
+		expect(PRESSURE_LAYER.formatValue(-0.126, 'inHg', true)).toBe('−0.13');
+		expect(PRESSURE_LAYER.formatValue(0.004, 'inHg', true)).toBe('0.00');
+		expect(PRESSURE_LAYER.formatTick(30, 'inHg')).toBe('30.00');
+		expect(PRESSURE_LAYER.formatTick(29.7, 'inHg')).toBe('29.70');
+		expect(() => PRESSURE_LAYER.formatTick(30, '°F')).toThrow(RangeError);
+	});
+});
+
+describe('fitSummaryScale in a unit, on an Earth-like year', () => {
+	const temperature = { months: earthLikeTemperature() };
+	const pressure = { months: earthLikePressure() };
+	const weights = cellWeights(temperature.months[0]?.length ?? 0);
+	/** The values between the two quantiles a scale spans, in a unit. */
+	const cutsIn = (
+		months: readonly Float32Array[],
+		toUnit: (value: number) => number,
+	) => {
+		const cuts = weightedQuantiles(months, weights, FIT_TAIL_SHARE);
+		return { low: toUnit(cuts.low), high: toUnit(cuts.high) };
+	};
+
+	it.each([
+		['°F', 4],
+		['K', 2],
+	] as const)(
+		'fits July’s temperature in %s to whole ends that hold every value, marked at whole ticks',
+		(unit, minSpan) => {
+			const view = summaryOf(TEMPERATURE_LAYER, 'month');
+			const range = fitSummaryScale(
+				TEMPERATURE_LAYER,
+				view,
+				[temperature],
+				6,
+				unit,
+			);
+			expect(Number.isInteger(range.min), `${range.min}`).toBe(true);
+			expect(Number.isInteger(range.max), `${range.max}`).toBe(true);
+			expect(range.max - range.min).toBeGreaterThanOrEqual(minSpan);
+			const cuts = cutsIn(temperature.months, (value) =>
+				toLayerUnit(TEMPERATURE_LAYER, unit, value, false),
+			);
+			expect(range.min).toBeLessThanOrEqual(cuts.low);
+			expect(range.max).toBeGreaterThanOrEqual(cuts.high);
+			// Rounded outward by less than a whole unit.
+			expect(cuts.low - range.min).toBeLessThan(1);
+			expect(range.max - cuts.high).toBeLessThan(1);
+			const ticks = legendTicks(range.min, range.max);
+			expect(ticks.every(Number.isInteger), `${ticks}`).toBe(true);
+		},
+	);
+
+	it('fits the temperature’s range of the seasons in °F by the scale alone, holding every value', () => {
+		const view = summaryOf(TEMPERATURE_LAYER, 'range');
+		const celsius = fitSummaryScale(
+			TEMPERATURE_LAYER,
+			view,
+			[temperature],
+			'range',
+		);
+		const fahrenheit = fitSummaryScale(
+			TEMPERATURE_LAYER,
+			view,
+			[temperature],
+			'range',
+			'°F',
+		);
+		const field = yearField(TEMPERATURE_LAYER, temperature, 'range');
+		const largest = Math.max(...field);
+		expect(celsius).toEqual({ min: 0, max: Math.ceil(largest) });
+		expect(fahrenheit).toEqual({ min: 0, max: Math.ceil(largest * 1.8) });
+		expect(
+			legendTicks(0, fahrenheit.max, inUnit(view.tickStep ?? {}, '°F')),
+		).toEqual(
+			Array.from(
+				{ length: Math.floor(fahrenheit.max / 10) + 1 },
+				(_, k) => k * 10,
+			),
+		);
+	});
+
+	it('fits July’s pressure in inHg about the year’s mean, to ends and ticks of two decimals that hold every value', () => {
+		const view = summaryOf(PRESSURE_LAYER, 'month');
+		const range = fitSummaryScale(PRESSURE_LAYER, view, [pressure], 6, 'inHg');
+		expect(hasTwoDecimals(range.min), `${range.min}`).toBe(true);
+		expect(hasTwoDecimals(range.max), `${range.max}`).toBe(true);
+		const middle = (range.min + range.max) / 2;
+		const mean = toLayerUnit(
+			PRESSURE_LAYER,
+			'inHg',
+			weightedMean(pressure.months, weights),
+			false,
+		);
+		expect(Math.abs(middle - mean)).toBeLessThanOrEqual(0.005 + 1e-9);
+		const cuts = cutsIn(pressure.months, (value) =>
+			toLayerUnit(PRESSURE_LAYER, 'inHg', value, false),
+		);
+		expect(range.min).toBeLessThanOrEqual(cuts.low);
+		expect(range.max).toBeGreaterThanOrEqual(cuts.high);
+		const ticks = legendTicks(range.min, range.max, undefined, 2);
+		expect(ticks.every(hasTwoDecimals), `${ticks}`).toBe(true);
+		expect(
+			ticks.map((tick) => PRESSURE_LAYER.formatTick(tick, 'inHg')),
+		).toEqual(ticks.map((tick) => tick.toFixed(2)));
+	});
+
+	it('fits the pressure in hPa as it always has', () => {
+		const view = summaryOf(PRESSURE_LAYER, 'month');
+		expect(fitSummaryScale(PRESSURE_LAYER, view, [pressure], 6, 'hPa')).toEqual(
+			fitSummaryScale(PRESSURE_LAYER, view, [pressure], 6),
+		);
+	});
+
+	it('refuses a unit of another quantity', () => {
+		const view = summaryOf(PRESSURE_LAYER, 'month');
+		expect(() =>
+			fitSummaryScale(PRESSURE_LAYER, view, [pressure], 6, '°F'),
+		).toThrow(RangeError);
 	});
 });
