@@ -133,3 +133,18 @@
 | re-check | correctness | - | - | dropped | - | `src/app/ui/settingsPanel.ts:163` | The wider select type relies on method bivariance — dropped: each select gets only its own quantity's value, so nothing wrong can reach it |
 | manual | user | low | defect | - | fixed | `src/app/preferences.ts:371` | The user chose to fix both: choosing "As the system" for wind speed also removes the old entry, and the doc says the old entry is removed only once the override is kept: "Approve, fix both" |
 | re-check | correctness | low | docs | verified | open | `src/app/preferences.ts:122` | `setUnitOverride`'s doc does not say that choosing "As the system" for the wind speed also removes the old wind unit entry |
+
+## piece 9 · 2026-11-17 · Units in the read-outs
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | docs | minor | docs | verified | fixed | `docs/user-guide.md:333` | A sentence on the globe's colours under other units had no verb in its second half |
+| round | correctness | low | cleanup | verified | fixed | `src/app/scalarLayer.ts:984` | Whether a view's values are differences was decided in two places (the fit and the globe's metric range); now one helper, `isDifferenceView`, used by both and by the read-out |
+| round | correctness | nit | docs | verified | fixed | `src/app/scalarLayer.ts:509` | A remarks line left unwrapped (raised by correctness and docs, merged) |
+| round | coverage | - | - | dropped | - | `src/app/ui/layerPanel.test.ts` | The inHg panel test matches ticks loosely — dropped: the exact inHg ends and ticks are pinned in `scalarLayer.test.ts`; the panel test shows the wiring |
+| round | coverage | - | - | dropped | - | `src/app/ui/layerPanel.ts` | `setUnits` redraws when another layer's unit changes — dropped: harmless, the output is the same |
+| round | security | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | 96%: uncovered `main.ts` (entry point, including the statistics' height unit), `topBar.ts:83`, `renderer.ts`, reasons accepted |
+| re-check | docs | - | - | - | - | `docs/user-guide.md:333` | Light re-check of the sentence and the comments: clean |
+| re-check | correctness | low | cleanup | verified | open | `src/app/scalarLayer.ts:473` | `isDifferenceView` also counts an end-to-end or centred view marked as differences, whose fit runs over absolute months; such a view would drop the °F or K offset and share the ordinary views' cached scale. None exists; a new test approves that combination |
+| re-check | docs | low | docs | verified | open | `src/app/scalarLayer.ts:462` | `isDifferenceView`'s doc gives the conversion rule as its own reason; the reason is that the view's values are spans |
