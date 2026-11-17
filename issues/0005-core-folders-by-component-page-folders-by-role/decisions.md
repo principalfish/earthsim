@@ -9,10 +9,13 @@ The user's brief (2026-11-17): "lets /planner refactor 3a", roadmap step 3a in `
 - The worker stays as it is (three small files). From the roadmap.
 - Planned through `/planner refactor`, not `/quick-build`. The user: "lets /planner refactor 3a" (2026-11-17)
 
+- Files added since the layout was agreed: in the core, the baselines split per model (`temperature/baseline/earthTemperature.*`, `wind/baseline/earthWinds.*`) and `temperatureCoarse.test.ts` and `temperatureGuess.test.ts` into `temperature/`; in the page, a new `settings/` folder for what the browser remembers (`preferences`, `units`, `panelMemory`, so `panelMemory` no longer stays flat), and `scalarLayer` into `layers/`. The user: "As proposed (Recommended)" (2026-11-17)
+- `ui/` splits in two along the line 3c drew: `ui/main/` for what sits over the globe (mainView, layerDock, topBar, timeline, infoBox, pauseButton, legend, cursorReadout, comparison, windKey) and `ui/panel/` for the side panel's sections and the New world dialog; shared pieces (fields, icons, section, layerPanel) stay at `ui/`. This replaces the 2026-11-13 "ui/ stays as it is". The user: "Split in two (Recommended)" (2026-11-17)
+- The four largest files are split in this issue, still with no behaviour change: `ui/layerPanel.ts` (1,440 lines), `globe/material.ts` (1,064), `scalarLayer.ts` (1,017), `wiring.ts` (953). The user: "Split all four" (2026-11-17)
+- `scripts/` is out of scope: only the import paths the move breaks are updated. The user: "Out of scope (Recommended)" (2026-11-17)
+
 ## Open
-- Where the files added since the layout was agreed go: core `baseline/earthWinds` (the layout put `baseline/` under `temperature/`), `temperatureCoarse.test.ts`, `temperatureGuess.test.ts`; page `scalarLayer`, `units`, `preferences`.
-- Whether `ui/` (26 files after 3c) stays flat or splits.
-- Whether splitting the largest files (`ui/layerPanel.ts` 1,440 lines, `globe/material.ts` 1,064, `scalarLayer.ts` 1,017, `wiring.ts` 953) is in this issue.
-- Whether `scripts/` (about 20 top-level files) is in scope.
+- How each of the four large files splits, and into what.
+- Whether the moves or the splits come first.
 
 ## Assumed
