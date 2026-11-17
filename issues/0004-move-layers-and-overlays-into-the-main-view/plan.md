@@ -175,7 +175,7 @@ Rejected:
 - [x] 8. Units: the model and its settings
 - [x] 9. Units in the read-outs
 - [x] 10. Units in the controls
-- [ ] 11. Choosing Metric or Imperial clears the overrides
+- [x] 11. Choosing Metric or Imperial clears the overrides
 - [ ] 12. The user guide restructured around the main view
 
 ## Verification
@@ -305,3 +305,4 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - The unit store's `setSystem` became `chooseSystem`: it writes the system if it changed, removes all five overrides (and so the old wind entry), and tells its listeners once, or not at all when nothing changed. `createSegmentedChoice` gained `onChosenAgain`, called on a click of the segment already chosen and on Space let go on it; it tracks the chosen value itself, so a click on the other segment, which sends click then change, calls back once.
 - In headless Edge: with Temperature on K and Wind speed on knots, a mouse click on Imperial gave °F and mph everywhere, every select "As the system", and only `unitSystem` stored; still so after a reload. A click on the chosen Imperial, ArrowLeft, and (after the fix) Space on the chosen Metric each cleared the overrides.
 - One review round (correctness, security, coverage, docs): two findings verified and fixed (Space on the chosen system, the arrow-key tests), two dropped; light re-check by correctness and coverage raised one low doc nit on the fake document, left for the user. In `findings.md`.
+- Approved on the user's word with the nit fixed: "Approve, fix it". The fake's `keyUp` doc now says "as Chromium does".

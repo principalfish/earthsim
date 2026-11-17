@@ -178,4 +178,5 @@
 | round | docs | - | - | - | - | - | Clean |
 | round | coverage | - | - | - | - | - | 97%: uncovered only `main.ts`, `topBar.ts:83` and `renderer.ts`, none touched here, reasons accepted |
 | re-check | coverage | - | - | - | - | `src/app/ui/fields.ts:420` | Light re-check of the keyup listener's tests: clean |
-| re-check | correctness | low | docs | verified | open | `src/app/testing/fakeDocument.ts:70` | The fake's `keyUp` doc says it lets go of a key "as the browser does", but it models Chromium (no click for Space on a checked radio); browsers are not known to agree |
+| re-check | correctness | low | docs | verified | fixed | `src/app/testing/fakeDocument.ts:70` | The fake's `keyUp` doc says it lets go of a key "as the browser does", but it models Chromium (no click for Space on a checked radio); browsers are not known to agree |
+| manual | user | low | docs | - | fixed | `src/app/testing/fakeDocument.ts:70` | The user chose "as Chromium does" for the fake's `keyUp` doc: "Approve, fix it" |
