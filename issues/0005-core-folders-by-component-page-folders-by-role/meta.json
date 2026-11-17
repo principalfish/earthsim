@@ -3,12 +3,12 @@
   "slug": "core-folders-by-component-page-folders-by-role",
   "title": "Core folders by component, page folders by role",
   "mode": "refactor",
-  "state": "investigating",
+  "state": "planned",
   "branch": "core-folders-by-component-page-folders-by-role",
   "base": "main",
   "gh_issue": 9,
   "build_model": null,
   "created": "2026-11-17 18:50",
-  "updated": "2026-11-17 19:28",
+  "updated": "2026-11-17 19:30",
   "done": null
 }
