@@ -12,7 +12,7 @@ Not included: any change to the temperature or wind models, a layout for phone-s
 
 ## Plan
 
-_2026-11-17 · 11 of 12 pieces done · now: piece 12 in progress_
+_2026-11-17 · 11 of 12 pieces done · now: waiting on review of piece 12_
 
 - [x] **1/12 The main-view regions, the icons, and the layer and overlay tiles** · `6278b72`
   Icon tiles down the left edge of the globe choose the colour layer and switch Winds, Sunlight and the grid.
@@ -36,5 +36,5 @@ _2026-11-17 · 11 of 12 pieces done · now: piece 12 in progress_
   The Sea level, brush and New world controls read in the chosen units.
 - [x] **11/12 Choosing Metric or Imperial clears the overrides** · `2a510dd` · added 2026-11-17: at the user's request
   Clicking Metric or Imperial sets every unit to that family, clearing any override.
-- [ ] **12/12 The user guide restructured around the main view** · in progress (was 11)
+- [ ] **12/12 The user guide restructured around the main view** · waiting on you (was 11)
   The guide and the development notes put in order for the new layout.
