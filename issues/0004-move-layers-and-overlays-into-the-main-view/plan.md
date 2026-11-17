@@ -306,3 +306,10 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - In headless Edge: with Temperature on K and Wind speed on knots, a mouse click on Imperial gave °F and mph everywhere, every select "As the system", and only `unitSystem` stored; still so after a reload. A click on the chosen Imperial, ArrowLeft, and (after the fix) Space on the chosen Metric each cleared the overrides.
 - One review round (correctness, security, coverage, docs): two findings verified and fixed (Space on the chosen system, the arrow-key tests), two dropped; light re-check by correctness and coverage raised one low doc nit on the fake document, left for the user. In `findings.md`.
 - Approved on the user's word with the nit fixed: "Approve, fix it". The fake's `keyUp` doc now says "as Chromium does".
+
+### Piece 12 (2026-11-17)
+
+- Built on claude-opus-5-5. Go-ahead "Start it", on the outline in the look-ahead: the main view, the panel in its own order with Units opening on the system click, and one "What the browser remembers" paragraph.
+- Moved, not rewritten: Layers and its subsections came up into the main view, the value under the pointer sits in the info box, and the panel's sections follow the panel. The scattered "not saved" lines became links to the one paragraph. A Temperature heading was added for text already there. `docs/temperature.md` links to `#units`.
+- A link checker over README and `docs/` (in the session's scratch folder) found 85 links, none broken, before and after the fixes.
+- One review round (correctness and docs; security and coverage do not apply to docs): four findings verified and fixed, four dropped; light re-check clean. In `findings.md`.

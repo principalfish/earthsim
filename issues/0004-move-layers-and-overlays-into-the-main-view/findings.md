@@ -180,3 +180,19 @@
 | re-check | coverage | - | - | - | - | `src/app/ui/fields.ts:420` | Light re-check of the keyup listener's tests: clean |
 | re-check | correctness | low | docs | verified | fixed | `src/app/testing/fakeDocument.ts:70` | The fake's `keyUp` doc says it lets go of a key "as the browser does", but it models Chromium (no click for Space on a checked radio); browsers are not known to agree |
 | manual | user | low | docs | - | fixed | `src/app/testing/fakeDocument.ts:70` | The user chose "as Chromium does" for the fake's `keyUp` doc: "Approve, fix it" |
+
+## piece 12 · 2026-11-17 · The user guide restructured around the main view
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | medium | docs | verified | fixed | `docs/user-guide.md:156` | The timeline was said to show with Sunlight or Winds on whatever the layer; it shows for them only on Terrain |
+| round | correctness | low | cleanup | verified | fixed | `docs/user-guide.md:333` | A second "Arrows or streaks" heading under Settings; renamed "Winds drawn as" |
+| round | docs | low | docs | verified | fixed | `docs/user-guide.md:364` | The old wind unit's carry-over named a control that no longer exists and read as history; now a present fact |
+| round | correctness | nit | docs | verified | fixed | `docs/user-guide.md:3` | The intro said the panel holds only the world and its settings |
+| round | docs | - | - | dropped | - | `docs/user-guide.md:335` | Settings repeats the wind style's default — dropped: the guide gives a control's starting value where it lives |
+| round | docs | - | - | dropped | - | `docs/user-guide.md:146` | The top bar restates Show and the comparison — dropped: its bullets are already one-line pointers |
+| round | docs | - | - | dropped | - | `docs/user-guide.md:153` | Status wording repeated — dropped: moved unchanged, and the Winds text already links to the info box |
+| round | correctness | - | - | dropped | - | `README.md:13` | "its status" read as the legend's — dropped: it reads as the info box's own status line, which it is |
+| round | security | - | - | - | - | - | Not run: docs only |
+| round | coverage | - | - | - | - | - | Not run: docs only; 85 links checked, none broken |
+| re-check | correctness | - | - | - | - | `docs/user-guide.md:156` | Light re-check of the four fixes, as correctness and docs: clean |
