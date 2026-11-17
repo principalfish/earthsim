@@ -92,6 +92,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 9's per-unit scale settings, as the builder proposed: minimum fitted span 2 °C, 4 °F, 2 K, 10 hPa, 0.3 inHg; seasonal range tick step 5 °C, 10 °F, 5 K; difference half-span ±20 °C, ±40 °F, ±20 K, ±20 hPa, ±0.6 inHg; difference tick step 10 °C, 20 °F, 10 K, 10 hPa, 0.3 inHg. The open doc nit at `preferences.ts:122` (`setUnitOverride` not saying that "As the system" for wind speed also removes the old entry) is fixed in piece 9. The user: "Start it" (2026-11-17)
 
+- Piece 9 approved after the user ran it (they reported trying the units in the app: "the instances of km in the raise tool dont show miles when i selet miles", which is piece 10's), with both re-check findings fixed first: (1) `isDifferenceView` counts only views fitted from zero, and the test that accepted a month-style or centred view marked as a difference is flipped; (2) its doc says the values are spans, which convert by scale alone. The user: "ok approve and fix as you suggest" (2026-11-17)
+
 ## Open
 - None.
 
