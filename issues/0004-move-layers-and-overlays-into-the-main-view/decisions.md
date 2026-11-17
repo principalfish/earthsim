@@ -108,6 +108,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 12 approved as reviewed. The user: "Approve" (2026-11-17). Piece 12 has no manual review in the plan.
 
+- Review 01 fixes approved, with two comment lines fixed first: the 94-character line in the `startPage` doc at `wiring.ts:530` rewrapped, and the `PageView.winds` doc at `view.ts:204` saying "as arrows or as moving streaks". The user: "Approve, fix both" (2026-11-17)
+
 ## Open
 - None.
 
