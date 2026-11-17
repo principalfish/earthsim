@@ -148,7 +148,7 @@ Rejected:
 
 ## Checkpoints
 - [x] 1. The core in component folders
-- [ ] 2. The page's top-level files in role folders
+- [x] 2. The page's top-level files in role folders
 - [ ] 3. `ui/` split into the main view and the panel
 - [ ] 4. The scalar layers split, with the legend's fitting code
 - [ ] 5. The globe's material split
