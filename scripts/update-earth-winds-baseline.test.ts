@@ -7,7 +7,7 @@ import {
 	type WIND_BASELINE_PERIODS,
 	type WindBaselineFigures,
 	windBaselineText,
-} from '../src/core/baseline/earthWinds';
+} from '../src/core/wind/baseline/earthWinds';
 import { main, WIND_BASELINE_FILE } from './update-earth-winds-baseline';
 
 /** The committed baseline file's text. */

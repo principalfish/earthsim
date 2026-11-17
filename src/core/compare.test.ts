@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { compareField, compareFields, differenceField } from './compare';
-import { getGrid } from './grid';
-import { cellLatitudes, MONTHS_PER_YEAR } from './insolation';
+import { getGrid } from './grid/grid';
+import { cellLatitudes, MONTHS_PER_YEAR } from './planet/insolation';
 
 const grid = getGrid(64);
 const { cellCount } = grid;

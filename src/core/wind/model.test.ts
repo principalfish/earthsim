@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { type Grid, getGrid } from '../grid';
-import { cellLatitudes, MONTHS_PER_YEAR } from '../insolation';
+import { type Grid, getGrid } from '../grid/grid';
+import { cellLatitudes, MONTHS_PER_YEAR } from '../planet/insolation';
 import {
 	DIRECTION_MIN_SPEED_M_PER_S,
 	type WindMonth,

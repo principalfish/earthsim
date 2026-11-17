@@ -23,7 +23,7 @@ Requires Node.js and npm. Run `npm install` once.
 
 ## The Earth temperature baseline
 
-`src/core/baseline/earthTemperature.json` records how far the simulated Earth is from the observed one, so that a change to the model cannot make it worse unnoticed.
+`src/core/temperature/baseline/earthTemperature.json` records how far the simulated Earth is from the observed one, so that a change to the model cannot make it worse unnoticed.
 
 - **What it holds:** for the Earth at 64 cells per face edge, the mean and root-mean-square difference (simulated less observed, in kelvin) for the annual average, each month, the warmest month, the coldest month and the seasonal range.
 - **The test:** a test solves that Earth and fails, naming each figure, if any is worse than the file's by more than 0.05 K. A figure that has improved passes.
@@ -50,7 +50,7 @@ python3 -m venv <dir>
 
 - **Re-running it with nothing changed** leaves the PDF byte-identical, so the PDF changes in a commit only when the script does. The committed PDF was drawn with reportlab 5.1.0; another version may write the same pages as different bytes.
 - **The diagram is a design,** mostly of parts not built yet. Redraw it when one of them, once built, changes it.
-- **The settings pages are a dated snapshot,** kept by hand in the script, with the date set once at its top. When a setting is added, removed or changed in `src/core/wind/rules.ts` or `src/core/temperature.ts`, bring the pages up to the code. A future `src/core/config.md` is to become the living list of the settings.
+- **The settings pages are a dated snapshot,** kept by hand in the script, with the date set once at its top. When a setting is added, removed or changed in `src/core/wind/rules.ts` or `src/core/temperature/temperature.ts`, bring the pages up to the code. A future `src/core/config.md` is to become the living list of the settings.
 
 ## Type-checking rules
 
@@ -65,32 +65,33 @@ A pure library with no DOM, Three.js or worker globals.
 
 | File | What it holds |
 |-|-|
-| `grid.ts` | The cubed-sphere grid every layer lives on |
-| `world.ts` | A world: its settings, its date and the elevation of every cell |
-| `generate.ts`, `noise.ts` | Worlds with noise-shaped continents, and the seeded noise behind them |
-| `brush.ts` | The sculpting brushes: raise, lower and smooth |
-| `history.ts` | The history of terrain edits, for undo and redo |
-| `stats.ts` | Summary statistics of a world's terrain |
+| `grid/grid.ts` | The cubed-sphere grid every layer lives on |
+| `world/world.ts` | A world: its settings, its date and the elevation of every cell |
+| `world/generate.ts`, `world/noise.ts` | Worlds with noise-shaped continents, and the seeded noise behind them |
+| `world/brush.ts` | The sculpting brushes: raise, lower and smooth |
+| `world/history.ts` | The history of terrain edits, for undo and redo |
+| `world/stats.ts` | Summary statistics of a world's terrain |
 | `protocol.ts` | The messages between the page and the worker, of three kinds: the terrain statistics, the temperature and the winds |
 | `index.ts` | What the core exports |
-| `serialize.ts` | The world file format and the checks a file must pass |
-| `earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
-| `observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
+| `world/serialize.ts` | The world file format and the checks a file must pass |
+| `earth/earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
+| `temperature/observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
 | `wind/model.ts` | The shape every wind model shares, its error figures against the observed winds and pressure, and the mean of a field by bands of latitude |
 | `wind/rules.ts` | The rules wind model on a world's own grid, and its parts: sea-level pressure from zonal bands placed by the temperature and the day length plus thermal highs and lows, and the wind from it by a balance of pressure gradient, turning and friction; see [Winds](winds.md) |
 | `wind/solve.ts` | The winds of a world: its input checked, the rules model's pressure worked out on the 64 grid and carried back to the world's grid, the winds from it there, and the annual mean of a year of winds |
-| `observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `vector.ts`'s directions east and north |
-| `observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
-| `planet.ts` | The six planet settings, their limits and Earth's values, and the five of them the temperature reads (all but the day length); the sunlight, year length, rotation rate and trust warnings that follow from them; a world's date |
-| `star.ts` | The star as the planet sees it: radius, surface temperature, colour, size in the sky and direction in each month |
-| `insolation.ts` | Sunlight by latitude and time of year, the twelve months, and each cell's latitude |
-| `temperature.ts` | The temperature model |
-| `coarsen.ts` | A world or a field averaged onto the grid a step coarser, and a field or a vector field carried back from it |
-| `vector.ts` | Vector fields on the grid, east and north at every cell, and the gradient, divergence, curl, Laplacian and smoothing of fields |
-| `exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
+| `wind/observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `grid/vector.ts`'s directions east and north |
+| `earth/observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
+| `planet/planet.ts` | The six planet settings, their limits and Earth's values, and the five of them the temperature reads (all but the day length); the sunlight, year length, rotation rate and trust warnings that follow from them; a world's date |
+| `planet/star.ts` | The star as the planet sees it: radius, surface temperature, colour, size in the sky and direction in each month |
+| `planet/insolation.ts` | Sunlight by latitude and time of year, the twelve months, and each cell's latitude |
+| `temperature/temperature.ts` | The temperature model |
+| `grid/coarsen.ts` | A world or a field averaged onto the grid a step coarser, and a field or a vector field carried back from it |
+| `grid/vector.ts` | Vector fields on the grid, east and north at every cell, and the gradient, divergence, curl, Laplacian and smoothing of fields |
+| `temperature/exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
 | `compare.ts` | One field less another, and area-weighted error figures |
-| `quantile.ts` | Area-weighted quantiles of values on the grid |
-| `baseline/` | The Earth temperature baseline and the Earth winds baseline (`earthWinds.ts`, the figures in `earthWinds.json`), each with its check |
+| `grid/quantile.ts` | Area-weighted quantiles of values on the grid |
+| `temperature/baseline/` | The Earth temperature baseline (`earthTemperature.ts`, the figures in `earthTemperature.json`) and its check |
+| `wind/baseline/` | The Earth winds baseline (`earthWinds.ts`, the figures in `earthWinds.json`) and its check |
 | `testing/` | Helpers only the tests use |
 
 ### `src/app/`: the page

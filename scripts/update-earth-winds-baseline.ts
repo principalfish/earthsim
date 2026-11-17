@@ -1,7 +1,7 @@
 /**
  * Writes the Earth winds baseline afresh: the error figures of the Earth
  * preset's winds and sea-level pressure, as the models solve them now,
- * against the observed, into `src/core/baseline/earthWinds.json`.
+ * against the observed, into `src/core/wind/baseline/earthWinds.json`.
  *
  * Run with `npm run baseline:winds` after a change that is meant to move
  * the figures, and commit the file with the change. The winds are worked
@@ -14,12 +14,6 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-	type EarthWindFigures,
-	earthWindFigures,
-	WIND_BASELINE_RESOLUTION,
-	windBaselineText,
-} from '../src/core/baseline/earthWinds';
-import {
 	decodeEarth,
 	decodeObservedPressure,
 	decodeObservedWind,
@@ -30,6 +24,12 @@ import {
 	solveTemperature,
 	solveWinds,
 } from '../src/core/index';
+import {
+	type EarthWindFigures,
+	earthWindFigures,
+	WIND_BASELINE_RESOLUTION,
+	windBaselineText,
+} from '../src/core/wind/baseline/earthWinds';
 import { writeBaseline } from './baselineUpdate';
 import {
 	readEarthDataFile,
@@ -44,6 +44,7 @@ export const WIND_BASELINE_FILE = join(
 	ROOT,
 	'src',
 	'core',
+	'wind',
 	'baseline',
 	'earthWinds.json',
 );

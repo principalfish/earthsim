@@ -4,7 +4,7 @@ import {
 	PLANET_SETTINGS,
 	TEMPERATURE_SETTINGS,
 	temperaturePlanet,
-} from './planet';
+} from './planet/planet';
 import {
 	isSimKind,
 	isSimProgress,
@@ -16,13 +16,13 @@ import {
 	type SimRequest,
 	simFailure,
 } from './protocol';
-import { computeTerrainStats } from './stats';
 import type {
 	TemperatureConditions,
 	TemperatureProgress,
 	TemperatureState,
-} from './temperature';
-import { createBlankWorld } from './world';
+} from './temperature/temperature';
+import { computeTerrainStats } from './world/stats';
+import { createBlankWorld } from './world/world';
 
 const world = createBlankWorld(64);
 

@@ -283,7 +283,7 @@ c.showPage()
 # ---------------------------------------------------------------------------
 # The settings pages: every number the two models are built on, with what
 # raising or lowering each one does. Kept by hand: bring them up to the code
-# in src/core/wind/rules.ts and src/core/temperature.ts when a setting changes.
+# in src/core/wind/rules.ts and src/core/temperature/temperature.ts when a setting changes.
 # ---------------------------------------------------------------------------
 CELL = ParagraphStyle(
     "cell", fontName="Helvetica", fontSize=7.4, leading=9, textColor=INK

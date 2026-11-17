@@ -48,18 +48,22 @@
  * world's own grid.
  */
 
-import { type Grid, getGrid } from '../grid';
-import { cellLatitudes, MONTHS_PER_YEAR } from '../insolation';
-import { DEFAULT_PLANET, type PlanetSettings, rotationRate } from '../planet';
-import { lapseCooling } from '../temperature';
+import { type Grid, getGrid } from '../grid/grid';
 import {
 	createVectorField,
 	type EastNorthField,
 	gradient,
 	smoothField,
 	toEastNorth,
-} from '../vector';
-import { PLANET_RADIUS_KM, type World } from '../world';
+} from '../grid/vector';
+import { cellLatitudes, MONTHS_PER_YEAR } from '../planet/insolation';
+import {
+	DEFAULT_PLANET,
+	type PlanetSettings,
+	rotationRate,
+} from '../planet/planet';
+import { lapseCooling } from '../temperature/temperature';
+import { PLANET_RADIUS_KM, type World } from '../world/world';
 import { type WindResult, type ZonalMean, zonalMean } from './model';
 
 const RADIANS_PER_DEGREE = Math.PI / 180;

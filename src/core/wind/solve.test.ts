@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { readEarthDataFile } from '../../../scripts/earth/dataFile.mjs';
-import { decodeEarth, earthWorld } from '../earth';
-import { getGrid, type Resolution } from '../grid';
-import { cellLatitudes, MONTHS_PER_YEAR } from '../insolation';
-import { DEFAULT_PLANET, normalisePlanet } from '../planet';
-import { lapseCooling, solveTemperature } from '../temperature';
-import { createBlankWorld, type World } from '../world';
+import { decodeEarth, earthWorld } from '../earth/earth';
+import { getGrid, type Resolution } from '../grid/grid';
+import { cellLatitudes, MONTHS_PER_YEAR } from '../planet/insolation';
+import { DEFAULT_PLANET, normalisePlanet } from '../planet/planet';
+import { lapseCooling, solveTemperature } from '../temperature/temperature';
+import { createBlankWorld, type World } from '../world/world';
 import { type WindResult, zonalMean } from './model';
 import {
 	DEFAULT_WIND_SETTINGS,
