@@ -164,7 +164,7 @@ Rejected:
 - [x] 5. Everything worked out after every change, with Pause
 - [x] 6. The browser remembers the view
 - [x] 7. The Settings section, with arrows or streaks starting on Streaks
-- [ ] 8. Units: the model and its settings
+- [x] 8. Units: the model and its settings
 - [ ] 9. Units in the read-outs
 - [ ] 10. Units in the controls
 - [ ] 11. The user guide restructured around the main view
@@ -268,3 +268,4 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - `fields.ts` gained `createSelectChoice` (with `setValue` and `setLabel`); `createSelectField` wraps it. Wind units are offered as m/s, mph, km/h, knots.
 - In headless Edge: Imperial wrote "11 mph W" under the pointer at once, the knots override "9 knots W" under either system, and a stored old "m/s" carried over and kept m/s under Imperial.
 - One review round (correctness, security, coverage, docs): four findings verified and fixed, one dropped; light re-check by correctness and docs raised two low findings from the carry-over fix, left for the user. In `findings.md`.
+- Approved on the user's word with both re-check findings fixed: "Approve, fix both". Choosing "As the system" for wind speed also removes the old entry. The light re-check of that fix raised one doc nit (the `setUnitOverride` doc does not mention it), left open for the user.

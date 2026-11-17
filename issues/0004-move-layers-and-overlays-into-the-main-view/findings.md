@@ -128,6 +128,8 @@
 | round | security | - | - | - | - | - | Clean |
 | round | coverage | - | - | - | - | - | Clean: 96%; uncovered lines only in files this change does not touch (`main.ts`, `topBar.ts:83`, `renderer.ts`), reasons accepted |
 | re-check | docs | - | - | - | - | `README.md:12` | Light re-check of the README and the new comments: clean |
-| re-check | correctness | low | defect | verified | open | `src/app/preferences.ts:371` | Where storage refuses writes but allows removals, the old wind entry now survives the visit; choosing "As the system" for wind speed then removes only the new key, so the old unit comes back next visit over that choice |
-| re-check | correctness | low | docs | verified | open | `src/app/preferences.ts:105` | `unitChoice`'s doc still says the old entry is removed whatever it holds; since the fix it stays when the override cannot be written |
+| re-check | correctness | low | defect | verified | fixed | `src/app/preferences.ts:371` | Where storage refuses writes but allows removals, the old wind entry now survives the visit; choosing "As the system" for wind speed then removes only the new key, so the old unit comes back next visit over that choice |
+| re-check | correctness | low | docs | verified | fixed | `src/app/preferences.ts:105` | `unitChoice`'s doc still says the old entry is removed whatever it holds; since the fix it stays when the override cannot be written |
 | re-check | correctness | - | - | dropped | - | `src/app/ui/settingsPanel.ts:163` | The wider select type relies on method bivariance — dropped: each select gets only its own quantity's value, so nothing wrong can reach it |
+| manual | user | low | defect | - | fixed | `src/app/preferences.ts:371` | The user chose to fix both: choosing "As the system" for wind speed also removes the old entry, and the doc says the old entry is removed only once the override is kept: "Approve, fix both" |
+| re-check | correctness | low | docs | verified | open | `src/app/preferences.ts:122` | `setUnitOverride`'s doc does not say that choosing "As the system" for the wind speed also removes the old wind unit entry |
