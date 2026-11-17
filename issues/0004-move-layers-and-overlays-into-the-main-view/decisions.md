@@ -96,6 +96,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 10 started on the user's go-ahead, with the builder's two calls as stated in the briefing: the New world hints read "about 95 / 45 / 25 mi cells", rounded to the nearest 5 like the km figures; the brush radius shows whole miles (100–3,000 km in 50 km steps reads about 62–1,864 mi in steps of about 31, so no two steps share a figure). Brush strength follows the height unit (m/s or ft/s of land), not the wind unit. The user: "Start it" (2026-11-17)
 
+- Piece 10 approved after the user tried it, with the re-check finding fixed first: the two checks for the removed checkbox class in `viewPanel.test.ts` (lines 81 and 109) are dropped. The user: "Tried it, fix it" (2026-11-17)
+
 ## Open
 - None.
 
