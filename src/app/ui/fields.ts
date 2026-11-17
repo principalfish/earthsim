@@ -281,16 +281,30 @@ export const createCheckField = (options: CheckFieldOptions): HTMLElement => {
 	return field;
 };
 
+/** A drop-down choice, with ways to show another choice and relabel one. */
+export type SelectChoice<T extends string> = {
+	/** The drop-down with its label, to put in a panel. */
+	readonly element: HTMLElement;
+	/** Shows a value as the one chosen, without calling `onChange`. */
+	setValue(value: T): void;
+	/**
+	 * Gives one of the things offered another text; a value not offered
+	 * changes nothing.
+	 */
+	setLabel(value: T, label: string): void;
+};
+
 /**
  * Creates a labelled drop-down choice of one of several things, for
- * choices whose labels are too long or too many for a row of segments.
+ * choices whose labels are too long or too many for a row of segments,
+ * whose choice can be set, and whose labels changed, from outside.
  *
  * @param options - What it offers, the starting choice and the callback.
- * @returns The drop-down with its label, to put in a panel.
+ * @returns The drop-down and the ways to change what it shows.
  */
-export const createSelectField = <T extends string>(
+export const createSelectChoice = <T extends string>(
 	options: SelectFieldOptions<T>,
-): HTMLElement => {
+): SelectChoice<T> => {
 	const field = createElement('div', 'field');
 
 	const label = createElement('label', 'field__label');
@@ -299,10 +313,12 @@ export const createSelectField = <T extends string>(
 
 	const select = createElement('select', 'field__select');
 	select.id = options.id;
+	const optionsByValue = new Map<T, HTMLOptionElement>();
 	for (const choice of options.choices) {
 		const option = createElement('option', 'field__option');
 		option.value = choice.value;
 		option.textContent = choice.label;
+		optionsByValue.set(choice.value, option);
 		select.append(option);
 	}
 	// Once the options are in: a value is chosen from among them.
@@ -317,8 +333,32 @@ export const createSelectField = <T extends string>(
 	});
 
 	field.append(label, select);
-	return field;
+	return {
+		element: field,
+		setValue: (value) => {
+			select.value = value;
+		},
+		setLabel: (value, text) => {
+			const option = optionsByValue.get(value);
+			if (option !== undefined) {
+				option.textContent = text;
+			}
+		},
+	};
 };
+
+/**
+ * Creates a labelled drop-down choice of one of several things.
+ *
+ * @remarks
+ * As {@link createSelectChoice}, for a choice made only on it.
+ *
+ * @param options - What it offers, the starting choice and the callback.
+ * @returns The drop-down with its label, to put in a panel.
+ */
+export const createSelectField = <T extends string>(
+	options: SelectFieldOptions<T>,
+): HTMLElement => createSelectChoice(options).element;
 
 /** A segmented picker, with a way to show another choice made elsewhere. */
 export type SegmentedChoice<T extends string> = {

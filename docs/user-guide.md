@@ -235,7 +235,7 @@ About the layer's value:
 
 About the wind:
 
-- **Its speed** is in the **Wind speed** unit, as a whole number, and its direction is the point of the compass it blows from, one of N, NE, E, SE, S, SW, W and NW: `15 mph S` blows from the south. On Annual average it is the mean wind of the year.
+- **Its speed** is in the wind speed's unit from [Settings](#settings), as a whole number, and its direction is the point of the compass it blows from, one of N, NE, E, SE, S, SW, W and NW: `15 mph S` blows from the south. On Annual average it is the mean wind of the year.
 - **It is the cell's own wind,** from the same winds the arrows are drawn from, not the mean of an arrow's patch, and it is not capped at 10 m/s as the arrows are.
 - **"calm"** below 0.5 m/s, in every unit, with no direction, where no arrow would be drawn.
 - **"observed"** follows the wind while the arrows are the observed winds: `7 m/s W observed` or `calm observed`. A simulated wind has no mark.
@@ -293,7 +293,7 @@ Which winds are shown follows the layer's **Show**:
 - **The info box** is the same either way.
 - **The page draws continuously only while streaks are moving:** while Streaks is chosen, Winds is on, there are winds to show and the page is visible. Choosing Arrows, switching Winds off or putting the tab in the background stops it, and the page draws only when something changes, as it does with arrows.
 - **Streaks to start with, or arrows with reduced motion.** On a first visit the winds are drawn as streaks, unless your system is set to reduce motion, when they start as arrows, which stand still. Streaks are still offered then, and move only if you choose them; choosing Arrows stops them.
-- The browser remembers the choice, as it does the open sections and the wind speed unit, and whether Winds was on. A remembered choice is kept whatever your system's setting.
+- The browser remembers the choice, as it does the open sections and the units, and whether Winds was on. A remembered choice is kept whatever your system's setting.
 
 ### Simulated or observed winds
 
@@ -314,9 +314,14 @@ The Statistics section shows how much of the surface is land, the highest and de
 
 ## Settings
 
-The Settings section holds two choices the browser remembers; neither is saved with the world. It is closed on a first visit.
+The Settings section holds choices the browser remembers; none is saved with the world. It is closed on a first visit.
 
 | Control | Range | What it does |
 |-|-|-|
 | Winds drawn as | Arrows or Streaks, starting on Streaks, or on Arrows when your system is set to reduce motion | Whether the winds are drawn as arrows that stand still or as streaks carried along by the wind; see [Arrows or streaks](#arrows-or-streaks). Shown whether or not Winds is on. A remembered choice is kept |
-| Wind speed | m/s, km/h or mph, starting on m/s | The unit the wind under the pointer is written in, in the [info box](#the-info-box). It changes it at once, and does not change the arrows. Shown whether or not Winds is on |
+| Units: Metric / Imperial | Starting on Metric | The system of units: Metric is °C, hPa, m/s, m and km; Imperial is °F, inHg, mph, ft and mi |
+| Units: Temperature, Pressure, Wind speed, Heights and depths, Distances | **As the system**, which names the unit the system gives, such as "As the system (°C)", or one of the quantity's units: °C, °F or K; hPa or inHg; m/s, mph, km/h or knots; m or ft; km or mi | A unit for that quantity whatever the system |
+
+For now only the wind speed follows these choices: the wind under the pointer, in the [info box](#the-info-box), is written in the wind speed's unit, and changes at once. The other quantities' choices are remembered but do not yet change what the page shows. The arrows do not change with the unit.
+
+A wind speed unit chosen in the earlier Wind speed setting carries over as the wind speed's choice, m/s included, so it stays the same under either system.

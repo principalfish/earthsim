@@ -444,6 +444,21 @@ body {
   outline-offset: -2px;
 }
 
+/* The Units group of the settings: a small heading, worded as the dock's
+   headings are, over the system and a drop-down for each quantity. */
+.settings-units {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.settings-units__heading {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .button-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

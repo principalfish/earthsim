@@ -10,6 +10,7 @@ import {
 	createRangeField,
 	createSegmentedChoice,
 	createSegmentedPicker,
+	createSelectChoice,
 	createSelectField,
 	type RangeMark,
 	rangeFraction,
@@ -341,5 +342,51 @@ describe('createSelectField', () => {
 		select.value = 'plum';
 		select.fire('change');
 		expect(chosen).toEqual([]);
+	});
+});
+
+describe('createSelectChoice', () => {
+	let fake: FakeDocument;
+	beforeEach(() => {
+		fake = createFakeDocument();
+		vi.stubGlobal('document', fake.document);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const make = () => {
+		const chosen: string[] = [];
+		const choice = createSelectChoice({
+			id: 'fruit',
+			label: 'Fruit',
+			choices: [
+				{ value: 'apple', label: 'Apple' },
+				{ value: 'pear', label: 'Pear' },
+			],
+			value: 'pear',
+			onChange: (value) => chosen.push(value),
+		});
+		const field = choice.element as unknown as FakeElement;
+		return { choice, chosen, select: oneByClass(field, 'field__select') };
+	};
+
+	it('shows another value chosen without passing it on', () => {
+		const { choice, select, chosen } = make();
+		choice.setValue('apple');
+		expect(select.value).toBe('apple');
+		expect(chosen).toEqual([]);
+	});
+
+	it('gives one choice another text, and changes nothing for a value it does not offer', () => {
+		const { choice, select } = make();
+		choice.setLabel('apple', 'Green apple');
+		choice.setLabel('plum' as 'apple', 'Plum');
+		expect(
+			select.children.map((option) => [option.value, option.textContent]),
+		).toEqual([
+			['apple', 'Green apple'],
+			['pear', 'Pear'],
+		]);
 	});
 });

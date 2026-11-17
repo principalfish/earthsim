@@ -1,102 +1,267 @@
 import { describe, expect, it } from 'vitest';
 import { WIND_STYLES } from './globe/windMotion';
-import type { PanelStorage } from './panelMemory';
 import {
 	createPreferences,
 	GRID_KEY,
 	LAYER_KEY,
 	OFF_ENTRY,
+	OLD_WIND_SPEED_UNIT_KEY,
 	ON_ENTRY,
+	type PreferenceStorage,
 	type Preferences,
 	SUNLIGHT_KEY,
 	storedView,
 	storeView,
 	summaryKey,
-	WIND_SPEED_UNIT_KEY,
+	UNIT_SYSTEM_KEY,
+	unitOverrideKey,
 	WIND_STYLE_KEY,
 	WINDS_KEY,
 } from './preferences';
 import { PRESSURE_LAYER, TEMPERATURE_LAYER } from './scalarLayer';
 import { createFakeStorage } from './testing/fakeStorage';
+import { DEFAULT_UNIT_CHOICE, QUANTITIES, unitsOf } from './units';
 import {
 	DEFAULT_PAGE_VIEW,
 	LAYERS,
 	SCALAR_LAYER_IDS,
 	type StoredView,
 } from './view';
-import { DEFAULT_WIND_UNIT, WIND_UNITS } from './windUnits';
 
 /** Storage that throws on every read and every write. */
-const refusingStorage: PanelStorage = {
+const refusingStorage: PreferenceStorage = {
 	getItem: () => {
 		throw new Error('Storage is blocked');
 	},
 	setItem: () => {
 		throw new Error('Storage is blocked');
 	},
+	removeItem: () => {
+		throw new Error('Storage is blocked');
+	},
 };
 
-describe('createPreferences, the wind speed unit', () => {
-	it('is kept under its own name', () => {
-		expect(WIND_SPEED_UNIT_KEY).toBe('earth_sim.preference.windSpeedUnit');
+describe('createPreferences, the units', () => {
+	it('keeps the system and each override under a name of its own', () => {
+		expect(UNIT_SYSTEM_KEY).toBe('earth_sim.preference.unitSystem');
+		expect(QUANTITIES.map(unitOverrideKey)).toEqual([
+			'earth_sim.preference.temperatureUnitOverride',
+			'earth_sim.preference.pressureUnitOverride',
+			'earth_sim.preference.windSpeedUnitOverride',
+			'earth_sim.preference.heightUnitOverride',
+			'earth_sim.preference.distanceUnitOverride',
+		]);
+		expect(OLD_WIND_SPEED_UNIT_KEY).toBe('earth_sim.preference.windSpeedUnit');
 	});
 
-	it('starts in metres a second', () => {
-		expect(DEFAULT_WIND_UNIT).toBe('m/s');
-		expect(createPreferences(createFakeStorage()).windSpeedUnit()).toBe('m/s');
+	it('starts on metric with no overrides', () => {
+		const storage = createFakeStorage();
+		expect(createPreferences(storage).unitChoice()).toEqual(
+			DEFAULT_UNIT_CHOICE,
+		);
+		expect(DEFAULT_UNIT_CHOICE).toEqual({ system: 'metric', overrides: {} });
+		expect(storage.writes).toEqual([]);
+		expect(storage.removals).toEqual([]);
 	});
 
-	it('remembers each unit chosen in one entry', () => {
+	it('remembers the system and each override, each in its own entry', () => {
 		const storage = createFakeStorage();
 		const preferences = createPreferences(storage);
-		for (const unit of WIND_UNITS) {
-			preferences.setWindSpeedUnit(unit);
-			expect(preferences.windSpeedUnit()).toBe(unit);
-		}
-		expect(storage.entries).toEqual(new Map([[WIND_SPEED_UNIT_KEY, 'mph']]));
-	});
-
-	it('restores the unit an earlier visit chose', () => {
-		const first = createFakeStorage();
-		createPreferences(first).setWindSpeedUnit('km/h');
-		const again = createPreferences(
-			createFakeStorage(Object.fromEntries(first.entries)),
+		preferences.setUnitSystem('imperial');
+		preferences.setUnitOverride('temperature', 'K');
+		preferences.setUnitOverride('windSpeed', 'knots');
+		preferences.setUnitOverride('height', 'm');
+		expect(preferences.unitChoice()).toEqual({
+			system: 'imperial',
+			overrides: { temperature: 'K', windSpeed: 'knots', height: 'm' },
+		});
+		expect(storage.entries).toEqual(
+			new Map([
+				[UNIT_SYSTEM_KEY, 'imperial'],
+				[unitOverrideKey('temperature'), 'K'],
+				[unitOverrideKey('windSpeed'), 'knots'],
+				[unitOverrideKey('height'), 'm'],
+			]),
 		);
-		expect(again.windSpeedUnit()).toBe('km/h');
 	});
 
-	it.each(['', 'knots', 'KM/H', 'm/s ', '3.6'])(
-		'falls back to m/s for an entry of %j',
+	it('reads every unit of every quantity back as its override', () => {
+		for (const quantity of QUANTITIES) {
+			for (const unit of unitsOf(quantity)) {
+				const preferences = createPreferences(
+					createFakeStorage({ [unitOverrideKey(quantity)]: unit }),
+				);
+				expect(preferences.unitChoice().overrides, unit).toEqual({
+					[quantity]: unit,
+				});
+			}
+		}
+	});
+
+	it('forgets an override set back to the system by removing its entry', () => {
+		const storage = createFakeStorage({
+			[unitOverrideKey('pressure')]: 'inHg',
+		});
+		const preferences = createPreferences(storage);
+		preferences.setUnitOverride('pressure', null);
+		expect(storage.removals).toEqual([unitOverrideKey('pressure')]);
+		expect(preferences.unitChoice().overrides).toEqual({});
+	});
+
+	it.each(['', 'Imperial', 'si', 'metric '])(
+		'falls back to metric for a system of %j',
 		(entry) => {
 			const preferences = createPreferences(
-				createFakeStorage({ [WIND_SPEED_UNIT_KEY]: entry }),
+				createFakeStorage({ [UNIT_SYSTEM_KEY]: entry }),
 			);
-			expect(preferences.windSpeedUnit()).toBe('m/s');
+			expect(preferences.unitChoice().system).toBe('metric');
 		},
 	);
 
-	it('falls back to m/s, and no error, from storage that throws on reading', () => {
-		expect(createPreferences(refusingStorage).windSpeedUnit()).toBe('m/s');
+	it.each([
+		['temperature', 'C'],
+		['temperature', 'm/s'],
+		['pressure', 'mb'],
+		['windSpeed', 'kn'],
+		['height', ''],
+		['distance', 'miles'],
+	] as const)(
+		'falls back to no override of %s for an entry of %j',
+		(quantity, entry) => {
+			const preferences = createPreferences(
+				createFakeStorage({
+					[UNIT_SYSTEM_KEY]: 'imperial',
+					[unitOverrideKey(quantity)]: entry,
+				}),
+			);
+			expect(preferences.unitChoice()).toEqual({
+				system: 'imperial',
+				overrides: {},
+			});
+		},
+	);
+
+	it.each(['m/s', 'km/h', 'mph'] as const)(
+		'carries an old wind speed unit of %s over as the override, once, and removes the old entry',
+		(unit) => {
+			const storage = createFakeStorage({ [OLD_WIND_SPEED_UNIT_KEY]: unit });
+			const preferences = createPreferences(storage);
+			expect(preferences.unitChoice()).toEqual({
+				system: 'metric',
+				overrides: { windSpeed: unit },
+			});
+			expect(storage.writes).toEqual([[unitOverrideKey('windSpeed'), unit]]);
+			expect(storage.removals).toEqual([OLD_WIND_SPEED_UNIT_KEY]);
+			expect(storage.entries.has(OLD_WIND_SPEED_UNIT_KEY)).toBe(false);
+			expect(preferences.unitChoice().overrides).toEqual({ windSpeed: unit });
+			expect(storage.writes).toHaveLength(1);
+			expect(storage.removals).toHaveLength(1);
+		},
+	);
+
+	it('never carries the old wind speed unit over an override kept, and still removes it', () => {
+		const storage = createFakeStorage({
+			[OLD_WIND_SPEED_UNIT_KEY]: 'km/h',
+			[unitOverrideKey('windSpeed')]: 'knots',
+		});
+		expect(createPreferences(storage).unitChoice().overrides).toEqual({
+			windSpeed: 'knots',
+		});
+		expect(storage.writes).toEqual([]);
+		expect(storage.removals).toEqual([OLD_WIND_SPEED_UNIT_KEY]);
 	});
 
-	it('carries on, without an error, past storage that throws on writing', () => {
-		const storage = createFakeStorage();
+	it('carries the old wind speed unit over an override that is not a unit', () => {
+		const storage = createFakeStorage({
+			[OLD_WIND_SPEED_UNIT_KEY]: 'mph',
+			[unitOverrideKey('windSpeed')]: 'warp',
+		});
+		expect(createPreferences(storage).unitChoice().overrides).toEqual({
+			windSpeed: 'mph',
+		});
+		expect(storage.entries.get(unitOverrideKey('windSpeed'))).toBe('mph');
+	});
+
+	it('removes an old wind speed unit that is not a unit, carrying nothing over', () => {
+		const storage = createFakeStorage({
+			[OLD_WIND_SPEED_UNIT_KEY]: 'furlongs',
+		});
+		expect(createPreferences(storage).unitChoice()).toEqual(
+			DEFAULT_UNIT_CHOICE,
+		);
+		expect(storage.writes).toEqual([]);
+		expect(storage.removals).toEqual([OLD_WIND_SPEED_UNIT_KEY]);
+	});
+
+	it('gives the old wind speed unit for the visit where the storage will not keep it', () => {
+		const storage = createFakeStorage({ [OLD_WIND_SPEED_UNIT_KEY]: 'mph' });
 		const preferences = createPreferences({
 			getItem: storage.getItem,
 			setItem: refusingStorage.setItem,
+			removeItem: refusingStorage.removeItem,
 		});
-		expect(() => preferences.setWindSpeedUnit('mph')).not.toThrow();
-		expect(preferences.windSpeedUnit()).toBe('m/s');
-		expect(() =>
-			createPreferences(refusingStorage).setWindSpeedUnit('km/h'),
-		).not.toThrow();
+		expect(preferences.unitChoice().overrides).toEqual({ windSpeed: 'mph' });
+		expect(storage.entries.get(OLD_WIND_SPEED_UNIT_KEY)).toBe('mph');
 	});
 
-	it('falls back to m/s, and no error, with no storage at all', () => {
+	it('keeps the old wind speed unit where the override cannot be written, and carries it over on a later visit', () => {
+		const storage = createFakeStorage({ [OLD_WIND_SPEED_UNIT_KEY]: 'mph' });
+		const refusingWrites = createPreferences({
+			getItem: storage.getItem,
+			setItem: refusingStorage.setItem,
+			removeItem: storage.removeItem,
+		});
+		expect(refusingWrites.unitChoice().overrides).toEqual({ windSpeed: 'mph' });
+		expect(storage.removals).toEqual([]);
+		expect(storage.entries.get(OLD_WIND_SPEED_UNIT_KEY)).toBe('mph');
+
+		expect(createPreferences(storage).unitChoice().overrides).toEqual({
+			windSpeed: 'mph',
+		});
+		expect(storage.writes).toEqual([[unitOverrideKey('windSpeed'), 'mph']]);
+		expect(storage.removals).toEqual([OLD_WIND_SPEED_UNIT_KEY]);
+		expect(storage.entries.has(OLD_WIND_SPEED_UNIT_KEY)).toBe(false);
+	});
+
+	it('never lets an old wind speed unit kept on a refused write come back over "As the system"', () => {
+		const storage = createFakeStorage({ [OLD_WIND_SPEED_UNIT_KEY]: 'mph' });
+		const refusingWrites = createPreferences({
+			getItem: storage.getItem,
+			setItem: refusingStorage.setItem,
+			removeItem: storage.removeItem,
+		});
+		expect(refusingWrites.unitChoice().overrides).toEqual({ windSpeed: 'mph' });
+		refusingWrites.setUnitOverride('windSpeed', null);
+		expect(storage.entries.has(OLD_WIND_SPEED_UNIT_KEY)).toBe(false);
+		expect(createPreferences(storage).unitChoice().overrides).toEqual({});
+	});
+
+	it('leaves the old wind speed unit alone when another quantity follows the system', () => {
+		const storage = createFakeStorage({ [OLD_WIND_SPEED_UNIT_KEY]: 'mph' });
+		const refusingWrites = createPreferences({
+			getItem: storage.getItem,
+			setItem: refusingStorage.setItem,
+			removeItem: storage.removeItem,
+		});
+		refusingWrites.setUnitOverride('height', null);
+		expect(storage.entries.get(OLD_WIND_SPEED_UNIT_KEY)).toBe('mph');
+	});
+
+	it('gives metric with no overrides, and no error, from storage that throws', () => {
+		const preferences = createPreferences(refusingStorage);
+		expect(preferences.unitChoice()).toEqual(DEFAULT_UNIT_CHOICE);
+		expect(() => preferences.setUnitSystem('imperial')).not.toThrow();
+		expect(() => preferences.setUnitOverride('windSpeed', 'mph')).not.toThrow();
+		expect(() => preferences.setUnitOverride('windSpeed', null)).not.toThrow();
+		expect(preferences.unitChoice()).toEqual(DEFAULT_UNIT_CHOICE);
+	});
+
+	it('gives metric with no overrides, and no error, with no storage at all', () => {
 		for (const storage of [null, undefined]) {
 			const preferences = createPreferences(storage);
-			expect(() => preferences.setWindSpeedUnit('mph')).not.toThrow();
-			expect(preferences.windSpeedUnit()).toBe('m/s');
+			expect(() => preferences.setUnitSystem('imperial')).not.toThrow();
+			expect(() => preferences.setUnitOverride('height', null)).not.toThrow();
+			expect(preferences.unitChoice()).toEqual(DEFAULT_UNIT_CHOICE);
 		}
 	});
 });
@@ -148,19 +313,19 @@ describe('createPreferences, how the winds are drawn', () => {
 		).toBe('arrows');
 	});
 
-	it('remembers each way chosen in one entry, apart from the unit', () => {
+	it('remembers each way chosen in one entry, apart from the units', () => {
 		const storage = createFakeStorage();
 		const preferences = createPreferences(storage);
-		preferences.setWindSpeedUnit('km/h');
+		preferences.setUnitSystem('imperial');
 		for (const style of WIND_STYLES) {
 			preferences.setWindStyle(style);
 			expect(preferences.windStyle()).toBe(style);
 		}
 		preferences.setWindStyle('streaks');
-		expect(preferences.windSpeedUnit()).toBe('km/h');
+		expect(preferences.unitChoice().system).toBe('imperial');
 		expect(storage.entries).toEqual(
 			new Map([
-				[WIND_SPEED_UNIT_KEY, 'km/h'],
+				[UNIT_SYSTEM_KEY, 'imperial'],
 				[WIND_STYLE_KEY, 'streaks'],
 			]),
 		);
@@ -194,6 +359,7 @@ describe('createPreferences, how the winds are drawn', () => {
 		const preferences = createPreferences({
 			getItem: storage.getItem,
 			setItem: refusingStorage.setItem,
+			removeItem: refusingStorage.removeItem,
 		});
 		expect(() => preferences.setWindStyle('arrows')).not.toThrow();
 		expect(preferences.windStyle()).toBe('streaks');
@@ -394,6 +560,7 @@ describe('createPreferences, the view settings, with storage that fails', () => 
 		const preferences = createPreferences({
 			getItem: storage.getItem,
 			setItem: refusingStorage.setItem,
+			removeItem: refusingStorage.removeItem,
 		});
 		expect(() => writeAll(preferences)).not.toThrow();
 		expect(readAll(preferences)).toEqual(DEFAULTS);

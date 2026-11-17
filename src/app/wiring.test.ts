@@ -30,21 +30,20 @@ import {
 } from '../worker/testing/fakeWorker';
 import { type AppState, createAppState } from './appState';
 import { MAIN_BUTTON, SECONDARY_BUTTON } from './globe/input';
-import {
-	createPanelMemory,
-	type PanelStorage,
-	panelMemoryKey,
-} from './panelMemory';
+import { createPanelMemory, panelMemoryKey } from './panelMemory';
 import { PLAYBACK_STEP_MS } from './playback';
 import {
 	createPreferences,
 	GRID_KEY,
 	LAYER_KEY,
 	OFF_ENTRY,
+	OLD_WIND_SPEED_UNIT_KEY,
 	ON_ENTRY,
+	type PreferenceStorage,
 	SUNLIGHT_KEY,
 	summaryKey,
-	WIND_SPEED_UNIT_KEY,
+	UNIT_SYSTEM_KEY,
+	unitOverrideKey,
 	WIND_STYLE_KEY,
 	WINDS_KEY,
 } from './preferences';
@@ -63,6 +62,7 @@ import { createFakeStorage, type FakeStorage } from './testing/fakeStorage';
 import { createFakeTimers } from './testing/fakeTimers';
 import { settle } from './testing/settle';
 import type { ComparisonContent } from './ui/comparison';
+import { describeReadout } from './ui/cursorReadout';
 import { createLayerDock, type LayerDockOptions } from './ui/layerDock';
 import {
 	createLayerPanel,
@@ -89,6 +89,7 @@ import {
 	type WorldPanelOptions,
 } from './ui/worldPanel';
 import type { ShortcutEvent } from './undo';
+import { DEFAULT_UNIT_CHOICE, type UnitChoice } from './units';
 import {
 	DEFAULT_MONTH,
 	DEFAULT_PAGE_VIEW,
@@ -137,6 +138,8 @@ type Stage = {
 	readonly toolPanelOptions: ToolPanelOptions;
 	readonly viewPanelOptions: ViewPanelOptions;
 	readonly settingsPanelOptions: SettingsPanelOptions;
+	/** Every choice of units the stand-in for the settings was shown. */
+	readonly settingsUnits: UnitChoice[];
 	readonly dockOptions: LayerDockOptions;
 	/** Every view the stand-in for the dock was told to show, in order. */
 	readonly dockViews: PageView[];
@@ -247,11 +250,14 @@ type StageParts = Partial<
 };
 
 /** Storage that throws on every read and every write. */
-const REFUSING_STORAGE: PanelStorage = {
+const REFUSING_STORAGE: PreferenceStorage = {
 	getItem: () => {
 		throw new Error('Storage is blocked');
 	},
 	setItem: () => {
+		throw new Error('Storage is blocked');
+	},
+	removeItem: () => {
 		throw new Error('Storage is blocked');
 	},
 };
@@ -276,6 +282,7 @@ const createStage = (
 	let toolPanelOptions: ToolPanelOptions | undefined;
 	let viewPanelOptions: ViewPanelOptions | undefined;
 	let settingsPanelOptions: SettingsPanelOptions | undefined;
+	const settingsUnits: UnitChoice[] = [];
 	let globeWindStylesBeforeWorld: string[] | undefined;
 	let dockOptions: LayerDockOptions | undefined;
 	const dockViews: PageView[] = [];
@@ -332,6 +339,7 @@ const createStage = (
 		get settingsPanelOptions() {
 			return required(settingsPanelOptions, 'settings panel');
 		},
+		settingsUnits,
 		get globeWindStylesBeforeWorld() {
 			return required(globeWindStylesBeforeWorld, 'world on the globe');
 		},
@@ -508,6 +516,7 @@ const createStage = (
 		createSettingsPanel: (options) => {
 			log.push('createSettingsPanel');
 			settingsPanelOptions = options;
+			return { showUnits: (choice) => settingsUnits.push(choice) };
 		},
 		createLayerDock: (options) => {
 			log.push('createLayerDock');
@@ -2779,55 +2788,163 @@ const createWindUnitStage = async (
 	};
 };
 
-describe('the wind speed unit', () => {
-	it('starts in m/s with nothing stored, in the settings and the readout, and tells the layer panel nothing of it', async () => {
+describe('the units', () => {
+	/** A wind from the north-east of about 7 m/s, at a place on the equator. */
+	const NORTH_EASTERLY = {
+		latitudeDeg: 0,
+		longitudeDeg: 0,
+		heightM: 10,
+		value: null,
+		wind: { east: -5, north: -5, current: true },
+	} as const;
+
+	/** The wind the readout writes, in the unit it is given at the time. */
+	const readoutWind = (stage: Stage): string | null =>
+		describeReadout(NORTH_EASTERLY, stage.readoutOptions.windUnit()).wind;
+
+	it('starts on metric with nothing stored, in the settings and the readout, and tells the layer panel nothing of it', async () => {
 		const { stage } = await createWindUnitStage();
-		expect(stage.settingsPanelOptions.windUnit).toBe('m/s');
+		expect(stage.settingsPanelOptions.units).toEqual(DEFAULT_UNIT_CHOICE);
 		expect('windUnit' in stage.layerOptions).toBe(false);
 		expect(stage.readoutOptions.windUnit()).toBe('m/s');
+		expect(readoutWind(stage)).toBe('7 m/s NE');
+		expect(stage.settingsUnits).toEqual([]);
 	});
 
-	it('starts in the stored unit, in the settings and the readout', async () => {
+	it('starts on the stored system and overrides, in the settings and the readout', async () => {
 		const { stage } = await createWindUnitStage({
-			[WIND_SPEED_UNIT_KEY]: 'mph',
+			[UNIT_SYSTEM_KEY]: 'imperial',
+			[unitOverrideKey('temperature')]: 'K',
 		});
-		expect(stage.settingsPanelOptions.windUnit).toBe('mph');
-		expect(stage.readoutOptions.windUnit()).toBe('mph');
+		expect(stage.settingsPanelOptions.units).toEqual({
+			system: 'imperial',
+			overrides: { temperature: 'K' },
+		});
+		expect(readoutWind(stage)).toBe('16 mph NE');
 		expect(stage.preferenceStorage.writes).toEqual([]);
 	});
 
-	it('starts in m/s when the storage holds something else', async () => {
+	it('starts on metric when the storage holds something else', async () => {
 		const { stage } = await createWindUnitStage({
-			[WIND_SPEED_UNIT_KEY]: 'knots',
+			[UNIT_SYSTEM_KEY]: 'imperial-ish',
+			[unitOverrideKey('windSpeed')]: 'kn',
 		});
-		expect(stage.settingsPanelOptions.windUnit).toBe('m/s');
+		expect(stage.settingsPanelOptions.units).toEqual(DEFAULT_UNIT_CHOICE);
 		expect(stage.readoutOptions.windUnit()).toBe('m/s');
 	});
 
-	it('stores a unit chosen, and changes the readout at once', async () => {
-		const { stage } = await createWindUnitStage();
-		stage.settingsPanelOptions.onWindUnit('km/h');
-		expect(stage.preferenceStorage.writes).toEqual([
-			[WIND_SPEED_UNIT_KEY, 'km/h'],
-		]);
-		expect(stage.readoutOptions.windUnit()).toBe('km/h');
-		expect(stage.readoutCalls).toEqual(['invalidate']);
-		stage.settingsPanelOptions.onWindUnit('mph');
-		expect(stage.readoutOptions.windUnit()).toBe('mph');
-		expect(stage.readoutCalls).toEqual(['invalidate', 'invalidate']);
+	it('starts on metric where the storage throws', async () => {
+		const stage = await createStartedStage(undefined, {
+			preferencesRefused: true,
+		});
+		expect(stage.settingsPanelOptions.units).toEqual(DEFAULT_UNIT_CHOICE);
+		expect(stage.readoutOptions.windUnit()).toBe('m/s');
 	});
 
-	it('tells the readout of the unit, and nothing else', async () => {
+	it('carries a stored m/s over as the wind speed’s override, which Imperial then keeps', async () => {
+		const { stage } = await createWindUnitStage({
+			[OLD_WIND_SPEED_UNIT_KEY]: 'm/s',
+		});
+		expect(stage.settingsPanelOptions.units).toEqual({
+			system: 'metric',
+			overrides: { windSpeed: 'm/s' },
+		});
+		expect(stage.preferenceStorage.entries).toEqual(
+			new Map([[unitOverrideKey('windSpeed'), 'm/s']]),
+		);
+		stage.settingsPanelOptions.onUnitSystem('imperial');
+		expect(readoutWind(stage)).toBe('7 m/s NE');
+		expect(stage.readoutCalls).toEqual(['invalidate']);
+	});
+
+	it('carries a stored mph over as the wind speed’s override', async () => {
+		const { stage } = await createWindUnitStage({
+			[OLD_WIND_SPEED_UNIT_KEY]: 'mph',
+		});
+		expect(readoutWind(stage)).toBe('16 mph NE');
+		expect(stage.preferenceStorage.removals).toEqual([OLD_WIND_SPEED_UNIT_KEY]);
+	});
+
+	it('writes the wind in mph at once on switching to Imperial, and stores the system', async () => {
+		const { stage } = await createWindUnitStage();
+		stage.settingsPanelOptions.onUnitSystem('imperial');
+		expect(stage.readoutCalls).toEqual(['invalidate']);
+		expect(readoutWind(stage)).toBe('16 mph NE');
+		expect(stage.preferenceStorage.writes).toEqual([
+			[UNIT_SYSTEM_KEY, 'imperial'],
+		]);
+		expect(stage.settingsUnits).toEqual([
+			{ system: 'imperial', overrides: {} },
+		]);
+	});
+
+	it.each(['metric', 'imperial'] as const)(
+		'writes the wind in knots once they are chosen, under %s',
+		async (system) => {
+			const { stage } = await createWindUnitStage({
+				[UNIT_SYSTEM_KEY]: system,
+			});
+			stage.settingsPanelOptions.onUnitOverride('windSpeed', 'knots');
+			expect(stage.readoutCalls).toEqual(['invalidate']);
+			expect(readoutWind(stage)).toBe('14 knots NE');
+			expect(stage.preferenceStorage.writes).toEqual([
+				[unitOverrideKey('windSpeed'), 'knots'],
+			]);
+			stage.settingsPanelOptions.onUnitSystem(
+				system === 'metric' ? 'imperial' : 'metric',
+			);
+			expect(readoutWind(stage)).toBe('14 knots NE');
+		},
+	);
+
+	it('goes back to the system’s unit when As the system is chosen', async () => {
+		const { stage } = await createWindUnitStage({
+			[UNIT_SYSTEM_KEY]: 'imperial',
+			[unitOverrideKey('windSpeed')]: 'km/h',
+		});
+		expect(readoutWind(stage)).toBe('25 km/h NE');
+		stage.settingsPanelOptions.onUnitOverride('windSpeed', null);
+		expect(readoutWind(stage)).toBe('16 mph NE');
+		expect(stage.preferenceStorage.removals).toEqual([
+			unitOverrideKey('windSpeed'),
+			OLD_WIND_SPEED_UNIT_KEY,
+		]);
+		expect(stage.settingsUnits).toEqual([
+			{ system: 'imperial', overrides: {} },
+		]);
+	});
+
+	it('stores the other quantities’ overrides, and changes nothing they would show', async () => {
 		const stage = await createStartedStage();
-		stage.settingsPanelOptions.onWindUnit('mph');
+		stage.settingsPanelOptions.onUnitOverride('temperature', '°F');
+		stage.settingsPanelOptions.onUnitOverride('height', 'ft');
+		expect(stage.preferenceStorage.writes).toEqual([
+			[unitOverrideKey('temperature'), '°F'],
+			[unitOverrideKey('height'), 'ft'],
+		]);
+		expect(stage.readoutOptions.windUnit()).toBe('m/s');
+		expect(stage.log).toEqual([]);
+	});
+
+	it('tells the settings and the readout of a change, and nothing of none', async () => {
+		const stage = await createStartedStage();
+		stage.settingsPanelOptions.onUnitSystem('metric');
+		stage.settingsPanelOptions.onUnitOverride('pressure', null);
+		expect(stage.readoutCalls).toEqual([]);
+		expect(stage.settingsUnits).toEqual([]);
+		stage.settingsPanelOptions.onUnitOverride('pressure', 'inHg');
 		expect(stage.log).toEqual([]);
 		expect(stage.readoutCalls).toEqual(['invalidate']);
+		expect(stage.settingsUnits).toEqual([
+			{ system: 'metric', overrides: { pressure: 'inHg' } },
+		]);
 	});
 
 	it('writes nothing to the world, and marks nothing for saving', async () => {
 		const stage = await createStartedStage();
 		const before = serializeWorld(stage.state.world);
-		stage.settingsPanelOptions.onWindUnit('km/h');
+		stage.settingsPanelOptions.onUnitSystem('imperial');
+		stage.settingsPanelOptions.onUnitOverride('windSpeed', 'km/h');
 		expect(serializeWorld(stage.state.world)).toEqual(before);
 		expect(stage.log).not.toContain('autosave.markChanged');
 		expect(stage.saved).toEqual([]);
@@ -2836,7 +2953,7 @@ describe('the wind speed unit', () => {
 
 	it('is kept through a new world', async () => {
 		const { stage } = await createWindUnitStage();
-		stage.settingsPanelOptions.onWindUnit('mph');
+		stage.settingsPanelOptions.onUnitSystem('imperial');
 		stage.state.replaceWorld(createBlankWorld(64));
 		expect(stage.readoutOptions.windUnit()).toBe('mph');
 		expect(stage.preferenceStorage.writes).toHaveLength(1);

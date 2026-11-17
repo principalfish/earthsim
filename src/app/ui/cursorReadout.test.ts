@@ -21,7 +21,7 @@ import {
 	oneByClass,
 } from '../testing/fakeDocument';
 import { MADE_UP_LAYER } from '../testing/scalarLayerFixtures';
-import { WIND_UNITS, type WindUnit } from '../windUnits';
+import { unitsOf, type WindUnit } from '../units';
 import {
 	createCursorReadout,
 	createReadoutBlock,
@@ -294,6 +294,9 @@ describe('describeReadout', () => {
 		expect(describeReadout({ ...place, wind: northEasterly }, 'mph').wind).toBe(
 			'16 mph NE',
 		);
+		expect(
+			describeReadout({ ...place, wind: northEasterly }, 'knots').wind,
+		).toBe('14 knots NE');
 	});
 
 	it.each([
@@ -324,7 +327,7 @@ describe('describeReadout', () => {
 	);
 
 	it('reads a calm wind as calm in every unit, from below 0.5 m/s, with no direction', () => {
-		for (const unit of WIND_UNITS) {
+		for (const unit of unitsOf('windSpeed')) {
 			const calm = { ...northEasterly, east: 0.49, north: 0 };
 			expect(describeReadout({ ...place, wind: calm }, unit).wind, unit).toBe(
 				'calm',

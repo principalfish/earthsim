@@ -1,19 +1,21 @@
 /**
  * A stand-in for the browser's local storage, for the tests of what keeps
  * small settings in it: entries that hold what was written, and a record
- * of every write.
+ * of every write and removal.
  *
  * Nothing on the page imports this module.
  */
 
-import type { PanelStorage } from '../panelMemory';
+import type { PreferenceStorage } from '../preferences';
 
 /** The stand-in storage and what tests ask of it. */
-export type FakeStorage = PanelStorage & {
+export type FakeStorage = PreferenceStorage & {
 	/** What each entry holds, by name. */
 	readonly entries: Map<string, string>;
 	/** Every write, as its name and what it wrote, in order. */
 	readonly writes: (readonly [string, string])[];
+	/** The name of every entry removed, in order. */
+	readonly removals: string[];
 };
 
 /**
@@ -26,13 +28,19 @@ export const createFakeStorage = (
 ): FakeStorage => {
 	const held = new Map(Object.entries(entries));
 	const writes: (readonly [string, string])[] = [];
+	const removals: string[] = [];
 	return {
 		entries: held,
 		writes,
+		removals,
 		getItem: (name) => held.get(name) ?? null,
 		setItem: (name, value) => {
 			writes.push([name, value]);
 			held.set(name, value);
+		},
+		removeItem: (name) => {
+			removals.push(name);
+			held.delete(name);
 		},
 	};
 };

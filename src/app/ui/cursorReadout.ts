@@ -21,13 +21,8 @@ import {
 } from '../../core/index';
 import type { Globe, WindowPoint } from '../globe/renderer';
 import type { ScalarLayerSpec } from '../scalarLayer';
+import { formatWind, SYSTEM_UNITS, type WindUnit, windFromDeg } from '../units';
 import type { Source, WindSource } from '../view';
-import {
-	DEFAULT_WIND_UNIT,
-	formatWind,
-	type WindUnit,
-	windFromDeg,
-} from '../windUnits';
 import { createElement } from './fields';
 import type { ShownLayer, ShownWinds } from './layerPanel';
 
@@ -215,7 +210,7 @@ export type ReadoutText = {
  */
 export const describeReadout = (
 	parts: ReadoutParts,
-	unit: WindUnit = DEFAULT_WIND_UNIT,
+	unit: WindUnit = SYSTEM_UNITS.metric.windSpeed,
 ): ReadoutText => {
 	const { value, wind } = parts;
 	return {

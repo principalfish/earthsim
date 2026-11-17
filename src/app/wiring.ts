@@ -62,7 +62,7 @@ import {
 } from './ui/newWorldDialog';
 import type { PauseButtonOptions } from './ui/pauseButton';
 import type { PlanetPanel, PlanetPanelOptions } from './ui/planetPanel';
-import type { SettingsPanelOptions } from './ui/settingsPanel';
+import type { SettingsPanel, SettingsPanelOptions } from './ui/settingsPanel';
 import type { Timeline, TimelineOptions } from './ui/timeline';
 import type { ToolPanel, ToolPanelOptions } from './ui/toolPanel';
 import type { TopBar, TopBarOptions } from './ui/topBar';
@@ -79,13 +79,13 @@ import {
 	handleHistoryKey,
 	type ShortcutEvent,
 } from './undo';
+import { createUnitStore, type WindUnit } from './units';
 import {
 	DEFAULT_PAGE_VIEW,
 	type Layer,
 	type PageView,
 	type StoredView,
 } from './view';
-import type { WindUnit } from './windUnits';
 
 /** What the page asks of its globe once the globe exists. */
 export type PageGlobe = Pick<
@@ -211,10 +211,12 @@ export type PageParts = {
 		options: ViewPanelOptions,
 	) => Pick<ViewPanel, 'setSeaLevel'>;
 	/**
-	 * Adds the settings to the panel: how the winds are drawn and the unit
-	 * of their speeds.
+	 * Adds the settings to the panel: how the winds are drawn and the
+	 * units, and gives the way to show units chosen.
 	 */
-	readonly createSettingsPanel: (options: SettingsPanelOptions) => void;
+	readonly createSettingsPanel: (
+		options: SettingsPanelOptions,
+	) => Pick<SettingsPanel, 'showUnits'>;
 	/**
 	 * Lays the dock over the globe, whose tiles choose the layer and switch
 	 * the winds, the sunlight and the cell grid.
@@ -303,12 +305,16 @@ export type PageParts = {
 	) => Pick<CursorReadout, 'invalidate' | 'clear'>;
 	/**
 	 * The page's preferences, remembered by the browser apart from the
-	 * world: the unit wind speeds are written in, how the winds are drawn,
-	 * and the view settings but the month and the source.
+	 * world: the units, how the winds are drawn, and the view settings but
+	 * the month and the source.
 	 */
 	readonly preferences: Pick<
 		Preferences,
-		'windSpeedUnit' | 'setWindSpeedUnit' | 'windStyle' | 'setWindStyle'
+		| 'unitChoice'
+		| 'setUnitSystem'
+		| 'setUnitOverride'
+		| 'windStyle'
+		| 'setWindStyle'
 	> &
 		ViewPreferences;
 	/** Opens the dialog that starts a new world. */
@@ -673,8 +679,8 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			handleHistoryKey(event, edits.perform);
 		}
 	});
-	/** The unit wind speeds are written in, as last chosen. */
-	let windUnit = parts.preferences.windSpeedUnit();
+	/** The units chosen, read once from the preferences. */
+	const units = createUnitStore(parts.preferences);
 	const view = parts.createViewPanel({
 		seaLevel: state.world.seaLevel,
 		onExaggeration: globe.setExaggeration,
@@ -689,18 +695,15 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			readout.invalidate();
 		},
 	});
-	parts.createSettingsPanel({
+	const settings = parts.createSettingsPanel({
 		windStyle,
-		windUnit,
+		units: units.choice(),
 		onWindStyle: (style) => {
 			parts.preferences.setWindStyle(style);
 			globe.setWindStyle(style);
 		},
-		onWindUnit: (unit) => {
-			windUnit = unit;
-			parts.preferences.setWindSpeedUnit(unit);
-			readout.invalidate();
-		},
+		onUnitSystem: units.setSystem,
+		onUnitOverride: units.setOverride,
 	});
 	const dock = parts.createLayerDock({
 		view: startView,
@@ -781,7 +784,13 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		isStrokeActive: sculpt.isStrokeActive,
 		shownLayer: layerPanel.shown,
 		shownWinds: layerPanel.shownWinds,
-		windUnit: () => windUnit,
+		windUnit: () => units.units().windSpeed,
+	});
+	// One listener takes a change of the units to everything that shows
+	// them.
+	units.addListener(() => {
+		settings.showUnits(units.choice());
+		readout.invalidate();
 	});
 	// Told after the layer panel, which brings what the globe shows up to
 	// date first.
