@@ -88,6 +88,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 - The old stored wind speed unit carries over as the wind speed override whatever it is, m/s included, then the old entry is removed. A stored m/s therefore stays m/s under Imperial; the user chose this over dropping a stored m/s (option b). The user: "Keep all, start it" (2026-11-17)
 - Piece 8 started on the user's go-ahead, with the builder's four calls as stated in the briefing: Settings order "Winds drawn as", then Units (Metric or Imperial switch, then Temperature, Pressure, Wind speed, Heights and depths, Distances); the old entry migrates once and is removed; tests cover the pointer's wind only, since the wind key no longer exists; all five overrides show, four taking effect in piece 9. The user: "Keep all, start it" (2026-11-17)
 
+- Piece 8 approved, with both re-check findings fixed first: (1) deleting the wind speed override also deletes the old wind entry, so it cannot come back over "As the system" on a browser that can delete but not save, with a test; (2) the doc comment at `preferences.ts:105` reworded to say the old entry is removed only once the override is saved. The user: "Approve, fix both" (2026-11-17). Piece 8 has no manual review in the plan.
+
 ## Open
 - None.
 
