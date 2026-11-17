@@ -3,7 +3,7 @@ import {
 	readObservedPressureFile,
 	readObservedTemperatureFile,
 	readObservedWindFile,
-} from '../../scripts/earth/dataFile.mjs';
+} from '../../../scripts/earth/dataFile.mjs';
 import {
 	decodeObservedPressure,
 	decodeObservedTemperature,
@@ -15,7 +15,7 @@ import {
 	observedPressure,
 	observedTemperature,
 	observedWind,
-} from '../core/index';
+} from '../../core/index';
 import type { EarthResponse } from './earthData';
 import {
 	createObservedLoader,

@@ -3,7 +3,13 @@ import {
 	PRESSURE_LAYER,
 	type ScalarLayerSpec,
 	TEMPERATURE_LAYER,
-} from '../scalarLayer';
+} from '../layers/scalarLayer';
+import {
+	DEFAULT_PAGE_VIEW,
+	type PageView,
+	SOURCES,
+	WIND_SOURCES,
+} from '../layers/view';
 import {
 	byClass,
 	createFakeDocument,
@@ -12,12 +18,6 @@ import {
 	oneByClass,
 } from '../testing/fakeDocument';
 import { MADE_UP_ID, MADE_UP_LAYER } from '../testing/scalarLayerFixtures';
-import {
-	DEFAULT_PAGE_VIEW,
-	type PageView,
-	SOURCES,
-	WIND_SOURCES,
-} from '../view';
 import { COMPARISON_NAME } from './comparison';
 import { createTopBar, SHOW_LABEL } from './topBar';
 

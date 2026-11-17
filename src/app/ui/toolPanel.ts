@@ -20,14 +20,14 @@ import {
 	MIN_SMOOTH_SETTING,
 	TOOLS,
 	type Tool,
-} from '../sculpt';
-import type { HistoryAction, HistoryState } from '../undo';
+} from '../editing/sculpt';
+import type { HistoryAction, HistoryState } from '../editing/undo';
 import {
 	formatQuantity,
 	type ResolvedUnits,
 	SYSTEM_UNITS,
 	type UnitOf,
-} from '../units';
+} from '../settings/units';
 import {
 	createButton,
 	createElement,

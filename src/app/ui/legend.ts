@@ -14,13 +14,18 @@ import {
 	weightedQuantiles,
 } from '../../core/index';
 import { type ColourRamp, rampGradient, type ValueRange } from '../globe/ramp';
-import type { LayerStatus } from '../layers';
+import type { LayerStatus } from '../layers/layers';
 import type {
 	LayerUnit,
 	ScalarLayerReading,
 	ScalarLayerSpec,
-} from '../scalarLayer';
-import { SYSTEM_UNITS, type UnitSpec, unitLabel, unitSpec } from '../units';
+} from '../layers/scalarLayer';
+import {
+	SYSTEM_UNITS,
+	type UnitSpec,
+	unitLabel,
+	unitSpec,
+} from '../settings/units';
 import { createElement } from './fields';
 
 /**

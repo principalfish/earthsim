@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createBlankWorld, type World } from '../core/index';
+import { createBlankWorld, type World } from '../../core/index';
 import {
 	applyStartup,
 	decideStartup,

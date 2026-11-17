@@ -66,32 +66,32 @@ A pure library with no DOM, Three.js or worker globals.
 | File | What it holds |
 |-|-|
 | `grid/grid.ts` | The cubed-sphere grid every layer lives on |
+| `grid/coarsen.ts` | A world or a field averaged onto the grid a step coarser, and a field or a vector field carried back from it |
+| `grid/vector.ts` | Vector fields on the grid, east and north at every cell, and the gradient, divergence, curl, Laplacian and smoothing of fields |
+| `grid/quantile.ts` | Area-weighted quantiles of values on the grid |
 | `world/world.ts` | A world: its settings, its date and the elevation of every cell |
 | `world/generate.ts`, `world/noise.ts` | Worlds with noise-shaped continents, and the seeded noise behind them |
 | `world/brush.ts` | The sculpting brushes: raise, lower and smooth |
 | `world/history.ts` | The history of terrain edits, for undo and redo |
 | `world/stats.ts` | Summary statistics of a world's terrain |
-| `protocol.ts` | The messages between the page and the worker, of three kinds: the terrain statistics, the temperature and the winds |
-| `index.ts` | What the core exports |
 | `world/serialize.ts` | The world file format and the checks a file must pass |
+| `planet/planet.ts` | The six planet settings, their limits and Earth's values, and the five of them the temperature reads (all but the day length); the sunlight, year length, rotation rate and trust warnings that follow from them; a world's date |
+| `planet/star.ts` | The star as the planet sees it: radius, surface temperature, colour, size in the sky and direction in each month |
+| `planet/insolation.ts` | Sunlight by latitude and time of year, the twelve months, and each cell's latitude |
 | `earth/earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
+| `earth/observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
 | `temperature/observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
+| `temperature/temperature.ts` | The temperature model |
+| `temperature/exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
+| `temperature/baseline/` | The Earth temperature baseline (`earthTemperature.ts`, the figures in `earthTemperature.json`) and its check |
 | `wind/model.ts` | The shape every wind model shares, its error figures against the observed winds and pressure, and the mean of a field by bands of latitude |
 | `wind/rules.ts` | The rules wind model on a world's own grid, and its parts: sea-level pressure from zonal bands placed by the temperature and the day length plus thermal highs and lows, and the wind from it by a balance of pressure gradient, turning and friction; see [Winds](winds.md) |
 | `wind/solve.ts` | The winds of a world: its input checked, the rules model's pressure worked out on the 64 grid and carried back to the world's grid, the winds from it there, and the annual mean of a year of winds |
 | `wind/observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `grid/vector.ts`'s directions east and north |
-| `earth/observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
-| `planet/planet.ts` | The six planet settings, their limits and Earth's values, and the five of them the temperature reads (all but the day length); the sunlight, year length, rotation rate and trust warnings that follow from them; a world's date |
-| `planet/star.ts` | The star as the planet sees it: radius, surface temperature, colour, size in the sky and direction in each month |
-| `planet/insolation.ts` | Sunlight by latitude and time of year, the twelve months, and each cell's latitude |
-| `temperature/temperature.ts` | The temperature model |
-| `grid/coarsen.ts` | A world or a field averaged onto the grid a step coarser, and a field or a vector field carried back from it |
-| `grid/vector.ts` | Vector fields on the grid, east and north at every cell, and the gradient, divergence, curl, Laplacian and smoothing of fields |
-| `temperature/exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
-| `compare.ts` | One field less another, and area-weighted error figures |
-| `grid/quantile.ts` | Area-weighted quantiles of values on the grid |
-| `temperature/baseline/` | The Earth temperature baseline (`earthTemperature.ts`, the figures in `earthTemperature.json`) and its check |
 | `wind/baseline/` | The Earth winds baseline (`earthWinds.ts`, the figures in `earthWinds.json`) and its check |
+| `index.ts` | What the core exports |
+| `protocol.ts` | The messages between the page and the worker, of three kinds: the terrain statistics, the temperature and the winds |
+| `compare.ts` | One field less another, and area-weighted error figures |
 | `testing/` | Helpers only the tests use |
 
 ### `src/app/`: the page
@@ -100,21 +100,21 @@ A pure library with no DOM, Three.js or worker globals.
 |-|-|
 | `main.ts` | Makes the parts of the page and hands them over to be joined |
 | `wiring.ts` | Joins the parts: which part hears of what, and in which order |
-| `startup.ts` | Brings the saved world back, or opens the New world dialog |
-| `appState.ts` | The world being edited, and the ways to replace it or change its planet settings |
-| `sculpt.ts` | Sculpting with the mouse |
-| `undo.ts` | Undo and redo of strokes |
-| `refresh.ts` | When to ask a worker again after the world changes, whatever is on screen; the winds after each new temperature result and each change of the day length; the temperature and the winds stopped while paused and caught up on resuming; with `oneAtATime` (statistics, winds) one request at a time, an overtaken answer ignored |
-| `workerService.ts` | The statistics, temperature and winds services, each on its own worker |
-| `layers.ts` | The computed layers the page holds, the temperature and the winds worked out from it, and whether each is current |
-| `view.ts` | What the globe shows: the layer, each computed layer's part of the year, the one source for the layer and the winds, the month, the sunlight, the winds and the grid; `StoredView`, the part the browser remembers (all but the month and the source) |
-| `scalarLayer.ts` | Each layer of one computed value per cell described as data, the temperature and the sea-level pressure the two offered: its name, unit, how its values are written, its legend wording, its views of the year with their colours and scale fitting, its comparison with the observed Earth and where in the layer store its months come from; the layer panel, legend, cursor readout, top bar, date line and lighting take a description rather than naming the temperature |
-| `playback.ts` | Playing through the year |
-| `storage.ts`, `autosave.ts` | The saved world in IndexedDB, export and import, and when to save |
-| `panelMemory.ts` | Which panel sections are open, remembered by the browser |
-| `preferences.ts` | The page's preferences, remembered by the browser apart from the world, one `earth_sim.preference.` entry each: the system of units (`unitSystem`) and each quantity's unit override (such as `windSpeedUnitOverride`), into which the old `windSpeedUnit` entry is carried once and then removed, whether the winds are drawn as arrows or streaks, the layer, each layer's Show, and the Winds, Sunlight and Grid overlays; never the month or the comparison's source |
-| `units.ts` | The five quantities (temperature, pressure, wind speed, heights, distances), their units with each one's conversion from metric and decimals, the Metric and Imperial systems, the choice of a system with an override per quantity and the store that tells its listeners of each change, where choosing a system clears the overrides; also the eight compass points and a wind in words |
-| `earthData.ts`, `observedData.ts` | Fetching the Earth data files when first needed, the observed years through a description of their file |
+| `editing/appState.ts` | The world being edited, and the ways to replace it or change its planet settings |
+| `editing/sculpt.ts` | Sculpting with the mouse |
+| `editing/undo.ts` | Undo and redo of strokes |
+| `saving/startup.ts` | Brings the saved world back, or opens the New world dialog |
+| `saving/storage.ts`, `saving/autosave.ts` | The saved world in IndexedDB, export and import, and when to save |
+| `layers/refresh.ts` | When to ask a worker again after the world changes, whatever is on screen; the winds after each new temperature result and each change of the day length; the temperature and the winds stopped while paused and caught up on resuming; with `oneAtATime` (statistics, winds) one request at a time, an overtaken answer ignored |
+| `layers/workerService.ts` | The statistics, temperature and winds services, each on its own worker |
+| `layers/layers.ts` | The computed layers the page holds, the temperature and the winds worked out from it, and whether each is current |
+| `layers/view.ts` | What the globe shows: the layer, each computed layer's part of the year, the one source for the layer and the winds, the month, the sunlight, the winds and the grid; `StoredView`, the part the browser remembers (all but the month and the source) |
+| `layers/scalarLayer.ts` | Each layer of one computed value per cell described as data, the temperature and the sea-level pressure the two offered: its name, unit, how its values are written, its legend wording, its views of the year with their colours and scale fitting, its comparison with the observed Earth and where in the layer store its months come from; the layer panel, legend, cursor readout, top bar, date line and lighting take a description rather than naming the temperature |
+| `layers/playback.ts` | Playing through the year |
+| `layers/earthData.ts`, `layers/observedData.ts` | Fetching the Earth data files when first needed, the observed years through a description of their file |
+| `settings/panelMemory.ts` | Which panel sections are open, remembered by the browser |
+| `settings/preferences.ts` | The page's preferences, remembered by the browser apart from the world, one `earth_sim.preference.` entry each: the system of units (`unitSystem`) and each quantity's unit override (such as `windSpeedUnitOverride`), into which the old `windSpeedUnit` entry is carried once and then removed, whether the winds are drawn as arrows or streaks, the layer, each layer's Show, and the Winds, Sunlight and Grid overlays; never the month or the comparison's source |
+| `settings/units.ts` | The five quantities (temperature, pressure, wind speed, heights, distances), their units with each one's conversion from metric and decimals, the Metric and Imperial systems, the choice of a system with an override per quantity and the store that tells its listeners of each change, where choosing a system clears the overrides; also the eight compass points and a wind in words |
 | `globe/` | The renderer, shaders, camera, picking, colour ramps, the wind arrows and the wind streaks (`streaks.ts`: the trails moved along the wind, and their ribbons), when the globe is drawn (`frameLoop.ts`: on demand, or at every frame while animating) and the rule for when the streaks move (`windMotion.ts`) |
 | `ui/` | The regions laid over the globe (`mainView.ts`), the dock of tiles there that choose the layer and switch the overlays (`layerDock.ts`), the top bar beside it with the layer's Show choice and the one comparison control (`topBar.ts`, `comparison.ts`), the timeline along the bottom with the month and Play (`timeline.ts`), the icons drawn for the page (`icons.ts`), the Pause button in the top-right corner (`pauseButton.ts`), the info box in the bottom-right corner (`infoBox.ts`), made of the legend (`legend.ts`), one status line for the calculation, the layer and the winds (`windKey.ts` words where the winds stand) and the cursor readout (`cursorReadout.ts`), the panel's sections and controls, the Settings section's wind style and units among them (`settingsPanel.ts`), and the New world dialog |
 | `styles.css` | The page's styles |

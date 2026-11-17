@@ -6,8 +6,8 @@
  */
 
 import type { World, WorldFileError, WorldFileResult } from '../../core/index';
-import type { AutosaveState } from '../autosave';
-import { WORLD_FILE_EXTENSION } from '../storage';
+import type { AutosaveState } from '../saving/autosave';
+import { WORLD_FILE_EXTENSION } from '../saving/storage';
 import { createButton, createElement } from './fields';
 
 /** What separates the parts of the line that describes a world. */

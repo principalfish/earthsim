@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { SOURCES, type Source, WIND_SOURCES } from '../layers/view';
 import {
 	byClass,
 	createFakeDocument,
@@ -6,7 +7,6 @@ import {
 	type FakeElement,
 	oneByClass,
 } from '../testing/fakeDocument';
-import { SOURCES, type Source, WIND_SOURCES } from '../view';
 import {
 	COMPARISON_LEGEND,
 	COMPARISON_NAME,

@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+	DEFAULT_MONTH,
+	DEFAULT_PAGE_VIEW,
+	type PageView,
+} from '../layers/view';
+import {
 	byClass,
 	createFakeDocument,
 	type FakeDocument,
 	type FakeElement,
 	oneByClass,
 } from '../testing/fakeDocument';
-import { DEFAULT_MONTH, DEFAULT_PAGE_VIEW, type PageView } from '../view';
 import { thumbCentre } from './fields';
 import {
 	createTimeline,

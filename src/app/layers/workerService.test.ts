@@ -8,21 +8,21 @@ import {
 	type TemperatureResult,
 	type TerrainStats,
 	type World,
-} from '../core/index';
+} from '../../core/index';
 import {
 	progressMessageOf,
 	temperatureOf,
-} from '../core/testing/temperatureFixtures';
-import { windResultOf } from '../core/testing/windFixtures';
-import type { WorkerLike } from '../worker/client';
+} from '../../core/testing/temperatureFixtures';
+import { windResultOf } from '../../core/testing/windFixtures';
+import type { WorkerLike } from '../../worker/client';
 import {
 	createFakeWorker,
 	type FakeWorker,
-} from '../worker/testing/fakeWorker';
+} from '../../worker/testing/fakeWorker';
+import { createFakeTimers } from '../testing/fakeTimers';
+import { settle } from '../testing/settle';
 import { createLayerStore } from './layers';
 import { STATS_DEBOUNCE_MS, TEMPERATURE_DEBOUNCE_MS } from './refresh';
-import { createFakeTimers } from './testing/fakeTimers';
-import { settle } from './testing/settle';
 import {
 	createStatisticsService,
 	createTemperatureService,

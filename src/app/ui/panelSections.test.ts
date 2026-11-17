@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PLANET, type TerrainStats } from '../../core/index';
-import { createPanelMemory, panelMemoryKey } from '../panelMemory';
+import { createPanelMemory, panelMemoryKey } from '../settings/panelMemory';
 import {
 	byClass,
 	createFakeDocument,

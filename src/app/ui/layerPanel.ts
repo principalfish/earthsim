@@ -38,9 +38,9 @@ import {
 import { type ColourRamp, centredRange, type ValueRange } from '../globe/ramp';
 import type { Globe } from '../globe/renderer';
 import type { WindField } from '../globe/wind';
-import type { LayerStore, SolvedWinds } from '../layers';
-import type { ObservedLoader } from '../observedData';
-import { createPlayback, type PlaybackOptions } from '../playback';
+import type { LayerStore, SolvedWinds } from '../layers/layers';
+import type { ObservedLoader } from '../layers/observedData';
+import { createPlayback, type PlaybackOptions } from '../layers/playback';
 import {
 	fitSummaryScale,
 	inUnit,
@@ -63,8 +63,7 @@ import {
 	windsStatus,
 	type YearFieldKey,
 	yearField,
-} from '../scalarLayer';
-import { type ResolvedUnits, SYSTEM_UNITS } from '../units';
+} from '../layers/scalarLayer';
 import {
 	DEFAULT_MONTH,
 	DEFAULT_PAGE_VIEW,
@@ -81,7 +80,8 @@ import {
 	type Summary,
 	type WindSource,
 	windSourceFor,
-} from '../view';
+} from '../layers/view';
+import { type ResolvedUnits, SYSTEM_UNITS } from '../settings/units';
 import type { ComparisonContent } from './comparison';
 import { type CalculationContent, calculationContent } from './infoBox';
 import { type LegendContent, type LegendSource, legendContent } from './legend';

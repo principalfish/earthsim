@@ -24,7 +24,7 @@ import {
 	type UnitSystem,
 	unitLabel,
 	unitsOf,
-} from '../units';
+} from '../settings/units';
 import {
 	createElement,
 	createSegmentedChoice,

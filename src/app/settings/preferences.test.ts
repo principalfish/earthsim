@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { WIND_STYLES } from './globe/windMotion';
+import { WIND_STYLES } from '../globe/windMotion';
+import { PRESSURE_LAYER, TEMPERATURE_LAYER } from '../layers/scalarLayer';
+import {
+	DEFAULT_PAGE_VIEW,
+	LAYERS,
+	SCALAR_LAYER_IDS,
+	type StoredView,
+} from '../layers/view';
+import { createFakeStorage } from '../testing/fakeStorage';
 import {
 	createPreferences,
 	GRID_KEY,
@@ -18,15 +26,7 @@ import {
 	WIND_STYLE_KEY,
 	WINDS_KEY,
 } from './preferences';
-import { PRESSURE_LAYER, TEMPERATURE_LAYER } from './scalarLayer';
-import { createFakeStorage } from './testing/fakeStorage';
 import { DEFAULT_UNIT_CHOICE, QUANTITIES, unitsOf } from './units';
-import {
-	DEFAULT_PAGE_VIEW,
-	LAYERS,
-	SCALAR_LAYER_IDS,
-	type StoredView,
-} from './view';
 
 /** Storage that throws on every read and every write. */
 const refusingStorage: PreferenceStorage = {

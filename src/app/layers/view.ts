@@ -170,7 +170,7 @@ export const offeredSources = (
 };
 
 /** The months of the year, January first, as the page names them. */
-export { MONTH_NAMES } from '../core/index';
+export { MONTH_NAMES } from '../../core/index';
 
 /**
  * The month on screen when the page opens and when a new world arrives, as

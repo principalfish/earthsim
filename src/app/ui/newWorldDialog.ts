@@ -21,7 +21,12 @@ import {
 	SUPPORTED_RESOLUTIONS,
 	type World,
 } from '../../core/index';
-import { convert, SYSTEM_UNITS, type UnitOf, unitLabel } from '../units';
+import {
+	convert,
+	SYSTEM_UNITS,
+	type UnitOf,
+	unitLabel,
+} from '../settings/units';
 import { createButton, createElement, createRangeField } from './fields';
 
 /** The least land the slider can be set to, as a percentage. */

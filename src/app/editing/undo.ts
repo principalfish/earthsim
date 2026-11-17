@@ -7,8 +7,8 @@
  * to the world and the globe, and tells the page what changed.
  */
 
-import { createHistory, type History, type World } from '../core/index';
-import type { Globe } from './globe/renderer';
+import { createHistory, type History, type World } from '../../core/index';
+import type { Globe } from '../globe/renderer';
 import { faceBits, facesOfBits, type StrokeChanges } from './sculpt';
 
 /** A step through the history of strokes. */

@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readEarthDataFile } from '../../scripts/earth/dataFile.mjs';
-import { decodeEarth, EARTH_DATA_BYTES, EARTH_DATA_CELLS } from '../core/index';
+import { readEarthDataFile } from '../../../scripts/earth/dataFile.mjs';
+import {
+	decodeEarth,
+	EARTH_DATA_BYTES,
+	EARTH_DATA_CELLS,
+} from '../../core/index';
 import {
 	createEarthLoader,
 	EARTH_DATA_PATH,

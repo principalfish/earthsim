@@ -9,7 +9,7 @@ import {
 	type WorldFileError,
 	type WorldFileResult,
 } from '../../core/index';
-import { importWorldFile } from '../storage';
+import { importWorldFile } from '../saving/storage';
 import {
 	createFakeDocument,
 	type FakeDocument,

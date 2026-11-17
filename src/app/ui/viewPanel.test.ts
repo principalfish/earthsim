@@ -3,6 +3,7 @@ import {
 	MAX_DRAWN_SEA_LEVEL_M,
 	MIN_DRAWN_SEA_LEVEL_M,
 } from '../globe/material';
+import type { UnitOf } from '../settings/units';
 import {
 	byClass,
 	createFakeDocument,
@@ -10,7 +11,6 @@ import {
 	type FakeElement,
 	findAll,
 } from '../testing/fakeDocument';
-import type { UnitOf } from '../units';
 import {
 	createViewPanel,
 	formatExaggeration,

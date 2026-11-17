@@ -3,7 +3,7 @@
  * Earth world is first asked for and then keeps.
  */
 
-import { decodeEarth, type EarthData } from '../core/index';
+import { decodeEarth, type EarthData } from '../../core/index';
 
 /** Where the data file is, from the page's base address. */
 export const EARTH_DATA_PATH = 'data/earth-256.bin';

@@ -12,7 +12,7 @@ import {
 	PLANET_LIMITS,
 	type PlanetSettings,
 	type World,
-} from '../core/index';
+} from '../../core/index';
 import { createAppState } from './appState';
 import {
 	createUndoController,

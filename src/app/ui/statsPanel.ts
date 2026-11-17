@@ -4,7 +4,7 @@
  */
 
 import type { TerrainStats } from '../../core/index';
-import { formatQuantity, SYSTEM_UNITS, type UnitOf } from '../units';
+import { formatQuantity, SYSTEM_UNITS, type UnitOf } from '../settings/units';
 import { createElement } from './fields';
 
 /** One figure of the readout, as it is written on the page. */

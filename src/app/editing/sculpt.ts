@@ -24,14 +24,14 @@ import {
 	strokePath,
 	type Vec3,
 	type World,
-} from '../core/index';
+} from '../../core/index';
 import {
 	isButtonHeld,
 	MAIN_BUTTON,
 	type RotateButton,
 	SECONDARY_BUTTON,
-} from './globe/input';
-import type { Globe, WindowPoint } from './globe/renderer';
+} from '../globe/input';
+import type { Globe, WindowPoint } from '../globe/renderer';
 
 /** What the main mouse button does on the globe. */
 export type Tool = 'move' | BrushMode;

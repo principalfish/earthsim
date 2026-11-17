@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { temperatureOf } from '../../core/testing/temperatureFixtures';
 import { windResultOf } from '../../core/testing/windFixtures';
-import { createLayerStore, type WindsLayer } from '../layers';
+import { createLayerStore, type WindsLayer } from '../layers/layers';
 import { LEGEND_EMPTY_TEXT, LEGEND_OUT_OF_DATE_TEXT } from './legend';
 import {
 	OBSERVED_WINDS_FAILED_TEXT,

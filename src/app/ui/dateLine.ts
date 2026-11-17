@@ -5,8 +5,8 @@
  * screen while the globe is lit by the sun.
  */
 
-import { scalarLayerOf, summaryOf } from '../scalarLayer';
-import { MONTH_NAMES, offersMonth, type PageView } from '../view';
+import { scalarLayerOf, summaryOf } from '../layers/scalarLayer';
+import { MONTH_NAMES, offersMonth, type PageView } from '../layers/view';
 
 /** What separates the parts of the date line. */
 const PART_SEPARATOR = ' · ';

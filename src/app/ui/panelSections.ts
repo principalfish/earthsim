@@ -3,7 +3,7 @@
  * opened or closed as the browser remembers it.
  */
 
-import type { PanelMemory } from '../panelMemory';
+import type { PanelMemory } from '../settings/panelMemory';
 import { createSection, type Section } from './section';
 
 /** The panel's sections, in the order it shows them, which is the tab order. */

@@ -20,33 +20,53 @@ import {
 	type World,
 	type WorldFileResult,
 } from '../core/index';
-import type { AppState } from './appState';
-import type { Autosave, AutosaveOptions } from './autosave';
-import type { RotateButton, ViewInput } from './globe/input';
-import type { SunlightStyle } from './globe/material';
-import type { Globe } from './globe/renderer';
-import { createLayerStore, type LayerStore } from './layers';
-import type { ObservedLoader } from './observedData';
-import {
-	type Preferences,
-	storedView,
-	storeView,
-	type ViewPreferences,
-} from './preferences';
-import type {
-	RefreshScheduler,
-	TemperatureScheduler,
-	WindsScheduler,
-} from './refresh';
-import { type ScalarObservedLoader, scalarLayerOf } from './scalarLayer';
+import type { AppState } from './editing/appState';
 import {
 	DEFAULT_TOOL,
 	rotateButtonFor,
 	type SculptController,
 	type SculptOptions,
-} from './sculpt';
-import { applyStartup, decideStartup, type StartupRead } from './startup';
-import type { WorldStore } from './storage';
+} from './editing/sculpt';
+import {
+	createUndoController,
+	handleHistoryKey,
+	type ShortcutEvent,
+} from './editing/undo';
+import type { RotateButton, ViewInput } from './globe/input';
+import type { SunlightStyle } from './globe/material';
+import type { Globe } from './globe/renderer';
+import { createLayerStore, type LayerStore } from './layers/layers';
+import type { ObservedLoader } from './layers/observedData';
+import type {
+	RefreshScheduler,
+	TemperatureScheduler,
+	WindsScheduler,
+} from './layers/refresh';
+import { type ScalarObservedLoader, scalarLayerOf } from './layers/scalarLayer';
+import {
+	DEFAULT_PAGE_VIEW,
+	type Layer,
+	type PageView,
+	type StoredView,
+} from './layers/view';
+import type { Autosave, AutosaveOptions } from './saving/autosave';
+import {
+	applyStartup,
+	decideStartup,
+	type StartupRead,
+} from './saving/startup';
+import type { WorldStore } from './saving/storage';
+import {
+	type Preferences,
+	storedView,
+	storeView,
+	type ViewPreferences,
+} from './settings/preferences';
+import {
+	createUnitStore,
+	type ResolvedUnits,
+	type UnitOf,
+} from './settings/units';
 import type { ComparisonContent } from './ui/comparison';
 import type { CursorReadout } from './ui/cursorReadout';
 import { createDateLine } from './ui/dateLine';
@@ -75,18 +95,6 @@ import {
 	type WorldPanel,
 	type WorldPanelOptions,
 } from './ui/worldPanel';
-import {
-	createUndoController,
-	handleHistoryKey,
-	type ShortcutEvent,
-} from './undo';
-import { createUnitStore, type ResolvedUnits, type UnitOf } from './units';
-import {
-	DEFAULT_PAGE_VIEW,
-	type Layer,
-	type PageView,
-	type StoredView,
-} from './view';
 
 /** What the page asks of its globe once the globe exists. */
 export type PageGlobe = Pick<

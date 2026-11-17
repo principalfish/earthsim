@@ -17,7 +17,7 @@ import {
 	observedTemperature,
 	observedWind,
 	type Resolution,
-} from '../core/index';
+} from '../../core/index';
 import type { EarthResponse } from './earthData';
 
 /** Where the observed temperature file is, from the page's base address. */

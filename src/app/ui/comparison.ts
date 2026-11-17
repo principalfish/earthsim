@@ -8,7 +8,7 @@
  * layer panel decides what it offers.
  */
 
-import { SOURCE_LABELS, SOURCES, type Source } from '../view';
+import { SOURCE_LABELS, SOURCES, type Source } from '../layers/view';
 import { createElement, createSegmentedChoice } from './fields';
 
 /** The name of the comparison's group of radio buttons. */

@@ -15,19 +15,8 @@ import {
 	defaultWindStyle,
 	isWindStyle,
 	type WindStyle,
-} from './globe/windMotion';
-import type { PanelStorage } from './panelMemory';
-import { offersSummary, SCALAR_LAYER_SPECS } from './scalarLayer';
-import {
-	DEFAULT_UNIT_SYSTEM,
-	isUnitOf,
-	isUnitSystem,
-	QUANTITIES,
-	type Quantity,
-	type UnitChoice,
-	type UnitOf,
-	type UnitSystem,
-} from './units';
+} from '../globe/windMotion';
+import { offersSummary, SCALAR_LAYER_SPECS } from '../layers/scalarLayer';
 import {
 	DEFAULT_LAYER,
 	DEFAULT_SUMMARY,
@@ -38,7 +27,18 @@ import {
 	type ScalarLayerId,
 	type StoredView,
 	type Summary,
-} from './view';
+} from '../layers/view';
+import type { PanelStorage } from './panelMemory';
+import {
+	DEFAULT_UNIT_SYSTEM,
+	isUnitOf,
+	isUnitSystem,
+	QUANTITIES,
+	type Quantity,
+	type UnitChoice,
+	type UnitOf,
+	type UnitSystem,
+} from './units';
 
 /** What the preferences ask of the browser's storage. */
 export type PreferenceStorage = PanelStorage & Pick<Storage, 'removeItem'>;

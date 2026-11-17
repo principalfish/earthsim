@@ -25,9 +25,13 @@ import {
 	type ValueRange,
 } from '../globe/ramp';
 import type { WindField } from '../globe/wind';
-import { createLayerStore, type LayerStore, type SolvedWinds } from '../layers';
-import type { ObservedLoader } from '../observedData';
-import { PLAYBACK_STEP_MS } from '../playback';
+import {
+	createLayerStore,
+	type LayerStore,
+	type SolvedWinds,
+} from '../layers/layers';
+import type { ObservedLoader } from '../layers/observedData';
+import { PLAYBACK_STEP_MS } from '../layers/playback';
 import {
 	fitSummaryScale,
 	isDifferenceView,
@@ -44,7 +48,21 @@ import {
 	TEMPERATURE_NOT_SHOWN_TEXT,
 	TEMPERATURE_UNAVAILABLE_TEXT,
 	toLayerUnit,
-} from '../scalarLayer';
+} from '../layers/scalarLayer';
+import {
+	DEFAULT_MONTH,
+	DEFAULT_PAGE_VIEW,
+	DEFAULT_SOURCE,
+	DEFAULT_SUMMARY,
+	type Layer,
+	type PageView,
+	SOURCES,
+	type Source,
+	type StoredView,
+	type Summary,
+	WIND_SOURCES,
+} from '../layers/view';
+import { SYSTEM_UNITS } from '../settings/units';
 import {
 	byClass,
 	createFakeDocument,
@@ -61,20 +79,6 @@ import {
 	weightedMean,
 } from '../testing/scalarLayerFixtures';
 import { settle } from '../testing/settle';
-import { SYSTEM_UNITS } from '../units';
-import {
-	DEFAULT_MONTH,
-	DEFAULT_PAGE_VIEW,
-	DEFAULT_SOURCE,
-	DEFAULT_SUMMARY,
-	type Layer,
-	type PageView,
-	SOURCES,
-	type Source,
-	type StoredView,
-	type Summary,
-	WIND_SOURCES,
-} from '../view';
 import type { ComparisonContent } from './comparison';
 import {
 	CALCULATING_TEMPERATURE_TEXT,

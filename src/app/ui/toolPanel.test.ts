@@ -10,7 +10,12 @@ import {
 	MIN_BRUSH_STRENGTH,
 	MIN_SMOOTH_SETTING,
 	TOOLS,
-} from '../sculpt';
+} from '../editing/sculpt';
+import {
+	type ResolvedUnits,
+	SYSTEM_UNITS,
+	type UnitSystem,
+} from '../settings/units';
 import {
 	byClass,
 	createFakeDocument,
@@ -19,7 +24,6 @@ import {
 	findAll,
 	oneByClass,
 } from '../testing/fakeDocument';
-import { type ResolvedUnits, SYSTEM_UNITS, type UnitSystem } from '../units';
 import { createSection } from './section';
 import {
 	BRUSH_RADIUS_SLIDER_STEP_KM,

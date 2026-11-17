@@ -20,7 +20,7 @@ import type {
 	TemperatureStart,
 	WindResult,
 	World,
-} from '../core/index';
+} from '../../core/index';
 import type { LayerStore, SolvedWinds } from './layers';
 
 /**

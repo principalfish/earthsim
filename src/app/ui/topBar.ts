@@ -6,8 +6,8 @@
  * winds come from.
  */
 
-import { SCALAR_LAYERS, type ScalarLayerSpec } from '../scalarLayer';
-import type { PageView, ScalarLayerId, Source, Summary } from '../view';
+import { SCALAR_LAYERS, type ScalarLayerSpec } from '../layers/scalarLayer';
+import type { PageView, ScalarLayerId, Source, Summary } from '../layers/view';
 import { type ComparisonContent, createComparisonControls } from './comparison';
 import { createElement, createSelectField } from './fields';
 

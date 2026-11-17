@@ -11,7 +11,7 @@ import {
 	serializeWorld,
 	WORLD_FILE_PREFIX_BYTES,
 	type World,
-} from '../core/index';
+} from '../../core/index';
 import {
 	DOWNLOAD_URL_LIFETIME_MS,
 	downloadBlob,

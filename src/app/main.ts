@@ -1,17 +1,26 @@
 import './styles.css';
 import { CORE_VERSION, createBlankWorld } from '../core/index';
-import { createAppState } from './appState';
-import { AUTOSAVE_DELAY_MS, createAutosave } from './autosave';
-import { loadEarthData } from './earthData';
+import { createAppState } from './editing/appState';
+import { createSculptController } from './editing/sculpt';
 import { attachViewInput } from './globe/input';
 import { MAX_DRAWN_SEA_LEVEL_M, MIN_DRAWN_SEA_LEVEL_M } from './globe/material';
 import { createGlobe, type Globe } from './globe/renderer';
-import { loadObservedWinds } from './observedData';
-import { createPanelMemory, reachStorage } from './panelMemory';
-import { createPreferences } from './preferences';
-import { loadLayerObserved } from './scalarLayer';
-import { createSculptController } from './sculpt';
-import { exportWorldFile, importWorldFile, openWorldStore } from './storage';
+import { loadEarthData } from './layers/earthData';
+import { loadObservedWinds } from './layers/observedData';
+import { loadLayerObserved } from './layers/scalarLayer';
+import {
+	createStatisticsService,
+	createTemperatureService,
+	createWindsService,
+} from './layers/workerService';
+import { AUTOSAVE_DELAY_MS, createAutosave } from './saving/autosave';
+import {
+	exportWorldFile,
+	importWorldFile,
+	openWorldStore,
+} from './saving/storage';
+import { createPanelMemory, reachStorage } from './settings/panelMemory';
+import { createPreferences } from './settings/preferences';
 import { createCursorReadout } from './ui/cursorReadout';
 import { createInfoBox } from './ui/infoBox';
 import { createLayerDock } from './ui/layerDock';
@@ -29,11 +38,6 @@ import { createTopBar } from './ui/topBar';
 import { createViewPanel, SEA_LEVEL_SLIDER_STEP_M } from './ui/viewPanel';
 import { createWorldPanel } from './ui/worldPanel';
 import { startPage } from './wiring';
-import {
-	createStatisticsService,
-	createTemperatureService,
-	createWindsService,
-} from './workerService';
 
 /** Looks up an element the page markup is required to contain. */
 const requireElement = <T extends Element>(

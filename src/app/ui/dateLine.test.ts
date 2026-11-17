@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PAGE_VIEW, type PageView, type Summary } from '../view';
+import { DEFAULT_PAGE_VIEW, type PageView, type Summary } from '../layers/view';
 import { createDateLine, dateLineText, formatWorldAge } from './dateLine';
 
 /** The view in Temperature view with the month and summary given. */

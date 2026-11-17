@@ -15,13 +15,13 @@ import type {
 	SimResults,
 	TerrainStats,
 	World,
-} from '../core/index';
+} from '../../core/index';
 import {
 	createSimClient,
 	type RequestOptions,
 	type SimClient,
 	type WorkerLike,
-} from '../worker/client';
+} from '../../worker/client';
 import type { LayerStore } from './layers';
 import {
 	createRefreshScheduler,

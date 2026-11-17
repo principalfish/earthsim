@@ -3,7 +3,8 @@ import {
 	PRESSURE_LAYER,
 	SCALAR_LAYERS,
 	TEMPERATURE_LAYER,
-} from '../scalarLayer';
+} from '../layers/scalarLayer';
+import { DEFAULT_PAGE_VIEW, type PageView } from '../layers/view';
 import {
 	byClass,
 	createFakeDocument,
@@ -11,7 +12,6 @@ import {
 	type FakeElement,
 	oneByClass,
 } from '../testing/fakeDocument';
-import { DEFAULT_PAGE_VIEW, type PageView } from '../view';
 import {
 	createLayerDock,
 	DOCK_LAYERS_HEADING,

@@ -9,7 +9,13 @@ import {
 	type Vec3,
 	type World,
 } from '../../core/index';
-import { PRESSURE_LAYER, TEMPERATURE_LAYER } from '../scalarLayer';
+import { PRESSURE_LAYER, TEMPERATURE_LAYER } from '../layers/scalarLayer';
+import {
+	type ResolvedUnits,
+	SYSTEM_UNITS,
+	unitsOf,
+	type WindUnit,
+} from '../settings/units';
 import {
 	createFakeCanvas,
 	createFakeFrames,
@@ -21,12 +27,6 @@ import {
 	oneByClass,
 } from '../testing/fakeDocument';
 import { MADE_UP_LAYER } from '../testing/scalarLayerFixtures';
-import {
-	type ResolvedUnits,
-	SYSTEM_UNITS,
-	unitsOf,
-	type WindUnit,
-} from '../units';
 import {
 	createCursorReadout,
 	createReadoutBlock,

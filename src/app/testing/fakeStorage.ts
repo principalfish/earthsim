@@ -6,7 +6,7 @@
  * Nothing on the page imports this module.
  */
 
-import type { PreferenceStorage } from '../preferences';
+import type { PreferenceStorage } from '../settings/preferences';
 
 /** The stand-in storage and what tests ask of it. */
 export type FakeStorage = PreferenceStorage & {

@@ -5,7 +5,7 @@
  * observed winds' loading and failure lines.
  */
 
-import type { LayerStatus, WindsLayer } from '../layers';
+import type { LayerStatus, WindsLayer } from '../layers/layers';
 import { LEGEND_EMPTY_TEXT, LEGEND_OUT_OF_DATE_TEXT } from './legend';
 
 /** What is said of the winds while they are being worked out. */

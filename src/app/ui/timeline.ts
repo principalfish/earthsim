@@ -4,7 +4,7 @@
  * on screen depends on the month.
  */
 
-import { MONTH_NAMES, offersMonth, type PageView } from '../view';
+import { MONTH_NAMES, offersMonth, type PageView } from '../layers/view';
 import { createElement, rangeFraction, thumbCentre } from './fields';
 import { pauseIcon, playIcon } from './icons';
 

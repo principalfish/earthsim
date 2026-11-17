@@ -12,8 +12,8 @@
  * {@link infoStatus} picks the one line the box shows of the three.
  */
 
-import type { LayerStatus, TemperatureLayer } from '../layers';
-import { TEMPERATURE_UNAVAILABLE_TEXT } from '../scalarLayer';
+import type { LayerStatus, TemperatureLayer } from '../layers/layers';
+import { TEMPERATURE_UNAVAILABLE_TEXT } from '../layers/scalarLayer';
 import { createReadoutBlock, type ReadoutText } from './cursorReadout';
 import { createElement } from './fields';
 import {

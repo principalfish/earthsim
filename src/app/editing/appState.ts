@@ -20,7 +20,7 @@ import {
 	PLANET_SETTINGS,
 	type PlanetSettings,
 	type World,
-} from '../core/index';
+} from '../../core/index';
 
 /** Called with the new world after it has replaced the one being edited. */
 export type WorldListener = (world: World) => void;

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { createFakeStorage } from '../testing/fakeStorage';
 import {
 	createPreferences,
 	OLD_WIND_SPEED_UNIT_KEY,
 	UNIT_SYSTEM_KEY,
 	unitOverrideKey,
 } from './preferences';
-import { createFakeStorage } from './testing/fakeStorage';
 import {
 	COMPASS_POINTS,
 	compassPoint,

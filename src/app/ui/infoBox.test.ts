@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TemperatureProgress } from '../../core/index';
 import { progressOf } from '../../core/testing/temperatureFixtures';
 import { TEMPERATURE_RAMP } from '../globe/ramp';
-import type { LayerStatus } from '../layers';
+import type { LayerStatus } from '../layers/layers';
 import {
 	PRESSURE_LAYER,
 	PRESSURE_UNAVAILABLE_TEXT,
 	TEMPERATURE_LAYER,
 	TEMPERATURE_NOT_SHOWN_TEXT,
 	TEMPERATURE_UNAVAILABLE_TEXT,
-} from '../scalarLayer';
+} from '../layers/scalarLayer';
 import {
 	byClass,
 	createFakeDocument,

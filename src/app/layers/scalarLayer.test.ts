@@ -1,12 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { getGrid, summariseWinds, weightedQuantiles } from '../core/index';
-import { progressOf, temperatureOf } from '../core/testing/temperatureFixtures';
+import { getGrid, summariseWinds, weightedQuantiles } from '../../core/index';
+import {
+	progressOf,
+	temperatureOf,
+} from '../../core/testing/temperatureFixtures';
 import {
 	DIFFERENCE_RAMP,
 	PRESSURE_RAMP,
 	SEASONAL_RANGE_RAMP,
 	TEMPERATURE_RAMP,
-} from './globe/ramp';
+} from '../globe/ramp';
+import { SYSTEM_UNITS } from '../settings/units';
+import {
+	earthLikePressure,
+	earthLikeTemperature,
+} from '../testing/earthLikeFixtures';
+import {
+	MADE_UP_LAYER,
+	pressureWinds,
+	weightedMean,
+} from '../testing/scalarLayerFixtures';
+import {
+	cellWeights,
+	FIT_TAIL_SHARE,
+	fitRange,
+	fitRangeCentred,
+	legendTicks,
+} from '../ui/legend';
 import { createLayerStore } from './layers';
 import { loadObservedPressure, loadObservedTemperature } from './observedData';
 import {
@@ -39,23 +59,6 @@ import {
 	yearField,
 	yearSummaries,
 } from './scalarLayer';
-import {
-	earthLikePressure,
-	earthLikeTemperature,
-} from './testing/earthLikeFixtures';
-import {
-	MADE_UP_LAYER,
-	pressureWinds,
-	weightedMean,
-} from './testing/scalarLayerFixtures';
-import {
-	cellWeights,
-	FIT_TAIL_SHARE,
-	fitRange,
-	fitRangeCentred,
-	legendTicks,
-} from './ui/legend';
-import { SYSTEM_UNITS } from './units';
 import {
 	DEFAULT_SUMMARY,
 	LAYERS,

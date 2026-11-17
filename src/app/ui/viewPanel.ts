@@ -15,7 +15,7 @@ import {
 	MIN_DRAWN_SEA_LEVEL_M,
 	MIN_EXAGGERATION,
 } from '../globe/material';
-import { formatQuantity, SYSTEM_UNITS, type UnitOf } from '../units';
+import { formatQuantity, SYSTEM_UNITS, type UnitOf } from '../settings/units';
 import { createRangeField, type RangeScale } from './fields';
 
 /** The step between sea levels the slider can be set to, in metres. */

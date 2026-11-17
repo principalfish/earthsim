@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { createFakeTimers } from '../testing/fakeTimers';
 import { createPlayback, PLAYBACK_STEP_MS } from './playback';
-import { createFakeTimers } from './testing/fakeTimers';
 
 /** Playback on fake timers, recording what it tells. */
 const createStage = (month = 6) => {

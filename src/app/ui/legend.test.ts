@@ -10,13 +10,14 @@ import {
 	SEASONAL_RANGE_RAMP,
 	TEMPERATURE_RAMP,
 } from '../globe/ramp';
-import type { TemperatureLayer } from '../layers';
+import type { TemperatureLayer } from '../layers/layers';
 import {
 	PRESSURE_LAYER,
 	TEMPERATURE_LAYER,
 	TEMPERATURE_NOT_SHOWN_TEXT,
 	TEMPERATURE_UNAVAILABLE_TEXT,
-} from '../scalarLayer';
+} from '../layers/scalarLayer';
+import { UNITS } from '../settings/units';
 import {
 	byClass,
 	createFakeDocument,
@@ -25,7 +26,6 @@ import {
 } from '../testing/fakeDocument';
 import { SEVEN_STOP_RAMP, TWO_STOP_RAMP } from '../testing/rampFixtures';
 import { MADE_UP_LAYER } from '../testing/scalarLayerFixtures';
-import { UNITS } from '../units';
 import {
 	cellWeights,
 	createLegend,

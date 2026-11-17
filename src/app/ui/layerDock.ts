@@ -6,8 +6,8 @@
  * cell grid, each switched on and off on its own.
  */
 
-import { SCALAR_LAYERS, type ScalarLayerSpec } from '../scalarLayer';
-import { type Layer, type PageView, TERRAIN_LABEL } from '../view';
+import { SCALAR_LAYERS, type ScalarLayerSpec } from '../layers/scalarLayer';
+import { type Layer, type PageView, TERRAIN_LABEL } from '../layers/view';
 import { createElement } from './fields';
 import {
 	gridIcon,

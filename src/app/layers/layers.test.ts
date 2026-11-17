@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { TemperatureResult } from '../core/index';
-import { progressOf, temperatureOf } from '../core/testing/temperatureFixtures';
-import { windResultOf } from '../core/testing/windFixtures';
+import type { TemperatureResult } from '../../core/index';
+import {
+	progressOf,
+	temperatureOf,
+} from '../../core/testing/temperatureFixtures';
+import { windResultOf } from '../../core/testing/windFixtures';
 import {
 	createLayerStore,
 	type LayerStatus,

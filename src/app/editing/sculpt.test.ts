@@ -18,9 +18,15 @@ import {
 	smoothPasses,
 	type Vec3,
 	type World,
-} from '../core/index';
-import { MAIN_BUTTON, SECONDARY_BUTTON } from './globe/input';
-import type { Globe, WindowPoint } from './globe/renderer';
+} from '../../core/index';
+import { MAIN_BUTTON, SECONDARY_BUTTON } from '../globe/input';
+import type { Globe, WindowPoint } from '../globe/renderer';
+import {
+	createFakeCanvas,
+	createFakeFrames,
+	type FakeCanvas,
+	type FakeFrames,
+} from '../testing/fakeCanvas';
 import {
 	clampSetting,
 	createSculptController,
@@ -57,12 +63,6 @@ import {
 	smoothRate,
 	TOOLS,
 } from './sculpt';
-import {
-	createFakeCanvas,
-	createFakeFrames,
-	type FakeCanvas,
-	type FakeFrames,
-} from './testing/fakeCanvas';
 
 /**
  * Time allowed for the test that simulates whole seconds of smoothing on the

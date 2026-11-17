@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createFakeStorage } from '../testing/fakeStorage';
 import {
 	CLOSED_ENTRY,
 	createPanelMemory,
@@ -7,7 +8,6 @@ import {
 	panelMemoryKey,
 	reachStorage,
 } from './panelMemory';
-import { createFakeStorage } from './testing/fakeStorage';
 
 /** Storage that throws on every read and every write. */
 const refusingStorage: PanelStorage = {

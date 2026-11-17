@@ -9,7 +9,7 @@
  * unit changes only how a value is written.
  */
 
-import { CALM_SPEED } from './globe/wind';
+import { CALM_SPEED } from '../globe/wind';
 
 /** The quantities the page writes, in the order Settings offers them. */
 export const QUANTITIES = [

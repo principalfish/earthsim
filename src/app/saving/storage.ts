@@ -16,7 +16,7 @@ import {
 	type World,
 	type WorldFileError,
 	type WorldFileResult,
-} from '../core/index';
+} from '../../core/index';
 
 /** The name an exported world is downloaded under. */
 export const WORLD_FILE_NAME = 'world.earthsim';

@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WindStyle } from '../globe/windMotion';
 import {
+	DEFAULT_UNIT_CHOICE,
+	QUANTITIES,
+	type UnitChoice,
+} from '../settings/units';
+import {
 	byClass,
 	createFakeDocument,
 	type FakeDocument,
 	type FakeElement,
 	oneByClass,
 } from '../testing/fakeDocument';
-import { DEFAULT_UNIT_CHOICE, QUANTITIES, type UnitChoice } from '../units';
 import {
 	AS_THE_SYSTEM,
 	asTheSystemLabel,

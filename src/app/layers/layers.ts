@@ -12,7 +12,7 @@ import type {
 	TemperatureProgress,
 	TemperatureResult,
 	WindResult,
-} from '../core/index';
+} from '../../core/index';
 
 /**
  * Where a layer's result on hand stands against the world: here for the

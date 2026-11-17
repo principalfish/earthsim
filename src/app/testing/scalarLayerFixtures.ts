@@ -13,13 +13,13 @@
  */
 
 import { temperatureOf } from '../../core/testing/temperatureFixtures';
-import type { SolvedWinds } from '../layers';
+import type { SolvedWinds } from '../layers/layers';
 import {
 	formatWhole,
 	type ScalarLayerSpec,
 	type ScalarSummarySpec,
-} from '../scalarLayer';
-import type { ScalarLayerId } from '../view';
+} from '../layers/scalarLayer';
+import type { ScalarLayerId } from '../layers/view';
 import { SEVEN_STOP_RAMP } from './rampFixtures';
 
 /**

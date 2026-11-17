@@ -3,7 +3,7 @@
  * the saved world back, or open the dialog that starts a new one.
  */
 
-import type { World } from '../core/index';
+import type { World } from '../../core/index';
 import type { AutosaveState } from './autosave';
 import type { LoadOutcome } from './storage';
 

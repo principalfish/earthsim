@@ -27,7 +27,8 @@ import {
 	type ScalarLayerSpec,
 	summaryOf,
 	toLayerUnit,
-} from '../scalarLayer';
+} from '../layers/scalarLayer';
+import type { Source, Summary, WindSource } from '../layers/view';
 import {
 	convert,
 	formatWind,
@@ -37,8 +38,7 @@ import {
 	unitLabel,
 	type WindUnit,
 	windFromDeg,
-} from '../units';
-import type { Source, Summary, WindSource } from '../view';
+} from '../settings/units';
 import { createElement } from './fields';
 import type { ShownLayer, ShownWinds } from './layerPanel';
 

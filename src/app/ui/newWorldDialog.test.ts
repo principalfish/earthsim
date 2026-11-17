@@ -15,12 +15,12 @@ import {
 	MAX_SEED,
 	SUPPORTED_RESOLUTIONS,
 } from '../../core/index';
+import type { UnitOf } from '../settings/units';
 import {
 	byClass,
 	createFakeDocument,
 	type FakeElement,
 } from '../testing/fakeDocument';
-import type { UnitOf } from '../units';
 import {
 	CELL_SIZE_ROUNDING,
 	CONFIRM_LABEL,

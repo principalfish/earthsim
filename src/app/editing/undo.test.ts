@@ -7,7 +7,7 @@ import {
 	latLonToDirection,
 	type Vec3,
 	type World,
-} from '../core/index';
+} from '../../core/index';
 import {
 	createStrokeRecord,
 	DEFAULT_SMOOTH_SETTING,

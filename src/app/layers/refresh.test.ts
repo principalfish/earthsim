@@ -6,9 +6,14 @@ import {
 	type TemperatureStart,
 	type WindResult,
 	type World,
-} from '../core/index';
-import { progressOf, temperatureOf } from '../core/testing/temperatureFixtures';
-import { windResultOf } from '../core/testing/windFixtures';
+} from '../../core/index';
+import {
+	progressOf,
+	temperatureOf,
+} from '../../core/testing/temperatureFixtures';
+import { windResultOf } from '../../core/testing/windFixtures';
+import { createFakeTimers, type FakeTimers } from '../testing/fakeTimers';
+import { settle } from '../testing/settle';
 import { createLayerStore, type LayerStatus, type LayerStore } from './layers';
 import {
 	createRefreshScheduler,
@@ -21,8 +26,6 @@ import {
 	type TemperatureScheduler,
 	type WindsScheduler,
 } from './refresh';
-import { createFakeTimers, type FakeTimers } from './testing/fakeTimers';
-import { settle } from './testing/settle';
 
 /** A request the test answers by hand. */
 type Asked = {

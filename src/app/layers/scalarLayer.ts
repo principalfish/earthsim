@@ -14,8 +14,8 @@ import {
 	type Resolution,
 	summariseTemperature,
 	type TemperatureProgress,
-} from '../core/index';
-import type { SunlightStyle } from './globe/material';
+} from '../../core/index';
+import type { SunlightStyle } from '../globe/material';
 import {
 	type ColourRamp,
 	DIFFERENCE_RAMP,
@@ -23,21 +23,7 @@ import {
 	SEASONAL_RANGE_RAMP,
 	TEMPERATURE_RAMP,
 	type ValueRange,
-} from './globe/ramp';
-import type { LayerStatus, LayerStore } from './layers';
-import {
-	loadObservedPressure,
-	loadObservedTemperature,
-	type ObservedLoader,
-} from './observedData';
-import {
-	cellWeights,
-	fitRange,
-	fitRangeCentred,
-	fitRangeFromZero,
-	formatTick,
-	MIN_FITTED_SPAN_C,
-} from './ui/legend';
+} from '../globe/ramp';
 import {
 	convert,
 	convertDifference,
@@ -48,7 +34,21 @@ import {
 	type UnitOf,
 	unitLabel,
 	unitSpec,
-} from './units';
+} from '../settings/units';
+import {
+	cellWeights,
+	fitRange,
+	fitRangeCentred,
+	fitRangeFromZero,
+	formatTick,
+	MIN_FITTED_SPAN_C,
+} from '../ui/legend';
+import type { LayerStatus, LayerStore } from './layers';
+import {
+	loadObservedPressure,
+	loadObservedTemperature,
+	type ObservedLoader,
+} from './observedData';
 import {
 	isScalarLayer,
 	type Layer,

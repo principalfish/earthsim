@@ -28,10 +28,27 @@ import {
 	createFakeWorker,
 	type FakeWorker,
 } from '../worker/testing/fakeWorker';
-import { type AppState, createAppState } from './appState';
+import { type AppState, createAppState } from './editing/appState';
+import type { SculptOptions, StrokeChanges } from './editing/sculpt';
+import type { ShortcutEvent } from './editing/undo';
 import { MAIN_BUTTON, SECONDARY_BUTTON } from './globe/input';
-import { createPanelMemory, panelMemoryKey } from './panelMemory';
-import { PLAYBACK_STEP_MS } from './playback';
+import { PLAYBACK_STEP_MS } from './layers/playback';
+import { TEMPERATURE_DEBOUNCE_MS } from './layers/refresh';
+import { TEMPERATURE_LAYER } from './layers/scalarLayer';
+import {
+	DEFAULT_MONTH,
+	DEFAULT_PAGE_VIEW,
+	type PageView,
+	type StoredView,
+} from './layers/view';
+import {
+	createStatisticsService,
+	createTemperatureService,
+	createWindsService,
+} from './layers/workerService';
+import { RESTORE_FAILED_MESSAGE } from './saving/startup';
+import type { LoadOutcome } from './saving/storage';
+import { createPanelMemory, panelMemoryKey } from './settings/panelMemory';
 import {
 	createPreferences,
 	GRID_KEY,
@@ -46,12 +63,12 @@ import {
 	unitOverrideKey,
 	WIND_STYLE_KEY,
 	WINDS_KEY,
-} from './preferences';
-import { TEMPERATURE_DEBOUNCE_MS } from './refresh';
-import { TEMPERATURE_LAYER } from './scalarLayer';
-import type { SculptOptions, StrokeChanges } from './sculpt';
-import { RESTORE_FAILED_MESSAGE } from './startup';
-import type { LoadOutcome } from './storage';
+} from './settings/preferences';
+import {
+	DEFAULT_UNIT_CHOICE,
+	SYSTEM_UNITS,
+	type UnitChoice,
+} from './settings/units';
 import {
 	byClass,
 	createFakeDocument,
@@ -89,14 +106,6 @@ import {
 	NOT_A_WORLD_MESSAGE,
 	type WorldPanelOptions,
 } from './ui/worldPanel';
-import type { ShortcutEvent } from './undo';
-import { DEFAULT_UNIT_CHOICE, SYSTEM_UNITS, type UnitChoice } from './units';
-import {
-	DEFAULT_MONTH,
-	DEFAULT_PAGE_VIEW,
-	type PageView,
-	type StoredView,
-} from './view';
 import {
 	type PageAutosaveOptions,
 	type PageLayerOptions,
@@ -106,11 +115,6 @@ import {
 	type PageTemperatureOptions,
 	startPage,
 } from './wiring';
-import {
-	createStatisticsService,
-	createTemperatureService,
-	createWindsService,
-} from './workerService';
 
 /** A page made of stand-ins, each writing what it is asked into one log. */
 type Stage = {
