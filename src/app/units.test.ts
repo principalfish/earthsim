@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+	createPreferences,
+	OLD_WIND_SPEED_UNIT_KEY,
+	UNIT_SYSTEM_KEY,
+	unitOverrideKey,
+} from './preferences';
+import { createFakeStorage } from './testing/fakeStorage';
+import {
 	COMPASS_POINTS,
 	compassPoint,
 	convert,
@@ -263,7 +270,7 @@ describe('createUnitStore', () => {
 		const told: string[] = [];
 		store.addListener(() => told.push(`first ${store.units().windSpeed}`));
 		store.addListener(() => told.push(`second ${store.units().windSpeed}`));
-		store.setSystem('imperial');
+		store.chooseSystem('imperial');
 		expect(told).toEqual(['first mph', 'second mph']);
 		store.setOverride('windSpeed', 'knots');
 		expect(told).toEqual([
@@ -278,12 +285,17 @@ describe('createUnitStore', () => {
 		expect(told).toHaveLength(6);
 		expect(fake.writes).toEqual([
 			'system imperial',
+			'temperature none',
+			'pressure none',
+			'windSpeed none',
+			'height none',
+			'distance none',
 			'windSpeed knots',
 			'windSpeed none',
 		]);
 	});
 
-	it('tells nobody and writes nothing when nothing changes', () => {
+	it('tells nobody and writes nothing when an override is chosen again', () => {
 		const fake = createFakeUnitPreferences({
 			system: 'metric',
 			overrides: { temperature: 'K' },
@@ -293,11 +305,60 @@ describe('createUnitStore', () => {
 		store.addListener(() => {
 			told += 1;
 		});
-		store.setSystem('metric');
 		store.setOverride('temperature', 'K');
 		store.setOverride('pressure', null);
 		expect(told).toBe(0);
 		expect(fake.writes).toEqual([]);
+	});
+
+	it.each([
+		['the other system', 'imperial'],
+		['the system already chosen', 'metric'],
+	] as const)(
+		'clears every override, and its entry, on choosing %s, as one change',
+		(_, system) => {
+			const fake = createFakeUnitPreferences({
+				system: 'metric',
+				overrides: { temperature: 'K', windSpeed: 'knots', distance: 'mi' },
+			});
+			const store = createUnitStore(fake.preferences);
+			const told: UnitChoice[] = [];
+			store.addListener(() => told.push(store.choice()));
+			store.chooseSystem(system);
+			expect(store.choice()).toEqual({ system, overrides: {} });
+			expect(store.units()).toEqual(SYSTEM_UNITS[system]);
+			expect(told).toEqual([{ system, overrides: {} }]);
+			expect(fake.writes).toEqual([
+				...(system === 'imperial' ? ['system imperial'] : []),
+				'temperature none',
+				'pressure none',
+				'windSpeed none',
+				'height none',
+				'distance none',
+			]);
+		},
+	);
+
+	it('tells nobody when the system already chosen is chosen with no overrides, and still clears each entry', () => {
+		const fake = createFakeUnitPreferences({
+			system: 'imperial',
+			overrides: {},
+		});
+		const store = createUnitStore(fake.preferences);
+		let told = 0;
+		store.addListener(() => {
+			told += 1;
+		});
+		store.chooseSystem('imperial');
+		expect(told).toBe(0);
+		expect(store.choice()).toEqual({ system: 'imperial', overrides: {} });
+		expect(fake.writes).toEqual([
+			'temperature none',
+			'pressure none',
+			'windSpeed none',
+			'height none',
+			'distance none',
+		]);
 	});
 
 	it('keeps an override that names the system’s own unit apart from none', () => {
@@ -313,8 +374,72 @@ describe('createUnitStore', () => {
 		store.setOverride('windSpeed', 'mph');
 		expect(told).toBe(1);
 		expect(store.choice().overrides).toEqual({ windSpeed: 'mph' });
-		store.setSystem('metric');
-		expect(store.units().windSpeed).toBe('mph');
+		store.chooseSystem('imperial');
+		expect(told).toBe(2);
+		expect(store.choice().overrides).toEqual({});
+	});
+
+	it('removes every override’s stored entry and the old wind speed entry on choosing a system', () => {
+		const storage = createFakeStorage({
+			[UNIT_SYSTEM_KEY]: 'imperial',
+			[unitOverrideKey('temperature')]: 'K',
+			[unitOverrideKey('windSpeed')]: 'knots',
+			[OLD_WIND_SPEED_UNIT_KEY]: 'mph',
+		});
+		const store = createUnitStore(createPreferences(storage));
+		expect(store.choice().overrides).toEqual({
+			temperature: 'K',
+			windSpeed: 'knots',
+		});
+		store.chooseSystem('metric');
+		expect(storage.entries).toEqual(new Map([[UNIT_SYSTEM_KEY, 'metric']]));
+		expect(createPreferences(storage).unitChoice()).toEqual({
+			system: 'metric',
+			overrides: {},
+		});
+	});
+
+	it('gives the cleared choice for the visit where the storage will not remove the entries', () => {
+		const storage = createFakeStorage({
+			[unitOverrideKey('pressure')]: 'inHg',
+		});
+		const store = createUnitStore(
+			createPreferences({
+				getItem: storage.getItem,
+				setItem: storage.setItem,
+				removeItem: () => {
+					throw new Error('Storage is blocked');
+				},
+			}),
+		);
+		let told = 0;
+		store.addListener(() => {
+			told += 1;
+		});
+		store.chooseSystem('metric');
+		expect(told).toBe(1);
+		expect(store.choice()).toEqual({ system: 'metric', overrides: {} });
+		expect(store.units()).toEqual(SYSTEM_UNITS.metric);
+		expect(storage.entries.get(unitOverrideKey('pressure'))).toBe('inHg');
+	});
+
+	it('keeps and remembers an override chosen after a system', () => {
+		const fake = createFakeUnitPreferences({
+			system: 'metric',
+			overrides: { height: 'ft' },
+		});
+		const store = createUnitStore(fake.preferences);
+		store.chooseSystem('imperial');
+		store.setOverride('pressure', 'hPa');
+		expect(store.choice()).toEqual({
+			system: 'imperial',
+			overrides: { pressure: 'hPa' },
+		});
+		expect(store.units()).toEqual({
+			...SYSTEM_UNITS.imperial,
+			pressure: 'hPa',
+		});
+		expect(fake.writes.at(-1)).toBe('pressure hPa');
 	});
 });
 

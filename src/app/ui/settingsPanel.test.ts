@@ -220,6 +220,33 @@ describe('createSettingsPanel', () => {
 		]);
 	});
 
+	it('reports the system on a click of either, the one chosen included, once a click', () => {
+		const { told, systems, unit } = make('streaks', {
+			system: 'metric',
+			overrides: { pressure: 'inHg' },
+		});
+		fake.click(systems[0] as FakeElement);
+		expect(told).toEqual(['system metric']);
+		fake.click(systems[1] as FakeElement);
+		expect(told).toEqual(['system metric', 'system imperial']);
+		// Showing a choice is left to the caller.
+		expect(unit('pressure').value).toBe('inHg');
+	});
+
+	it('reports a system chosen with the arrow keys once, as their click and change', () => {
+		const { told, systems } = make();
+		fake.click(systems[1] as FakeElement);
+		fake.click(systems[0] as FakeElement);
+		expect(told).toEqual(['system imperial', 'system metric']);
+	});
+
+	it('reports the system on Space on either, the one chosen included, once a key', () => {
+		const { told, systems } = make();
+		fake.keyUp(systems[0] as FakeElement, ' ');
+		fake.keyUp(systems[1] as FakeElement, ' ');
+		expect(told).toEqual(['system metric', 'system imperial']);
+	});
+
 	it('reports each unit chosen, and none for As the system', () => {
 		const { told, unit } = make();
 		unit('windSpeed').value = 'knots';

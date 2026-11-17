@@ -2850,7 +2850,7 @@ describe('the units', () => {
 		expect(stage.readoutOptions.units().windSpeed).toBe('m/s');
 	});
 
-	it('carries a stored m/s over as the wind speed’s override, which Imperial then keeps', async () => {
+	it('carries a stored m/s over as the wind speed’s override, which choosing Imperial clears', async () => {
 		const { stage } = await createWindUnitStage({
 			[OLD_WIND_SPEED_UNIT_KEY]: 'm/s',
 		});
@@ -2862,8 +2862,11 @@ describe('the units', () => {
 			new Map([[unitOverrideKey('windSpeed'), 'm/s']]),
 		);
 		stage.settingsPanelOptions.onUnitSystem('imperial');
-		expect(readoutWind(stage)).toBe('7 m/s NE');
+		expect(readoutWind(stage)).toBe('16 mph NE');
 		expect(stage.readoutCalls).toEqual(['invalidate']);
+		expect(stage.preferenceStorage.entries).toEqual(
+			new Map([[UNIT_SYSTEM_KEY, 'imperial']]),
+		);
 	});
 
 	it('carries a stored mph over as the wind speed’s override', async () => {
@@ -2902,9 +2905,44 @@ describe('the units', () => {
 			stage.settingsPanelOptions.onUnitSystem(
 				system === 'metric' ? 'imperial' : 'metric',
 			);
-			expect(readoutWind(stage)).toBe('14 knots NE');
+			expect(readoutWind(stage)).toBe(
+				system === 'metric' ? '16 mph NE' : '7 m/s NE',
+			);
+			expect(
+				stage.preferenceStorage.entries.has(unitOverrideKey('windSpeed')),
+			).toBe(false);
 		},
 	);
+
+	it('clears every override at once on a click of the system already chosen, telling each part once', async () => {
+		const stage = await createStartedStage(undefined, {
+			preferenceEntries: {
+				[UNIT_SYSTEM_KEY]: 'imperial',
+				[unitOverrideKey('pressure')]: 'hPa',
+				[unitOverrideKey('height')]: 'm',
+			},
+		});
+		stage.settingsPanelOptions.onUnitSystem('imperial');
+		expect(stage.readoutOptions.units()).toEqual(SYSTEM_UNITS.imperial);
+		expect(stage.settingsUnits).toEqual([
+			{ system: 'imperial', overrides: {} },
+		]);
+		expect(stage.log).toEqual([
+			`layerPanel.setUnits ${JSON.stringify(SYSTEM_UNITS.imperial)}`,
+			'statistics.setHeightUnit ft',
+			'viewPanel.setHeightUnit ft',
+			'toolPanel.setUnits ft mi',
+		]);
+		expect(stage.readoutCalls).toEqual(['invalidate']);
+		expect(stage.preferenceStorage.entries).toEqual(
+			new Map([[UNIT_SYSTEM_KEY, 'imperial']]),
+		);
+		stage.settingsPanelOptions.onUnitOverride('distance', 'km');
+		expect(stage.readoutOptions.units().distance).toBe('km');
+		expect(
+			stage.preferenceStorage.entries.get(unitOverrideKey('distance')),
+		).toBe('km');
+	});
 
 	it('goes back to the system’s unit when As the system is chosen', async () => {
 		const { stage } = await createWindUnitStage({

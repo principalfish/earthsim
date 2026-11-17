@@ -319,12 +319,15 @@ export type UnitStore = {
 	/** The choice the units are resolved from. */
 	choice(): UnitChoice;
 	/**
-	 * Chooses a system, remembers it and tells the listeners; nothing at
-	 * all for the system already chosen.
+	 * Chooses a system and clears every override, so that each quantity
+	 * takes the system's unit, as one change: the system is remembered
+	 * where it differs, each quantity is remembered as having no override,
+	 * and the listeners are told once. The same system chosen again clears
+	 * the overrides too; with none to clear, the listeners are not told.
 	 *
 	 * @param system - The system.
 	 */
-	setSystem(system: UnitSystem): void;
+	chooseSystem(system: UnitSystem): void;
 	/**
 	 * Chooses a quantity's unit whatever the system, or none for null,
 	 * remembers it and tells the listeners; nothing at all for the
@@ -362,12 +365,21 @@ export const createUnitStore = (preferences: UnitPreferences): UnitStore => {
 	return {
 		units: () => units,
 		choice: () => choice,
-		setSystem: (system) => {
-			if (system === choice.system) {
-				return;
+		chooseSystem: (system) => {
+			const changed =
+				system !== choice.system || Object.keys(choice.overrides).length > 0;
+			if (system !== choice.system) {
+				preferences.setUnitSystem(system);
 			}
-			preferences.setUnitSystem(system);
-			change({ ...choice, system });
+			// Every quantity, not only those with an override held here, so
+			// that an entry the storage kept against an earlier removal goes
+			// too.
+			for (const quantity of QUANTITIES) {
+				preferences.setUnitOverride(quantity, null);
+			}
+			if (changed) {
+				change({ system, overrides: {} });
+			}
 		},
 		setOverride: (quantity, unit) => {
 			if ((choice.overrides[quantity] ?? null) === unit) {

@@ -61,6 +61,21 @@ export type FakeDocument = {
 	 * of its group are cleared, and it alone is sent `change`.
 	 */
 	pick(radio: FakeElement): void;
+	/**
+	 * Clicks a radio button as the browser does: it is checked and the
+	 * others of its group are cleared, it is sent `click`, and then, only
+	 * if it was not checked before, `change`.
+	 */
+	click(radio: FakeElement): void;
+	/**
+	 * Lets go of a key on an element as Chromium does: it is sent
+	 * `keyup` with the key and a `preventDefault`, and then, for Space on
+	 * a radio button not checked and with the default not stopped, a
+	 * click, as `click` sends one.
+	 *
+	 * @returns Whether a listener stopped the key's default.
+	 */
+	keyUp(element: FakeElement, key: string): boolean;
 };
 
 const createFakeElement = (
@@ -188,7 +203,7 @@ export const createFakeDocument = (): FakeDocument => {
 			return focused;
 		},
 	} as unknown as Document;
-	return {
+	const fake: FakeDocument = {
 		document,
 		createElement,
 		pick: (radio) => {
@@ -199,7 +214,38 @@ export const createFakeDocument = (): FakeDocument => {
 			}
 			radio.fire('change');
 		},
+		click: (radio) => {
+			const wasChecked = radio.checked;
+			for (const other of all) {
+				if (other.type === 'radio' && other.name === radio.name) {
+					other.checked = other === radio;
+				}
+			}
+			radio.fire('click');
+			if (!wasChecked) {
+				radio.fire('change');
+			}
+		},
+		keyUp: (element, key) => {
+			let prevented = false;
+			element.fire('keyup', {
+				key,
+				preventDefault: () => {
+					prevented = true;
+				},
+			});
+			if (
+				key === ' ' &&
+				!prevented &&
+				element.type === 'radio' &&
+				!element.checked
+			) {
+				fake.click(element);
+			}
+			return prevented;
+		},
 	};
+	return fake;
 };
 
 /**

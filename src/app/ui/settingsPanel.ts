@@ -69,7 +69,11 @@ export type SettingsPanelOptions = {
 	readonly units: UnitChoice;
 	/** Called with the way chosen when another is chosen to draw the winds. */
 	readonly onWindStyle: (style: WindStyle) => void;
-	/** Called with the system when the other is chosen. */
+	/**
+	 * Called with the system when either is clicked, the one already chosen
+	 * included, the other is chosen with the arrow keys, or Space is let go
+	 * on either.
+	 */
 	readonly onUnitSystem: (system: UnitSystem) => void;
 	/**
 	 * Called with a quantity and its unit when one is chosen for it, or
@@ -123,7 +127,8 @@ const createUnitSelect = <Q extends Quantity>(
  *
  * @remarks
  * First is the Winds drawn as choice, a drop-down of Arrows and Streaks.
- * Under it is the Units group: a row of Metric and Imperial, then a
+ * Under it is the Units group: a row of Metric and Imperial, either of
+ * which chooses its system when clicked, the one already chosen too, then a
  * drop-down for each quantity, Temperature, Pressure, Wind speed, Heights
  * and depths and Distances, whose first choice, As the system, follows
  * the system and names the unit it gives, and whose others are the
@@ -154,6 +159,7 @@ export const createSettingsPanel = (
 		})),
 		value: units.system,
 		onChange: options.onUnitSystem,
+		onChosenAgain: options.onUnitSystem,
 	});
 	const selects: readonly (readonly [
 		Quantity,

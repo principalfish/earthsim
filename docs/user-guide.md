@@ -319,8 +319,8 @@ The Settings section holds choices the browser remembers; none is saved with the
 | Control | Range | What it does |
 |-|-|-|
 | Winds drawn as | Arrows or Streaks, starting on Streaks, or on Arrows when your system is set to reduce motion | Whether the winds are drawn as arrows that stand still or as streaks carried along by the wind; see [Arrows or streaks](#arrows-or-streaks). Shown whether or not Winds is on. A remembered choice is kept |
-| Units: Metric / Imperial | Starting on Metric | The system of units: Metric is °C, hPa, m/s, m and km; Imperial is °F, inHg, mph, ft and mi |
-| Units: Temperature, Pressure, Wind speed, Heights and depths, Distances | **As the system**, which names the unit the system gives, such as "As the system (°C)", or one of the quantity's units: °C, °F or K; hPa or inHg; m/s, mph, km/h or knots; m or ft; km or mi | A unit for that quantity whatever the system |
+| Units: Metric / Imperial | Starting on Metric | The system of units: Metric is °C, hPa, m/s, m and km; Imperial is °F, inHg, mph, ft and mi. Choosing one sets every quantity to it and puts each drop-down below back to As the system, also when you click the one already chosen |
+| Units: Temperature, Pressure, Wind speed, Heights and depths, Distances | **As the system**, which names the unit the system gives, such as "As the system (°C)", or one of the quantity's units: °C, °F or K; hPa or inHg; m/s, mph, km/h or knots; m or ft; km or mi | A unit for that quantity whatever the system, kept until you next choose Metric or Imperial |
 
 What the page writes follows these choices, and changes at once, with no new calculation:
 
@@ -333,4 +333,4 @@ A seasonal range and a difference are converted by the unit's size alone: a rang
 
 The colours on the globe stay as they are, except that a scale's rounded ends can move them a little, and a difference's colours shift more, since its reach in °F or inHg is not quite that in °C or hPa. The arrows do not change with the unit, and no slider moves.
 
-A wind speed unit chosen in the earlier Wind speed setting carries over as the wind speed's choice, m/s included, so it stays the same under either system.
+A wind speed unit chosen in the earlier Wind speed setting carries over as the wind speed's choice, m/s included, until you next choose Metric or Imperial.

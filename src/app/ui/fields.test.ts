@@ -150,6 +150,77 @@ describe('createSegmentedChoice', () => {
 		// Offering is not choosing.
 		expect(chosen).toEqual([]);
 	});
+
+	describe('a click on the segment already chosen', () => {
+		const makeAgain = () => {
+			const told: string[] = [];
+			const choice = createSegmentedChoice({
+				name: 'fruit',
+				legend: 'Fruit',
+				choices: [
+					{ value: 'apple', label: 'Apple' },
+					{ value: 'pear', label: 'Pear' },
+				],
+				value: 'apple',
+				onChange: (value) => told.push(`change ${value}`),
+				onChosenAgain: (value) => told.push(`again ${value}`),
+			});
+			const picker = choice.element as unknown as FakeElement;
+			return { choice, told, inputs: byClass(picker, 'segmented__input') };
+		};
+
+		it('does nothing when no one is to be told of it', () => {
+			const { chosen, inputs } = make();
+			fake.click(inputs[0] as FakeElement);
+			expect(chosen).toEqual([]);
+			fake.click(inputs[1] as FakeElement);
+			expect(chosen).toEqual(['pear']);
+		});
+
+		it('is passed on, as a click on the other is passed on once as a change', () => {
+			const { told, inputs } = makeAgain();
+			fake.click(inputs[0] as FakeElement);
+			expect(told).toEqual(['again apple']);
+			fake.click(inputs[1] as FakeElement);
+			expect(told).toEqual(['again apple', 'change pear']);
+			fake.click(inputs[1] as FakeElement);
+			expect(told).toEqual(['again apple', 'change pear', 'again pear']);
+		});
+
+		it('is passed on for Space on it, once, with its default stopped', () => {
+			const { told, inputs } = makeAgain();
+			expect(fake.keyUp(inputs[0] as FakeElement, ' ')).toBe(true);
+			expect(told).toEqual(['again apple']);
+		});
+
+		it('leaves Space on the other to choose it, passed on once as a change', () => {
+			const { told, inputs } = makeAgain();
+			expect(fake.keyUp(inputs[1] as FakeElement, ' ')).toBe(false);
+			expect(told).toEqual(['change pear']);
+		});
+
+		it('passes on nothing for any key but Space', () => {
+			const { told, inputs } = makeAgain();
+			for (const key of ['Enter', 'a', 'Spacebar', 'ArrowRight']) {
+				expect(fake.keyUp(inputs[0] as FakeElement, key)).toBe(false);
+			}
+			expect(told).toEqual([]);
+		});
+
+		it('passes on nothing for Space when no one is to be told of it', () => {
+			const { chosen, inputs } = make();
+			expect(fake.keyUp(inputs[0] as FakeElement, ' ')).toBe(false);
+			expect(chosen).toEqual([]);
+		});
+
+		it('follows a value set from outside', () => {
+			const { choice, told, inputs } = makeAgain();
+			choice.setValue('pear');
+			fake.click(inputs[1] as FakeElement);
+			fake.click(inputs[0] as FakeElement);
+			expect(told).toEqual(['again pear', 'change apple']);
+		});
+	});
 });
 
 describe('createRangeField', () => {

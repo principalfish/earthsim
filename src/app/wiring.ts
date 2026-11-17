@@ -725,7 +725,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			parts.preferences.setWindStyle(style);
 			globe.setWindStyle(style);
 		},
-		onUnitSystem: units.setSystem,
+		onUnitSystem: units.chooseSystem,
 		onUnitOverride: units.setOverride,
 	});
 	const dock = parts.createLayerDock({

@@ -103,6 +103,13 @@ export type SegmentedPickerOptions<T extends string> = {
 	readonly value: T;
 	/** Called with the value when another is chosen. */
 	readonly onChange: (value: T) => void;
+	/**
+	 * Called with the value on a click of the segment already chosen, which
+	 * changes nothing and so does not call `onChange`, and on Space let go
+	 * on it, for which browsers send no click. Left out, neither does
+	 * anything.
+	 */
+	readonly onChosenAgain?: (value: T) => void;
 };
 
 /** What a drop-down choice is built from. */
@@ -380,6 +387,10 @@ export const createSegmentedChoice = <T extends string>(
 		readonly option: HTMLLabelElement;
 		readonly input: HTMLInputElement;
 	}[] = [];
+	// The value shown as chosen. A click on a segment checks it before the
+	// click is sent and before its `change`, so a click on any segment
+	// but this one is followed by a `change`, and one on this is not.
+	let current: T = options.value;
 
 	for (const choice of options.choices) {
 		const option = createElement('label', 'segmented__option');
@@ -391,9 +402,28 @@ export const createSegmentedChoice = <T extends string>(
 		input.checked = choice.value === options.value;
 		input.addEventListener('change', () => {
 			if (input.checked) {
+				current = choice.value;
 				options.onChange(choice.value);
 			}
 		});
+		input.addEventListener('click', () => {
+			if (choice.value === current) {
+				options.onChosenAgain?.(choice.value);
+			}
+		});
+		const { onChosenAgain } = options;
+		if (onChosenAgain) {
+			// Space let go on an unchecked segment is sent a click, which
+			// checks it; on the one already checked it is sent nothing.
+			// Stopping its default keeps a browser that does send that click
+			// from calling back a second time.
+			input.addEventListener('keyup', (event: KeyboardEvent) => {
+				if (event.key === ' ' && input.checked && choice.value === current) {
+					event.preventDefault();
+					onChosenAgain(choice.value);
+				}
+			});
+		}
 		inputs.push({ value: choice.value, option, input });
 
 		const label = createElement('span', 'segmented__label');
@@ -407,6 +437,7 @@ export const createSegmentedChoice = <T extends string>(
 	return {
 		element: picker,
 		setValue: (value) => {
+			current = value;
 			for (const entry of inputs) {
 				entry.input.checked = entry.value === value;
 			}
