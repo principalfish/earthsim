@@ -3,13 +3,13 @@
   "slug": "core-folders-by-component-page-folders-by-role",
   "title": "Core folders by component, page folders by role",
   "mode": "refactor",
-  "state": "building",
+  "state": "review",
   "branch": "claude/core-folders-by-component-page-folders-by-role-c9bcc4",
   "base": "main",
   "gh_issue": 9,
   "build_model": null,
   "created": "2026-11-17 18:50",
-  "updated": "2026-11-17 20:03",
+  "updated": "2026-11-17 21:50",
   "done": null,
   "local": [
     {

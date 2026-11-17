@@ -53,3 +53,12 @@
 | round | correctness | - | - | - | - | - | Clean: declarations identical, `differenceOf` and `figuresOf` close over nothing of `createLayerPanel`, the describe and test names identical, no top-level hook lost |
 | round | security | - | - | - | - | - | Clean |
 | round | coverage | - | - | - | - | - | Clean; the three uncovered helper lines (`testing/layerPanelStage.ts` 123, 126, 254) accepted: two unused default loader stand-ins and one unreachable throw, identical in the old test file |
+
+## piece 7 · 2026-11-17 · The page wiring's types moved out
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | docs | low | docs | noticed | fixed | `docs/development.md:103` | Optional nit: "What the joining is given" fits `parts.ts` but not `lighting.ts`; reworded to "What the joining uses: the types of the parts it is given ... and how the globe is lit" (no verifier ran: every other check was clean and this was a wording nit) |
+| round | correctness | - | - | - | - | - | Clean: moved declarations identical apart from `export` and one `{@link}` reworded; everything from `startPage`'s doc comment to the end of `wiring.ts` byte-identical |
+| round | security | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | Clean |

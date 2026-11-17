@@ -153,7 +153,7 @@ Rejected:
 - [x] 4. The scalar layers split, with the legend's fitting code
 - [x] 5. The globe's material split
 - [x] 6. The layer panel's types, constants and pure helpers moved out, and its tests split
-- [ ] 7. The page wiring's types moved out
+- [x] 7. The page wiring's types moved out
 
 ## Verification
 
@@ -190,3 +190,8 @@ Docs: `docs/development.md`'s folder tables follow each piece, and any doc namin
   - Decided by the builder: the file header's `{@link ScalarLayerSpec}` and `{@link LayerControls}` became plain backticks, since Biome counts an import used only in a `{@link}` as unused. Links inside declarations' doc comments use type-only imports as before.
   - Decided by the builder: theme assignment followed the plan's wording ("the key's wording" stays in the core file although it concerns the wind key); the three `layerCaption` tests merged into the existing `describe('layerCaption')` in `caption.test.ts`, because Biome warns about a duplicate describe title.
   - The folder-level dependency between `ui/` and `ui/main/` noted at piece 3 is unchanged: the `ShownLayer`/`ShownWinds` types now live in `ui/layerPanel/types.ts`, and `ui/main/cursorReadout.ts` still imports them through `../layerPanel`. Moving them into `ui/main/` would change importers, so it stays a roadmap-level choice.
+
+- Piece 7 (2026-11-17): `wiring.ts` went from 964 to 618 lines; `wiring/parts.ts` (329 lines) holds the eight `Page*` types and `wiring/lighting.ts` (25) holds `sunlightStyleFor`; `startPage`, its doc comment and everything after it are byte-identical to before, and `main.ts` and `wiring.test.ts` are unchanged (187 test cases run in it, 153 `it(` calls, as before). 3623 tests before and after. Changed-lines coverage over the whole branch 98%, the missing lines being the accepted test-helper lines. No verifier or re-check ran: every check was clean, and the one docs nit was a wording fix.
+  - Decided by the builder: `wiring.ts` re-exports only the six types `wiring.test.ts` imports (`PageAutosaveOptions`, `PageLayerOptions`, `PageParts`, `PageReadoutOptions`, `PageStatisticsOptions`, `PageTemperatureOptions`), as the plan says; `PageGlobe` and `PageStatsOptions` were exported from `wiring.ts` before and are now exported only from `wiring/parts.ts`, since nothing imports them from `./wiring` (checked by grep). Options: re-export them too (one line each) or not (chosen, the plan's wording).
+  - Decided by the builder: `sunlightStyleFor` goes to its own `wiring/lighting.ts` (the plan leaves it open: "if it reads better apart"), as it is the only value code that moved and it is not a parts type. It was private and is now exported from `lighting.ts`, imported by `wiring.ts` only; it has no direct tests and runs through the `wiring.test.ts` sunlight cases (coverage 100%).
+  - Decided by the builder: `PageParts`'s doc comment says `startPage` in backticks instead of `{@link startPage}`, because linking it needs an import from `../wiring`, a cycle.
