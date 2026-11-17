@@ -100,6 +100,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Choosing Metric or Imperial sets every unit to that family: all five overrides go back to "As the system" and their stored entries (and the old wind entry) are removed. This applies on every click, including the system already chosen. It is a new piece 11, before the guide, which becomes piece 12. The user: "can we add a piece to this issue in the final section which changes functionality such that clicking metric or imperial immediately sets all settings to that family. opverriding any choice"; "Before the guide (Recommended)"; "Clear overrides (Recommended)" (2026-11-17). This changes piece 8's behaviour, where the overrides survived a change of system.
 
+- Piece 11 started on the user's go-ahead, with the builder's two calls as stated in the briefing: the keyboard clears as a click does (arrow keys to the other system; Space on the chosen one), and there is no undo or confirmation. The user: "Start it" (2026-11-17)
+
 ## Open
 - None.
 
