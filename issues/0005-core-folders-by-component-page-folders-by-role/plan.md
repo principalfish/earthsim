@@ -164,3 +164,5 @@ For the moves (pieces 1-3): `git diff -M --stat main` (or against the previous p
 Docs: `docs/development.md`'s folder tables follow each piece, and any doc naming a moved path (`docs/winds.md:117`). README needs no change. No manual review: nothing the page does changes, and the build, the tests and the baselines check that; the user can still open the page from the worktree at any piece.
 
 ## Notes
+
+- Piece 1 (2026-11-17): moves done by a script that rewrote each relative import to the file's new location, then `biome check --write` re-sorted the imports it touched (Biome sorts import lines, so some imports moved or re-wrapped; no body line changed). Both baseline update scripts now join `src/core/temperature/baseline/` and `src/core/wind/baseline/`. Changed-lines coverage: no executable lines changed, so nothing to cover. Light re-check skipped: the two fixes were one-path comment and doc edits, confirmed by grep and `biome check`.
