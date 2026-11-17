@@ -147,11 +147,19 @@ Rejected:
     - Tests: each control's text in metric is unchanged from before; in imperial the Sea level reads whole feet for its least, greatest and a middle step, the brush size whole miles, the strength in ft/s; the `aria-valuetext` matches the shown text; a change of units rewrites every control's text and fires no change event; the dialog's hints convert.
     - Manual review: in Imperial, move Sea level, the brush size and strength, and open the New world dialog. How: the user runs `npm run dev` themselves from the builder's worktree, whose path the planner gives them; the builder leaves no server running for it.
 
-11. The user guide restructured around the main view
+11. Choosing Metric or Imperial clears the overrides (added 2026-11-17)
+    - Files: `src/app/units.ts`, `src/app/preferences.ts`, `src/app/ui/settingsPanel.ts`, `src/app/wiring.ts`, their tests, `docs/user-guide.md`.
+    - What: Clicking Metric or Imperial in Settings → Units sets that system and resets all five overrides to "As the system", removing their stored entries (and the old wind entry, if any), so every quantity follows the family at once. It applies on every click, including a click on the system already chosen, which is the way back to a clean set. Choosing an override afterwards works as before. The reset is one change: the read-outs and controls redraw once.
+    - Functions: the unit store's `setSystem` (or a new call beside it) clears the overrides; the Metric / Imperial switch acts on a click of the chosen button too.
+    - Depends on: 10.
+    - Acceptance: under Metric with Temperature on K and Wind speed on knots, clicking Imperial gives °F and mph everywhere and all five selects read "As the system (…)"; under Metric with an override, clicking Metric clears it; after a reload the overrides are still gone.
+    - Tests: choosing a system clears every override and its stored entry, the old wind entry included; a click on the chosen system clears its overrides; listeners hear one change per click, and none when nothing changes (the chosen system clicked with no overrides); an override chosen afterwards sticks and is stored; a storage that refuses to delete still gives the cleared choice for the visit.
+
+12. The user guide restructured around the main view
     - Files: `docs/user-guide.md`, `docs/development.md`, `README.md`.
     - What: Each earlier piece corrects the guide for what it changes; this piece puts the result in order. The guide gets a section for **The main view** (the tiles, the top bar, Pause, the info box, the timeline) ahead of the side panel's sections, with Layers, The value under the pointer, The sun and Winds rewritten to say where things now are; **The panel** lists the six sections; a **Settings** section covers units and arrows or streaks; "not saved" lines are corrected for what the browser now remembers. `docs/development.md`'s `src/app/` table lists the new files and drops the removed ones. `README.md`'s "What works today" gets one line on the main-view controls and one on units. No behaviour changes.
     - Functions: none.
-    - Depends on: 10.
+    - Depends on: 11.
     - Acceptance: a reader of the guide can find every control where the guide says it is; no heading or link in the docs points at a section that no longer exists.
     - Tests: none. Docs only; checked by the docs check, by `npm run check` on the Markdown, and by following each in-page link.
 
@@ -167,7 +175,8 @@ Rejected:
 - [x] 8. Units: the model and its settings
 - [x] 9. Units in the read-outs
 - [x] 10. Units in the controls
-- [ ] 11. The user guide restructured around the main view
+- [ ] 11. Choosing Metric or Imperial clears the overrides
+- [ ] 12. The user guide restructured around the main view
 
 ## Verification
 
@@ -286,3 +295,6 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - In headless Edge in Imperial: Sea level −19,685 … 19,685 ft (33, 66, 98 ft for the first steps), brush radius 62 / 963 / 1,864 mi, strength 328 / 8,530 / 16,404 ft/s, unchanged by a knots override; hints "about 95 / 45 / 25 mi cells"; back in Metric every text as before and the world untouched.
 - One review round (correctness, security, coverage, docs): three findings verified and fixed (including deleting the unused `createCheckField`), one dropped; light re-check by correctness and docs raised one low test cleanup, left for the user. In `findings.md`.
 - Approved after the user's manual review with the finding fixed: "Tried it, fix it". The two dead checkbox checks in `viewPanel.test.ts` went; light re-check clean.
+
+### Changed 2026-11-17: a piece added
+- Piece 11 added at the user's request: choosing Metric or Imperial sets every unit to that family, overriding any choice. The user: "can we add a piece to this issue in the final section which changes functionality such that clicking metric or imperial immediately sets all settings to that family. opverriding any choice"; placed before the guide ("Before the guide (Recommended)") and clearing on a click of the chosen system too ("Clear overrides (Recommended)"). The guide restructure becomes piece 12 and covers it. No manual review proposed; the review request carries screenshots.

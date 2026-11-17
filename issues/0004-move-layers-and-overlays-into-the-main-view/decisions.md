@@ -98,6 +98,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 10 approved after the user tried it, with the re-check finding fixed first: the two checks for the removed checkbox class in `viewPanel.test.ts` (lines 81 and 109) are dropped. The user: "Tried it, fix it" (2026-11-17)
 
+- Choosing Metric or Imperial sets every unit to that family: all five overrides go back to "As the system" and their stored entries (and the old wind entry) are removed. This applies on every click, including the system already chosen. It is a new piece 11, before the guide, which becomes piece 12. The user: "can we add a piece to this issue in the final section which changes functionality such that clicking metric or imperial immediately sets all settings to that family. opverriding any choice"; "Before the guide (Recommended)"; "Clear overrides (Recommended)" (2026-11-17). This changes piece 8's behaviour, where the overrides survived a change of system.
+
 ## Open
 - None.
 

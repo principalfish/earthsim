@@ -12,7 +12,7 @@ Not included: any change to the temperature or wind models, a layout for phone-s
 
 ## Plan
 
-_2026-11-17 · 9 of 11 pieces done · now: waiting on review of piece 10_
+_2026-11-17 · 10 of 12 pieces done · now: waiting on a decision (piece 11)_
 
 - [x] **1/11 The main-view regions, the icons, and the layer and overlay tiles** · `6278b72`
   Icon tiles down the left edge of the globe choose the colour layer and switch Winds, Sunlight and the grid.
@@ -32,7 +32,9 @@ _2026-11-17 · 9 of 11 pieces done · now: waiting on review of piece 10_
   Metric or Imperial with an override for each quantity, in Settings; wind speed follows it first.
 - [x] **9/11 Units in the read-outs** · `383f8e4`
   The legend, the info box and the Statistics follow the units, with round ticks in each.
-- [ ] **10/11 Units in the controls** · waiting on you
+- [x] **10/11 Units in the controls** · `6bf4fac`
   The Sea level, brush and New world controls read in the chosen units.
-- [ ] **11/11 The user guide restructured around the main view** · not started
+- [ ] **11/12 Choosing Metric or Imperial clears the overrides** · not started · added 2026-11-17: at the user's request
+  Clicking Metric or Imperial sets every unit to that family, clearing any override.
+- [ ] **12/12 The user guide restructured around the main view** · not started (was 11)
   The guide and the development notes put in order for the new layout.
