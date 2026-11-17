@@ -30,6 +30,8 @@ The user's brief (2026-11-17): "lets /planner refactor 3a", roadmap step 3a in `
 
 - Piece 3 started, with no decisions open. The user: "Start it" (2026-11-17)
 
+- Pieces 3-7 run straight through with no pause for the user: each piece is committed and pushed after its review round and light re-check; findings the verifier upholds are fixed rather than left open; any choice the plan does not settle is made by the builder, recorded in `plan.md` Notes, and listed for the user at the end. The user: "go ahead and implement all stage of this, make decisions yourself and flag them to me at the end" (2026-11-17)
+
 ## Open
 - None.
 
