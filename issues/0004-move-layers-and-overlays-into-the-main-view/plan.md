@@ -163,7 +163,7 @@ Rejected:
 - [x] 4. One info box
 - [x] 5. Everything worked out after every change, with Pause
 - [x] 6. The browser remembers the view
-- [ ] 7. The Settings section, with arrows or streaks starting on Streaks
+- [x] 7. The Settings section, with arrows or streaks starting on Streaks
 - [ ] 8. Units: the model and its settings
 - [ ] 9. Units in the read-outs
 - [ ] 10. Units in the controls
@@ -259,3 +259,4 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - `main.ts` reads `prefers-reduced-motion` once and passes it to `createPreferences(storage, { reducedMotion })`; `preferences.windStyle()` gives the stored style or `defaultWindStyle(reducedMotion)`. The preferences are built before the globe, and `createGlobe(canvas, style)` puts only the streaks or only the arrows in the scene from the start, so the first frame draws the resolved style.
 - Frame times in headless Edge at 256 with Winds on: about 55 fps (median 18 ms, longest 20 ms) with streaks while the opening solve runs; 53 fps with streaks and 52 with arrows once idle; after a stroke with streaks, median 18 ms with one 91 ms frame, when the new winds arrive.
 - One review round (correctness, security, coverage, docs): one low finding verified and fixed (a stale comment in `wiring.ts`), one dropped; light re-check by correctness and docs, clean. Uncovered changed lines: `src/app/main.ts` (entry point), `src/app/ui/topBar.ts:83`, and `src/app/globe/renderer.ts` 315, 384-385, 467 (the WebGL renderer, which has no tests; the start style was checked in a browser). In `findings.md`.
+- Approved on the user's word: "Approve".
