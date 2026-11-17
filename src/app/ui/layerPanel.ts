@@ -63,7 +63,7 @@ import {
 	windsStatus,
 	type YearFieldKey,
 	yearField,
-} from '../layers/scalarLayer';
+} from '../layers/scalar';
 import {
 	DEFAULT_MONTH,
 	DEFAULT_PAGE_VIEW,

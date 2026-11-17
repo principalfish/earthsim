@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { WIND_STYLES } from '../globe/windMotion';
-import { PRESSURE_LAYER, TEMPERATURE_LAYER } from '../layers/scalarLayer';
+import { PRESSURE_LAYER, TEMPERATURE_LAYER } from '../layers/scalar';
 import {
 	DEFAULT_PAGE_VIEW,
 	LAYERS,

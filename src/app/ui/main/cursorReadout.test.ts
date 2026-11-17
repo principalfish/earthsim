@@ -9,7 +9,7 @@ import {
 	type Vec3,
 	type World,
 } from '../../../core/index';
-import { PRESSURE_LAYER, TEMPERATURE_LAYER } from '../../layers/scalarLayer';
+import { PRESSURE_LAYER, TEMPERATURE_LAYER } from '../../layers/scalar';
 import {
 	type ResolvedUnits,
 	SYSTEM_UNITS,

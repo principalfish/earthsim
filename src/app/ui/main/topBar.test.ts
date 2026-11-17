@@ -3,7 +3,7 @@ import {
 	PRESSURE_LAYER,
 	type ScalarLayerSpec,
 	TEMPERATURE_LAYER,
-} from '../../layers/scalarLayer';
+} from '../../layers/scalar';
 import {
 	DEFAULT_PAGE_VIEW,
 	type PageView,

@@ -18,7 +18,7 @@ import {
 	formatWhole,
 	type ScalarLayerSpec,
 	type ScalarSummarySpec,
-} from '../layers/scalarLayer';
+} from '../layers/scalar';
 import type { ScalarLayerId } from '../layers/view';
 import { SEVEN_STOP_RAMP } from './rampFixtures';
 

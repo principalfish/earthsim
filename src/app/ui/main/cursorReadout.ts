@@ -27,7 +27,7 @@ import {
 	type ScalarLayerSpec,
 	summaryOf,
 	toLayerUnit,
-} from '../../layers/scalarLayer';
+} from '../../layers/scalar';
 import type { Source, Summary, WindSource } from '../../layers/view';
 import {
 	convert,

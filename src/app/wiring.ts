@@ -42,7 +42,7 @@ import type {
 	TemperatureScheduler,
 	WindsScheduler,
 } from './layers/refresh';
-import { type ScalarObservedLoader, scalarLayerOf } from './layers/scalarLayer';
+import { type ScalarObservedLoader, scalarLayerOf } from './layers/scalar';
 import {
 	DEFAULT_PAGE_VIEW,
 	type Layer,

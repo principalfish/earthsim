@@ -13,7 +13,7 @@
  */
 
 import type { LayerStatus, TemperatureLayer } from '../../layers/layers';
-import { TEMPERATURE_UNAVAILABLE_TEXT } from '../../layers/scalarLayer';
+import { TEMPERATURE_UNAVAILABLE_TEXT } from '../../layers/scalar';
 import { createElement } from '../fields';
 import { createReadoutBlock, type ReadoutText } from './cursorReadout';
 import {

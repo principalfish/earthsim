@@ -48,7 +48,14 @@ import {
 	TEMPERATURE_NOT_SHOWN_TEXT,
 	TEMPERATURE_UNAVAILABLE_TEXT,
 	toLayerUnit,
-} from '../layers/scalarLayer';
+} from '../layers/scalar';
+import {
+	cellWeights,
+	FIT_TAIL_SHARE,
+	fitRange,
+	fitRangeCentred,
+	fitRangeFromZero,
+} from '../layers/scalar/fit';
 import {
 	DEFAULT_MONTH,
 	DEFAULT_PAGE_VIEW,
@@ -94,11 +101,6 @@ import {
 	PAUSED_TEXT,
 } from './main/infoBox';
 import {
-	cellWeights,
-	FIT_TAIL_SHARE,
-	fitRange,
-	fitRangeCentred,
-	fitRangeFromZero,
 	formatFigures,
 	LEGEND_CALCULATING_TEXT,
 	LEGEND_EMPTY_TEXT,

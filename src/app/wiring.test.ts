@@ -34,7 +34,7 @@ import type { ShortcutEvent } from './editing/undo';
 import { MAIN_BUTTON, SECONDARY_BUTTON } from './globe/input';
 import { PLAYBACK_STEP_MS } from './layers/playback';
 import { TEMPERATURE_DEBOUNCE_MS } from './layers/refresh';
-import { TEMPERATURE_LAYER } from './layers/scalarLayer';
+import { TEMPERATURE_LAYER } from './layers/scalar';
 import {
 	DEFAULT_MONTH,
 	DEFAULT_PAGE_VIEW,

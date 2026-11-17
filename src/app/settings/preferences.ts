@@ -16,7 +16,7 @@ import {
 	isWindStyle,
 	type WindStyle,
 } from '../globe/windMotion';
-import { offersSummary, SCALAR_LAYER_SPECS } from '../layers/scalarLayer';
+import { offersSummary, SCALAR_LAYER_SPECS } from '../layers/scalar';
 import {
 	DEFAULT_LAYER,
 	DEFAULT_SUMMARY,

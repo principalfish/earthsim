@@ -9,7 +9,7 @@ import {
 	TEMPERATURE_LAYER,
 	TEMPERATURE_NOT_SHOWN_TEXT,
 	TEMPERATURE_UNAVAILABLE_TEXT,
-} from '../../layers/scalarLayer';
+} from '../../layers/scalar';
 import {
 	byClass,
 	createFakeDocument,

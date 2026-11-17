@@ -6,7 +6,7 @@
  * winds come from.
  */
 
-import { SCALAR_LAYERS, type ScalarLayerSpec } from '../../layers/scalarLayer';
+import { SCALAR_LAYERS, type ScalarLayerSpec } from '../../layers/scalar';
 import type {
 	PageView,
 	ScalarLayerId,

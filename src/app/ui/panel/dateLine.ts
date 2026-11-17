@@ -5,7 +5,7 @@
  * screen while the globe is lit by the sun.
  */
 
-import { scalarLayerOf, summaryOf } from '../../layers/scalarLayer';
+import { scalarLayerOf, summaryOf } from '../../layers/scalar';
 import { MONTH_NAMES, offersMonth, type PageView } from '../../layers/view';
 
 /** What separates the parts of the date line. */

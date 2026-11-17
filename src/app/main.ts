@@ -7,7 +7,7 @@ import { MAX_DRAWN_SEA_LEVEL_M, MIN_DRAWN_SEA_LEVEL_M } from './globe/material';
 import { createGlobe, type Globe } from './globe/renderer';
 import { loadEarthData } from './layers/earthData';
 import { loadObservedWinds } from './layers/observedData';
-import { loadLayerObserved } from './layers/scalarLayer';
+import { loadLayerObserved } from './layers/scalar';
 import {
 	createStatisticsService,
 	createTemperatureService,
