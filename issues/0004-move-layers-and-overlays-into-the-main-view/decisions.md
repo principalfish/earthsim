@@ -83,6 +83,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 7 started on the user's go-ahead, with the builder's two calls as stated in the briefing: in Settings, "Winds drawn as" comes first, then "Wind speed"; and the test that a change reaches the info box is dropped, since the box has shown neither the wind style nor its unit since piece 4 (the style is tested reaching the globe and the stored preference, the unit reaching the pointer's read-out). The user: "Start it" (2026-11-17)
 
+- Piece 7 approved as reviewed. The user: "Approve" (2026-11-17). Piece 7 has no manual review in the plan, so no try was needed.
+
 ## Open
 - None.
 
