@@ -10,15 +10,15 @@ Nothing the page does changes. Every test, the build and both Earth baselines mu
 
 ## Plan
 
-_2026-11-17 · 2 of 7 pieces done · now: piece 3 in progress_
+_2026-11-17 · 3 of 7 pieces done · now: piece 4 in progress_
 
 - [x] **1/7 The core in component folders** · `c239ed8`
   The core's files move into grid, world, planet, earth, temperature and wind folders, each model with its own baseline.
 - [x] **2/7 The page's top-level files in role folders** · `1ff995c`
   The page's files move into editing, saving, layers and settings folders.
-- [ ] **3/7 ui/ split into the main view and the panel** · in progress
+- [x] **3/7 ui/ split into the main view and the panel** · `c604d06`
   What sits over the globe and the side panel's sections get a folder each.
-- [ ] **4/7 The scalar layers split, with the legend's fitting code** · not started
+- [ ] **4/7 The scalar layers split, with the legend's fitting code** · in progress
   The temperature and pressure layer descriptions become a folder of small files, taking the scale fitting from the legend.
 - [ ] **5/7 The globe's material split** · not started
   The globe's shaders, ramps and material setup become a folder of small files, the shader text unchanged.
