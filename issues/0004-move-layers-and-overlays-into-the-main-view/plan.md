@@ -260,3 +260,11 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - Frame times in headless Edge at 256 with Winds on: about 55 fps (median 18 ms, longest 20 ms) with streaks while the opening solve runs; 53 fps with streaks and 52 with arrows once idle; after a stroke with streaks, median 18 ms with one 91 ms frame, when the new winds arrive.
 - One review round (correctness, security, coverage, docs): one low finding verified and fixed (a stale comment in `wiring.ts`), one dropped; light re-check by correctness and docs, clean. Uncovered changed lines: `src/app/main.ts` (entry point), `src/app/ui/topBar.ts:83`, and `src/app/globe/renderer.ts` 315, 384-385, 467 (the WebGL renderer, which has no tests; the start style was checked in a browser). In `findings.md`.
 - Approved on the user's word: "Approve".
+
+### Piece 8 (2026-11-17)
+
+- Built on claude-opus-5-5. Go-ahead "Keep all, start it"; any stored old wind unit, m/s included, becomes the wind override and the old entry is removed; Settings order, pointer-only tests and all five overrides shown as stated in the look-ahead.
+- `src/app/units.ts` replaces `windUnits.ts`. Keys: `earth_sim.preference.unitSystem` and `earth_sim.preference.<quantity>UnitOverride` ("As the system" removes the override's entry). `preferences.unitChoice()` carries the old `windSpeedUnit` over once, removing it only after the override is written. The unit store is made in the wiring; its one listener tells the Settings section and invalidates the pointer's read-out, which reads the wind unit from the store.
+- `fields.ts` gained `createSelectChoice` (with `setValue` and `setLabel`); `createSelectField` wraps it. Wind units are offered as m/s, mph, km/h, knots.
+- In headless Edge: Imperial wrote "11 mph W" under the pointer at once, the knots override "9 knots W" under either system, and a stored old "m/s" carried over and kept m/s under Imperial.
+- One review round (correctness, security, coverage, docs): four findings verified and fixed, one dropped; light re-check by correctness and docs raised two low findings from the carry-over fix, left for the user. In `findings.md`.

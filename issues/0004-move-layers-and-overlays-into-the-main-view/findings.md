@@ -115,3 +115,19 @@
 | round | coverage | - | - | - | - | - | 96%: uncovered `main.ts` (entry point), `topBar.ts:83` (unreachable guard) and `renderer.ts` 315, 384-385, 467 (the WebGL renderer has no tests), all reasons accepted |
 | re-check | correctness | - | - | - | - | `src/app/wiring.ts:453` | Light re-check of the reworded comment: clean |
 | re-check | docs | - | - | - | - | `src/app/wiring.ts:453` | Light re-check of the reworded comment: clean |
+
+## piece 8 · 2026-11-17 · Units: the model and its settings
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | docs | low | docs | verified | fixed | `README.md:12` | Said the wind under the pointer is in m/s, km/h or mph; knots is offered and the unit comes from Settings |
+| round | correctness | low | defect | verified | fixed | `src/app/preferences.ts:302` | Carrying over the old wind unit removed the old entry even when writing the override failed, losing the old unit for good; now removed only after a successful write |
+| round | correctness | nit | cleanup | verified | fixed | `src/app/ui/settingsPanel.ts:97` | `createUnitSelect` was typed `SelectChoice<string>`, dropping the unit type |
+| round | correctness | nit | docs | verified | fixed | `src/app/preferences.ts:5` | Header comment broke its line early |
+| round | correctness | - | - | dropped | - | `src/app/preferences.ts:356` | `unitChoice()` sounds like a plain read but migrates — dropped: its doc already says so, and only the store calls it, once |
+| round | security | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | Clean: 96%; uncovered lines only in files this change does not touch (`main.ts`, `topBar.ts:83`, `renderer.ts`), reasons accepted |
+| re-check | docs | - | - | - | - | `README.md:12` | Light re-check of the README and the new comments: clean |
+| re-check | correctness | low | defect | verified | open | `src/app/preferences.ts:371` | Where storage refuses writes but allows removals, the old wind entry now survives the visit; choosing "As the system" for wind speed then removes only the new key, so the old unit comes back next visit over that choice |
+| re-check | correctness | low | docs | verified | open | `src/app/preferences.ts:105` | `unitChoice`'s doc still says the old entry is removed whatever it holds; since the fix it stays when the override cannot be written |
+| re-check | correctness | - | - | dropped | - | `src/app/ui/settingsPanel.ts:163` | The wider select type relies on method bivariance — dropped: each select gets only its own quantity's value, so nothing wrong can reach it |
