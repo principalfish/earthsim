@@ -100,6 +100,7 @@ A pure library with no DOM, Three.js or worker globals.
 |-|-|
 | `main.ts` | Makes the parts of the page and hands them over to be joined |
 | `wiring.ts` | Joins the parts: which part hears of what, and in which order |
+| `wiring/` | What the joining uses: the types of the parts it is given (`parts.ts`), and how the globe is lit for the layer and the Sunlight setting (`lighting.ts`) |
 | `editing/appState.ts` | The world being edited, and the ways to replace it or change its planet settings |
 | `editing/sculpt.ts` | Sculpting with the mouse |
 | `editing/undo.ts` | Undo and redo of strokes |
