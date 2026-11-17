@@ -102,6 +102,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 11 started on the user's go-ahead, with the builder's two calls as stated in the briefing: the keyboard clears as a click does (arrow keys to the other system; Space on the chosen one), and there is no undo or confirmation. The user: "Start it" (2026-11-17)
 
+- Piece 11 approved, with the re-check nit fixed first: the test helper's doc at `src/app/testing/fakeDocument.ts:70` says "as Chromium does" in place of "as the browser does". Firefox was not tested. The user: "Approve, fix it" (2026-11-17). Piece 11 has no manual review in the plan.
+
 ## Open
 - None.
 
