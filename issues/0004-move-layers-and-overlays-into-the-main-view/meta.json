@@ -22,12 +22,14 @@
     {
       "kind": "worktree",
       "name": "/home/philiph/workspace/earth_sim/.claude/worktrees/move-layers-and-overlays-into-the-main-view-d898bd",
-      "added": "2026-11-15 12:52"
+      "added": "2026-11-15 12:52",
+      "removed": "2026-11-17 18:49"
     },
     {
       "kind": "branch",
       "name": "claude/move-layers-and-overlays-into-the-main-view-d898bd",
-      "added": "2026-11-15 12:52"
+      "added": "2026-11-15 12:52",
+      "removed": "2026-11-17 18:49"
     }
   ],
   "pr": 8
