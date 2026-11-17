@@ -24,6 +24,8 @@ The user's brief (2026-11-17): "lets /planner refactor 3a", roadmap step 3a in `
 
 - Piece 1 approved as reviewed, with the light re-check of its two one-path doc fixes skipped as the builder proposed. The user: "Approve" (2026-11-17)
 
+- Piece 2 started, with no decisions open. The user: "Start it" (2026-11-17)
+
 ## Open
 - None.
 
