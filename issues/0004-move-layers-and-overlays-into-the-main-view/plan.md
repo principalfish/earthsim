@@ -166,7 +166,7 @@ Rejected:
 - [x] 7. The Settings section, with arrows or streaks starting on Streaks
 - [x] 8. Units: the model and its settings
 - [x] 9. Units in the read-outs
-- [ ] 10. Units in the controls
+- [x] 10. Units in the controls
 - [ ] 11. The user guide restructured around the main view
 
 ## Verification
@@ -285,3 +285,4 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - Sliders gained `setFormat(format)`, which rewrites the shown text and `aria-valuetext` without moving the slider or calling `onInput`. The View section has `setHeightUnit` and the Tools section `setUnits({height, distance})`, called from the one units listener; the dialog takes the distance unit each time it opens. The unit store is now made before the tool panel, so it starts in the stored units.
 - In headless Edge in Imperial: Sea level −19,685 … 19,685 ft (33, 66, 98 ft for the first steps), brush radius 62 / 963 / 1,864 mi, strength 328 / 8,530 / 16,404 ft/s, unchanged by a knots override; hints "about 95 / 45 / 25 mi cells"; back in Metric every text as before and the world untouched.
 - One review round (correctness, security, coverage, docs): three findings verified and fixed (including deleting the unused `createCheckField`), one dropped; light re-check by correctness and docs raised one low test cleanup, left for the user. In `findings.md`.
+- Approved after the user's manual review with the finding fixed: "Tried it, fix it". The two dead checkbox checks in `viewPanel.test.ts` went; light re-check clean.

@@ -162,4 +162,6 @@
 | round | security | - | - | - | - | - | Clean |
 | round | coverage | - | - | - | - | - | 97%: uncovered `main.ts`, `topBar.ts:83` and `renderer.ts`, none touched here, reasons accepted |
 | re-check | docs | - | - | - | - | `docs/user-guide.md:83` | Light re-check of the guide's notes: clean |
-| re-check | correctness | low | cleanup | verified | open | `src/app/ui/viewPanel.test.ts:81` | Two test lines (:81, :109) still look for the `field__checkbox` class, which nothing creates any more; they cannot fail, and the test's claim holds without them |
+| re-check | correctness | low | cleanup | verified | fixed | `src/app/ui/viewPanel.test.ts:81` | Two test lines (:81, :109) still look for the `field__checkbox` class, which nothing creates any more; they cannot fail, and the test's claim holds without them |
+| manual | user | low | cleanup | - | fixed | `src/app/ui/viewPanel.test.ts:81` | The user chose to drop the two dead checkbox checks: "Tried it, fix it" |
+| re-check | correctness | - | - | - | - | `src/app/ui/viewPanel.test.ts:81` | Light re-check of the dropped test lines: clean |
