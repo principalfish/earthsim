@@ -12,7 +12,7 @@ Not included: any change to the temperature or wind models, a layout for phone-s
 
 ## Plan
 
-_2026-11-17 · 5 of 11 pieces done · now: piece 6 in progress_
+_2026-11-17 · 5 of 11 pieces done · now: waiting on review of piece 6_
 
 - [x] **1/11 The main-view regions, the icons, and the layer and overlay tiles** · `6278b72`
   Icon tiles down the left edge of the globe choose the colour layer and switch Winds, Sunlight and the grid.
@@ -24,7 +24,7 @@ _2026-11-17 · 5 of 11 pieces done · now: piece 6 in progress_
   The legend, the wind key, one status and the value under the pointer in a single box.
 - [x] **5/11 Everything worked out after every change, with Pause** · `07c3a26`
   The climate is solved after every change and when the page opens, with a Pause button for sculpting.
-- [ ] **6/11 The browser remembers the view** · in progress
+- [ ] **6/11 The browser remembers the view** · waiting on you
   The layer, its view of the year and the three toggles come back as they were left.
 - [ ] **7/11 The Settings section, with arrows or streaks starting on Streaks** · not started
   A Settings section in the side panel; winds start as streaks unless the system asks for reduced motion.
