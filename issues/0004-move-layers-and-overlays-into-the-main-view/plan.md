@@ -243,3 +243,11 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - Timed in headless Edge at 256 (Earth): a fresh open solves in 6.6 s; a 1.8 s stroke keeps its frames under 30 ms with Pause off or on; after a stroke everything is current 3.0 s after letting go; after Resume, 2.5 s; a new world made while paused shows "Paused" and is solved 5.6 s after Resume.
 - One review round (correctness, security, coverage, docs) and a light re-check (correctness, docs). Uncovered changed lines: `src/app/main.ts` (entry point) and `src/app/ui/topBar.ts:83`, both reasons accepted. In `findings.md`.
 - Approved after the user tried it, with all three open findings fixed: "Tried it, fix all, B". Pause keeps its pressed state and its accessible name stays "Pause"; only the visible word and the tooltip change to "Resume". The status table in `docs/temperature.md` matches the box, and the legend's first-year and no-estimate wordings, which could no longer show, are gone (those cases say "Calculating" with a bar of unknown fraction). Light re-check clean.
+
+### Piece 6 (2026-11-17)
+
+- Built on claude-opus-5-5. Go-ahead relayed as "pauise", then "resume"; each layer keeps its own stored Show (the builder's call, not objected to).
+- Keys under `earth_sim.preference.`: `layer`, `temperatureSummary`, `pressureSummary`, `sunlight`, `winds`, `grid` (the toggles as `'true'`/`'false'`, anything but `'true'` reading as off). `storedView` reads them all at once; `storeView` writes only what changed, and its type has no place for the month or the source.
+- The grid is now a field of `PageView`, held by the layer panel and shown by the dock; the dock's `gridVisible` option went.
+- `startPage` reads the stored view once, tells the globe the sunlight style and grid first, and starts the date line, dock, top bar, timeline and layer panel on the same view in one synchronous run. In headless Edge the dock showed Pressure from its first frame after a reload, with no Terrain in between.
+- One review round (correctness, security, coverage, docs): two low findings verified and fixed, one dropped. Uncovered changed lines: `src/app/main.ts` (entry point) and `src/app/ui/topBar.ts:83`, both reasons accepted. In `findings.md`.

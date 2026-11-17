@@ -91,3 +91,15 @@
 | re-check | docs | - | - | dropped | - | `docs/temperature.md:63` | Name the "first year" state in the row — dropped: that line can no longer show |
 | manual | user | low | defect | - | fixed | `src/app/ui/pauseButton.ts:49` | The user chose to fix all three and option (b), the name fixed at "Pause" with only the word and tooltip changing: "Tried it, fix all, B" |
 | re-check | correctness | - | - | - | - | `src/app/ui/pauseButton.ts:49` | Light re-check of the three fixes: clean |
+
+## piece 6 · 2026-11-17 · The browser remembers the view
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | docs | low | docs | verified | fixed | `docs/user-guide.md:107` | "What is not saved: … the view, layer, month and tool settings" read as if the layer and view were forgotten between visits; now "not saved with the world", with what the browser remembers |
+| round | correctness | low | cleanup | verified | fixed | `src/app/wiring.ts:380` | A doc-comment line left at 120 characters after the edit |
+| round | correctness | - | - | dropped | - | `src/app/ui/layerPanel.ts:609` | The layer and Show fallbacks are written in both the preferences and the layer panel — dropped: the panel needs its own check for the layers it is given, and in the app both check the same full list, so they cannot disagree |
+| round | security | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | Clean: 96%, uncovered `main.ts` (entry point, untouched here) and `topBar.ts:83` (unreachable guard), both reasons accepted |
+| re-check | correctness | - | - | - | - | `src/app/wiring.ts:380` | Light re-check of the rewrap and the guide's line: clean |
+| re-check | docs | nit | docs | verified | open | `docs/user-guide.md:107` | The new line says the browser never remembers "the month" but leaves out the comparison, which the guide's other two places name too; not wrong, less complete |
