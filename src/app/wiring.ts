@@ -63,6 +63,7 @@ import {
 import type { PauseButtonOptions } from './ui/pauseButton';
 import type { PlanetPanel, PlanetPanelOptions } from './ui/planetPanel';
 import type { SettingsPanel, SettingsPanelOptions } from './ui/settingsPanel';
+import type { StatsPanel } from './ui/statsPanel';
 import type { Timeline, TimelineOptions } from './ui/timeline';
 import type { ToolPanel, ToolPanelOptions } from './ui/toolPanel';
 import type { TopBar, TopBarOptions } from './ui/topBar';
@@ -79,7 +80,7 @@ import {
 	handleHistoryKey,
 	type ShortcutEvent,
 } from './undo';
-import { createUnitStore, type WindUnit } from './units';
+import { createUnitStore, type ResolvedUnits, type UnitOf } from './units';
 import {
 	DEFAULT_PAGE_VIEW,
 	type Layer,
@@ -116,6 +117,15 @@ export type PageStatisticsOptions = {
 };
 
 /**
+ * What the page's statistics are computed from, and the unit their heights
+ * and depths are written in at first.
+ */
+export type PageStatsOptions = PageStatisticsOptions & {
+	/** The unit heights and depths are written in at first. */
+	readonly heightUnit: UnitOf<'height'>;
+};
+
+/**
  * What the page's temperature, or its winds, are computed from, and where
  * they are kept.
  */
@@ -139,6 +149,8 @@ export type PageLayerOptions = {
 	 * month and the source start as on a first visit.
 	 */
 	readonly start: StoredView;
+	/** The unit chosen for each quantity it starts on. */
+	readonly units: ResolvedUnits;
 	/**
 	 * Where the temperature and the winds are kept: the store their
 	 * calculations write.
@@ -166,8 +178,8 @@ export type PageReadoutOptions = PageStatisticsOptions & {
 	readonly shownLayer: () => ShownLayer | null;
 	/** What the globe shows of the winds, at the time it is asked. */
 	readonly shownWinds: () => ShownWinds | null;
-	/** The unit wind speeds are written in, at the time it is asked. */
-	readonly windUnit: () => WindUnit;
+	/** The unit each quantity is written in, at the time it is asked. */
+	readonly units: () => ResolvedUnits;
 };
 
 /** The parts of a page, for {@link startPage} to join. */
@@ -251,11 +263,13 @@ export type PageParts = {
 	) => Pick<PlanetPanel, 'setPlanet'>;
 	/**
 	 * Adds the statistics readout to the panel and starts whatever computes
-	 * the statistics.
+	 * the statistics, and gives the way to write its heights in another
+	 * unit.
 	 */
 	readonly createStatistics: (
-		options: PageStatisticsOptions,
-	) => Pick<RefreshScheduler, 'refresh' | 'reset'>;
+		options: PageStatsOptions,
+	) => Pick<RefreshScheduler, 'refresh' | 'reset'> &
+		Pick<StatsPanel, 'setHeightUnit'>;
 	/** Starts whatever computes the temperature, running. */
 	readonly createTemperature: (
 		options: PageTemperatureOptions,
@@ -293,6 +307,7 @@ export type PageParts = {
 		| 'setMonth'
 		| 'togglePlaying'
 		| 'setPaused'
+		| 'setUnits'
 		| 'shown'
 		| 'shownWinds'
 	>;
@@ -436,16 +451,18 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * a pointer held still after each turn and zoom of the camera, each change
  * of the terrain or the sea level, each new world, each change of the view
  * settings, the Winds tile's included, each change of the store of the
- * temperature and the winds, and each change of the wind speed unit.
+ * temperature and the winds, and each change of the units.
  * Opening the New world dialog hides the readout until the next pointer
  * event on the canvas: a move, a press or a release. Once the readout is
  * made, the layer panel is told whether the world the page opens on is the
  * measured Earth.
  *
- * The unit wind speeds are written in is a preference of the browser, not
- * part of the world: it is read once, as the page starts, and the settings
- * and the readout start in it. A unit chosen in the settings is remembered
- * by the preferences, and reaches the readout at once. It is never saved
+ * The units are a preference of the browser, not part of the world: they
+ * are read once, as the page starts, and the settings, the legend, the
+ * statistics and the readout start in them. A unit chosen in the settings
+ * is remembered by the preferences, and reaches them all at once: the
+ * layer panel writes the legend in it, the statistics their heights, and
+ * the readout looks again, with no new calculation. They are never saved
  * with the world.
  *
  * So is how the winds are drawn, as arrows or as streaks: read once as the
@@ -747,6 +764,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	});
 	const layerPanel = parts.createLayerPanel({
 		start: stored,
+		units: units.units(),
 		store: layers,
 		onView: (next, playing) => {
 			storeView(parts.preferences, stored, next);
@@ -777,6 +795,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	const statistics = parts.createStatistics({
 		currentWorld: () => state.world,
 		isStrokeActive: sculpt.isStrokeActive,
+		heightUnit: units.units().height,
 	});
 	statistics.refresh();
 	const readout = parts.createCursorReadout({
@@ -784,12 +803,16 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		isStrokeActive: sculpt.isStrokeActive,
 		shownLayer: layerPanel.shown,
 		shownWinds: layerPanel.shownWinds,
-		windUnit: () => units.units().windSpeed,
+		units: units.units,
 	});
 	// One listener takes a change of the units to everything that shows
-	// them.
+	// them, each of which writes what it shows in them at once, with no new
+	// calculation.
 	units.addListener(() => {
+		const resolved = units.units();
 		settings.showUnits(units.choice());
+		layerPanel.setUnits(resolved);
+		statistics.setHeightUnit(resolved.height);
 		readout.invalidate();
 	});
 	// Told after the layer panel, which brings what the globe shows up to

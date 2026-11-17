@@ -15,7 +15,12 @@ import {
 } from '../../core/index';
 import { type ColourRamp, rampGradient, type ValueRange } from '../globe/ramp';
 import type { LayerStatus } from '../layers';
-import type { ScalarLayerReading, ScalarLayerSpec } from '../scalarLayer';
+import type {
+	LayerUnit,
+	ScalarLayerReading,
+	ScalarLayerSpec,
+} from '../scalarLayer';
+import { SYSTEM_UNITS, type UnitSpec, unitLabel, unitSpec } from '../units';
 import { createElement } from './fields';
 
 /**
@@ -76,6 +81,37 @@ const tickIndices = (
 	};
 };
 
+/**
+ * The unit a scale is fitted in: how a value converts to it, as
+ * {@link UnitSpec} gives it, and to how many decimals its ends are
+ * rounded.
+ */
+export type ScaleUnit = Pick<UnitSpec, 'scale' | 'offset' | 'decimals'>;
+
+/** Values fitted as they are, to whole numbers. */
+export const AS_GIVEN: ScaleUnit = { scale: 1, offset: 0, decimals: 0 };
+
+/**
+ * A value as a count of steps of a tenth to the power of the decimals,
+ * rounded down: the largest count whose value is at or below it, though
+ * the value times the steps in one rounds up to a whole number.
+ */
+const countDown = (value: number, decimals: number): number => {
+	const factor = 10 ** decimals;
+	const count = Math.floor(value * factor);
+	return count / factor > value ? count - 1 : count;
+};
+
+/**
+ * A value as a count of steps of a tenth to the power of the decimals,
+ * rounded up: the smallest count whose value is at or above it.
+ */
+const countUp = (value: number, decimals: number): number => {
+	const factor = 10 ** decimals;
+	const count = Math.ceil(value * factor);
+	return count / factor < value ? count + 1 : count;
+};
+
 /** What the legend says before there is a result to show. */
 export const LEGEND_EMPTY_TEXT = 'Not calculated yet';
 
@@ -126,18 +162,24 @@ export const cellWeights = (cellCount: number): ArrayLike<number> => {
  * weight, as a cell-month by its cell's area: so a peak or a pole that
  * covers little of the world does not stretch the scale and squeeze the
  * rest into a few colours. Values beyond the ends take the end colours.
- * Before they are rounded, the ends are widened about their middle to the
+ * The ends are converted to the unit given, and the rest is done in it:
+ * before they are rounded, they are widened about their middle to the
  * smallest span if they are closer than that. They are then rounded
- * outward to whole numbers, the low end down and the high end up.
+ * outward to the unit's decimals, whole numbers for most, the low end down
+ * and the high end up, so that the range holds every value between the
+ * two quantiles.
  *
  * @param months - The fields, such as the twelve months of a year, each one
  * value per cell. Values that are not numbers or are infinite are passed
  * over.
  * @param weights - What each cell counts for, one per cell, as from
  * {@link cellWeights}.
- * @param minSpan - The smallest span of the scale, above zero;
- * {@link MIN_FITTED_SPAN_C} when left out.
- * @returns The range, at least `minSpan` wide with whole ends.
+ * @param minSpan - The smallest span of the scale, above zero, in the
+ * unit; {@link MIN_FITTED_SPAN_C} when left out.
+ * @param unit - The unit to fit the scale in; the values' own, to whole
+ * numbers, when left out.
+ * @returns The range in the unit, at least `minSpan` wide with ends of the
+ * unit's decimals.
  * @throws RangeError if no field holds a finite value, or a field or the
  * weights are not as {@link weightedQuantiles} takes them.
  */
@@ -145,31 +187,46 @@ export const fitRange = (
 	months: readonly Float32Array[],
 	weights: ArrayLike<number>,
 	minSpan: number = MIN_FITTED_SPAN_C,
+	unit: ScaleUnit = AS_GIVEN,
 ): ValueRange => {
-	let { low, high } = weightedQuantiles(months, weights, FIT_TAIL_SHARE);
+	const cuts = weightedQuantiles(months, weights, FIT_TAIL_SHARE);
+	let low = cuts.low * unit.scale + unit.offset;
+	let high = cuts.high * unit.scale + unit.offset;
 	if (high - low < minSpan) {
 		const middle = (low + high) / 2;
 		low = middle - minSpan / 2;
 		high = middle + minSpan / 2;
 	}
-	return { min: Math.floor(low), max: Math.ceil(high) };
+	const factor = 10 ** unit.decimals;
+	return {
+		min: countDown(low, unit.decimals) / factor,
+		max: countUp(high, unit.decimals) / factor,
+	};
 };
 
 /**
  * The range a scale of sizes is fitted to, such as the seasonal range: from
- * zero up to the largest value in the field, rounded up to a whole number.
+ * zero up to the largest value in the field, in the unit given, rounded up
+ * to the unit's decimals.
+ *
+ * @remarks
+ * A size is a difference of two values, so it converts by the unit's scale
+ * alone: a range of 10 °C is one of 18 °F.
  *
  * @param field - The values, none below zero.
- * @param minSpan - The smallest span of the scale, above zero;
- * {@link MIN_FITTED_SPAN_C} when left out.
- * @returns From 0 to the largest finite value rounded up to a whole number,
- * or to `minSpan` if that is larger. Values that are not numbers or are
- * infinite are passed over.
+ * @param minSpan - The smallest span of the scale, above zero, in the
+ * unit; {@link MIN_FITTED_SPAN_C} when left out.
+ * @param unit - The unit to fit the scale in; the values' own, to whole
+ * numbers, when left out.
+ * @returns From 0 to the largest finite value in the unit, rounded up to
+ * its decimals, or to `minSpan` if that is larger. Values that are not
+ * numbers or are infinite are passed over.
  * @throws RangeError if the field holds no finite value.
  */
 export const fitRangeFromZero = (
 	field: Float32Array,
 	minSpan: number = MIN_FITTED_SPAN_C,
+	unit: ScaleUnit = AS_GIVEN,
 ): ValueRange => {
 	let max = Number.NEGATIVE_INFINITY;
 	for (const value of field) {
@@ -180,7 +237,9 @@ export const fitRangeFromZero = (
 	if (!Number.isFinite(max)) {
 		throw new RangeError('A scale needs at least one finite value to fit');
 	}
-	return { min: 0, max: Math.max(minSpan, Math.ceil(max)) };
+	const largest =
+		countUp(max * unit.scale, unit.decimals) / 10 ** unit.decimals;
+	return { min: 0, max: Math.max(minSpan, largest) };
 };
 
 /**
@@ -189,23 +248,27 @@ export const fitRangeFromZero = (
  * every month, and spanning the middle 99% of the world by area.
  *
  * @remarks
- * The centre is rounded to a whole number first. The scale then reaches
- * either way as far as the further of the weighted quantiles
- * {@link FIT_TAIL_SHARE} in from either end of every value, as for
- * {@link fitRange}, and at least half the smallest span, rounded up to a
- * whole number, so that its ends are whole numbers too. Values beyond the
- * ends take the end colours.
+ * The centre and the quantiles are converted to the unit given, and the
+ * rest is done in it. The centre is rounded to the unit's decimals first,
+ * a whole number for most. The scale then reaches either way as far as the
+ * further of the weighted quantiles {@link FIT_TAIL_SHARE} in from either
+ * end of every value, as for {@link fitRange}, and at least half the
+ * smallest span, rounded up to the unit's decimals, so that its ends are
+ * of those decimals too. Values beyond the ends take the end colours.
  *
  * @param months - The fields, such as the twelve months of a year, each one
  * value per cell. Values that are not numbers or are infinite are passed
  * over.
  * @param weights - What each cell counts for, one per cell, as from
  * {@link cellWeights}.
- * @param centre - The value the scale is centred on; finite.
- * @param minSpan - The smallest span of the scale, above zero;
- * {@link MIN_FITTED_SPAN_C} when left out.
- * @returns The range, centred on the rounded centre and at least `minSpan`
- * wide.
+ * @param centre - The value the scale is centred on, in the values' own
+ * unit; finite.
+ * @param minSpan - The smallest span of the scale, above zero, in the
+ * unit; {@link MIN_FITTED_SPAN_C} when left out.
+ * @param unit - The unit to fit the scale in; the values' own, to whole
+ * numbers, when left out.
+ * @returns The range in the unit, centred on the rounded centre and at
+ * least `minSpan` wide.
  * @throws RangeError if the centre is not finite, if no field holds a
  * finite value, or if a field or the weights are not as
  * {@link weightedQuantiles} takes them.
@@ -215,6 +278,7 @@ export const fitRangeCentred = (
 	weights: ArrayLike<number>,
 	centre: number,
 	minSpan: number = MIN_FITTED_SPAN_C,
+	unit: ScaleUnit = AS_GIVEN,
 ): ValueRange => {
 	if (!Number.isFinite(centre)) {
 		throw new RangeError(
@@ -222,23 +286,40 @@ export const fitRangeCentred = (
 		);
 	}
 	const cuts = weightedQuantiles(months, weights, FIT_TAIL_SHARE);
-	const middle = Math.round(centre);
-	const reach = Math.ceil(
-		Math.max(middle - cuts.low, cuts.high - middle, minSpan / 2),
+	const { scale, offset, decimals } = unit;
+	const factor = 10 ** decimals;
+	// The centre and the reach are counted in steps of the unit's decimals,
+	// so that the ends are exactly the decimals they are written as.
+	const middleCount = Math.round((centre * scale + offset) * factor);
+	const middle = middleCount / factor;
+	const reachCount = countUp(
+		Math.max(
+			middle - (cuts.low * scale + offset),
+			cuts.high * scale + offset - middle,
+			minSpan / 2,
+		),
+		decimals,
 	);
-	return { min: middle - reach, max: middle + reach };
+	return {
+		min: (middleCount - reachCount) / factor,
+		max: (middleCount + reachCount) / factor,
+	};
 };
 
 /**
- * The whole multiples of a whole step inside a range, or null for fewer
- * than two of them, more than {@link MAX_STEPPED_TICKS}, or multiples of
- * the step past {@link MAX_TICK_INDEX}, the most counted to for a step
- * chosen as well.
+ * The whole multiples of a step inside a range, or null for fewer than two
+ * of them, more than {@link MAX_STEPPED_TICKS}, or multiples of the step
+ * past {@link MAX_TICK_INDEX}, the most counted to for a step chosen as
+ * well. The step is a whole number of steps of a tenth to the power of the
+ * decimals, `count` of them, and each multiple is worked out from that
+ * count, so that it is the nearest number to its decimal value.
  */
 const steppedTicks = (
 	min: number,
 	max: number,
 	step: number,
+	count: number,
+	decimals: number,
 ): number[] | null => {
 	const { first, last } = tickIndices(min, max, step);
 	if (
@@ -248,9 +329,10 @@ const steppedTicks = (
 	) {
 		return null;
 	}
+	const factor = 10 ** decimals;
 	const ticks: number[] = [];
 	for (let k = first; k <= last; k++) {
-		const tick = k * step;
+		const tick = (k * count) / factor;
 		if (tick >= min && tick <= max) {
 			// Not -0, which would print as such in some places.
 			ticks.push(tick === 0 ? 0 : tick);
@@ -270,8 +352,9 @@ const steppedTicks = (
  * a value that falls on an end of the range is marked.
  *
  * A scale can be given a step of its own instead, such as every 5 degrees
- * for the seasonal range: then the values are the whole multiples of that
- * step inside the range, ends included, so long as there are from two to
+ * for the seasonal range, or every 0.3 inches of mercury with two
+ * decimals: then the values are the whole multiples of that step inside
+ * the range, ends included, so long as there are from two to
  * {@link MAX_STEPPED_TICKS} of them. For a range so wide that the step
  * gives more, or so narrow that it gives fewer than two, the step is set
  * aside and the values are chosen as above.
@@ -286,31 +369,45 @@ const steppedTicks = (
  *
  * @param min - The low end of the scale.
  * @param max - The high end; above `min`.
- * @param step - A step of the scale's own to mark it at, a whole number
- * above zero; left out, the step is chosen as above.
+ * @param step - A step of the scale's own to mark it at, above zero and a
+ * whole number of steps of the last of the decimals, so a whole number for
+ * none; left out, the step is chosen as above.
+ * @param decimals - How many decimals a step given may have, a whole
+ * number from 0; none when left out.
  * @returns The values, lowest first: from two to {@link MAX_LEGEND_TICKS},
  * or to {@link MAX_STEPPED_TICKS} at a step given.
  * @throws RangeError unless both ends are finite and `min` is below `max`,
- * for a step given that is not a whole number above zero, and for a range
- * that cannot be marked at two round values, as above.
+ * for decimals that are not a whole number from 0, for a step given that
+ * is not above zero with no more than the decimals, and for a range that
+ * cannot be marked at two round values, as above.
  */
 export const legendTicks = (
 	min: number,
 	max: number,
 	step?: number,
+	decimals = 0,
 ): number[] => {
 	if (!Number.isFinite(min) || !Number.isFinite(max) || !(min < max)) {
 		throw new RangeError(
 			`A scale must run up from one finite value to another; got ${min} to ${max}`,
 		);
 	}
+	if (!(Number.isSafeInteger(decimals) && decimals >= 0)) {
+		throw new RangeError(
+			`A step's decimals must be a whole number from 0; got ${decimals}`,
+		);
+	}
 	if (step !== undefined) {
-		if (!(Number.isSafeInteger(step) && step > 0)) {
+		const factor = 10 ** decimals;
+		const count = Math.round(step * factor);
+		if (
+			!(Number.isSafeInteger(count) && count > 0 && count / factor === step)
+		) {
 			throw new RangeError(
-				`A step to mark a scale at must be a whole number above zero; got ${step}`,
+				`A step to mark a scale at must be above zero with at most ${decimals} decimals; got ${step}`,
 			);
 		}
-		const ticks = steppedTicks(min, max, step);
+		const ticks = steppedTicks(min, max, step, count, decimals);
 		if (ticks !== null) {
 			return ticks;
 		}
@@ -379,14 +476,15 @@ export const formatTick = (value: number): string => {
 };
 
 /**
- * A difference to one decimal as the legend's error figures write it: a
- * true minus sign below zero, a plus sign above it, and `0.0`, with no
- * sign, for one that rounds to zero.
+ * A difference to so many decimals as the legend's error figures write it:
+ * a true minus sign below zero, a plus sign above it, and no sign for one
+ * that rounds to zero, such as `0.0`.
  */
-const signedTenths = (value: number): string => {
-	const tenths = Math.round(Math.abs(value) * 10);
-	const digits = (tenths / 10).toFixed(1);
-	if (tenths === 0) {
+const signedFixed = (value: number, decimals: number): string => {
+	const factor = 10 ** decimals;
+	const steps = Math.round(Math.abs(value) * factor);
+	const digits = (steps / factor).toFixed(decimals);
+	if (steps === 0) {
 		return digits;
 	}
 	return `${value < 0 ? '−' : '+'}${digits}`;
@@ -397,17 +495,26 @@ const signedTenths = (value: number): string => {
  * writes them under its scale, such as `Mean −0.1 °C · RMS 3.9 °C`.
  *
  * @remarks
- * Both are to one decimal, a half rounded away from zero. The mean
- * difference is signed, `+0.3` above zero and `−0.1` below, and one that
- * rounds to zero is `0.0` with no sign; the root-mean-square difference is
- * never below zero and has no sign.
+ * Both are to one decimal unless others are given, a half rounded away
+ * from zero. The mean difference is signed, `+0.3` above zero and `−0.1`
+ * below, and one that rounds to zero is `0.0` with no sign; the
+ * root-mean-square difference is never below zero and has no sign.
  *
- * @param figures - The mean and root-mean-square difference, in the
- * layer's unit.
- * @param unit - The layer's unit, such as `°C`.
+ * @param figures - The mean and root-mean-square difference, in the unit.
+ * @param unit - The unit, as it is written, such as `°C`.
+ * @param decimals - How many decimals to write; one when left out.
  */
-export const formatFigures = (figures: FieldDifference, unit: string): string =>
-	`Mean ${signedTenths(figures.meanDifference)} ${unit} · RMS ${(Math.round(figures.rmsDifference * 10) / 10).toFixed(1)} ${unit}`;
+export const formatFigures = (
+	figures: FieldDifference,
+	unit: string,
+	decimals = 1,
+): string => {
+	const factor = 10 ** decimals;
+	const rms = (Math.round(figures.rmsDifference * factor) / factor).toFixed(
+		decimals,
+	);
+	return `Mean ${signedFixed(figures.meanDifference, decimals)} ${unit} · RMS ${rms} ${unit}`;
+};
 
 /**
  * Where a value sits along the scale, as a percentage of its length from
@@ -488,22 +595,32 @@ export type LegendScale = {
 	readonly figures: string | null;
 };
 
-/** What the globe shows a layer with, for the legend to draw. */
+/**
+ * What the globe shows a layer with, for the legend to draw, in the unit
+ * the legend writes it in.
+ */
 export type LegendSource = {
-	/** The range the layer is shown on. */
+	/** The range the layer is shown on, in the unit. */
 	readonly range: ValueRange;
 	/** The ramp it is shown with. */
 	readonly ramp: ColourRamp;
 	/** What the field shown measures, with its unit. */
 	readonly caption: string;
 	/**
-	 * A step of the scale's own to mark it at, as {@link legendTicks} takes
-	 * it; left out, the legend chooses one.
+	 * The unit the scale is written in, one of the layer's quantity: its
+	 * ticks, as the layer writes them in it, and its error figures. Left
+	 * out, the quantity's metric unit.
+	 */
+	readonly unit?: LayerUnit;
+	/**
+	 * A step of the scale's own to mark it at, in the unit, as
+	 * {@link legendTicks} takes it with the unit's decimals; left out, the
+	 * legend chooses one.
 	 */
 	readonly tickStep?: number;
 	/**
-	 * The error figures of the field shown against the observed one, or
-	 * null or left out when there are none to show.
+	 * The error figures of the field shown against the observed one, in the
+	 * unit, or null or left out when there are none to show.
 	 */
 	readonly figures?: FieldDifference | null;
 };
@@ -546,9 +663,9 @@ export type LegendContent = {
  * result, and not an earlier one it kept when it refused this one. False
  * whenever it shows no scale.
  * @param sourceLayer - The description of the layer the source is of: its
- * unit and how its ticks are written. It differs from `layer` only while
- * the globe keeps a field of another layer, having refused the first field
- * of the one chosen; `layer` when left out.
+ * quantity and how its ticks are written. It differs from `layer` only
+ * while the globe keeps a field of another layer, having refused the first
+ * field of the one chosen; `layer` when left out.
  * @returns The scale whenever the globe shows one, with a line and, while
  * calculating, a bar. A current result has no line while the globe shows
  * it. While the globe does not, the line is {@link LEGEND_OUT_OF_DATE_TEXT}
@@ -559,17 +676,22 @@ export type LegendContent = {
  * the years left can be told are {@link LEGEND_CALCULATING_TEXT} and a bar
  * that does not know how far it has come, as any other layer has
  * throughout. The scale's ticks are at its own step when it has one, written
- * as the source's layer writes them, and it gives the source's error
- * figures in that layer's unit when it has them. Values beyond the ends,
- * which the globe draws in the end colours, are not marked.
+ * in the source's unit as the source's layer writes them, and it gives the
+ * source's error figures in that unit, to one decimal more than the unit's,
+ * when it has them. Values beyond the ends, which the globe draws in the
+ * end colours, are not marked.
+ * @throws RangeError if the source's unit is not one of its layer's
+ * quantity.
  */
 export const legendContent = (
 	layer: ScalarLayerSpec,
 	reading: Pick<ScalarLayerReading, 'status' | 'progress'>,
 	source: LegendSource | null,
 	showsResult: boolean,
-	sourceLayer: Pick<ScalarLayerSpec, 'formatTick' | 'unit'> = layer,
+	sourceLayer: Pick<ScalarLayerSpec, 'formatTick' | 'quantity'> = layer,
 ): LegendContent => {
+	const unit = source?.unit ?? SYSTEM_UNITS.metric[sourceLayer.quantity];
+	const { decimals } = unitSpec(sourceLayer.quantity, unit);
 	const scale =
 		source === null
 			? null
@@ -580,14 +702,19 @@ export const legendContent = (
 						source.range.min,
 						source.range.max,
 						source.tickStep,
+						decimals,
 					).map((value) => ({
-						label: sourceLayer.formatTick(value),
+						label: sourceLayer.formatTick(value, unit),
 						position: tickPosition(value, source.range),
 					})),
 					figures:
 						source.figures === undefined || source.figures === null
 							? null
-							: formatFigures(source.figures, sourceLayer.unit),
+							: formatFigures(
+									source.figures,
+									unitLabel(sourceLayer.quantity, unit),
+									decimals + 1,
+								),
 				};
 	switch (reading.status) {
 		case 'current': {

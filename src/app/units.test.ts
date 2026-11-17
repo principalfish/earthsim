@@ -6,6 +6,7 @@ import {
 	convertDifference,
 	createUnitStore,
 	DEFAULT_UNIT_CHOICE,
+	formatNumber,
 	formatQuantity,
 	formatWind,
 	isUnitOf,
@@ -18,6 +19,7 @@ import {
 	UNITS,
 	type UnitChoice,
 	type UnitPreferences,
+	unitSpec,
 	unitsOf,
 	WIND_CALM_TEXT,
 	windFromDeg,
@@ -415,5 +417,37 @@ describe('formatWind', () => {
 	it('writes a strong wind uncapped, its digits grouped in threes', () => {
 		expect(formatWind(123.4, 0, 'm/s')).toBe('123 m/s N');
 		expect(formatWind(300, 0, 'km/h')).toBe('1,080 km/h N');
+	});
+});
+
+describe('unitSpec', () => {
+	it('gives how a unit of a quantity is written and converted', () => {
+		expect(unitSpec('pressure', 'inHg')).toBe(UNITS.pressure.inHg);
+		expect(unitSpec('temperature', 'K').offset).toBe(273.15);
+	});
+
+	it('refuses a unit of another quantity', () => {
+		const pressureOrTemperature = 'pressure' as 'pressure' | 'temperature';
+		expect(() => unitSpec(pressureOrTemperature, '°F')).toThrow(RangeError);
+		expect(() => formatQuantity(pressureOrTemperature, 'K', 1)).toThrow(
+			RangeError,
+		);
+	});
+});
+
+describe('formatNumber', () => {
+	it('writes a number to the decimals given, grouped, with a true minus', () => {
+		expect(formatNumber(1018.4, 0)).toBe('1,018');
+		expect(formatNumber(29.921, 2)).toBe('29.92');
+		expect(formatNumber(-4.4, 0)).toBe('−4');
+		expect(formatNumber(30, 2)).toBe('30.00');
+	});
+
+	it('signs a value above zero when asked, and never writes −0 or +0', () => {
+		expect(formatNumber(2.2, 0, true)).toBe('+2');
+		expect(formatNumber(-0.126, 2, true)).toBe('−0.13');
+		expect(formatNumber(0.004, 2, true)).toBe('0.00');
+		expect(formatNumber(-0.4, 0, true)).toBe('0');
+		expect(formatNumber(-0, 0)).toBe('0');
 	});
 });

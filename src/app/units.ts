@@ -80,8 +80,13 @@ export const UNITS = {
 	readonly [Q in Quantity]: Readonly<Record<string, UnitSpec>>;
 };
 
-/** A unit a quantity can be written in, by its name in {@link UNITS}. */
-export type UnitOf<Q extends Quantity> = keyof (typeof UNITS)[Q] & string;
+/**
+ * A unit a quantity can be written in, by its name in {@link UNITS}; for
+ * several quantities, a unit of any of them.
+ */
+export type UnitOf<Q extends Quantity> = Q extends Quantity
+	? keyof (typeof UNITS)[Q] & string
+	: never;
 
 /** A unit a wind speed can be written in. */
 export type WindUnit = UnitOf<'windSpeed'>;
@@ -145,9 +150,24 @@ export const unitsOf = <Q extends Quantity>(
 	quantity: Q,
 ): readonly UnitOf<Q>[] => Object.keys(UNITS[quantity]) as UnitOf<Q>[];
 
-/** How a unit is written and converted. */
-const specOf = <Q extends Quantity>(quantity: Q, unit: UnitOf<Q>): UnitSpec =>
-	(UNITS[quantity] as Readonly<Record<string, UnitSpec>>)[unit] as UnitSpec;
+/**
+ * How a unit of a quantity is written and converted.
+ *
+ * @param quantity - The quantity.
+ * @param unit - One of its units.
+ * @throws RangeError if the unit is not one of the quantity's, as it can be
+ * when the quantity is one of several.
+ */
+export const unitSpec = <Q extends Quantity>(
+	quantity: Q,
+	unit: UnitOf<Q>,
+): UnitSpec => {
+	const units: Readonly<Record<string, UnitSpec>> = UNITS[quantity];
+	if (!Object.hasOwn(units, unit)) {
+		throw new RangeError(`${unit} is not a unit of ${quantity}`);
+	}
+	return units[unit] as UnitSpec;
+};
 
 /**
  * What follows a value written in a unit, such as `°F`.
@@ -158,7 +178,7 @@ const specOf = <Q extends Quantity>(quantity: Q, unit: UnitOf<Q>): UnitSpec =>
 export const unitLabel = <Q extends Quantity>(
 	quantity: Q,
 	unit: UnitOf<Q>,
-): string => specOf(quantity, unit).label;
+): string => unitSpec(quantity, unit).label;
 
 /**
  * Whether a value is one of {@link UNIT_SYSTEMS}.
@@ -210,7 +230,7 @@ export const convert = <Q extends Quantity>(
 	unit: UnitOf<Q>,
 	metricValue: number,
 ): number => {
-	const spec = specOf(quantity, unit);
+	const spec = unitSpec(quantity, unit);
 	return metricValue * spec.scale + spec.offset;
 };
 
@@ -227,16 +247,44 @@ export const convertDifference = <Q extends Quantity>(
 	quantity: Q,
 	unit: UnitOf<Q>,
 	metricDifference: number,
-): number => metricDifference * specOf(quantity, unit).scale;
+): number => metricDifference * unitSpec(quantity, unit).scale;
+
+/**
+ * A number as the page writes it, such as `1,018`, `29.92`, `−4` or `+2`.
+ *
+ * @remarks
+ * The value is rounded to the decimals given, a half upwards, and written
+ * with its digits grouped in threes and a true minus sign; signed, a value
+ * above zero has a plus sign. A value that rounds to zero is never `−0` or
+ * `+0`.
+ *
+ * @param value - The value.
+ * @param decimals - How many decimals to write; a whole number from 0.
+ * @param signed - Whether a value above zero has a plus sign.
+ */
+export const formatNumber = (
+	value: number,
+	decimals: number,
+	signed = false,
+): string => {
+	const factor = 10 ** decimals;
+	// Rounded once, so that the sign and the digits agree.
+	const rounded = Math.round(value * factor);
+	const digits = (Math.abs(rounded) / factor).toLocaleString('en-GB', {
+		minimumFractionDigits: decimals,
+		maximumFractionDigits: decimals,
+	});
+	const positive = signed && rounded > 0 ? '+' : '';
+	return `${rounded < 0 ? '−' : positive}${digits}`;
+};
 
 /**
  * A metric value of a quantity written in a unit, with the unit, such as
  * `22 mph`, `29.92 inHg` or `−4 °F`.
  *
  * @remarks
- * The value is rounded to the unit's decimals, or to those given, a half
- * upwards, and written with its digits grouped in threes and a true minus
- * sign; a value that rounds to zero is never `−0`.
+ * The value is converted, then written as {@link formatNumber} writes it
+ * to the unit's decimals, or to those given.
  *
  * @param quantity - The quantity.
  * @param unit - The unit to write it in.
@@ -247,17 +295,9 @@ export const formatQuantity = <Q extends Quantity>(
 	quantity: Q,
 	unit: UnitOf<Q>,
 	metricValue: number,
-	decimals: number = specOf(quantity, unit).decimals,
-): string => {
-	const factor = 10 ** decimals;
-	// Rounded once, so that the sign and the digits agree.
-	const rounded = Math.round(convert(quantity, unit, metricValue) * factor);
-	const digits = (Math.abs(rounded) / factor).toLocaleString('en-GB', {
-		minimumFractionDigits: decimals,
-		maximumFractionDigits: decimals,
-	});
-	return `${rounded < 0 ? '−' : ''}${digits} ${unitLabel(quantity, unit)}`;
-};
+	decimals: number = unitSpec(quantity, unit).decimals,
+): string =>
+	`${formatNumber(convert(quantity, unit, metricValue), decimals)} ${unitLabel(quantity, unit)}`;
 
 /** What the store of the units reads and writes the choice through. */
 export type UnitPreferences = {

@@ -43,21 +43,28 @@ import type { ObservedLoader } from '../observedData';
 import { createPlayback, type PlaybackOptions } from '../playback';
 import {
 	fitSummaryScale,
+	inUnit,
+	isDifferenceView,
 	type LayerYear,
 	layerCaption,
+	layerUnit,
 	meanOfMonths,
+	metricRange,
 	type ObservedComparison,
 	offersSummary,
+	type PerUnit,
 	SCALAR_LAYERS,
 	type ScalarLayerReading,
 	type ScalarLayerSpec,
 	type ScalarObservedLoader,
 	scaleKey,
 	summaryOf,
+	toLayerUnit,
 	windsStatus,
 	type YearFieldKey,
 	yearField,
 } from '../scalarLayer';
+import { type ResolvedUnits, SYSTEM_UNITS } from '../units';
 import {
 	DEFAULT_MONTH,
 	DEFAULT_PAGE_VIEW,
@@ -122,6 +129,11 @@ export type LayerPanelOptions = Pick<
 	 */
 	readonly start?: StoredView;
 	/**
+	 * The unit chosen for each quantity it starts on, which the legend is
+	 * written in; metric when left out.
+	 */
+	readonly units?: ResolvedUnits;
+	/**
 	 * The globe the layer and the winds are drawn on, showing the world
 	 * already.
 	 */
@@ -163,9 +175,12 @@ export type LayerPanelOptions = Pick<
 export type ShownLayer = {
 	/** The layer the field is of. */
 	readonly layer: ScalarLayerSpec;
+	/** The view of the layer's year the field is of. */
+	readonly summary: Summary;
 	/**
-	 * The field the globe was last given: one value per cell, in cell order.
-	 * It belongs to the panel and must not be changed.
+	 * The field the globe was last given: one value per cell, in cell order,
+	 * in the metric unit of the layer's quantity. It belongs to the panel
+	 * and must not be changed.
 	 */
 	readonly field: Float32Array;
 	/** Where the field comes from. */
@@ -306,6 +321,17 @@ export type LayerPanel = {
 	 */
 	setPaused(paused: boolean): void;
 	/**
+	 * Takes the unit chosen for each quantity, as the settings chose them,
+	 * and writes the legend in the units of the layers' quantities at once:
+	 * its scale fitted again in the new unit, its ticks, caption and error
+	 * figures, with no new calculation. The globe is given the field again
+	 * only when the scale's ends, rounded in the new unit, cover other
+	 * values. A change of no layer's unit changes nothing.
+	 *
+	 * @param units - The unit for each quantity.
+	 */
+	setUnits(units: ResolvedUnits): void;
+	/**
 	 * What the globe shows of a computed layer: exactly what it was last
 	 * given, as of the panel's latest update, which follows every change of
 	 * the view settings and of the store. Null while it shows the height
@@ -324,6 +350,8 @@ export type LayerPanel = {
 /** What the globe is given to show of a layer, and how. */
 type Shown = {
 	readonly field: Float32Array;
+	/** The range the globe colours the field on, in the metric unit. */
+	readonly range: ValueRange;
 	readonly legend: LegendSource;
 	readonly layer: ScalarLayerSpec;
 	readonly summary: Summary;
@@ -345,13 +373,30 @@ type ObservedYear = LayerYear & {
  */
 type Derived = LayerYear & {
 	readonly result: object;
-	/** The scales fitted to this year alone, by {@link scaleKey}. */
-	readonly scales: Map<string, ValueRange>;
+	/**
+	 * The scales fitted to this year alone, by {@link scaleKey} and the
+	 * unit they are fitted in.
+	 */
+	readonly scales: Map<string, FittedScale>;
 	against?: ObservedYear;
-	/** The scales fitted to this year and the observed one together. */
-	readonly shared: Map<string, ValueRange>;
+	/**
+	 * The scales fitted to this year and the observed one together, by
+	 * {@link scaleKey} and unit.
+	 */
+	readonly shared: Map<string, FittedScale>;
 	readonly differences: Map<YearFieldKey, Float32Array>;
 	readonly figures: Map<YearFieldKey, FieldDifference>;
+};
+
+/**
+ * A scale as it is fitted in a unit, and as the globe is given it, so that
+ * the same ranges are given again while it is kept.
+ */
+type FittedScale = {
+	/** The range in the unit, which the legend is marked along. */
+	readonly range: ValueRange;
+	/** The same range of the metric values the globe colours by. */
+	readonly metric: ValueRange;
 };
 
 /**
@@ -581,8 +626,18 @@ const kept = <K, V>(map: Map<K, V>, key: K, make: () => V): V => {
  * The legend's scale, ramp, caption and ticks are always those of what the
  * globe shows: what it was last given, or no scale while it shows the height
  * colours, written as the layer that field is of writes its values, with its
- * error figures in that layer's unit. Its line and bar say where the chosen
- * layer's result stands, in that layer's words.
+ * error figures, in the unit chosen for that layer's quantity, as the page
+ * gives the units at the start and by {@link LayerPanel.setUnits}; metric
+ * until it does. Each scale is fitted in that unit: the values are
+ * converted to it, and the scale fitted, at least the layer's smallest span
+ * in that unit wide, and rounded there, so that its ends and ticks are
+ * round in it; a seasonal range and a difference convert by the unit's
+ * scale alone, and the difference reaches as far either side of zero, and
+ * is marked at the step, the layer gives that unit. The globe is given the
+ * range back in the metric values it colours by. Each scale is worked out
+ * once for each unit, when first shown in it, and kept as the others are.
+ * Its line and bar say where the chosen layer's result stands, in that
+ * layer's words.
  *
  * Nothing here throws in normal use; what the globe throws reaches the
  * store's record of errors when it comes from a change of the store, and
@@ -629,6 +684,8 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 	let source = DEFAULT_PAGE_VIEW.source;
 	/** Whether the calculation is paused, as the page last said. */
 	let paused = false;
+	/** The unit chosen for each quantity, as the page last said. */
+	let units = options.units ?? SYSTEM_UNITS.metric;
 	/**
 	 * What has been worked out from the latest winds result, dropped with it.
 	 */
@@ -726,42 +783,76 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 		const showing: Source = year === null ? 'simulated' : source;
 		const view = summaryOf(spec, summary);
 		const key: YearFieldKey = summary === 'month' ? playback.month : summary;
+		const unit = layerUnit(spec, units);
+		/** A difference of the layer's quantity, in the unit. */
+		const differenceIn = (metric: number): number =>
+			toLayerUnit(spec, unit, metric, true);
+		const figures = (): FieldDifference | null => {
+			if (year === null) {
+				return null;
+			}
+			const metric = figuresOf(spec, from, year, key);
+			return {
+				meanDifference: differenceIn(metric.meanDifference),
+				rmsDifference: differenceIn(metric.rmsDifference),
+			};
+		};
+		/** What the globe is to show of a field on a scale. */
 		const on = (
 			field: Float32Array,
-			range: ValueRange,
+			scale: FittedScale,
 			ramp: ColourRamp,
-			tickStep?: number,
+			tickStep?: PerUnit,
 		): Shown => ({
 			field,
+			range: scale.metric,
 			legend: {
-				range,
+				range: scale.range,
 				ramp,
 				caption: layerCaption(
 					spec,
 					summary,
 					playback.month,
 					earth === null || spec.observed === null ? undefined : showing,
+					unit,
 				),
-				tickStep,
-				figures: year === null ? null : figuresOf(spec, from, year, key),
+				unit,
+				tickStep: tickStep === undefined ? undefined : inUnit(tickStep, unit),
+				figures: figures(),
 			},
 			layer: spec,
 			summary,
 			month: playback.month,
 			source: showing,
 		});
+		/**
+		 * A scale in the unit with the same of the metric values, whose
+		 * values are differences of the quantity or not.
+		 */
+		const fitted = (range: ValueRange, isDifference: boolean): FittedScale => ({
+			range,
+			metric: metricRange(spec, unit, range, isDifference),
+		});
+		const scaleIn = `${scaleKey(view, key)} ${unit}`;
+		const viewDifference = isDifferenceView(view);
 		if (year === null) {
 			return on(
 				yearField(spec, from, key),
-				kept(from.scales, scaleKey(view, key), () =>
-					fitSummaryScale(spec, view, [from], key),
+				kept(from.scales, scaleIn, () =>
+					fitted(
+						fitSummaryScale(spec, view, [from], key, unit),
+						viewDifference,
+					),
 				),
 				view.ramp,
 				view.tickStep,
 			);
 		}
-		const shared = kept(from.shared, scaleKey(view, key), () =>
-			fitSummaryScale(spec, view, [from, year], key),
+		const shared = kept(from.shared, scaleIn, () =>
+			fitted(
+				fitSummaryScale(spec, view, [from, year], key, unit),
+				viewDifference,
+			),
 		);
 		switch (showing) {
 			case 'simulated':
@@ -773,7 +864,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 				const { difference } = spec.observed as ObservedComparison;
 				return on(
 					differenceOf(spec, from, year, key),
-					centredRange(difference.halfSpan),
+					fitted(centredRange(inUnit(difference.halfSpan, unit)), true),
 					difference.ramp,
 					difference.tickStep,
 				);
@@ -946,10 +1037,10 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 					shown === null ||
 					shown.field !== next.field ||
 					shown.legend.ramp !== next.legend.ramp ||
-					shown.legend.range.min !== next.legend.range.min ||
-					shown.legend.range.max !== next.legend.range.max
+					shown.range.min !== next.range.min ||
+					shown.range.max !== next.range.max
 				) {
-					globe.setLayer(next.field, next.legend.range, next.legend.ramp);
+					globe.setLayer(next.field, next.range, next.legend.ramp);
 				}
 				shown = next;
 			} else if (shown !== null) {
@@ -976,6 +1067,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 					? null
 					: {
 							layer: shown.layer,
+							summary: shown.summary,
 							field: shown.field,
 							source: shown.source,
 							current:
@@ -1332,6 +1424,15 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			}
 			paused = next;
 			update();
+		},
+		setUnits: (next) => {
+			const changed = states.some(
+				(state) => layerUnit(state.spec, next) !== layerUnit(state.spec, units),
+			);
+			units = next;
+			if (changed) {
+				update();
+			}
 		},
 		shown: () => shownLayer,
 		shownWinds: () => shownWindsState,

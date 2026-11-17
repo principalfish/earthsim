@@ -20,9 +20,25 @@ import {
 	type World,
 } from '../../core/index';
 import type { Globe, WindowPoint } from '../globe/renderer';
-import type { ScalarLayerSpec } from '../scalarLayer';
-import { formatWind, SYSTEM_UNITS, type WindUnit, windFromDeg } from '../units';
-import type { Source, WindSource } from '../view';
+import {
+	isDifferenceView,
+	type LayerUnit,
+	metricUnit,
+	type ScalarLayerSpec,
+	summaryOf,
+	toLayerUnit,
+} from '../scalarLayer';
+import {
+	convert,
+	formatWind,
+	type ResolvedUnits,
+	SYSTEM_UNITS,
+	type UnitOf,
+	unitLabel,
+	type WindUnit,
+	windFromDeg,
+} from '../units';
+import type { Source, Summary, WindSource } from '../view';
 import { createElement } from './fields';
 import type { ShownLayer, ShownWinds } from './layerPanel';
 
@@ -70,46 +86,64 @@ export const formatLatLon = (
 
 /**
  * An elevation as the readout writes it, measured from the sea level: on
- * land the height above it, such as `1,234 m`, and at sea the depth below
- * it, such as `3,400 m deep`.
+ * land the height above it, such as `1,234 m` or `4,049 ft`, and at sea the
+ * depth below it, such as `3,400 m deep` or `11,155 ft deep`.
  *
  * @remarks
  * Land is what stands strictly above the sea level, so a place exactly at
- * it is sea: `0 m deep`. Metres are whole, with the digits grouped in
- * threes.
+ * it is sea: `0 m deep`. The height is converted to the unit and written
+ * whole, with the digits grouped in threes.
  *
  * @param heightM - Height above the sea level in metres; negative below it.
+ * @param unit - The unit to write it in; metres when left out.
  */
-export const formatElevation = (heightM: number): string =>
-	heightM > 0
-		? `${groupedWhole(heightM)} m`
-		: `${groupedWhole(heightM)} m deep`;
+export const formatElevation = (
+	heightM: number,
+	unit: UnitOf<'height'> = SYSTEM_UNITS.metric.height,
+): string => {
+	const text = `${groupedWhole(convert('height', unit, heightM))} ${unitLabel('height', unit)}`;
+	return heightM > 0 ? text : `${text} deep`;
+};
 
 /**
  * A value of a layer's field on screen as the readout writes it, followed
- * by the layer's unit, such as, for the temperature, `18 °C` or `−31 °C`,
+ * by the unit, such as, for the temperature, `18 °C`, `64 °F` or `−31 °C`,
  * whatever month or summary of the year the field is; and by where it
  * comes from, when that is not the simulation: `21 °C observed`, or
  * `+2 °C difference` for the simulated less the observed.
  *
  * @remarks
- * The value is written as the layer writes it, the temperature's rounded
- * to a whole degree, a half upwards, with its digits grouped in threes and
- * a true minus sign; a value that rounds to zero is `0`, never `−0`. A
- * difference is signed both ways, `+2` above zero and `−3` below, and one
- * that rounds to zero is `0`, never `+0`.
+ * The value is converted to the unit, a difference of simulated less
+ * observed and a view of differences such as the seasonal range by the
+ * unit's scale alone, so that a range of 10 °C reads `18 °F`. It is then
+ * written as the layer writes it, the temperature's rounded to a whole
+ * degree, a half upwards, with its digits grouped in threes and a true
+ * minus sign; a value that rounds to zero is `0`, never `−0`. A difference
+ * is signed both ways, `+2` above zero and `−3` below, and one that rounds
+ * to zero is `0`, never `+0`.
  *
  * @param layer - The layer's description.
- * @param value - The value, in the layer's unit.
+ * @param value - The value, in the metric unit of the layer's quantity.
  * @param source - Where the field comes from; the simulation when left
  * out.
+ * @param unit - The unit to write it in, one of the layer's quantity; its
+ * metric unit when left out.
+ * @param summary - The view of the year the field is of, one the layer
+ * offers; the Month when left out.
+ * @throws RangeError if the unit is not one of the layer's quantity, or the
+ * layer does not offer the view.
  */
 export const formatLayerValue = (
 	layer: ScalarLayerSpec,
 	value: number,
 	source: Source = 'simulated',
+	unit: LayerUnit = metricUnit(layer),
+	summary: Summary = 'month',
 ): string => {
-	const text = `${layer.formatValue(value, source === 'difference')} ${layer.unit}`;
+	const isDifference =
+		source === 'difference' || isDifferenceView(summaryOf(layer, summary));
+	const converted = toLayerUnit(layer, unit, value, isDifference);
+	const text = `${layer.formatValue(converted, unit, source === 'difference')} ${unitLabel(layer.quantity, unit)}`;
 	return source === 'simulated' ? text : `${text} ${source}`;
 };
 
@@ -117,7 +151,12 @@ export const formatLayerValue = (
 export type ReadoutValue = {
 	/** The layer on screen. */
 	readonly layer: ScalarLayerSpec;
-	/** The value of the field on screen at the place, in the layer's unit. */
+	/** The view of the layer's year on screen. */
+	readonly summary: Summary;
+	/**
+	 * The value of the field on screen at the place, in the metric unit of
+	 * the layer's quantity.
+	 */
 	readonly value: number;
 	/** Where the field comes from. */
 	readonly source: Source;
@@ -206,22 +245,30 @@ export type ReadoutText = {
  * The readout's text for one place.
  *
  * @param parts - What there is to say of the place.
- * @param unit - The unit to write a wind's speed in; m/s when left out.
+ * @param units - The unit to write each quantity in: the elevation in the
+ * height's, the layer's value in its quantity's and the wind's speed in
+ * the wind speed's; metric when left out.
  */
 export const describeReadout = (
 	parts: ReadoutParts,
-	unit: WindUnit = SYSTEM_UNITS.metric.windSpeed,
+	units: ResolvedUnits = SYSTEM_UNITS.metric,
 ): ReadoutText => {
 	const { value, wind } = parts;
 	return {
 		position: formatLatLon(parts.latitudeDeg, parts.longitudeDeg),
-		elevation: formatElevation(parts.heightM),
+		elevation: formatElevation(parts.heightM, units.height),
 		value:
 			value === null
 				? null
-				: formatLayerValue(value.layer, value.value, value.source),
+				: formatLayerValue(
+						value.layer,
+						value.value,
+						value.source,
+						units[value.layer.quantity],
+						value.summary,
+					),
 		status: value === null || value.current ? null : READOUT_OUT_OF_DATE_TEXT,
-		wind: wind === null ? null : formatReadoutWind(wind, unit),
+		wind: wind === null ? null : formatReadoutWind(wind, units.windSpeed),
 		windStatus: wind === null || wind.current ? null : READOUT_OUT_OF_DATE_TEXT,
 	};
 };
@@ -273,6 +320,7 @@ export const readoutPartsAt = (
 			shown !== null && Number.isFinite(value)
 				? {
 						layer: shown.layer,
+						summary: shown.summary,
 						value,
 						source: shown.source,
 						current: shown.current,
@@ -316,8 +364,8 @@ export type CursorReadoutOptions = {
 	readonly shownLayer: () => ShownLayer | null;
 	/** What the globe shows of the winds, at the time it is asked. */
 	readonly shownWinds: () => ShownWinds | null;
-	/** The unit wind speeds are written in, at the time it is asked. */
-	readonly windUnit: () => WindUnit;
+	/** The unit each quantity is written in, at the time it is asked. */
+	readonly units: () => ResolvedUnits;
 	/** Shows the readout's text, or hides the readout for null. */
 	readonly show: (text: ReadoutText | null) => void;
 };
@@ -327,9 +375,8 @@ export type CursorReadout = {
 	/**
 	 * Says that what lies under the pointer may have changed though the
 	 * pointer has not moved: the terrain, the sea level, the world, the
-	 * camera, the layer or the winds on screen, or the unit wind
-	 * speeds are written in. The readout looks again at the next animation
-	 * frame.
+	 * camera, the layer or the winds on screen, or the units. The readout
+	 * looks again at the next animation frame.
 	 */
 	invalidate(): void;
 	/**
@@ -398,7 +445,7 @@ export const createCursorReadout = (
 							options.shownLayer(),
 							options.shownWinds(),
 						),
-						options.windUnit(),
+						options.units(),
 					),
 		);
 		if (direction !== null && options.isStrokeActive()) {

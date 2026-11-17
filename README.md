@@ -10,6 +10,7 @@ It is a static site with no server and no account. The world is saved in the bro
 - **Planet settings.** Axial tilt, the star's brightness and mass, the orbit's distance, the greenhouse strength and the length of the day, which sets how many bands of wind there are and how wide.
 - **A temperature layer.** Air temperature for each month, or the year's average, warmest month, coldest month and seasonal range, recalculated after every change.
 - **Winds.** The surface winds for each month or the year's average, drawn over the globe as arrows or as moving streaks, with the wind under the pointer in the unit chosen in Settings (m/s, km/h, mph or knots).
+- **Units.** Metric or Imperial, or a unit per quantity: the legend, the value under the pointer and the Statistics are written in them, the legend's scale round in the unit chosen.
 - **A pressure layer.** The sea-level pressure the winds are worked out from, for each month or the year's average.
 - **The sun.** Drawn in the scene, with an optional day and night side on the globe.
 - **Earth comparison.** On the Earth, the simulated temperature and sea-level pressure beside the observed ones and the difference between them; the simulated winds beside the observed winds.

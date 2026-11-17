@@ -21,7 +21,12 @@ import {
 	oneByClass,
 } from '../testing/fakeDocument';
 import { MADE_UP_LAYER } from '../testing/scalarLayerFixtures';
-import { unitsOf, type WindUnit } from '../units';
+import {
+	type ResolvedUnits,
+	SYSTEM_UNITS,
+	unitsOf,
+	type WindUnit,
+} from '../units';
 import {
 	createCursorReadout,
 	createReadoutBlock,
@@ -37,6 +42,12 @@ import {
 	readoutPartsAt,
 } from './cursorReadout';
 import type { ShownLayer, ShownWinds } from './layerPanel';
+
+/** The metric units, with wind speeds in a unit given. */
+const withWind = (unit: WindUnit): ResolvedUnits => ({
+	...SYSTEM_UNITS.metric,
+	windSpeed: unit,
+});
 
 describe('formatLatLon', () => {
 	it('writes each coordinate to a tenth of a degree with its letter', () => {
@@ -147,6 +158,104 @@ describe('formatLayerValue', () => {
 	});
 });
 
+describe('the readout in other units', () => {
+	it('writes a height and a depth in feet', () => {
+		expect(formatElevation(1234, 'ft')).toBe('4,049 ft');
+		expect(formatElevation(-3400, 'ft')).toBe('11,155 ft deep');
+		expect(formatElevation(0, 'ft')).toBe('0 ft deep');
+		expect(formatElevation(1234, 'm')).toBe(formatElevation(1234));
+	});
+
+	it('writes a temperature in °F and K', () => {
+		expect(formatLayerValue(TEMPERATURE_LAYER, 18.2, 'simulated', '°F')).toBe(
+			'65 °F',
+		);
+		expect(formatLayerValue(TEMPERATURE_LAYER, -40, 'simulated', '°F')).toBe(
+			'−40 °F',
+		);
+		expect(formatLayerValue(TEMPERATURE_LAYER, 18.2, 'simulated', 'K')).toBe(
+			'291 K',
+		);
+		expect(formatLayerValue(TEMPERATURE_LAYER, 21, 'observed', 'K')).toBe(
+			'294 K observed',
+		);
+	});
+
+	it('converts a seasonal range and a difference by the scale alone', () => {
+		expect(
+			formatLayerValue(TEMPERATURE_LAYER, 10, 'simulated', '°F', 'range'),
+		).toBe('18 °F');
+		expect(
+			formatLayerValue(TEMPERATURE_LAYER, 10, 'simulated', 'K', 'range'),
+		).toBe('10 K');
+		expect(
+			formatLayerValue(TEMPERATURE_LAYER, 10, 'observed', '°F', 'range'),
+		).toBe('18 °F observed');
+		expect(formatLayerValue(TEMPERATURE_LAYER, 2.2, 'difference', '°F')).toBe(
+			'+4 °F difference',
+		);
+		expect(
+			formatLayerValue(TEMPERATURE_LAYER, -10, 'difference', '°F', 'range'),
+		).toBe('−18 °F difference');
+		// Any other view of the year is a temperature, with the offset.
+		expect(
+			formatLayerValue(TEMPERATURE_LAYER, 10, 'simulated', '°F', 'warmest'),
+		).toBe('50 °F');
+	});
+
+	it('writes a pressure in inHg to two decimals', () => {
+		expect(formatLayerValue(PRESSURE_LAYER, 1013.25, 'simulated', 'inHg')).toBe(
+			'29.92 inHg',
+		);
+		expect(formatLayerValue(PRESSURE_LAYER, -4.4, 'difference', 'inHg')).toBe(
+			'−0.13 inHg difference',
+		);
+	});
+
+	it('refuses a unit of another quantity', () => {
+		expect(() =>
+			formatLayerValue(PRESSURE_LAYER, 1013, 'simulated', '°F'),
+		).toThrow(RangeError);
+	});
+
+	it('writes the place, the value and the wind each in its unit', () => {
+		const text = describeReadout(
+			{
+				latitudeDeg: 0,
+				longitudeDeg: 0,
+				heightM: -3400,
+				value: {
+					layer: TEMPERATURE_LAYER,
+					summary: 'range',
+					value: 10,
+					source: 'simulated',
+					current: true,
+				},
+				wind: { east: -5, north: -5, current: true },
+			},
+			SYSTEM_UNITS.imperial,
+		);
+		expect(text).toMatchObject({
+			elevation: '11,155 ft deep',
+			value: '18 °F',
+			wind: '16 mph NE',
+		});
+	});
+
+	it('reads the view of the year from what the globe shows', () => {
+		const world = createBlankWorld(64);
+		const parts = readoutPartsAt(world, [0, 0, 1], {
+			layer: TEMPERATURE_LAYER,
+			summary: 'range',
+			field: new Float32Array(world.elevation.length).fill(10),
+			source: 'simulated',
+			current: true,
+		});
+		expect(parts.value?.summary).toBe('range');
+		expect(describeReadout(parts, SYSTEM_UNITS.imperial).value).toBe('18 °F');
+	});
+});
+
 describe('describeReadout', () => {
 	const place = {
 		latitudeDeg: 27.94,
@@ -173,6 +282,7 @@ describe('describeReadout', () => {
 				...place,
 				value: {
 					layer: TEMPERATURE_LAYER,
+					summary: 'month',
 					value: -18.2,
 					source: 'simulated',
 					current: true,
@@ -194,6 +304,7 @@ describe('describeReadout', () => {
 				...place,
 				value: {
 					layer: TEMPERATURE_LAYER,
+					summary: 'month',
 					value: -12,
 					source: 'difference',
 					current: false,
@@ -212,6 +323,7 @@ describe('describeReadout', () => {
 				...place,
 				value: {
 					layer: TEMPERATURE_LAYER,
+					summary: 'month',
 					value: 21,
 					source: 'observed',
 					current: true,
@@ -226,6 +338,7 @@ describe('describeReadout', () => {
 			heightM: -3400,
 			value: {
 				layer: TEMPERATURE_LAYER,
+				summary: 'month',
 				value: 12,
 				source: 'simulated',
 				current: false,
@@ -289,13 +402,14 @@ describe('describeReadout', () => {
 
 	it('writes the wind in the unit given', () => {
 		expect(
-			describeReadout({ ...place, wind: northEasterly }, 'km/h').wind,
+			describeReadout({ ...place, wind: northEasterly }, withWind('km/h')).wind,
 		).toBe('25 km/h NE');
-		expect(describeReadout({ ...place, wind: northEasterly }, 'mph').wind).toBe(
-			'16 mph NE',
-		);
 		expect(
-			describeReadout({ ...place, wind: northEasterly }, 'knots').wind,
+			describeReadout({ ...place, wind: northEasterly }, withWind('mph')).wind,
+		).toBe('16 mph NE');
+		expect(
+			describeReadout({ ...place, wind: northEasterly }, withWind('knots'))
+				.wind,
 		).toBe('14 knots NE');
 	});
 
@@ -311,6 +425,7 @@ describe('describeReadout', () => {
 				...place,
 				value: {
 					layer: TEMPERATURE_LAYER,
+					summary: 'month',
 					value: 18,
 					source: 'simulated',
 					current: temperatureCurrent,
@@ -329,12 +444,13 @@ describe('describeReadout', () => {
 	it('reads a calm wind as calm in every unit, from below 0.5 m/s, with no direction', () => {
 		for (const unit of unitsOf('windSpeed')) {
 			const calm = { ...northEasterly, east: 0.49, north: 0 };
-			expect(describeReadout({ ...place, wind: calm }, unit).wind, unit).toBe(
-				'calm',
-			);
+			expect(
+				describeReadout({ ...place, wind: calm }, withWind(unit)).wind,
+				unit,
+			).toBe('calm');
 			const light = { ...northEasterly, east: 0.5, north: 0 };
 			expect(
-				describeReadout({ ...place, wind: light }, unit).wind,
+				describeReadout({ ...place, wind: light }, withWind(unit)).wind,
 				unit,
 			).toMatch(/ W$/);
 		}
@@ -396,6 +512,7 @@ const shownOf = (
 	values: Partial<ShownLayer> = {},
 ): ShownLayer => ({
 	layer: TEMPERATURE_LAYER,
+	summary: 'month',
 	field,
 	source: 'simulated',
 	current: true,
@@ -441,6 +558,7 @@ describe('readoutPartsAt', () => {
 				.value,
 		).toEqual({
 			layer: TEMPERATURE_LAYER,
+			summary: 'month',
 			value: -12.5,
 			source: 'simulated',
 			current: false,
@@ -598,6 +716,8 @@ type Page = {
 	shownTemperature: ShownLayer | null;
 	shownWinds: ShownWinds | null;
 	windUnit: WindUnit;
+	/** The units the readout writes in, or null for metric with `windUnit`. */
+	units: ResolvedUnits | null;
 	/** How many times the globe was asked for the point under the pointer. */
 	picks: number;
 };
@@ -614,6 +734,7 @@ const createStage = (world: World = createBlankWorld(64)) => {
 		shownTemperature: null,
 		shownWinds: null,
 		windUnit: 'm/s',
+		units: null,
 		picks: 0,
 	};
 	const readout = createCursorReadout({
@@ -628,7 +749,7 @@ const createStage = (world: World = createBlankWorld(64)) => {
 		isStrokeActive: () => page.strokeActive,
 		shownLayer: () => page.shownTemperature,
 		shownWinds: () => page.shownWinds,
-		windUnit: () => page.windUnit,
+		units: () => page.units ?? withWind(page.windUnit),
 		show: (text) => shows.push(text),
 	});
 	return Object.assign(page, {
@@ -658,6 +779,7 @@ describe('the readout of the pressure', () => {
 		field[cell] = 1018.3;
 		const parts = readoutPartsAt(world, direction, {
 			layer: PRESSURE_LAYER,
+			summary: 'month',
 			field,
 			source: 'simulated',
 			current: true,
@@ -668,6 +790,7 @@ describe('the readout of the pressure', () => {
 		});
 		const annual = readoutPartsAt(world, direction, {
 			layer: PRESSURE_LAYER,
+			summary: 'annualMean',
 			field,
 			source: 'simulated',
 			current: true,
@@ -691,6 +814,7 @@ describe('the readout of another layer', () => {
 		field[cell] = 1021.2;
 		const parts = readoutPartsAt(world, direction, {
 			layer: MADE_UP_LAYER,
+			summary: 'month',
 			field,
 			source: 'simulated',
 			current: false,
@@ -803,6 +927,30 @@ describe('createCursorReadout', () => {
 			wind: null,
 			windStatus: null,
 		});
+	});
+
+	it('looks again after invalidate() when the units change, and writes the place and the value in them', () => {
+		const { stage, cell } = overLand();
+		const field = new Float32Array(stage.world.elevation.length);
+		field[cell] = 18.2;
+		stage.shownTemperature = shownOf(field);
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		expect(stage.last()).toMatchObject({
+			elevation: '1,234 m',
+			value: '18 °C',
+		});
+		stage.units = SYSTEM_UNITS.imperial;
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		expect(stage.last()).toMatchObject({
+			elevation: '4,049 ft',
+			value: '65 °F',
+		});
+		stage.units = { ...SYSTEM_UNITS.imperial, temperature: 'K' };
+		stage.readout.invalidate();
+		frames.runFrame(16);
+		expect(stage.last()?.value).toBe('291 K');
 	});
 
 	/** Winds NE everywhere, at 5√2 m/s. */

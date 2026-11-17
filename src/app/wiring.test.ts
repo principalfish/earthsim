@@ -69,6 +69,7 @@ import {
 	type ShownLayer,
 	type ShownWinds,
 } from './ui/layerPanel';
+import type { LegendContent } from './ui/legend';
 import {
 	FIRST_NEW_WORLD_VALUES,
 	type NewWorldDialogOptions,
@@ -89,7 +90,7 @@ import {
 	type WorldPanelOptions,
 } from './ui/worldPanel';
 import type { ShortcutEvent } from './undo';
-import { DEFAULT_UNIT_CHOICE, type UnitChoice } from './units';
+import { DEFAULT_UNIT_CHOICE, SYSTEM_UNITS, type UnitChoice } from './units';
 import {
 	DEFAULT_MONTH,
 	DEFAULT_PAGE_VIEW,
@@ -556,6 +557,7 @@ const createStage = (
 			return {
 				refresh: () => log.push('statistics.refresh'),
 				reset: () => log.push('statistics.reset'),
+				setHeightUnit: (unit) => log.push(`statistics.setHeightUnit ${unit}`),
 			};
 		},
 		createTemperature: (options) => {
@@ -602,6 +604,8 @@ const createStage = (
 				setMonth: (month) => log.push(`layerPanel.setMonth ${month}`),
 				togglePlaying: () => log.push('layerPanel.togglePlaying'),
 				setPaused: (paused) => log.push(`layerPanel.setPaused ${paused}`),
+				setUnits: (units) =>
+					log.push(`layerPanel.setUnits ${JSON.stringify(units)}`),
 				shown: () => stage.shownTemperature,
 				shownWinds: () => stage.shownWinds,
 			};
@@ -2224,6 +2228,7 @@ describe('the cursor readout', () => {
 		expect(stage.readoutOptions.shownLayer()).toBeNull();
 		const shown: ShownLayer = {
 			layer: TEMPERATURE_LAYER,
+			summary: 'month',
 			field: new Float32Array(next.elevation.length),
 			source: 'simulated',
 			current: true,
@@ -2334,6 +2339,7 @@ describe('the cursor readout', () => {
 		stage.layerOptions.store.setResult(result, true);
 		expect(stage.readoutOptions.shownLayer()).toEqual({
 			layer: TEMPERATURE_LAYER,
+			summary: 'month',
 			field: result.months[DEFAULT_MONTH],
 			source: 'simulated',
 			current: true,
@@ -2800,13 +2806,13 @@ describe('the units', () => {
 
 	/** The wind the readout writes, in the unit it is given at the time. */
 	const readoutWind = (stage: Stage): string | null =>
-		describeReadout(NORTH_EASTERLY, stage.readoutOptions.windUnit()).wind;
+		describeReadout(NORTH_EASTERLY, stage.readoutOptions.units()).wind;
 
-	it('starts on metric with nothing stored, in the settings and the readout, and tells the layer panel nothing of it', async () => {
+	it('starts on metric with nothing stored, in the settings, the layer panel and the readout', async () => {
 		const { stage } = await createWindUnitStage();
 		expect(stage.settingsPanelOptions.units).toEqual(DEFAULT_UNIT_CHOICE);
-		expect('windUnit' in stage.layerOptions).toBe(false);
-		expect(stage.readoutOptions.windUnit()).toBe('m/s');
+		expect(stage.layerOptions.units).toEqual(SYSTEM_UNITS.metric);
+		expect(stage.readoutOptions.units().windSpeed).toBe('m/s');
 		expect(readoutWind(stage)).toBe('7 m/s NE');
 		expect(stage.settingsUnits).toEqual([]);
 	});
@@ -2830,7 +2836,7 @@ describe('the units', () => {
 			[unitOverrideKey('windSpeed')]: 'kn',
 		});
 		expect(stage.settingsPanelOptions.units).toEqual(DEFAULT_UNIT_CHOICE);
-		expect(stage.readoutOptions.windUnit()).toBe('m/s');
+		expect(stage.readoutOptions.units().windSpeed).toBe('m/s');
 	});
 
 	it('starts on metric where the storage throws', async () => {
@@ -2838,7 +2844,7 @@ describe('the units', () => {
 			preferencesRefused: true,
 		});
 		expect(stage.settingsPanelOptions.units).toEqual(DEFAULT_UNIT_CHOICE);
-		expect(stage.readoutOptions.windUnit()).toBe('m/s');
+		expect(stage.readoutOptions.units().windSpeed).toBe('m/s');
 	});
 
 	it('carries a stored m/s over as the wind speed’s override, which Imperial then keeps', async () => {
@@ -2914,26 +2920,58 @@ describe('the units', () => {
 		]);
 	});
 
-	it('stores the other quantities’ overrides, and changes nothing they would show', async () => {
+	it('stores the other quantities’ overrides, and tells the layer panel and the statistics of each', async () => {
 		const stage = await createStartedStage();
+		expect(stage.layerOptions.units).toEqual(SYSTEM_UNITS.metric);
+		expect(stage.statisticsOptions).toMatchObject({ heightUnit: 'm' });
 		stage.settingsPanelOptions.onUnitOverride('temperature', '°F');
 		stage.settingsPanelOptions.onUnitOverride('height', 'ft');
 		expect(stage.preferenceStorage.writes).toEqual([
 			[unitOverrideKey('temperature'), '°F'],
 			[unitOverrideKey('height'), 'ft'],
 		]);
-		expect(stage.readoutOptions.windUnit()).toBe('m/s');
-		expect(stage.log).toEqual([]);
+		expect(stage.readoutOptions.units()).toEqual({
+			...SYSTEM_UNITS.metric,
+			temperature: '°F',
+			height: 'ft',
+		});
+		const fahrenheit = { ...SYSTEM_UNITS.metric, temperature: '°F' };
+		expect(stage.log).toEqual([
+			`layerPanel.setUnits ${JSON.stringify(fahrenheit)}`,
+			'statistics.setHeightUnit m',
+			`layerPanel.setUnits ${JSON.stringify({ ...fahrenheit, height: 'ft' })}`,
+			'statistics.setHeightUnit ft',
+		]);
+		expect(stage.readoutCalls).toEqual(['invalidate', 'invalidate']);
 	});
 
-	it('tells the settings and the readout of a change, and nothing of none', async () => {
+	it('starts the layer panel and the statistics in the stored units', async () => {
+		const stage = await createStartedStage(undefined, {
+			preferenceEntries: {
+				[UNIT_SYSTEM_KEY]: 'imperial',
+				[unitOverrideKey('pressure')]: 'hPa',
+			},
+		});
+		expect(stage.layerOptions.units).toEqual({
+			...SYSTEM_UNITS.imperial,
+			pressure: 'hPa',
+		});
+		expect(stage.statisticsOptions).toMatchObject({ heightUnit: 'ft' });
+		expect(stage.readoutOptions.units()).toEqual(stage.layerOptions.units);
+	});
+
+	it('tells the settings, the layer panel, the statistics and the readout of a change, and nothing of none', async () => {
 		const stage = await createStartedStage();
 		stage.settingsPanelOptions.onUnitSystem('metric');
 		stage.settingsPanelOptions.onUnitOverride('pressure', null);
 		expect(stage.readoutCalls).toEqual([]);
 		expect(stage.settingsUnits).toEqual([]);
-		stage.settingsPanelOptions.onUnitOverride('pressure', 'inHg');
 		expect(stage.log).toEqual([]);
+		stage.settingsPanelOptions.onUnitOverride('pressure', 'inHg');
+		expect(stage.log).toEqual([
+			`layerPanel.setUnits ${JSON.stringify({ ...SYSTEM_UNITS.metric, pressure: 'inHg' })}`,
+			'statistics.setHeightUnit m',
+		]);
 		expect(stage.readoutCalls).toEqual(['invalidate']);
 		expect(stage.settingsUnits).toEqual([
 			{ system: 'metric', overrides: { pressure: 'inHg' } },
@@ -2955,8 +2993,56 @@ describe('the units', () => {
 		const { stage } = await createWindUnitStage();
 		stage.settingsPanelOptions.onUnitSystem('imperial');
 		stage.state.replaceWorld(createBlankWorld(64));
-		expect(stage.readoutOptions.windUnit()).toBe('mph');
+		expect(stage.readoutOptions.units().windSpeed).toBe('mph');
 		expect(stage.preferenceStorage.writes).toHaveLength(1);
+	});
+
+	it('writes the legend of the real layer panel, the statistics and the readout in new units at once, with no new calculation', async () => {
+		const legends: (LegendContent | null)[] = [];
+		const stage = await createStartedStage(undefined, {
+			createLayerPanel: (options) =>
+				createLayerPanel({
+					...options,
+					globe: { setLayer: () => {}, setWinds: () => {} },
+					setTimer: () => 0,
+					clearTimer: () => {},
+					reportError: () => {},
+					createControls: () => ({
+						showLegend: (content) => legends.push(content),
+						showWindKey: () => {},
+						showCalculation: () => {},
+					}),
+				}),
+		});
+		stage.dockOptions.onLayer('temperature');
+		const cells = stage.state.world.elevation.length;
+		stage.layerOptions.store.markCalculating();
+		stage.layerOptions.store.setResult(temperatureOf(1, cells), true);
+		expect(legends.at(-1)?.scale?.caption).toBe('Air temperature in July, °C');
+		stage.log.length = 0;
+		stage.settingsPanelOptions.onUnitSystem('imperial');
+		expect(legends.at(-1)?.scale?.caption).toBe('Air temperature in July, °F');
+		expect(legends.at(-1)?.scale?.ticks.map((tick) => tick.label)).toEqual([
+			'30',
+			'31',
+			'32',
+			'33',
+			'34',
+		]);
+		expect(stage.log).toEqual(['statistics.setHeightUnit ft']);
+		expect(stage.readoutCalls.at(-1)).toBe('invalidate');
+		expect(
+			describeReadout(
+				{
+					latitudeDeg: 0,
+					longitudeDeg: 0,
+					heightM: -3400,
+					value: null,
+					wind: null,
+				},
+				stage.readoutOptions.units(),
+			).elevation,
+		).toBe('11,155 ft deep');
 	});
 });
 
@@ -3513,8 +3599,8 @@ describe('a worker that fails to load', () => {
 			return worker;
 		};
 		const stage = await createStartedStage(undefined, {
-			createStatistics: (options) =>
-				createStatisticsService({
+			createStatistics: (options) => ({
+				...createStatisticsService({
 					...options,
 					createWorker: make,
 					readout: {
@@ -3526,6 +3612,8 @@ describe('a worker that fails to load', () => {
 					clearTimer: timers.clearTimer,
 					logError: () => {},
 				}),
+				setHeightUnit: () => {},
+			}),
 			createTemperature: (options) =>
 				createTemperatureService({
 					...options,

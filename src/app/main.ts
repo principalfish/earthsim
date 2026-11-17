@@ -165,15 +165,23 @@ if (globe !== null) {
 		},
 		createPlanetPanel: (options) =>
 			createPlanetPanel(sections.planet.body, options),
-		createStatistics: (options) =>
-			createStatisticsService({
-				...options,
-				createWorker,
-				readout: createStatsPanel(sections.statistics.body),
-				setTimer,
-				clearTimer,
-				logError,
-			}),
+		createStatistics: (options) => {
+			const readout = createStatsPanel(
+				sections.statistics.body,
+				options.heightUnit,
+			);
+			return {
+				...createStatisticsService({
+					...options,
+					createWorker,
+					readout,
+					setTimer,
+					clearTimer,
+					logError,
+				}),
+				setHeightUnit: readout.setHeightUnit,
+			};
+		},
 		createTemperature: (options) =>
 			createTemperatureService({
 				...options,

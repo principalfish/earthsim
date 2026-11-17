@@ -120,8 +120,11 @@ export type Preferences = {
 	setUnitSystem(system: UnitSystem): void;
 	/**
 	 * Remembers a quantity's unit whatever the system, or, for null, that
-	 * it follows the system, by removing its entry. Storage that is missing
-	 * or will not take it is left as it is, without an error.
+	 * it follows the system, by removing its entry. For the wind speed, null
+	 * also removes the old entry under {@link OLD_WIND_SPEED_UNIT_KEY}, so
+	 * that the unit it holds cannot be carried over later in place of the
+	 * choice. Storage that is missing or will not take it is left as it is,
+	 * without an error.
 	 *
 	 * @param quantity - The quantity.
 	 * @param unit - Its unit, or null for none.

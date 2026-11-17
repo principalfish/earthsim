@@ -73,7 +73,8 @@ Until the first result arrives, the globe keeps the height colours.
 - **Colours** run from dark blue for the coldest, through red, to pale yellow for the hottest, growing lighter from cold to hot.
 - **One scale for the whole year.** It is fitted to the world's whole year, so a colour means the same temperature in every month and every summary.
 - **Fitted to the middle 99%.** The scale spans the middle 99% of the year by area, so a tall peak or a small cold corner does not squeeze the rest of the world into a few colours. Places beyond it take the colour at the end; the legend marks only the values along the scale.
-- **Seasonal range has its own scale and colours,** from near white to deep violet, starting at zero and marked every 5 degrees. The colours change fastest at the low end, since most of a world changes little through the year.
+- **Round in the unit chosen.** The scale is fitted in the temperature's unit from Settings, so its ends and ticks are whole degrees in °F and K as in °C; see the [user guide](user-guide.md#settings).
+- **Seasonal range has its own scale and colours,** from near white to deep violet, starting at zero and marked every 5 °C, 10 °F or 5 K. The colours change fastest at the low end, since most of a world changes little through the year.
 
 ## Earth comparison
 
@@ -87,7 +88,7 @@ On the **measured Earth**, the comparison control in the top bar over the globe 
 
 - **The measured Earth** is an Earth world exactly as it was made: Earth's planet settings, the sea level at 0 m, and every cell's elevation untouched. A stroke, a move of the Sea level or a Planet slider, or a new or imported world that is not such an Earth takes the choice away; undoing back, **Reset to Earth**, or the sea level back at 0 m returns it.
 - **Simulated and observed share one scale** once Observed or Difference has been chosen, so a colour means the same temperature in both.
-- **The difference has a fixed scale** from −20 to +20 °C: blue where the simulation is colder, near white where the two agree, red where it is warmer.
+- **The difference has a fixed scale** from −20 to +20 °C, −40 to +40 °F or −20 to +20 K: blue where the simulation is colder, near white where the two agree, red where it is warmer.
 - **Error figures** show under the legend, for the month or summary on screen: the mean difference and the root-mean-square difference, such as `Mean −0.1 °C · RMS 3.9 °C`.
 - The observed temperature is fetched the first time it is needed: when Observed or Difference is chosen in Temperature view, or Temperature is chosen while either is on. If that fails while Temperature is on screen, the view goes back to Simulated and the next choice tries again; if Temperature has been left meanwhile, the choice is kept and the fetch is tried again on coming back to it.
 

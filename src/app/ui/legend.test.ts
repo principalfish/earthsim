@@ -25,6 +25,7 @@ import {
 } from '../testing/fakeDocument';
 import { SEVEN_STOP_RAMP, TWO_STOP_RAMP } from '../testing/rampFixtures';
 import { MADE_UP_LAYER } from '../testing/scalarLayerFixtures';
+import { UNITS } from '../units';
 import {
 	cellWeights,
 	createLegend,
@@ -1044,5 +1045,173 @@ describe('createLegend', () => {
 		});
 		parts.legend.show(null);
 		expect(parts.root.hidden).toBe(true);
+	});
+});
+
+describe('fitting and marking a scale in a unit', () => {
+	const fahrenheit = UNITS.temperature['°F'];
+	const kelvin = UNITS.temperature.K;
+	const inches = UNITS.pressure.inHg;
+
+	it('converts the ends before widening and rounding them, outward to whole numbers', () => {
+		// −10 and 30 °C are 14 and 86 °F, and 263.15 and 303.15 K.
+		const months = [Float32Array.of(-10, 30)];
+		expect(fitRange(months, evenly(2), 4, fahrenheit)).toEqual({
+			min: 14,
+			max: 86,
+		});
+		expect(fitRange(months, evenly(2), 2, kelvin)).toEqual({
+			min: 263,
+			max: 304,
+		});
+		// 12 °C alone is 53.6 °F, widened to 4 °F about it.
+		expect(
+			fitRange([Float32Array.of(12, 12)], evenly(2), 4, fahrenheit),
+		).toEqual({ min: 51, max: 56 });
+	});
+
+	it('rounds the ends outward to the unit’s decimals', () => {
+		// 1000 and 1030 hPa are 29.5299… and 30.4160… inHg.
+		const range = fitRange(
+			[Float32Array.of(1000, 1030)],
+			evenly(2),
+			0.3,
+			inches,
+		);
+		expect(range).toEqual({ min: 29.52, max: 30.42 });
+		// Widened to 0.3 inHg about 1013 hPa, 29.9139… inHg.
+		expect(
+			fitRange([Float32Array.of(1013, 1013)], evenly(2), 0.3, inches),
+		).toEqual({ min: 29.76, max: 30.07 });
+	});
+
+	it('rounds an end on a decimal of the unit to itself, not past it', () => {
+		const exact = { scale: 1, offset: 0, decimals: 2 };
+		expect(
+			fitRange([Float32Array.of(0.5, 0.75)], evenly(2), 0.1, exact),
+		).toEqual({ min: 0.5, max: 0.75 });
+	});
+
+	it('fits sizes from zero by the scale alone', () => {
+		// A range of 10 °C is one of 18 °F, and of 10 K.
+		expect(fitRangeFromZero(Float32Array.of(10, 4), 4, fahrenheit)).toEqual({
+			min: 0,
+			max: 18,
+		});
+		expect(fitRangeFromZero(Float32Array.of(10, 4), 2, kelvin)).toEqual({
+			min: 0,
+			max: 10,
+		});
+		expect(fitRangeFromZero(Float32Array.of(1), 4, fahrenheit)).toEqual({
+			min: 0,
+			max: 4,
+		});
+		expect(fitRangeFromZero(Float32Array.of(10), 0.3, inches)).toEqual({
+			min: 0,
+			max: 0.3,
+		});
+		expect(fitRangeFromZero(Float32Array.of(20), 0.3, inches)).toEqual({
+			min: 0,
+			max: 0.6,
+		});
+	});
+
+	it('centres a scale on the centre in the unit, rounded to its decimals', () => {
+		const months = [Float32Array.of(1000, 1030)];
+		const range = fitRangeCentred(months, evenly(2), 1013.25, 0.3, inches);
+		// 1013.25 hPa is 29.92 inHg; the further end, 1000 hPa, is 0.39
+		// inHg below it, rounded up.
+		expect(range).toEqual({ min: 29.42, max: 30.42 });
+		expect(
+			fitRangeCentred([Float32Array.of(15, 15)], evenly(2), 15, 4, fahrenheit),
+		).toEqual({ min: 57, max: 61 });
+	});
+
+	it('marks a scale at a step with decimals, each tick the nearest number to its decimal', () => {
+		expect(legendTicks(-0.6, 0.6, 0.3, 2)).toEqual([-0.6, -0.3, 0, 0.3, 0.6]);
+		expect(legendTicks(29.4, 30.5, 0.3, 2)).toEqual([29.4, 29.7, 30, 30.3]);
+		expect(legendTicks(0, 49, 5, 2)).toEqual(legendTicks(0, 49, 5));
+		// A step that gives too many falls back on a step of the legend's.
+		expect(legendTicks(29, 30, 0.05, 2)).toEqual(legendTicks(29, 30));
+	});
+
+	it.each([
+		['more decimals than given', 0.25, 1],
+		['decimals that are not whole', 0.3, 1.5],
+		['decimals below zero', 3, -1],
+	])('refuses %s', (_, step, decimals) => {
+		expect(() => legendTicks(0, 1, step, decimals)).toThrow(RangeError);
+	});
+
+	it('writes the error figures to the decimals given', () => {
+		expect(
+			formatFigures(
+				{ meanDifference: 0.0312, rmsDifference: 0.1178 },
+				'inHg',
+				3,
+			),
+		).toBe('Mean +0.031 inHg · RMS 0.118 inHg');
+		expect(
+			formatFigures({ meanDifference: -0.0004, rmsDifference: 0 }, 'inHg', 3),
+		).toBe('Mean 0.000 inHg · RMS 0.000 inHg');
+	});
+
+	it('draws the scale in the source’s unit, its ticks written as the layer writes them there', () => {
+		const content = legendContent(
+			PRESSURE_LAYER,
+			{ status: 'current', progress: null },
+			{
+				range: { min: -0.6, max: 0.6 },
+				ramp: PRESSURE_RAMP,
+				caption: 'Simulated less observed in July, inHg',
+				unit: 'inHg',
+				tickStep: 0.3,
+				figures: { meanDifference: 0.0312, rmsDifference: 0.1178 },
+			},
+			true,
+		);
+		expect(content.scale?.ticks).toEqual([
+			{ label: '−0.60', position: 0 },
+			{ label: '−0.30', position: 25 },
+			{ label: '0.00', position: 50 },
+			{ label: '0.30', position: 75 },
+			{ label: '0.60', position: 100 },
+		]);
+		expect(content.scale?.figures).toBe('Mean +0.031 inHg · RMS 0.118 inHg');
+		const kelvin = legendContent(
+			TEMPERATURE_LAYER,
+			{ status: 'current', progress: null },
+			{
+				range: { min: 239, max: 305 },
+				ramp: TEMPERATURE_RAMP,
+				caption: 'Air temperature in July, K',
+				unit: 'K',
+				figures: { meanDifference: -0.14, rmsDifference: 3.93 },
+			},
+			true,
+		);
+		expect(kelvin.scale?.ticks.map((tick) => tick.label)).toEqual([
+			'240',
+			'260',
+			'280',
+			'300',
+		]);
+		expect(kelvin.scale?.figures).toBe('Mean −0.1 K · RMS 3.9 K');
+	});
+
+	it('refuses a source in a unit of another quantity', () => {
+		expect(() =>
+			legendContent(
+				PRESSURE_LAYER,
+				{ status: 'current', progress: null },
+				{
+					range: { min: 0, max: 10 },
+					ramp: PRESSURE_RAMP,
+					caption: 'Pressure',
+					unit: '°F',
+				},
+				true,
+			),
+		).toThrow(RangeError);
 	});
 });

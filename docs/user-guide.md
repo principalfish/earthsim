@@ -188,14 +188,14 @@ In Temperature view, **Show**, in the top bar, chooses what of the year is on th
 Pressure view colours the globe by the sea-level pressure of the winds' calculation, in hectopascals, for the month on screen.
 
 - **Reduced to sea level.** The value is what the pressure would be at sea level at that place, so high ground does not show as low pressure: over a mountain it is the sea-level pressure there, not the thinner air at the summit.
-- **Its colours** run from teal for low pressure, through near white, to brown for high. The near white is the planet's own mean over the whole year and the whole surface, and the scale is the same for every month and for the annual average, so a colour means the same in each as the year plays. The scale is at least 10 hPa wide, and the few places beyond its ends take the end colours.
+- **Its colours** run from teal for low pressure, through near white, to brown for high. The near white is the planet's own mean over the whole year and the whole surface, and the scale is the same for every month and for the annual average, so a colour means the same in each as the year plays. The scale is at least 10 hPa wide, 0.3 inHg in inHg, and the few places beyond its ends take the end colours.
 - **Show** offers **Month** and **Annual average** only.
 - **The legend** says what is shown, such as "Sea-level pressure in July, hPa" or "Annual average sea-level pressure, hPa". While the temperature and then the winds are being worked out the info box's status line says "Calculating temperature" and then "Calculating winds", as on any layer, and "Pressure unavailable" if they cannot be.
 - **The value under the pointer** gives the pressure there, such as `1,018 hPa`, whether by month or on the annual average.
 - **It is worked out with the winds,** from the temperature, after every change whether or not Pressure or Winds is on, so the colours appear as soon as the winds are ready. Winds can be shown over it.
 - **On an untouched Earth,** the comparison in the top bar offers the simulated pressure, the observed one (the mean sea-level pressure of 1981 to 2010), or the difference between them, as for the temperature. The observed pressure is fetched the first time it is needed: when Observed or Difference is chosen on Pressure, or Pressure is chosen while either is on. A line under the choice says "Loading observed pressure" meanwhile, and "Observed pressure could not be loaded" if it fails. The choice then goes back to Simulated when Pressure is still on screen, and the next choice tries again; if Pressure has been left, the choice is kept and the fetch is tried again on coming back to it.
   - **The legend** then says where the field comes from, such as "Observed sea-level pressure in July, hPa" or "Simulated less observed in July, hPa", and gives the mean and the root-mean-square of the simulated less the observed for the month or annual average on screen, in hPa, such as `Mean +1.2 hPa · RMS 4.5 hPa`.
-  - **The difference** is drawn from −20 to +20 hPa, marked every 10, in the temperature difference's blue-to-red colours: blue where the simulated pressure is too low, red where it is too high. The scale is the same for every month and the annual average.
+  - **The difference** is drawn from −20 to +20 hPa, marked every 10, or from −0.6 to +0.6 inHg, marked every 0.3, in the temperature difference's blue-to-red colours: blue where the simulated pressure is too low, red where it is too high. The scale is the same for every month and the annual average.
   - Any edit of the Earth removes the choice and puts it back on Simulated, and undoing the edit offers it again, as for the temperature.
 
 ### Simulated, observed or difference
@@ -307,7 +307,7 @@ On an untouched Earth, the comparison in the top bar also chooses whether the ar
 
 ## Statistics
 
-The Statistics section shows how much of the surface is land, the highest and deepest points, the mean height of the land and the mean depth of the ocean. It follows the terrain and the sea level, a moment after each change.
+The Statistics section shows how much of the surface is land, the highest and deepest points, the mean height of the land and the mean depth of the ocean, in the unit of heights and depths from [Settings](#settings). It follows the terrain and the sea level, a moment after each change.
 
 - The highest and deepest points are elevations on the scale of the Sea level slider. The two means are measured from the sea level.
 - "Statistics unavailable" means the worker that computes them could not start or failed. The rest of the page keeps working; reload the page to try again.
@@ -322,6 +322,14 @@ The Settings section holds choices the browser remembers; none is saved with the
 | Units: Metric / Imperial | Starting on Metric | The system of units: Metric is °C, hPa, m/s, m and km; Imperial is °F, inHg, mph, ft and mi |
 | Units: Temperature, Pressure, Wind speed, Heights and depths, Distances | **As the system**, which names the unit the system gives, such as "As the system (°C)", or one of the quantity's units: °C, °F or K; hPa or inHg; m/s, mph, km/h or knots; m or ft; km or mi | A unit for that quantity whatever the system |
 
-For now only the wind speed follows these choices: the wind under the pointer, in the [info box](#the-info-box), is written in the wind speed's unit, and changes at once. The other quantities' choices are remembered but do not yet change what the page shows. The arrows do not change with the unit.
+What the page writes follows these choices, and changes at once, with no new calculation:
+
+- **The legend:** its caption names the unit, such as "Air temperature in July, °F", and its ticks and error figures are in it. Its scale is fitted in the unit, so its ends and ticks are round there: whole degrees in °F and K, and two decimals in inHg, such as `29.70` and `30.00`.
+- **The value under the pointer:** the height or depth, such as `4,049 ft` or `11,155 ft deep`, the value of the layer, such as `65 °F` or `29.92 inHg`, and the wind.
+- **The Statistics:** the highest and deepest points and the two means.
+
+A seasonal range and a difference are converted by the unit's size alone: a range of 10 °C reads 18 °F, not 50 °F. Each unit has round settings of its own, chosen rather than converted: the narrowest scale is 2 °C, 4 °F or 2 K, and 10 hPa or 0.3 inHg wide; the seasonal range is marked every 5 °C, 10 °F or 5 K; and the difference runs from −20 to +20 °C marked every 10, −40 to +40 °F every 20, −20 to +20 K every 10, −20 to +20 hPa every 10, or −0.6 to +0.6 inHg every 0.3.
+
+The colours on the globe stay as they are, except that a scale's rounded ends can move them a little, and a difference's colours shift more, since its reach in °F or inHg is not quite that in °C or hPa. The arrows do not change with the unit. The sliders, such as Sea level and the brush's radius, and the Distances choice, do not yet follow the units.
 
 A wind speed unit chosen in the earlier Wind speed setting carries over as the wind speed's choice, m/s included, so it stays the same under either system.

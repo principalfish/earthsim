@@ -7,7 +7,8 @@
  *
  * It is shaped like a sea-level pressure: its months come from the store's
  * winds, it offers the Month and the Annual average alone, its scale is
- * centred on the year's mean by area, its unit is hPa, it has no observed
+ * centred on the year's mean by area, it measures a pressure, written in
+ * whole numbers whatever the unit, it has no observed
  * year to compare with and its calculation tells nothing of its progress.
  */
 
@@ -67,8 +68,8 @@ const meanOf = (months: readonly Float32Array[]): Float32Array => {
 export const MADE_UP_LAYER: ScalarLayerSpec = {
 	id: MADE_UP_ID,
 	label: 'Made-up pressure',
-	unit: 'hPa',
-	formatValue: formatWhole,
+	quantity: 'pressure',
+	formatValue: (value, _unit, signed) => formatWhole(value, signed),
 	formatTick: (value) => `≈${formatWhole(value, false)}`,
 	unavailableText: 'Made-up pressure unavailable',
 	notShownText: 'Made-up pressure could not be shown',
@@ -92,7 +93,7 @@ export const MADE_UP_LAYER: ScalarLayerSpec = {
 		},
 	],
 	summarise: (months) => ({ annualMean: meanOf(months) }),
-	minSpan: 10,
+	minSpan: { hPa: 10, inHg: 0.3 },
 	observed: null,
 	read: ({ winds }) => ({
 		status: winds.status,
