@@ -165,7 +165,7 @@ Rejected:
 - [x] 6. The browser remembers the view
 - [x] 7. The Settings section, with arrows or streaks starting on Streaks
 - [x] 8. Units: the model and its settings
-- [ ] 9. Units in the read-outs
+- [x] 9. Units in the read-outs
 - [ ] 10. Units in the controls
 - [ ] 11. The user guide restructured around the main view
 
@@ -277,3 +277,4 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - Existing metric expectations are unchanged; existing tests needed plumbing edits only, and two wiring tests that said the other quantities change nothing were rewritten. A synthetic Earth-like fixture (`src/app/testing/earthLikeFixtures.ts`) stands in for the real Earth files, which app tests cannot load.
 - In headless Edge on the Earth: °F ticks −20 … 80, seasonal 0 … 100 by 10, difference ±40 by 20; K 240 … 300, seasonal 0 … 55 by 5, difference ±20 by 10; inHg 29.50 / 30.00 / 30.50, difference ±0.60 by 0.30. Pointer "83 °F · 11 mph W", "14,735 ft deep", "29.82 inHg"; Statistics in ft. Once the observed year has arrived the legend shows Mean/RMS figures on Simulated too, and the range widens to cover both years: existing behaviour.
 - One review round (correctness, security, coverage, docs): three findings verified and fixed, two dropped; light re-check by correctness and docs raised two low findings on `isDifferenceView`, left for the user. In `findings.md`.
+- Approved after the user's manual review, with both re-check findings fixed: "ok approve and fix as you suggest". `isDifferenceView` counts only views fitted from zero, the `isDifference` flag went, and its doc says the values are spans. Light re-check clean. The user noted that the Raise tool's km do not show miles yet, which is the brush radius in piece 10.

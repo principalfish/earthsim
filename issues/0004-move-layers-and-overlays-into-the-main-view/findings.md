@@ -132,7 +132,7 @@
 | re-check | correctness | low | docs | verified | fixed | `src/app/preferences.ts:105` | `unitChoice`'s doc still says the old entry is removed whatever it holds; since the fix it stays when the override cannot be written |
 | re-check | correctness | - | - | dropped | - | `src/app/ui/settingsPanel.ts:163` | The wider select type relies on method bivariance — dropped: each select gets only its own quantity's value, so nothing wrong can reach it |
 | manual | user | low | defect | - | fixed | `src/app/preferences.ts:371` | The user chose to fix both: choosing "As the system" for wind speed also removes the old entry, and the doc says the old entry is removed only once the override is kept: "Approve, fix both" |
-| re-check | correctness | low | docs | verified | open | `src/app/preferences.ts:122` | `setUnitOverride`'s doc does not say that choosing "As the system" for the wind speed also removes the old wind unit entry |
+| re-check | correctness | low | docs | verified | fixed | `src/app/preferences.ts:122` | `setUnitOverride`'s doc does not say that choosing "As the system" for the wind speed also removes the old wind unit entry |
 
 ## piece 9 · 2026-11-17 · Units in the read-outs
 
@@ -146,5 +146,7 @@
 | round | security | - | - | - | - | - | Clean |
 | round | coverage | - | - | - | - | - | 96%: uncovered `main.ts` (entry point, including the statistics' height unit), `topBar.ts:83`, `renderer.ts`, reasons accepted |
 | re-check | docs | - | - | - | - | `docs/user-guide.md:333` | Light re-check of the sentence and the comments: clean |
-| re-check | correctness | low | cleanup | verified | open | `src/app/scalarLayer.ts:473` | `isDifferenceView` also counts an end-to-end or centred view marked as differences, whose fit runs over absolute months; such a view would drop the °F or K offset and share the ordinary views' cached scale. None exists; a new test approves that combination |
-| re-check | docs | low | docs | verified | open | `src/app/scalarLayer.ts:462` | `isDifferenceView`'s doc gives the conversion rule as its own reason; the reason is that the view's values are spans |
+| re-check | correctness | low | cleanup | verified | fixed | `src/app/scalarLayer.ts:473` | `isDifferenceView` also counts an end-to-end or centred view marked as differences, whose fit runs over absolute months; such a view would drop the °F or K offset and share the ordinary views' cached scale. None exists; a new test approves that combination |
+| re-check | docs | low | docs | verified | fixed | `src/app/scalarLayer.ts:462` | `isDifferenceView`'s doc gives the conversion rule as its own reason; the reason is that the view's values are spans |
+| manual | user | low | cleanup | - | fixed | `src/app/scalarLayer.ts:473` | The user chose to fix both: only views fitted from zero count as differences (the `isDifference` flag went), and the doc says their values are spans: "ok approve and fix as you suggest" |
+| re-check | correctness | - | - | - | - | `src/app/scalarLayer.ts:473` | Light re-check of the two fixes: clean |
