@@ -18,7 +18,13 @@ The user's brief (2026-11-17): "lets /planner refactor 3a", roadmap step 3a in `
 - The scale-fitting code `scalarLayer` borrows from `ui/legend.ts` (`fitRange`, `cellWeights`, `formatTick`, `MIN_FITTED_SPAN_C` and their siblings) moves into `layers/scalar/`, so `layers/` does not depend on `ui/`; the legend imports it from there. The user: "Move it to layers/ (Recommended)" (2026-11-17)
 - Moves first, then splits: the pure folder moves (core, then page) land first, each a commit git reads as renames, and each large file is then split in its final home. The user: "Moves first (Recommended)" (2026-11-17)
 
+- Tests split along with the source: `material`'s and `scalarLayer`'s tests one file per new source file (shared GLSL helpers to `testing/`); the tests of whatever moves out of `layerPanel` and `wiring` go with it; `layerPanel.test.ts` (4,380 lines) also splits by theme into five files (core, month, comparison, winds, units) with a shared stage helper in `testing/`, the `layerCaption` tests moving to the scalar tests; `wiring.test.ts` stays whole as the guard that the page still starts the same. The user: "sorry yes split tests along source", then "Split by theme (Recommended)" (2026-11-17)
+
 ## Open
-- Whether and how the large files' tests split with their source. The user answered "Something else" with no detail (2026-11-17).
+- None.
 
 ## Assumed
+- Verification for every piece: lint, typecheck, every test, the build, and both Earth baselines printing unchanged; the material split also compares the shader strings before and after, byte for byte.
+- Imports from the core keep going through `core/index`; new folders with an entry point (`globe/material/`, `layers/scalar/`) get an `index.ts`, so their importers change only by the folder move.
+- `docs/development.md`'s folder tables, and any doc naming a moved path, follow each piece. The roadmap gets a follow-up for the deeper `layerPanel` and `wiring` splits.
+- `ui/layerPanel.ts` stays at `ui/` and imports from `ui/main/` and `ui/panel/`; a parent folder importing its children is the expected direction.
