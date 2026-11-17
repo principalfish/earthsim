@@ -14,25 +14,25 @@ Not included: any change to the temperature or wind models, a layout for phone-s
 
 _2026-11-17 · 10 of 12 pieces done · now: waiting on a decision (piece 11)_
 
-- [x] **1/11 The main-view regions, the icons, and the layer and overlay tiles** · `6278b72`
+- [x] **1/12 The main-view regions, the icons, and the layer and overlay tiles** · `6278b72`
   Icon tiles down the left edge of the globe choose the colour layer and switch Winds, Sunlight and the grid.
-- [x] **2/11 Show and one comparison control at the top** · `996d82c`
+- [x] **2/12 Show and one comparison control at the top** · `996d82c`
   The view of the year and one Simulated, Observed or Difference control, for the layer and the winds together.
-- [x] **3/11 The month timeline, and the Layers section removed** · `f91b134`
+- [x] **3/12 The month timeline, and the Layers section removed** · `f91b134`
   The month slider and Play along the bottom of the globe; the side panel loses its Layers section.
-- [x] **4/11 One info box** · `7e3cd2e`
+- [x] **4/12 One info box** · `7e3cd2e`
   The legend, the wind key, one status and the value under the pointer in a single box.
-- [x] **5/11 Everything worked out after every change, with Pause** · `07c3a26`
+- [x] **5/12 Everything worked out after every change, with Pause** · `07c3a26`
   The climate is solved after every change and when the page opens, with a Pause button for sculpting.
-- [x] **6/11 The browser remembers the view** · `7c01ae3`
+- [x] **6/12 The browser remembers the view** · `7c01ae3`
   The layer, its view of the year and the three toggles come back as they were left.
-- [x] **7/11 The Settings section, with arrows or streaks starting on Streaks** · `77d695d`
+- [x] **7/12 The Settings section, with arrows or streaks starting on Streaks** · `77d695d`
   A Settings section in the side panel; winds start as streaks unless the system asks for reduced motion.
-- [x] **8/11 Units: the model and its settings** · `aad58e3`
+- [x] **8/12 Units: the model and its settings** · `aad58e3`
   Metric or Imperial with an override for each quantity, in Settings; wind speed follows it first.
-- [x] **9/11 Units in the read-outs** · `383f8e4`
+- [x] **9/12 Units in the read-outs** · `383f8e4`
   The legend, the info box and the Statistics follow the units, with round ticks in each.
-- [x] **10/11 Units in the controls** · `6bf4fac`
+- [x] **10/12 Units in the controls** · `6bf4fac`
   The Sea level, brush and New world controls read in the chosen units.
 - [ ] **11/12 Choosing Metric or Imperial clears the overrides** · not started · added 2026-11-17: at the user's request
   Clicking Metric or Imperial sets every unit to that family, clearing any override.
