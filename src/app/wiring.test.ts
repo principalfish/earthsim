@@ -1674,7 +1674,6 @@ describe('the temperature, on its worker', () => {
 							showLegend: () => {},
 							showWindKey: () => {},
 							showCalculation: () => {},
-							setWindUnit: () => {},
 						};
 					},
 				}),
@@ -2330,7 +2329,6 @@ describe('the cursor readout', () => {
 							showLegend: () => {},
 							showWindKey: () => {},
 							showCalculation: () => {},
-							setWindUnit: () => {},
 						};
 					},
 				}),
@@ -2443,7 +2441,6 @@ describe('the month on screen', () => {
 						showLegend: () => {},
 						showWindKey: () => {},
 						showCalculation: () => {},
-						setWindUnit: () => {},
 					}),
 				}),
 		});
@@ -2512,7 +2509,6 @@ const createSunStage = async (world?: World) => {
 					showLegend: () => {},
 					showWindKey: () => {},
 					showCalculation: () => {},
-					setWindUnit: () => {},
 				}),
 			}),
 	});
@@ -3585,7 +3581,6 @@ describe('the Sunlight control', () => {
 						showLegend: () => {},
 						showWindKey: () => {},
 						showCalculation: () => {},
-						setWindUnit: () => {},
 					}),
 				}),
 		});
@@ -3749,7 +3744,6 @@ describe('the comparison on the measured Earth', () => {
 						showLegend: () => {},
 						showWindKey: () => {},
 						showCalculation: () => {},
-						setWindUnit: () => {},
 					}),
 				}),
 		});

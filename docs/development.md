@@ -106,7 +106,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `refresh.ts` | When to ask a worker again after the world changes, whatever is on screen; the winds after each new temperature result and each change of the day length; the temperature and the winds stopped while paused and caught up on resuming; with `oneAtATime` (statistics, winds) one request at a time, an overtaken answer ignored |
 | `workerService.ts` | The statistics, temperature and winds services, each on its own worker |
 | `layers.ts` | The computed layers the page holds, the temperature and the winds worked out from it, and whether each is current |
-| `view.ts` | What the globe shows: the layer, each computed layer's part of the year and source, the month, the sunlight and the winds |
+| `view.ts` | What the globe shows: the layer, each computed layer's part of the year, the one source for the layer and the winds, the month, the sunlight, the winds and the grid; `StoredView`, the part the browser remembers (all but the month and the source) |
 | `scalarLayer.ts` | Each layer of one computed value per cell described as data, the temperature and the sea-level pressure the two offered: its name, unit, how its values are written, its legend wording, its views of the year with their colours and scale fitting, its comparison with the observed Earth and where in the layer store its months come from; the layer panel, legend, cursor readout, top bar, date line and lighting take a description rather than naming the temperature |
 | `playback.ts` | Playing through the year |
 | `storage.ts`, `autosave.ts` | The saved world in IndexedDB, export and import, and when to save |

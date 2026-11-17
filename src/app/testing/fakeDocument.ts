@@ -18,6 +18,7 @@ export type FakeElement = {
 	};
 	textContent: string | null;
 	hidden: boolean;
+	inert: boolean;
 	id: string;
 	type: string;
 	name: string;
@@ -122,6 +123,7 @@ const createFakeElement = (
 			element.children.length = 0;
 		},
 		hidden: false,
+		inert: false,
 		id: '',
 		type: '',
 		name: '',

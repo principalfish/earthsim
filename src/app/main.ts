@@ -224,6 +224,7 @@ if (globe !== null) {
 		setInert: (inert) => {
 			panel.inert = inert;
 			canvas.inert = inert;
+			mainView.setInert(inert);
 		},
 		isModalOpen: () => document.querySelector(':modal') !== null,
 		onKeyDown: (listener) => window.addEventListener('keydown', listener),

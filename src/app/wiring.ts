@@ -351,8 +351,8 @@ export type PageParts = {
 	/** Reads a file as a world, trusting nothing about it. */
 	readonly importWorld: (file: Blob) => Promise<WorldFileResult>;
 	/**
-	 * Puts the panel and the globe out of reach of the mouse and the
-	 * keyboard, or back within it.
+	 * Puts the panel, the globe and the controls over it out of reach of the
+	 * mouse and the keyboard, or back within it.
 	 */
 	readonly setInert: (inert: boolean) => void;
 	/** Whether a modal dialog is open, with the page behind it out of reach. */
@@ -524,12 +524,13 @@ const sunlightStyleFor = (layer: Layer, sunlight: boolean): SunlightStyle => {
  * the preferences, one entry for each setting that changed; the month and
  * the source are never written. A new world keeps them.
  *
- * Until the storage has answered, the panel, the globe and the history
- * shortcuts are out of reach and nothing is saved. A change made to the
- * blank world meanwhile would otherwise be saved over the saved world, or
- * be lost when that world arrives. Nor is the temperature asked for until
- * then: the world brought back is asked for as any new world is, and the
- * blank world, when the page stays on it, once the storage has answered.
+ * Until the storage has answered, the panel, the globe, the controls over
+ * it and the history shortcuts are out of reach and nothing is saved. A
+ * change made to the blank world meanwhile would otherwise be saved over
+ * the saved world, or be lost when that world arrives. Nor is the
+ * temperature asked for until then: the world brought back is asked for
+ * as any new world is, and the blank world, when the page stays on it,
+ * once the storage has answered.
  *
  * @param parts - The parts to join.
  * @returns A promise that resolves once the page has started: the saved

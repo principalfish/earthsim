@@ -201,7 +201,7 @@ export type PageView = {
 	readonly month: number;
 	/** Whether the globe is lit by the sun. */
 	readonly sunlight: boolean;
-	/** Whether the winds are shown as arrows over the globe. */
+	/** Whether the winds are shown over the globe, as arrows or as moving streaks. */
 	readonly winds: boolean;
 	/** Whether the outlines of the grid's cells are drawn over the globe. */
 	readonly grid: boolean;

@@ -6,8 +6,8 @@
  * calculation, the layer and the winds, and the pointer's read-out while
  * the pointer is over the globe.
  *
- * The legend and the winds are told what they show as before, each with a
- * line of its own, and the calculation of the temperature and the winds,
+ * The legend and the winds are each told what they show, with a line of
+ * its own, and the calculation of the temperature and the winds,
  * which goes on whatever is on screen, has a line too;
  * {@link infoStatus} picks the one line the box shows of the three.
  */

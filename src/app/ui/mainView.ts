@@ -19,6 +19,11 @@ export type MainView = {
 	readonly info: HTMLElement;
 	/** Along the bottom, beside the dock. */
 	readonly timeline: HTMLElement;
+	/**
+	 * Puts every region, and what it holds, out of reach of the mouse and
+	 * the keyboard, or back within it.
+	 */
+	readonly setInert: (inert: boolean) => void;
 };
 
 /**
@@ -47,5 +52,14 @@ export const createMainView = (viewport: HTMLElement): MainView => {
 	const timeline = createElement('div', 'main-view__timeline');
 	view.append(dock, topBar, corner, info, timeline);
 	viewport.append(view);
-	return { dock, topBar, corner, info, timeline };
+	return {
+		dock,
+		topBar,
+		corner,
+		info,
+		timeline,
+		setInert: (inert) => {
+			view.inert = inert;
+		},
+	};
 };

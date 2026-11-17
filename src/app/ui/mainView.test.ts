@@ -59,4 +59,14 @@ describe('createMainView', () => {
 			expect(as(region).children).toEqual([]);
 		}
 	});
+
+	it('puts the layer of regions out of reach, and back within it', () => {
+		const { viewport, view } = make();
+		const layer = oneByClass(viewport, 'main-view');
+		expect(layer.inert).toBe(false);
+		view.setInert(true);
+		expect(layer.inert).toBe(true);
+		view.setInert(false);
+		expect(layer.inert).toBe(false);
+	});
 });
