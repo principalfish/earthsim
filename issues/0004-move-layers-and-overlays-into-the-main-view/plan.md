@@ -176,7 +176,7 @@ Rejected:
 - [x] 9. Units in the read-outs
 - [x] 10. Units in the controls
 - [x] 11. Choosing Metric or Imperial clears the overrides
-- [ ] 12. The user guide restructured around the main view
+- [x] 12. The user guide restructured around the main view
 
 ## Verification
 
@@ -313,3 +313,4 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 - Moved, not rewritten: Layers and its subsections came up into the main view, the value under the pointer sits in the info box, and the panel's sections follow the panel. The scattered "not saved" lines became links to the one paragraph. A Temperature heading was added for text already there. `docs/temperature.md` links to `#units`.
 - A link checker over README and `docs/` (in the session's scratch folder) found 85 links, none broken, before and after the fixes.
 - One review round (correctness and docs; security and coverage do not apply to docs): four findings verified and fixed, four dropped; light re-check clean. In `findings.md`.
+- Approved on the user's word: "Approve".

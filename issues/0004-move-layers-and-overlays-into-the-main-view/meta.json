@@ -3,13 +3,13 @@
   "slug": "move-layers-and-overlays-into-the-main-view",
   "title": "Move layers and overlays into the main view",
   "mode": "build",
-  "state": "building",
+  "state": "review",
   "branch": "claude/move-layers-and-overlays-into-the-main-view-d898bd",
   "base": "main",
   "gh_issue": 7,
   "build_model": "claude-opus-5-5",
   "created": "2026-11-15 12:12",
-  "updated": "2026-11-15 13:45",
+  "updated": "2026-11-17 18:12",
   "done": null,
   "local": [
     {
