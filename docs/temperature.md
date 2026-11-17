@@ -73,7 +73,7 @@ Until the first result arrives, the globe keeps the height colours.
 - **Colours** run from dark blue for the coldest, through red, to pale yellow for the hottest, growing lighter from cold to hot.
 - **One scale for the whole year.** It is fitted to the world's whole year, so a colour means the same temperature in every month and every summary.
 - **Fitted to the middle 99%.** The scale spans the middle 99% of the year by area, so a tall peak or a small cold corner does not squeeze the rest of the world into a few colours. Places beyond it take the colour at the end; the legend marks only the values along the scale.
-- **Round in the unit chosen.** The scale is fitted in the temperature's unit from Settings, so its ends and ticks are whole degrees in °F and K as in °C; see the [user guide](user-guide.md#settings).
+- **Round in the unit chosen.** The scale is fitted in the temperature's unit from Settings, so its ends and ticks are whole degrees in °F and K as in °C; see the [user guide](user-guide.md#units).
 - **Seasonal range has its own scale and colours,** from near white to deep violet, starting at zero and marked every 5 °C, 10 °F or 5 K. The colours change fastest at the low end, since most of a world changes little through the year.
 
 ## Earth comparison
