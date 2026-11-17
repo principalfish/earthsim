@@ -9,7 +9,7 @@
   "gh_issue": 9,
   "build_model": null,
   "created": "2026-11-17 18:50",
-  "updated": "2026-11-17 19:46",
+  "updated": "2026-11-17 20:03",
   "done": null,
   "local": [
     {
@@ -28,5 +28,6 @@
       "name": "claude/core-folders-by-component-page-folders-by-role-c9bcc4",
       "added": "2026-11-17 19:46"
     }
-  ]
+  ],
+  "pr": 10
 }
