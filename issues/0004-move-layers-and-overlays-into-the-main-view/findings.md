@@ -165,3 +165,17 @@
 | re-check | correctness | low | cleanup | verified | fixed | `src/app/ui/viewPanel.test.ts:81` | Two test lines (:81, :109) still look for the `field__checkbox` class, which nothing creates any more; they cannot fail, and the test's claim holds without them |
 | manual | user | low | cleanup | - | fixed | `src/app/ui/viewPanel.test.ts:81` | The user chose to drop the two dead checkbox checks: "Tried it, fix it" |
 | re-check | correctness | - | - | - | - | `src/app/ui/viewPanel.test.ts:81` | Light re-check of the dropped test lines: clean |
+
+## piece 11 · 2026-11-17 · Choosing Metric or Imperial clears the overrides
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | medium | defect | verified | fixed | `src/app/ui/fields.ts:405` | Space on the system already chosen cleared nothing: browsers send no click for Space on a checked radio (seen in headless Edge); a keyup listener now calls back once and stops the default (raised by correctness and coverage, merged) |
+| round | coverage | low | test | verified | fixed | `src/app/ui/fields.test.ts:116` | The arrow-key tests drove a change alone, but an arrow key sends click then change; the fields one was a duplicate and went, the Settings one now clicks |
+| round | coverage | - | - | dropped | - | `docs/user-guide.md` | The guide's Space claim — dropped: the guide claims only clicks |
+| round | coverage | - | - | dropped | - | `src/app/ui/settingsPanel.test.ts:208` | No test of the selects reading "As the system" after a system click — dropped: covered by the wiring test and "shows units chosen elsewhere" |
+| round | security | - | - | - | - | - | Clean |
+| round | docs | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | 97%: uncovered only `main.ts`, `topBar.ts:83` and `renderer.ts`, none touched here, reasons accepted |
+| re-check | coverage | - | - | - | - | `src/app/ui/fields.ts:420` | Light re-check of the keyup listener's tests: clean |
+| re-check | correctness | low | docs | verified | open | `src/app/testing/fakeDocument.ts:70` | The fake's `keyUp` doc says it lets go of a key "as the browser does", but it models Chromium (no click for Space on a checked radio); browsers are not known to agree |

@@ -298,3 +298,10 @@ No test reads the stylesheet, so layout is proven by the browser look and the us
 
 ### Changed 2026-11-17: a piece added
 - Piece 11 added at the user's request: choosing Metric or Imperial sets every unit to that family, overriding any choice. The user: "can we add a piece to this issue in the final section which changes functionality such that clicking metric or imperial immediately sets all settings to that family. opverriding any choice"; placed before the guide ("Before the guide (Recommended)") and clearing on a click of the chosen system too ("Clear overrides (Recommended)"). The guide restructure becomes piece 12 and covers it. No manual review proposed; the review request carries screenshots.
+
+### Piece 11 (2026-11-17)
+
+- Built on claude-opus-5-5. Added to the plan at the user's request; go-ahead "Start it"; the keyboard clears as a click does, and there is no undo or confirmation.
+- The unit store's `setSystem` became `chooseSystem`: it writes the system if it changed, removes all five overrides (and so the old wind entry), and tells its listeners once, or not at all when nothing changed. `createSegmentedChoice` gained `onChosenAgain`, called on a click of the segment already chosen and on Space let go on it; it tracks the chosen value itself, so a click on the other segment, which sends click then change, calls back once.
+- In headless Edge: with Temperature on K and Wind speed on knots, a mouse click on Imperial gave °F and mph everywhere, every select "As the system", and only `unitSystem` stored; still so after a reload. A click on the chosen Imperial, ArrowLeft, and (after the fix) Space on the chosen Metric each cleared the overrides.
+- One review round (correctness, security, coverage, docs): two findings verified and fixed (Space on the chosen system, the arrow-key tests), two dropped; light re-check by correctness and coverage raised one low doc nit on the fake document, left for the user. In `findings.md`.
