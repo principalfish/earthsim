@@ -90,6 +90,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 8 approved, with both re-check findings fixed first: (1) deleting the wind speed override also deletes the old wind entry, so it cannot come back over "As the system" on a browser that can delete but not save, with a test; (2) the doc comment at `preferences.ts:105` reworded to say the old entry is removed only once the override is saved. The user: "Approve, fix both" (2026-11-17). Piece 8 has no manual review in the plan.
 
+- Piece 9's per-unit scale settings, as the builder proposed: minimum fitted span 2 °C, 4 °F, 2 K, 10 hPa, 0.3 inHg; seasonal range tick step 5 °C, 10 °F, 5 K; difference half-span ±20 °C, ±40 °F, ±20 K, ±20 hPa, ±0.6 inHg; difference tick step 10 °C, 20 °F, 10 K, 10 hPa, 0.3 inHg. The open doc nit at `preferences.ts:122` (`setUnitOverride` not saying that "As the system" for wind speed also removes the old entry) is fixed in piece 9. The user: "Start it" (2026-11-17)
+
 ## Open
 - None.
 
