@@ -1,6 +1,6 @@
 # Core folders by component, page folders by role
 
-The simulation core is one flat folder of about 30 files, and the page has about 20 files at its top level plus a `ui/` folder of 26. Five more layers are coming (rain, ocean currents, ice, storms, tectonics), so the code moves into folders before they arrive, and the four largest files are cut down while they move.
+The simulation core is mostly one flat folder of about 25 source files, and the page has about 20 files at its top level plus a `ui/` folder of 26. Five more layers are coming (rain, ocean currents, ice, storms, tectonics), so the code moves into folders before they arrive, and the four largest files are cut down while they move.
 
 The core gets one folder per component: grid maths, the world and its editing, the planet and its star, the Earth data, temperature and winds, each model with its own Earth baseline. The page is organised by role rather than by layer, since its legend, layer panel and pointer read-out serve every layer: editing, saving, layers and settings, with `ui/` split into what sits over the globe and the side panel's sections.
 
