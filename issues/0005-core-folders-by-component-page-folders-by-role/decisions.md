@@ -22,6 +22,8 @@ The user's brief (2026-11-17): "lets /planner refactor 3a", roadmap step 3a in `
 
 - The builder starts, and with it piece 1 (the core in component folders), with no decisions open and no manual reviews in the plan. The user: "Start it" (2026-11-17)
 
+- Piece 1 approved as reviewed, with the light re-check of its two one-path doc fixes skipped as the builder proposed. The user: "Approve" (2026-11-17)
+
 ## Open
 - None.
 
