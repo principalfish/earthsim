@@ -25,3 +25,13 @@
 | round | correctness | low | cleanup | dropped | - | `src/app/ui/layerPanel.ts:85-97` | `ui/` and `ui/main/` depend on each other at folder level (`main/cursorReadout.ts` imports types from `../layerPanel`) — dropped: a type-only back-edge, and the plan settles that `layerPanel` stays in `ui/` and imports its children |
 | round | verifier | low | cleanup | noticed | - | `src/app/ui/main/cursorReadout.ts:43` | Moving `ShownLayer` and `ShownWinds` into `ui/main/` would make the dependency one-way; optional, outside this refactor |
 | re-check | docs | low | docs | verified | fixed | `docs/development.md:121` | The first rewording ("What the folders above lean on") fitted `icons.ts`, `section.ts` and `layerPanel.ts` poorly (each used by one side or neither); now "What stays at the top of the folder", with `icons.ts` marked as the main view's only |
+
+## piece 4 · 2026-11-17 · The scalar layers split, with the legend's fitting code
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | docs | low | docs | verified | fixed | `src/app/layers/scalar/index.ts:14` | Header said the legend shares `fit.ts`; the legend imports nothing from it |
+| round | docs | low | docs | verified | fixed | `docs/development.md:112` | The `layers/scalar/` row said the same |
+| round | docs | low | docs | verified | fixed | `docs/development.md:119` | The `ui/main/` row said the legend's scale is fitted in `fit.ts`; the layer panel fits it (with `fitSummaryScale`) and the legend is handed the range |
+| round | correctness | low | cleanup | verified | fixed | `src/app/layers/scalar/yearScale.test.ts:13` | A test under `layers/` imported `legendTicks` from `ui/main/legend`, against "no file under layers/ imports from ui/"; the describe moved whole, unchanged, to `ui/main/legend.test.ts` |
+| re-check | correctness | - | - | - | - | - | Clean: the moved block is byte-identical, no test lost or duplicated, no `layers/` file imports `ui/` |

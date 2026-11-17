@@ -150,7 +150,7 @@ Rejected:
 - [x] 1. The core in component folders
 - [x] 2. The page's top-level files in role folders
 - [x] 3. `ui/` split into the main view and the panel
-- [ ] 4. The scalar layers split, with the legend's fitting code
+- [x] 4. The scalar layers split, with the legend's fitting code
 - [ ] 5. The globe's material split
 - [ ] 6. The layer panel's types, constants and pure helpers moved out, and its tests split
 - [ ] 7. The page wiring's types moved out
@@ -171,3 +171,9 @@ Docs: `docs/development.md`'s folder tables follow each piece, and any doc namin
 
 - Piece 3 (2026-11-17): 38 files moved (19 sources and their tests) by the same script and `biome check --write`; 45 files had imports rewritten, and nothing but import lines changed in `src/`. The `ui/` row of `docs/development.md` became three rows (`ui/main/`, `ui/panel/`, `ui/`), reworded twice after the docs check: the first draft said the top-level files were what "the two share", which only `fields.ts` is.
   - Decided by the builder: `layerPanel.ts` stays in `ui/` as the plan says, although `ui/main/cursorReadout.ts` imports two types back from it, so `ui/` and `ui/main/` depend on each other at folder level (a type-only edge). Options: leave it (chosen; the plan settles it and the edge existed before as a file-to-file import), or move `ShownLayer` and `ShownWinds` into `ui/main/`. Piece 6 moves those types into `ui/layerPanel/types.ts` anyway, which is the place to revisit it.
+
+- Piece 4 (2026-11-17): `scalarLayer.ts` (1,017 lines) split into `layers/scalar/` (the nine files the plan names, the longest 264 lines); the legend's fitting code (`MIN_FITTED_SPAN_C`, `FIT_TAIL_SHARE`, `ScaleUnit`, `AS_GIVEN`, `countDown`/`countUp`, `cellWeights`, `fitRange`, `fitRangeFromZero`, `fitRangeCentred`, `formatTick`) is in `fit.ts`. Code bodies are byte-identical to the originals (checked by a declaration-by-declaration comparison); `index.ts` re-exports exactly the 60 names `scalarLayer.ts` did; the suite has 3623 tests in 118 files (it was 111 files). Changed-lines coverage: 196 lines, 100%.
+  - Decided by the builder: `legendTicks` and its helpers stay in the legend. The fitting does not use them, and moving them would push `fit.ts` to about 430 lines. The legend now imports nothing from `fit.ts`; `layerPanel.test.ts` imports the fitting functions from `layers/scalar/fit` (no re-export from `legend.ts`).
+  - Decided by the builder: one legend `describe` ("fitting and marking a scale in a unit") mixed both kinds of test, so it split at a test boundary into "fitting a scale in a unit" (`fit.test.ts`) and "marking a scale in a unit" (`legend.test.ts`); the bodies are unchanged. A `spec.test.ts` was added for the 8-line `summaryOf` describe, to keep one test file per source file.
+  - Decided by the builder: the `describe` "fitSummaryScale in a unit, on an Earth-like year" (five tests, three of them check the fitted ranges against `legendTicks`) moved whole and unchanged from `layers/scalar/yearScale.test.ts` into `ui/main/legend.test.ts`, so that no file under `layers/` imports `ui/` (the plan's acceptance, read literally, includes tests). Options: keep it where it was and read the acceptance as "no source file" (rejected: the verifier's finding was upheld), or rewrite the tests (rejected: bodies must not change). Two of the five tests (hPa, refuses another unit) do not touch the legend, so "one test file per source file" bends slightly.
+  - Deviation: none from the settled ledger. The index re-exports and doc `{@link}`s needed no signature change; `index.ts` rewords `{@link TEMPERATURE_LAYER}` and `{@link PRESSURE_LAYER}` as plain text, since links do not follow re-exports.
