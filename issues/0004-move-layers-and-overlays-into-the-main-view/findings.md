@@ -201,12 +201,16 @@
 
 | Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
 |-|-|-|-|-|-|-|-|
-| round | correctness | low | defect | verified | open | `src/app/main.ts:224` | `setInert` leaves the main-view controls live while storage loads; Pause then Resume asks for the blank world's temperature |
-| round | docs | low | docs | verified | open | `docs/development.md:109` | The `view.ts` row misses the one source, the grid and `StoredView` |
-| round | common-mistakes | low | cleanup | verified | open | `src/app/wiring.test.ts:1677` | Six dead `setWindUnit` stubs in `createControls` |
-| round | docs | nit | docs | verified | open | `src/app/ui/infoBox.ts:9` | "as before" history wording in the header |
-| round | docs | nit | docs | verified | open | `README.md:14` | Two new bullets too long; one clause ungrammatical |
-| round | docs | nit | docs | noticed | open | `docs/winds.md:108` | Observed winds said to show "as arrows"; streaks follow them too |
+| round | correctness | low | defect | verified | fixed | `src/app/main.ts:224` | `setInert` leaves the main-view controls live while storage loads; Pause then Resume asks for the blank world's temperature |
+| round | docs | low | docs | verified | fixed | `docs/development.md:109` | The `view.ts` row misses the one source, the grid and `StoredView` |
+| round | common-mistakes | low | cleanup | verified | fixed | `src/app/wiring.test.ts:1677` | Six dead `setWindUnit` stubs in `createControls` |
+| round | docs | nit | docs | verified | fixed | `src/app/ui/infoBox.ts:9` | "as before" history wording in the header |
+| round | docs | nit | docs | verified | fixed | `README.md:14` | Two new bullets too long; one clause ungrammatical |
+| round | docs | nit | docs | noticed | fixed | `docs/winds.md:108` | Observed winds said to show "as arrows"; streaks follow them too |
 | round | common-mistakes | - | - | dropped | - | `src/app/main.ts:73` | Unguarded `window.matchMedia` — dropped: in every browser the page can run in; no change asked |
 | round | security | - | - | - | - | - | Clean |
 | round | coverage | - | - | - | - | - | Clean: 97%, 31 uncovered lines with accepted reasons |
+| re-check | common-mistakes | - | - | - | - | `src/app/wiring.test.ts:1677` | Light re-check of the removed stubs: clean |
+| re-check | correctness | low | cleanup | verified | open | `src/app/wiring.ts:530` | The reflowed `startPage` doc left one line at 94 characters among lines of 70 to 75 |
+| re-check | docs | - | - | dropped | - | `src/app/view.ts:204` | `PageView.winds` says shown "as arrows" — dropped: stale on main already, and this branch does not touch the line |
+| re-check | docs | low | docs | noticed | - | `src/app/view.ts:204` | Noticed: the same line could say "as arrows or as moving streaks", a one-line fix if wanted here |
