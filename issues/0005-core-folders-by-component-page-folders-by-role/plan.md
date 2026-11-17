@@ -149,7 +149,7 @@ Rejected:
 ## Checkpoints
 - [x] 1. The core in component folders
 - [x] 2. The page's top-level files in role folders
-- [ ] 3. `ui/` split into the main view and the panel
+- [x] 3. `ui/` split into the main view and the panel
 - [ ] 4. The scalar layers split, with the legend's fitting code
 - [ ] 5. The globe's material split
 - [ ] 6. The layer panel's types, constants and pure helpers moved out, and its tests split
@@ -168,3 +168,6 @@ Docs: `docs/development.md`'s folder tables follow each piece, and any doc namin
 - Piece 1 (2026-11-17): moves done by a script that rewrote each relative import to the file's new location, then `biome check --write` re-sorted the imports it touched (Biome sorts import lines, so some imports moved or re-wrapped; no body line changed). Both baseline update scripts now join `src/core/temperature/baseline/` and `src/core/wind/baseline/`. Changed-lines coverage: no executable lines changed, so nothing to cover. Light re-check skipped: the two fixes were one-path comment and doc edits, confirmed by grep and `biome check`.
 
 - Piece 2 (2026-11-17): 34 files moved (17 sources and their 17 tests) by the same import-rewrite script and `biome check --write` as piece 1; 70 files had imports rewritten. Every check came back clean, so no verifier or re-check ran. Changed-lines coverage: no executable lines changed. The first coverage run failed 10 tests while three subagents shared the CPU (310 s against 67 s); alone it passed 3623 of 3623. The main JS chunk has the same size (688,409 bytes) but a different hash, because the reordered imports change the bundler's module order and so the minifier's short names; the CSS and the worker chunk are byte-identical.
+
+- Piece 3 (2026-11-17): 38 files moved (19 sources and their tests) by the same script and `biome check --write`; 45 files had imports rewritten, and nothing but import lines changed in `src/`. The `ui/` row of `docs/development.md` became three rows (`ui/main/`, `ui/panel/`, `ui/`), reworded twice after the docs check: the first draft said the top-level files were what "the two share", which only `fields.ts` is.
+  - Decided by the builder: `layerPanel.ts` stays in `ui/` as the plan says, although `ui/main/cursorReadout.ts` imports two types back from it, so `ui/` and `ui/main/` depend on each other at folder level (a type-only edge). Options: leave it (chosen; the plan settles it and the edge existed before as a file-to-file import), or move `ShownLayer` and `ShownWinds` into `ui/main/`. Piece 6 moves those types into `ui/layerPanel/types.ts` anyway, which is the place to revisit it.
