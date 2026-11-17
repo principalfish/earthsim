@@ -25,4 +25,31 @@ describe('layerCaption', () => {
 		);
 		expect(() => layerCaption(MADE_UP_LAYER, 'range', 0)).toThrow(RangeError);
 	});
+
+	it('names no source unless given one', () => {
+		expect(layerCaption(TEMPERATURE_LAYER, 'month', 0)).toBe(
+			'Air temperature in January, °C',
+		);
+		expect(layerCaption(TEMPERATURE_LAYER, 'range', 0)).toBe(
+			'Seasonal range: difference between the warmest and coldest months, °C',
+		);
+	});
+
+	it('names the simulated and the observed source', () => {
+		expect(layerCaption(TEMPERATURE_LAYER, 'annualMean', 0, 'simulated')).toBe(
+			'Simulated annual average air temperature, °C',
+		);
+		expect(layerCaption(TEMPERATURE_LAYER, 'coldest', 0, 'observed')).toBe(
+			'Observed air temperature in the coldest month, °C',
+		);
+	});
+
+	it('names the difference after what it is a difference of', () => {
+		expect(layerCaption(TEMPERATURE_LAYER, 'month', 6, 'difference')).toBe(
+			'Simulated less observed in July, °C',
+		);
+		expect(layerCaption(TEMPERATURE_LAYER, 'range', 6, 'difference')).toBe(
+			'Simulated less observed, seasonal range, °C',
+		);
+	});
 });
