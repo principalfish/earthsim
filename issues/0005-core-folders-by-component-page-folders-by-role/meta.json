@@ -1,0 +1,14 @@
+{
+  "id": 5,
+  "slug": "core-folders-by-component-page-folders-by-role",
+  "title": "Core folders by component, page folders by role",
+  "mode": "refactor",
+  "state": "investigating",
+  "branch": "core-folders-by-component-page-folders-by-role",
+  "base": "main",
+  "gh_issue": null,
+  "build_model": null,
+  "created": "2026-11-17 18:50",
+  "updated": "2026-11-17 18:50",
+  "done": null
+}

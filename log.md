@@ -97,3 +97,4 @@
 - 2026-11-17 18:48 · move-layers-and-overlays-into-the-main-view (0004) · merged → done
 - 2026-11-17 18:49 · move-layers-and-overlays-into-the-main-view (0004) · session local_add73007-806b-4a2a-bdab-70cd7e365620 removed
 - 2026-11-17 18:49 · move-layers-and-overlays-into-the-main-view (0004) · cleanup: removed worktree /home/philiph/workspace/earth_sim/.claude/worktrees/move-layers-and-overlays-into-the-main-view-d898bd, branch claude/move-layers-and-overlays-into-the-main-view-d898bd
+- 2026-11-17 18:50 · core-folders-by-component-page-folders-by-role (0005) · created (refactor): Core folders by component, page folders by role
