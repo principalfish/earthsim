@@ -104,6 +104,8 @@ Step 3c of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.
 
 - Piece 11 approved, with the re-check nit fixed first: the test helper's doc at `src/app/testing/fakeDocument.ts:70` says "as Chromium does" in place of "as the browser does". Firefox was not tested. The user: "Approve, fix it" (2026-11-17). Piece 11 has no manual review in the plan.
 
+- Piece 12 started on the user's go-ahead, with the builder's outline as stated in the briefing: The main view (tiles, Layers, Winds, the sun, top bar, timeline, Pause, the info box with the value under the pointer); The panel in its own order (World, View, Planet, Tools, Statistics, Settings), with Settings → Units opening on the system click that clears the overrides; and one "What the browser remembers" paragraph replacing the scattered "not saved" lines. The user: "Start it" (2026-11-17)
+
 ## Open
 - None.
 
