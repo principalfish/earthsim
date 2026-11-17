@@ -35,3 +35,12 @@
 | round | docs | low | docs | verified | fixed | `docs/development.md:119` | The `ui/main/` row said the legend's scale is fitted in `fit.ts`; the layer panel fits it (with `fitSummaryScale`) and the legend is handed the range |
 | round | correctness | low | cleanup | verified | fixed | `src/app/layers/scalar/yearScale.test.ts:13` | A test under `layers/` imported `legendTicks` from `ui/main/legend`, against "no file under layers/ imports from ui/"; the describe moved whole, unchanged, to `ui/main/legend.test.ts` |
 | re-check | correctness | - | - | - | - | - | Clean: the moved block is byte-identical, no test lost or duplicated, no `layers/` file imports `ui/` |
+
+## piece 5 · 2026-11-17 · The globe's material split
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | - | - | - | - | - | Clean: 33 declarations byte-identical; the shader strings equal, checked a second way (a bundle of HEAD's file run beside the new folder); no runtime import cycle |
+| round | security | - | - | - | - | - | Clean |
+| round | docs | - | - | - | - | - | Clean (nit, not a finding: the `globe/` row's "material and its shaders" is slightly narrow, since `material/` also holds the data texture, the sunlight and the constants) |
+| round | coverage | - | - | - | - | - | Clean; the two uncovered lines (`testing/glsl.ts` 10 and 23, the test helper's defensive throws) accepted: the old test file never ran them either |
