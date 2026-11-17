@@ -14,8 +14,11 @@ The user's brief (2026-11-17): "lets /planner refactor 3a", roadmap step 3a in `
 - The four largest files are split in this issue, still with no behaviour change: `ui/layerPanel.ts` (1,440 lines), `globe/material.ts` (1,064), `scalarLayer.ts` (1,017), `wiring.ts` (953). The user: "Split all four" (2026-11-17)
 - `scripts/` is out of scope: only the import paths the move breaks are updated. The user: "Out of scope (Recommended)" (2026-11-17)
 
+- How the four large files split, from a read of each (2026-11-17). `globe/material.ts` and `scalarLayer.ts` split fully, with no signature changes: `material` into about nine files in `globe/material/` behind an `index.ts` that keeps its exports, so none of its importers change, with the shader text byte-identical; `scalarLayer` into about seven files in `layers/scalar/` (spec, inUnit, temperature, pressure, registry, caption, yearScale) behind an `index.ts`. `ui/layerPanel.ts` and `wiring.ts` move out only what moves unchanged (types, constants, already-pure helpers such as `differenceOf` and `figuresOf`): about 1,030 and 650 lines left. The deeper splits, which pass shared state into new functions, are a design change and become a roadmap follow-up. The user: "Pure parts only (Recommended)" (2026-11-17)
+- The scale-fitting code `scalarLayer` borrows from `ui/legend.ts` (`fitRange`, `cellWeights`, `formatTick`, `MIN_FITTED_SPAN_C` and their siblings) moves into `layers/scalar/`, so `layers/` does not depend on `ui/`; the legend imports it from there. The user: "Move it to layers/ (Recommended)" (2026-11-17)
+- Moves first, then splits: the pure folder moves (core, then page) land first, each a commit git reads as renames, and each large file is then split in its final home. The user: "Moves first (Recommended)" (2026-11-17)
+
 ## Open
-- How each of the four large files splits, and into what.
-- Whether the moves or the splits come first.
+- Whether and how the large files' tests split with their source. The user answered "Something else" with no detail (2026-11-17).
 
 ## Assumed
