@@ -10,9 +10,9 @@ Nothing the page does changes. Every test, the build and both Earth baselines mu
 
 ## Plan
 
-_2026-11-17 · 0 of 7 pieces done · now: waiting on review of piece 1_
+_2026-11-17 · 1 of 7 pieces done · now: waiting on a decision (piece 2)_
 
-- [ ] **1/7 The core in component folders** · waiting on you
+- [x] **1/7 The core in component folders** · `c239ed8`
   The core's files move into grid, world, planet, earth, temperature and wind folders, each model with its own baseline.
 - [ ] **2/7 The page's top-level files in role folders** · not started
   The page's files move into editing, saving, layers and settings folders.
