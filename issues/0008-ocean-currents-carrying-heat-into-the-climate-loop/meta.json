@@ -9,6 +9,14 @@
   "gh_issue": 15,
   "build_model": null,
   "created": "2026-11-18 19:50",
-  "updated": "2026-11-18 20:19",
-  "done": null
+  "updated": "2026-11-18 20:26",
+  "done": null,
+  "local": [
+    {
+      "kind": "session",
+      "name": "local_eb13cb33-7cf1-48ce-a63f-84119c45555c",
+      "added": "2026-11-18 20:26",
+      "note": "builder: ocean-currents-carrying-heat-into-the-climate-loop"
+    }
+  ]
 }
