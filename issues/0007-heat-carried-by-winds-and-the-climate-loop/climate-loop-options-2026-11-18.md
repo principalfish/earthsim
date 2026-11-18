@@ -67,3 +67,37 @@ The clear share, which sets the reflectivity and the heat capacity of sea ice, h
 | 1.2e6 | live (rule a) | 14.2/1.63, 12.1/1.13, 8.8/0.72, 8.0/0.60, 6.2/0.40 |
 | 6e5 | held | 7.6/0.76, 3.0/0.29, 1.1/0.10, 0.56/0.04, 0.24/0.02, 0.11/0.01, 0.05/0.00 (settled in 7) |
 | 6e5 | live (rule a) | 8.1, 4.6, 2.0, 1.2, 0.5 largest, not settled after 6 |
+
+# With `thermalHpaPerK` 0.7 (a winds override, measurement only) (2026-11-18)
+
+Same script and columns. The contraction is the rms change of the last pass over the one before it. The model default is 3 hPa/K. The same runs with the default are repeated for comparison (their seconds are from the clean runs).
+
+## The Earth at 64
+
+Observed: Europe W − Asia E 11.5 K annual, 22.9 January; North America W − E 5.8 annual, 15.1 January; East Asia (25–45°N, 105–145°E land) January −4.0 °C. Baseline, strength 0 with 0.7 (the winds do not carry heat): passes 2, 3.5 s, 0.7 / 2.4, −0.8 / −0.6, East Asia January +2.3 °C, rms error 4.99 (the same temperature as with no winds, since they do not feed back).
+
+| Strength | thermalHpaPerK | Rule | Passes | Seconds | Contraction | Eu−As ann / Jan | NA ann / Jan | E Asia Jan | rms error, all months |
+|-|-|-|-|-|-|-|-|-|-|
+| 1.2e6 | 0.7 | (a) max ≤ 0.1, cap 6 | 5 | 10.4 | 0.33 | 2.9 / 7.8 | 0.0 / 3.5 | 0.8 | 4.73 |
+| 1.2e6 | 3 (default) | (a) max ≤ 0.1, cap 6 | not settled after 6 | 14.2 | 0.67 | 5.3 / 12.5 | -0.7 / 3.4 | -0.3 | 4.55 |
+| 1.2e6 | 0.7 | (b) rms ≤ 0.1, cap 8 | 4 | 8.1 | 0.19 | 2.9 / 7.8 | 0.0 / 3.5 | 0.8 | 4.73 |
+| 1.2e6 | 3 (default) | (b) rms ≤ 0.1, cap 8 | not settled after 8 | 18.1 | 0.69 | 4.6 / 12.2 | -1.0 / 3.2 | 0.0 | 4.51 |
+| 1.2e6 | 0.7 | (c) half every pass, rms ≤ 0.1, cap 8 | 6 | 12.8 | 0.50 | 2.9 / 7.6 | 0.1 / 3.5 | 0.8 | 4.74 |
+| 1.2e6 | 3 (default) | (c) half every pass, rms ≤ 0.1, cap 8 | not settled after 8 | 17.8 | 0.67 | 5.0 / 12.5 | -1.0 / 3.2 | -0.2 | 4.51 |
+| 6e5 | 0.7 | (a) max ≤ 0.1, cap 6 | 4 | 7.1 | 0.00 | 2.1 / 5.5 | -0.1 / 2.3 | 1.2 | 4.85 |
+| 6e5 | 3 (default) | (a) max ≤ 0.1, cap 6 | not settled after 6 | 12.1 | 0.38 | 4.1 / 8.9 | -0.4 / 2.8 | -0.1 | 4.70 |
+| 6e5 | 0.7 | (b) rms ≤ 0.1, cap 8 | 3 | 5.5 | 0.10 | 2.1 / 5.5 | -0.1 / 2.3 | 1.2 | 4.85 |
+| 6e5 | 3 (default) | (b) rms ≤ 0.1, cap 8 | 5 | 10.1 | 0.47 | 4.1 / 8.9 | -0.5 / 2.7 | -0.1 | 4.70 |
+| 6e5 | 0.7 | (c) half every pass, rms ≤ 0.1, cap 8 | 5 | 9.7 | 0.46 | 2.0 / 5.3 | -0.1 / 2.1 | 1.2 | 4.86 |
+| 6e5 | 3 (default) | (c) half every pass, rms ≤ 0.1, cap 8 | 7 | 14.3 | 0.60 | 4.2 / 8.9 | -0.4 / 2.8 | -0.3 | 4.70 |
+
+## Three generated worlds at 64 with 0.7: passes to settle, or "no"
+
+| Strength | Rule | Seed 1 | Seed 2 | Seed 3 |
+|-|-|-|-|-|
+| 1.2e6 | (a) max ≤ 0.1, cap 6 | 6, contraction 0.00 | 6, contraction 0.00 | no (last rms 0.01), contraction 0.33 |
+| 1.2e6 | (b) rms ≤ 0.1, cap 8 | 4, contraction 0.25 | 4, contraction 0.21 | 5, contraction 0.27 |
+| 1.2e6 | (c) half every pass, rms ≤ 0.1, cap 8 | 6, contraction 0.50 | 6, contraction 0.50 | 7, contraction 0.56 |
+| 6e5 | (a) max ≤ 0.1, cap 6 | 5, contraction 0.00 | 5, contraction 0.00 | 5, contraction 0.00 |
+| 6e5 | (b) rms ≤ 0.1, cap 8 | 3, contraction 0.13 | 3, contraction 0.15 | 4, contraction 0.13 |
+| 6e5 | (c) half every pass, rms ≤ 0.1, cap 8 | 5, contraction 0.50 | 5, contraction 0.47 | 6, contraction 0.54 |
