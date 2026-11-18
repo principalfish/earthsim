@@ -13,9 +13,17 @@ The user's brief (2026-11-18): "Plan 3d", roadmap step 3d in `investigations/202
 - `config.ts` marks which settings are tunable (with any bounds); `scripts/tune` reads its list from there instead of its hand-written `TUNED_SETTINGS`, and the same 14 names come out, so tuning runs are unchanged; step 6b reads the same marks. The user: "Mark it in config (Recommended)" (2026-11-18)
 - The climate-process PDF (`scripts/docs/climate-process.py`) is out of scope and keeps its own hand-kept table. The user: "Leave the PDF by hand" (2026-11-18)
 
+- The long reasoning and references in today's doc comments stay as a doc comment above each entry in `config.ts`, for whoever edits it; the entry's fields stay short (`what`, a one-line `source`, `tuned`) and `config.md` shows only those. The user: "Doc comment on the entry (Recommended)" (2026-11-18)
+- The sections are `TEMPERATURE_CONFIG` and `WIND_CONFIG`; the models' value objects keep their names (`TEMPERATURE_MODEL`, `DEFAULT_WIND_SETTINGS`), so no caller changes. The user: "TEMPERATURE_CONFIG, WIND_CONFIG (Recommended)" (2026-11-18)
+- Grouped as the climate-process PDF groups them: temperature in its 3 groups, winds in its 8, the solver's numerical settings apart from the physical ones. The user: "As the process PDF does (Recommended)" (2026-11-18)
+
 ## Open
-- The names (`TEMPERATURE_SETTINGS` in `planet.ts` already means the five planet fields the temperature reads).
-- Where the long references and reasoning in today's doc comments go.
-- How the settings are grouped.
+- None.
 
 ## Assumed
+- The value objects keep today's key order whatever the grouping, since the tuning script and tests rely on it; if a group order would change it, the order is kept explicitly.
+- `config.ts` is a leaf: it imports nothing from the models, so no import cycle can form. Values the models share today (`GREENHOUSE_FACTOR`, used by `planet.ts` too, and the exchange solver's iteration cap) move into it, and their old homes read them from there.
+- The temperature run's own defaults (`DEFAULT_MAX_YEARS` 60, `DEFAULT_TOLERANCE_K` 0.05) stay as run options in `temperature.ts`: they set how long a run goes, not how the model behaves.
+- `config.md` is written by a new npm command (`npm run docs:config`) and checked by a Vitest test that compares the committed page with what the command would write, as the winds baseline test already does; `docs/temperature.md` and `docs/winds.md` point to it.
+- The core's `index.ts` also exports `TEMPERATURE_CONFIG` and `WIND_CONFIG`.
+- Verification: the values come out identical (a test pins each value object against today's literal values), the Earth temperature baseline is unchanged, the Earth's wind figures are the same bit for bit, and the tuning script lists the same 14 names.
