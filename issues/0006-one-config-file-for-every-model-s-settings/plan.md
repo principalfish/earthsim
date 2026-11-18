@@ -109,7 +109,7 @@ Rejected:
    - Manual review: open the Model settings screen and compare the diagram with the PDF's first page (open `docs/climate-process.pdf` from `main` before it is gone), in a wide and a narrow window. How: the user runs `npm run dev` themselves from the builder's worktree; the builder leaves no server running.
 
 ## Checkpoints
-- [ ] 1. The temperature's settings in `config.ts`
+- [x] 1. The temperature's settings in `config.ts`
 - [ ] 2. The winds' settings in `config.ts`, and the tuning list
 - [ ] 3. `config.md`, written from the config
 - [ ] 4. The "Model settings" screen
@@ -125,3 +125,17 @@ Docs: `config.md` (generated) and pointers to it in `docs/temperature.md` and `d
 
 ### How the pieces run (2026-11-18)
 - Straight through, as the user chose: commit and push each piece after its review round and light re-check, fix every verified finding, record each choice the plan leaves open under its piece as "Decided by the builder", and list them all at the end. Stop for the manual reviews of pieces 4 and 5, and for anything that changes a value, departs from the settled ledger, touches shared state or cannot be undone, or a check that cannot be made to pass.
+
+### Piece 1: the temperature's settings in `config.ts` (committed 279f599, 2026-11-18)
+
+Decided by the builder:
+- The plan's Context lists `MIN_DAMPING_SHARE`, `CORRECTION_PASSES`, the `GUESS_*` pair and `SLOWEST_SHRINK_TRUSTED` among the winds' constants, but they live in `temperature.ts`, so they moved in this piece, as the `constants` of `TEMPERATURE_CONFIG` (`minDampingShare`, `correctionPasses`, `guessIterations`, `guessChangeK`, `slowestShrinkTrusted`), under their old private names.
+- A section is `{ name, groups, constants }`: `groups` are what `valuesOf` flattens into the model's value object (so `TEMPERATURE_MODEL` keeps its 18 keys); `constants` is one group the code reads directly through `constantsOf`, which a run cannot override. Piece 2 puts the winds' chosen constants there too.
+- `defineSection` is generic over its literal groups, so `valuesOf`'s key set is inferred and the compiler checks `TEMPERATURE_MODEL`'s `TemperatureModel` type against the config's keys; it also deep-freezes the section and refuses a duplicate name or a non-finite value.
+- An entry's `unit` is the value's true unit (`lapseRate` 6.5e-3 K/m, where the PDF says 6.5 K/km); dimensionless values get a word ('fraction', 'factor', 'passes', 'iterations') so the unit is never empty.
+- `tuned` is a phrase for the PDF's four tuned settings (`landDiffusivity`, `albedo`, `albedoPoleward`, `iceAlbedo`); the PDF's "Not tuned." became `null`. The PDF's `source` text had its "Not tuned." dropped and, where it was bare, a source named (Trenberth et al. for `greenhouseFactor`, ICAO for `lapseRate`) from the old `@remarks`.
+- The five fixed choices had no PDF rows, so their `what`, `raising` and `lowering` are written from the code and its doc comments, with `source: 'Chosen.'`.
+- Stay in code: `DEFAULT_MAX_YEARS`, `DEFAULT_TOLERANCE_K` (run options), `MIN_TEMPERATURE_K` (physical), `MAX_START_K` and the `MAX_*` limits (safety), `SUNLIGHT_STEP_DEG` and the 64-grid threshold (grid structure).
+- `TEMPERATURE_CONFIG` is typed const-generic, so a reader of one group's literal type cannot read `numerical` without annotating it as `ConfigSection` (the test and the later screen do that).
+- The long `@remarks` bullets moved to doc comments above their entries; `TEMPERATURE_MODEL`'s doc now points to `TEMPERATURE_CONFIG`. `docs/development.md` line 53 (the PDF's settings pages, "a future `src/core/config.md`") is left for pieces 3 and 5.
+- Review: correctness, security, coverage and the verifier raised four verified findings, all fixed; the re-check raised one wording leftover, fixed. Changed-lines coverage 100% on the tracked files; `config.ts` is tested directly.
