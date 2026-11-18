@@ -77,3 +77,7 @@
 | round | docs | - | cleanup | verified | fixed | `src/core/wind/baseline/earthWinds.ts:11` | A reflowed header line was over-long |
 | round | coverage | low | test | verified | open | `src/core/wind/flowing.test.ts:411` | The guess tests show the same result from a warm guess but not that it takes fewer rounds; the round count is not exposed, so left (optional) |
 | round | coverage | - | - | dropped | - | `src/core/temperature/baseline/earthTemperature.test.ts` | A floor for North America's annual contrast — dropped: the 0.25 K regression check already fails if it shrinks |
+| re-check | docs | low | docs | verified | open | `docs/temperature.md:49` | "The loop's three settings are in the Model settings" now sits after the new coast section; belongs at the end of the loop's bullets |
+| re-check | docs | low | docs | verified | open | `docs/temperature.md:47` | "A quarter to a third of the observed" (also in the `windHeatCapacity` source in config.ts and config.md:22) is wrong for North America's year, 0.0 against 5.8 K; true of the other three figures |
+| re-check | correctness | low | docs | verified | open | `src/core/config.ts:1750` | `warmLimitK`'s "at most 18 hPa deep" assumes 3 hPa/K; about 4 hPa at 0.7 (and config.md:134) |
+| re-check | correctness | low | docs | verified | open | `docs/winds.md:220` | The tuning-script paragraph reads as though the What-it-gets-wrong figures were at 0.7; they were at 3 |
