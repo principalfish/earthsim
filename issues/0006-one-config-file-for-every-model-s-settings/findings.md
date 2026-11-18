@@ -72,3 +72,21 @@
 | round | docs | low | docs | verified | fixed | `src/app/ui/panel/settingsPanel.ts:140` | The comment on the button said the screen only lists the settings |
 | round | docs | low | cleanup | verified | fixed | `.gitattributes:2` | The `*.pdf binary` rule was dead with no PDF left |
 | round | security | - | - | - | - | - | Clean |
+
+## review 01 · 2026-11-18
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | docs | low | docs | verified | open | `src/app/ui/panel/processDiagram.test.ts:18` | Test comments and constant names point at the deleted PDF |
+| round | common-mistakes | low | docs | verified | open | `src/core/wind/rules.ts:81` | Use-site doc comments repeat the config entries' reasoning, value and status (also `temperature.ts:1336`) |
+| round | correctness | low | cleanup | verified | open | `scripts/tune/command.ts:17` | Groups-to-entries flattening repeated in four places, with casts |
+| round | common-mistakes | low | cleanup | verified | open | `src/core/config.ts:47` | `ConfigBounds` duplicates `SettingBounds` |
+| round | correctness | nit | cleanup | verified | open | `src/app/ui/panel/processDiagram.ts:153` | `DIAGRAM_LOOP.title`/`.note` never read; text copied in the labels |
+| round | common-mistakes | nit | docs | verified | open | `scripts/tune/command.ts:23` | `TUNED_SETTINGS` doc hand-lists the 14 names |
+| round | common-mistakes | nit | docs | verified | open | `src/core/config.ts:72` | Garbled `ConfigSection.name` doc |
+| round | docs | nit | docs | verified | open | `README.md:42` | Model settings row too long |
+| round | common-mistakes | nit | cleanup | verified | open | `src/app/wiring.ts:400` | `endStroke` + `readout.clear` pair copied |
+| round | common-mistakes | nit | test | verified | open | `src/core/config.test.ts:385` | `formatConfigValue` edge cases tested twice |
+| round | docs | - | - | dropped | - | `src/core/config.md` | Missing backticks on names in prose — dropped: only the Setting column is backticked |
+| round | security | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | Clean: 99% of 249 changed lines; 2 glue lines accepted |
