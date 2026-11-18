@@ -15,6 +15,7 @@ export * from './protocol';
 export * from './temperature/exchange';
 export * from './temperature/observed';
 export * from './temperature/temperature';
+export * from './wind/flowing';
 export * from './wind/model';
 export * from './wind/observedWind';
 export * from './wind/solve';

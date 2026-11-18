@@ -67,6 +67,12 @@ The wind follows from the pressure by one balance everywhere: the push of the pr
 - **Land** slows the wind five times as much as the sea.
 - **High ground** turns the wind along its slopes rather than over them: the steeper the slope, the more of the wind across it is taken away. A sea cell beside a high coast has a slope too, so the wind there turns along the coast.
 
+### The flowing part
+
+The surface wind runs in towards the lows, which a model of the surface alone cannot follow: what flows in rises and is gone. Heat carried by the wind as it stands would pile up where it converges and be made from nothing. So heat is to be carried by the wind's **flowing part**, `flowingPart` in `src/core/wind/flowing.ts`: what the wind carries across every edge between cells, with the converging and spreading part taken out so that every cell has as much going in as coming out, to a ten-millionth of the typical flow across an edge. The part taken out is the flow down the gradient of a potential, found with the same solver as the temperature's heat exchange. It is returned as the flows across the edges, in square metres a second, not as a wind at the cell centres: a wind at the centres cannot be made to have no net flow in or out of every cell.
+
+On the Earth at 64, July's flowing part keeps about two thirds of the surface wind's flow (by squared size) in the same pattern, and a month takes about 60 ms. The grid's skewed cells, at the cube's corners above all, leave about an eighth of a purely converging wind's flow in place, going round and not in; that part carries heat but makes none.
+
 ## The settings it reads
 
 - **Day length**, as one full turn of the planet: it sets the turning in the wind's balance and the width of the cells.

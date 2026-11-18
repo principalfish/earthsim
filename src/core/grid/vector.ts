@@ -35,6 +35,9 @@
  * it in the same way, so it is second order everywhere too; the divergence
  * of the gradient is not, in the rows beside the cube edges.
  *
+ * {@link edgeFlows} gives what a field carries across every edge, for
+ * whatever is to be moved from cell to cell along it.
+ *
  * Every length is on the unit sphere, in radians, unless a radius is given:
  * gradients are per radian of arc, and divergences and curls per radian,
  * by default, and Laplacians per radian squared. The operators take the
@@ -143,6 +146,11 @@ type Operators = {
 	readonly slopePlainCount: number;
 	/** The cells `a` and `b` of edge `e` at `2e` and `2e + 1`. */
 	readonly ends: Int32Array;
+	/**
+	 * Which side of `a` edge `e` is at `2e`, and which side of `b` at
+	 * `2e + 1`, as indices into each cell's neighbours.
+	 */
+	readonly sides: Uint8Array;
 	/**
 	 * For each plain edge, the cell beyond `a` on the line from `b` through
 	 * `a` at `2e`, and the cell beyond `b` on the line from `a` through `b`
@@ -802,6 +810,7 @@ const buildOperators = (grid: Grid): Operators => {
 	const pair: [number, number] = [0, 0];
 	const derivative = new Float64Array(5);
 	const ends = new Int32Array(2 * edgeCount);
+	const sides = new Uint8Array(2 * edgeCount);
 	const outer = new Int32Array(2 * plainCount);
 	const normals = new Float64Array(3 * edgeCount);
 	const tangents = new Float64Array(3 * edgeCount);
@@ -892,6 +901,12 @@ const buildOperators = (grid: Grid): Operators => {
 					tangents[3 * edge + 2] = mx * ny - my * nx;
 					ends[2 * edge] = cell;
 					ends[2 * edge + 1] = next;
+					let across = 0;
+					while (neighbours[SIDES * next + across] !== cell) {
+						across++;
+					}
+					sides[2 * edge] = side;
+					sides[2 * edge + 1] = across;
 					const unit: Vec3 = [nx / length, ny / length, nz / length];
 					if (isSlopePlain) {
 						slopeWeights(grid, cell, side, unit, length, pair);
@@ -1000,6 +1015,7 @@ const buildOperators = (grid: Grid): Operators => {
 		edgeCount,
 		plainCount,
 		ends,
+		sides,
 		outer,
 		normals,
 		tangents,
@@ -1149,6 +1165,80 @@ export const gradient = (
 	return result;
 };
 
+/** Working memory for {@link edgeFluxes}, kept per grid between calls. */
+const FLUX_SCRATCH = new WeakMap<Grid, Float64Array>();
+
+/** The grid's per-edge flux array, made on first use and then shared. */
+const fluxScratch = (grid: Grid, edgeCount: number): Float64Array => {
+	let fluxes = FLUX_SCRATCH.get(grid);
+	if (fluxes === undefined) {
+		fluxes = new Float64Array(edgeCount);
+		FLUX_SCRATCH.set(grid, fluxes);
+	}
+	return fluxes;
+};
+
+/**
+ * The field's value on each edge, dotted with one of the per-edge vectors
+ * (the normals or the tangents), written to `into` for each edge of the
+ * operators' list: what {@link edgeSum} adds up and {@link edgeFlows}
+ * hands on. The flux of edge `e` leaves its cell `a` and enters its cell
+ * `b`.
+ */
+const edgeFluxes = (
+	grid: Grid,
+	vectors: VectorField,
+	along: Float64Array,
+	into: Float64Array,
+): void => {
+	const {
+		edgeCount,
+		plainCount,
+		ends,
+		outer,
+		stencilStarts,
+		stencilCells,
+		stencilWeights,
+	} = operators(grid);
+	const { x, y, z } = vectors;
+	for (let edge = 0; edge < plainCount; edge++) {
+		const a = ends[2 * edge] as number;
+		const b = ends[2 * edge + 1] as number;
+		const before = outer[2 * edge] as number;
+		const after = outer[2 * edge + 1] as number;
+		const ux =
+			NEAR_WEIGHT * ((x[a] as number) + (x[b] as number)) +
+			FAR_WEIGHT * ((x[before] as number) + (x[after] as number));
+		const uy =
+			NEAR_WEIGHT * ((y[a] as number) + (y[b] as number)) +
+			FAR_WEIGHT * ((y[before] as number) + (y[after] as number));
+		const uz =
+			NEAR_WEIGHT * ((z[a] as number) + (z[b] as number)) +
+			FAR_WEIGHT * ((z[before] as number) + (z[after] as number));
+		into[edge] =
+			ux * (along[3 * edge] as number) +
+			uy * (along[3 * edge + 1] as number) +
+			uz * (along[3 * edge + 2] as number);
+	}
+	for (let edge = plainCount; edge < edgeCount; edge++) {
+		let ux = 0;
+		let uy = 0;
+		let uz = 0;
+		const end = stencilStarts[edge - plainCount + 1] as number;
+		for (let k = stencilStarts[edge - plainCount] as number; k < end; k++) {
+			const from = stencilCells[k] as number;
+			const weight = stencilWeights[k] as number;
+			ux += weight * (x[from] as number);
+			uy += weight * (y[from] as number);
+			uz += weight * (z[from] as number);
+		}
+		into[edge] =
+			ux * (along[3 * edge] as number) +
+			uy * (along[3 * edge + 1] as number) +
+			uz * (along[3 * edge + 2] as number);
+	}
+};
+
 /**
  * The sum over each cell's edges of the field's value on the edge dotted
  * with one of the per-edge vectors, divided by the cell's area and the
@@ -1166,63 +1256,77 @@ const edgeSum = (
 	const result = into ?? new Float64Array(grid.cellCount);
 	assertField(grid, result, 'outputs');
 	assertApart(vectors, result);
-	const {
-		edgeCount,
-		plainCount,
-		ends,
-		outer,
-		stencilStarts,
-		stencilCells,
-		stencilWeights,
-		inverseAreas,
-	} = operators(grid);
-	const { x, y, z } = vectors;
+	const { edgeCount, ends, inverseAreas } = operators(grid);
+	const fluxes = fluxScratch(grid, edgeCount);
+	edgeFluxes(grid, vectors, along, fluxes);
 	result.fill(0);
-	for (let edge = 0; edge < plainCount; edge++) {
+	for (let edge = 0; edge < edgeCount; edge++) {
 		const a = ends[2 * edge] as number;
 		const b = ends[2 * edge + 1] as number;
-		const before = outer[2 * edge] as number;
-		const after = outer[2 * edge + 1] as number;
-		const ux =
-			NEAR_WEIGHT * ((x[a] as number) + (x[b] as number)) +
-			FAR_WEIGHT * ((x[before] as number) + (x[after] as number));
-		const uy =
-			NEAR_WEIGHT * ((y[a] as number) + (y[b] as number)) +
-			FAR_WEIGHT * ((y[before] as number) + (y[after] as number));
-		const uz =
-			NEAR_WEIGHT * ((z[a] as number) + (z[b] as number)) +
-			FAR_WEIGHT * ((z[before] as number) + (z[after] as number));
-		const flux =
-			ux * (along[3 * edge] as number) +
-			uy * (along[3 * edge + 1] as number) +
-			uz * (along[3 * edge + 2] as number);
-		result[a] = (result[a] as number) + flux;
-		result[b] = (result[b] as number) - flux;
-	}
-	for (let edge = plainCount; edge < edgeCount; edge++) {
-		const a = ends[2 * edge] as number;
-		const b = ends[2 * edge + 1] as number;
-		let ux = 0;
-		let uy = 0;
-		let uz = 0;
-		const end = stencilStarts[edge - plainCount + 1] as number;
-		for (let k = stencilStarts[edge - plainCount] as number; k < end; k++) {
-			const from = stencilCells[k] as number;
-			const weight = stencilWeights[k] as number;
-			ux += weight * (x[from] as number);
-			uy += weight * (y[from] as number);
-			uz += weight * (z[from] as number);
-		}
-		const flux =
-			ux * (along[3 * edge] as number) +
-			uy * (along[3 * edge + 1] as number) +
-			uz * (along[3 * edge + 2] as number);
+		const flux = fluxes[edge] as number;
 		result[a] = (result[a] as number) + flux;
 		result[b] = (result[b] as number) - flux;
 	}
 	for (let cell = 0; cell < grid.cellCount; cell++) {
 		result[cell] =
 			((result[cell] as number) * (inverseAreas[cell] as number)) / radius;
+	}
+	return result;
+};
+
+/**
+ * What a vector field carries across every edge of the grid: the field's
+ * value on the edge, dotted with the edge's normal, times its length.
+ *
+ * @remarks
+ * Each entry is for one side of one cell, laid out like
+ * {@link Grid.neighbours}: entry `4c + k` is what leaves cell `c` across
+ * its side `k`, towards its `k`th neighbour, and the entry of the same edge
+ * seen from the neighbour is its negative, exactly. Each edge's value is the
+ * one {@link divergence} uses, so the entries leaving a cell sum to its
+ * divergence times its area and the radius, to rounding, and over the whole
+ * sphere they cancel in pairs.
+ *
+ * Given a wind in metres a second and the planet's radius in metres, the
+ * entries are in cubic metres a second per metre of depth, that is, square
+ * metres a second: what a layer of air of some depth moves across the edge
+ * is that times the depth.
+ *
+ * @param grid - The grid.
+ * @param vectors - One tangent vector per cell. It is not changed.
+ * @param radius - The sphere's radius: the flows are per this unit of
+ * length, times the unit of the vectors. Defaults to 1, for the unit
+ * sphere.
+ * @param into - Where to write the flows, `4 * cellCount` long; a new array
+ * when left out.
+ * @returns `into`, or the new array.
+ * @throws RangeError if an array has the wrong length, or `radius` is not
+ * positive and finite.
+ */
+export const edgeFlows = (
+	grid: Grid,
+	vectors: VectorField,
+	radius = 1,
+	into?: Float64Array,
+): Float64Array => {
+	assertVectors(grid, vectors, 'vector');
+	assertRadius(radius);
+	const result = into ?? new Float64Array(SIDES * grid.cellCount);
+	if (result.length !== SIDES * grid.cellCount) {
+		throw new RangeError(
+			`A grid of ${grid.cellCount} cells has ${SIDES * grid.cellCount} edge flows; got ${result.length}`,
+		);
+	}
+	const { edgeCount, ends, sides, normals } = operators(grid);
+	const fluxes = fluxScratch(grid, edgeCount);
+	edgeFluxes(grid, vectors, normals, fluxes);
+	for (let edge = 0; edge < edgeCount; edge++) {
+		const flow = (fluxes[edge] as number) * radius;
+		result[SIDES * (ends[2 * edge] as number) + (sides[2 * edge] as number)] =
+			flow;
+		result[
+			SIDES * (ends[2 * edge + 1] as number) + (sides[2 * edge + 1] as number)
+		] = -flow;
 	}
 	return result;
 };
