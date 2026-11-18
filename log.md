@@ -139,3 +139,4 @@
 - 2026-11-18 19:31 · heat-carried-by-winds-and-the-climate-loop (0007) · cleanup: removed worktree /home/philiph/workspace/earth_sim/.claude/worktrees/heat-carried-by-winds-and-the-climate-loop-4c86af, branch claude/heat-carried-by-winds-and-the-climate-loop-4c86af
 - 2026-11-18 19:50 · ocean-currents-carrying-heat-into-the-climate-loop (0008) · created (build): Ocean currents carrying heat into the climate loop
 - 2026-11-18 20:17 · ocean-currents-carrying-heat-into-the-climate-loop (0008) · GitHub issue #15
+- 2026-11-18 20:19 · ocean-currents-carrying-heat-into-the-climate-loop (0008) · investigating → planned

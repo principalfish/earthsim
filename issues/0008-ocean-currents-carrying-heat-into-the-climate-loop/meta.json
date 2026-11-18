@@ -3,12 +3,12 @@
   "slug": "ocean-currents-carrying-heat-into-the-climate-loop",
   "title": "Ocean currents carrying heat into the climate loop",
   "mode": "build",
-  "state": "investigating",
+  "state": "planned",
   "branch": "ocean-currents-carrying-heat-into-the-climate-loop",
   "base": "main",
   "gh_issue": 15,
   "build_model": null,
   "created": "2026-11-18 19:50",
-  "updated": "2026-11-18 20:17",
+  "updated": "2026-11-18 20:19",
   "done": null
 }
