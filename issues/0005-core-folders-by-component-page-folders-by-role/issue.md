@@ -10,7 +10,7 @@ Nothing the page does changes. Every test, the build and both Earth baselines mu
 
 ## Plan
 
-_2026-11-17 · 7 of 7 pieces done · now: all done, in review; self review done_
+_2026-11-18 · 7 of 7 pieces done · now: all done, in review; self review done_
 
 - [x] **1/7 The core in component folders** · `c239ed8`
   The core's files move into grid, world, planet, earth, temperature and wind folders, each model with its own baseline.
