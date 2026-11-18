@@ -14,6 +14,8 @@
  * A world also has a date, counted in years since it began.
  */
 
+import { TEMPERATURE_CONFIG, valuesOf } from '../config';
+
 /** A planet's settings, each within its {@link PLANET_LIMITS}. */
 export type PlanetSettings = {
 	/** Angle between the planet's axis and its orbit's axis, in degrees. */
@@ -272,9 +274,11 @@ export const windTrustNote = (
  * How fast the temperature model's emissivity falls as the greenhouse
  * effect strengthens: the emissivity is `1 / (1 + k g)` for greenhouse
  * strength `g`, so Earth (`g = 1`) radiates with emissivity about 0.61.
- * The model takes its own greenhouse factor from here.
+ * The value is the temperature model's `greenhouseFactor`, from
+ * {@link TEMPERATURE_CONFIG}.
  */
-export const GREENHOUSE_FACTOR = 0.633;
+export const GREENHOUSE_FACTOR: number =
+	valuesOf(TEMPERATURE_CONFIG).greenhouseFactor;
 
 /**
  * The lowest warmth, from {@link warmthRelativeToEarth}, that the

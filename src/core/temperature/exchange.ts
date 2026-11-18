@@ -25,6 +25,7 @@
  * stiff indeed.
  */
 
+import { TEMPERATURE_CONFIG, valuesOf } from '../config';
 import {
 	edgeGeometry,
 	FACE_COUNT,
@@ -101,8 +102,13 @@ export type ExchangeSolveOutcome = {
 	readonly converged: boolean;
 };
 
-/** The most iterations one solve may take unless the solver is given fewer. */
-export const EXCHANGE_MAX_ITERATIONS = 200;
+/**
+ * The most iterations one solve may take unless the solver is given fewer:
+ * the temperature model's `solverMaxIterations`, from
+ * {@link TEMPERATURE_CONFIG}.
+ */
+export const EXCHANGE_MAX_ITERATIONS: number =
+	valuesOf(TEMPERATURE_CONFIG).solverMaxIterations;
 
 /** Throws unless a tolerance is finite and above zero. */
 const assertTolerance = (tolerance: number): void => {

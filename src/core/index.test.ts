@@ -62,6 +62,17 @@ describe('core', () => {
 		}
 	});
 
+	it('exports the config sections and their helpers', () => {
+		for (const name of [
+			'TEMPERATURE_CONFIG',
+			'defineSection',
+			'valuesOf',
+			'constantsOf',
+		]) {
+			expect(core, name).toHaveProperty(name);
+		}
+	});
+
 	it('exports the temperature solver and its comparison with observed', () => {
 		for (const name of [
 			'edgeGeometry',

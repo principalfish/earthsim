@@ -2,6 +2,7 @@
 export const CORE_VERSION = '0.0.0';
 
 export * from './compare';
+export * from './config';
 export * from './earth/earth';
 export * from './grid/coarsen';
 export * from './grid/grid';

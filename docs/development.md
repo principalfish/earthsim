@@ -69,6 +69,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `grid/coarsen.ts` | A world or a field averaged onto the grid a step coarser, and a field or a vector field carried back from it |
 | `grid/vector.ts` | Vector fields on the grid, east and north at every cell, and the gradient, divergence, curl, Laplacian and smoothing of fields |
 | `grid/quantile.ts` | Area-weighted quantiles of values on the grid |
+| `config.ts` | The models' settings as data, a section per model: each setting's value, unit, what it controls, what raising and lowering it do, where its value comes from and whether it was tuned, in titled groups; the temperature's 18 settings and its fixed choices. The models build their value objects from it, and it imports nothing from them |
 | `world/world.ts` | A world: its settings, its date and the elevation of every cell |
 | `world/generate.ts`, `world/noise.ts` | Worlds with noise-shaped continents, and the seeded noise behind them |
 | `world/brush.ts` | The sculpting brushes: raise, lower and smooth |
@@ -81,7 +82,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `earth/earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
 | `earth/observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
 | `temperature/observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
-| `temperature/temperature.ts` | The temperature model |
+| `temperature/temperature.ts` | The temperature model, its values read from `config.ts` |
 | `temperature/exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
 | `temperature/baseline/` | The Earth temperature baseline (`earthTemperature.ts`, the figures in `earthTemperature.json`) and its check |
 | `wind/model.ts` | The shape every wind model shares, its error figures against the observed winds and pressure, and the mean of a field by bands of latitude |
