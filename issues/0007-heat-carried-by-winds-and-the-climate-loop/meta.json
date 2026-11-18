@@ -9,14 +9,15 @@
   "gh_issue": 13,
   "build_model": null,
   "created": "2026-11-18 11:49",
-  "updated": "2026-11-18 19:30",
+  "updated": "2026-11-18 19:31",
   "done": "2026-11-18 19:30",
   "local": [
     {
       "kind": "session",
       "name": "local_e928166b-ef1e-4442-bcd6-e0f934a0abb0",
       "added": "2026-11-18 13:12",
-      "note": "builder: heat-carried-by-winds-and-the-climate-loop"
+      "note": "builder: heat-carried-by-winds-and-the-climate-loop",
+      "removed": "2026-11-18 19:31"
     },
     {
       "kind": "worktree",
