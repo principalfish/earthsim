@@ -171,7 +171,7 @@ const assertAntisymmetric = (grid: Grid, flows: ArrayLike<number>): void => {
  * negative of the entry for the same edge seen from the other cell. Not
  * changed.
  * @returns The flowing part, in a new array laid out the same way: the
- * entries leaving any cell sum to zero, to ten millionths of the
+ * entries leaving any cell sum to zero, to a ten-millionth of the
  * input's root-mean-square flow across an edge.
  * @throws RangeError if `flows` has the wrong length, a value that is not
  * finite, or an edge whose two entries are not each other's negatives.

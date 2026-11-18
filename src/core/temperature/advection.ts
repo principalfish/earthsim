@@ -18,7 +18,8 @@
  * upwind values, so it is stable however long the step is and makes no new
  * extreme: a cell cannot come out warmer than its warmest upwind
  * neighbour or colder than its coldest, give or take the closing shift
- * below, which is within the sweeps' tolerance.
+ * below, which is within the sweeps' tolerance when they converge, and
+ * unbounded when they run out of sweeps.
  *
  * The flows must have no net flow in or out of any cell, as
  * {@link flowingPart} gives them. Then what a cell takes in at its upwind

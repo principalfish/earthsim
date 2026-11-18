@@ -191,8 +191,10 @@ describe('solveTemperature with winds', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		for (const month of result.months) {
 			for (const value of month) {
 				expect(Number.isFinite(value)).toBe(true);
-				// The model never holds less than the cosmic background, 2.7 K.
-				expect(value).toBeGreaterThan(-273.15);
+				// The months are air temperatures: the cosmic background, 2.7 K,
+				// the least the model holds at sea level, less at most half of it
+				// for the lapse cooling of high ground, so 1.35 K.
+				expect(value).toBeGreaterThanOrEqual(1.35 - 273.15 - 1e-4);
 			}
 		}
 	});
