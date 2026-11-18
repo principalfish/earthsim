@@ -149,14 +149,12 @@ export const DIAGRAM_BOXES: readonly DiagramBox[] = [
 	},
 ];
 
-/** The loop's own frame, with its two lines of title. */
+/** The loop's own frame; its title and note are among the labels. */
 export const DIAGRAM_LOOP = {
 	x: 40,
 	y: 250,
 	width: 560,
 	height: 220,
-	title: 'THE LOOP',
-	note: 'repeats until the temperature stops changing',
 } as const;
 
 /** How an arrow reads: a step forward, or heat or ice feeding back. */

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	type ConfigSection,
 	defineSection,
+	entriesOf,
 	formatConfigValue,
 	TEMPERATURE_CONFIG,
 	WIND_CONFIG,
@@ -54,10 +55,8 @@ const small: ConfigSection = defineSection(
 );
 
 /** The names of a section's settings, in the order the screen lists them. */
-const namesOf = (section: ConfigSection): string[] => [
-	...section.groups.flatMap((group) => Object.keys(group.settings)),
-	...Object.keys(section.constants.settings),
-];
+const namesOf = (section: ConfigSection): string[] =>
+	entriesOf([...section.groups, section.constants]).map(([name]) => name);
 
 describe('openModelSettings', () => {
 	let fake: FakeDocument;
@@ -222,10 +221,7 @@ describe('openModelSettings', () => {
 		const { panels } = open();
 		MODEL_SETTINGS_SECTIONS.forEach((section, index) => {
 			const cards = byClass(panels[index + 1] as FakeElement, 'model-setting');
-			const entries = [
-				...section.groups.flatMap((group) => Object.entries(group.settings)),
-				...Object.entries(section.constants.settings),
-			];
+			const entries = entriesOf([...section.groups, section.constants]);
 			expect(cards).toHaveLength(entries.length);
 			entries.forEach(([name, setting], position) => {
 				const shownCard = cardOf(cards[position] as FakeElement);

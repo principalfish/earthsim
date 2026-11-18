@@ -1335,8 +1335,12 @@ const largestMagnitude = (values: Float64Array): number => {
 
 /**
  * The most of the year before's change that a year's change may be for the
- * two to give a guess at the years left: a change that shrank by less than
- * a quarter says too little about how fast the solve is settling.
+ * two to give a guess at the years left, as a ratio of the two: a change
+ * that is a larger share of the one before says too little about how fast
+ * the solve is settling.
+ *
+ * Its value and where it comes from are the `slowestShrinkTrusted` entry of
+ * {@link TEMPERATURE_CONFIG}.
  */
 const SLOWEST_SHRINK_TRUSTED: number = FIXED_CHOICES.slowestShrinkTrusted;
 
@@ -1351,10 +1355,10 @@ const SLOWEST_SHRINK_TRUSTED: number = FIXED_CHOICES.slowestShrinkTrusted;
  * a guess and no more: the factor itself changes from year to year, and in
  * the first year or two after a start far from the answer it is a poor
  * guide. Where the change did not shrink there is no basis for one at all,
- * and where it shrank by less than a quarter there is none worth giving: a
- * year that barely moved the change, as the second or third of a solve
- * sometimes does before the next settles it, would otherwise be read as
- * dozens of years still to run.
+ * and where it shrank by too little (see {@link SLOWEST_SHRINK_TRUSTED})
+ * there is none worth giving: a year that barely moved the change, as the
+ * second or third of a solve sometimes does before the next settles it,
+ * would otherwise be read as dozens of years still to run.
  *
  * A year whose change is already below the tolerance but that did not end
  * the solve, because some of its steps were not solved to their accuracy,
@@ -1370,8 +1374,8 @@ const SLOWEST_SHRINK_TRUSTED: number = FIXED_CHOICES.slowestShrinkTrusted;
  * @returns 1 when the change of the year just finished is below the
  * tolerance, in the first year or any other. Otherwise a whole number of
  * years from 1 to `yearsLeftUnderCap`, or null in the first year, or when
- * the change shrank by less than a quarter or not at all, or either change
- * is not a finite number.
+ * the change shrank by too little or not at all, or either change is not a
+ * finite number.
  */
 export const estimateYearsLeft = (
 	previousChangeK: number | null,

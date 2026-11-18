@@ -80,22 +80,20 @@ const RADIUS_M = PLANET_RADIUS_KM * 1000;
 
 /**
  * The globe's area-weighted mean sea-level pressure, in hectopascals, that
- * every month's pressure is shifted to. The observed Earth's mean of 1981
- * to 2010, over every month, on the 64 grid, rounded to a whole
- * hectopascal; it is below the standard atmosphere's 1,013.25 hPa because
- * the observed pressure is reduced to sea level over high ground too.
+ * every month's pressure is shifted to.
  *
- * The value is `referencePressureHpa`, from {@link WIND_CONFIG}.
+ * Its value and where it comes from are the `referencePressureHpa` entry of
+ * {@link WIND_CONFIG}.
  */
 export const REFERENCE_PRESSURE_HPA: number =
 	FIXED_CHOICES.referencePressureHpa;
 
 /**
- * The density of the air near the surface, in kilograms a cubic metre: the
- * standard atmosphere's 1.225 kg m⁻³ at sea level and 15 °C, rounded down
- * for air a little warmer and higher on average.
+ * The density of the air near the surface, in kilograms a cubic metre,
+ * which turns a pressure gradient into the push on the wind.
  *
- * The value is `airDensityKgM3`, from {@link WIND_CONFIG}.
+ * Its value and where it comes from are the `airDensityKgM3` entry of
+ * {@link WIND_CONFIG}.
  */
 export const AIR_DENSITY_KG_M3: number = FIXED_CHOICES.airDensityKgM3;
 
@@ -111,11 +109,11 @@ const EARTH_ROTATION_RATE = rotationRate(DEFAULT_PLANET);
 
 /**
  * The width of the Earth's tropical (Hadley) cell, in degrees of latitude
- * from the low to the subtropical high: the observed subtropical highs lie
- * near 30° in both hemispheres. It is also the width of each cell beyond:
- * the observed subpolar lows lie near 60° and the polar highs at the poles.
+ * from the low to the subtropical high, and of each cell beyond it: the
+ * width every other planet's cells are scaled from.
  *
- * The value is `earthCellWidthDeg`, from {@link WIND_CONFIG}.
+ * Its value and where it comes from are the `earthCellWidthDeg` entry of
+ * {@link WIND_CONFIG}.
  */
 export const EARTH_CELL_WIDTH_DEG: number = FIXED_CHOICES.earthCellWidthDeg;
 
@@ -324,9 +322,10 @@ const smoothStep = (x: number): number => {
 /**
  * Over how many cells of phase the start of the outer bands' weakening
  * turns from the third band to `fullBandsReachDeg` from the low, so that
- * the bands have no corner as the day length changes. A guess, not tuned.
+ * the bands have no corner as the day length changes.
  *
- * The value is `fullBandsEaseCells`, from {@link WIND_CONFIG}.
+ * Its value and where it comes from are the `fullBandsEaseCells` entry of
+ * {@link WIND_CONFIG}.
  */
 export const FULL_BANDS_EASE_CELLS: number = FIXED_CHOICES.fullBandsEaseCells;
 

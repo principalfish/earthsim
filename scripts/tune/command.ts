@@ -3,40 +3,30 @@
  */
 
 import {
-	type ConfigEntry,
-	type ConfigSection,
+	type ConfigBounds,
 	DEFAULT_WIND_SETTINGS,
+	entriesOf,
 	WIND_CONFIG,
 	WIND_SETTING_NAMES,
 	type WindSettingName,
 	type WindSettings,
 } from '../../src/core/index';
-import { type SettingBounds, sweepValues } from './search';
-
-/** Every wind setting's entry in the config, by name, in the config's order. */
-const WIND_ENTRIES: readonly (readonly [WindSettingName, ConfigEntry])[] = (
-	WIND_CONFIG as ConfigSection
-).groups.flatMap(
-	(group) => Object.entries(group.settings) as [WindSettingName, ConfigEntry][],
-);
+import { sweepValues } from './search';
 
 /**
  * What `search tuned` searches: the settings the config gives a
- * `searchOrder`, in that order. They are the eleven whose entries say they
- * were tuned by hand against the observed Earth (bandAmplitudeHpa,
- * thermalHpaPerK, thermalSmoothingKm, hotWindowK, seaFrictionPerS,
- * landFrictionFactor, lowShiftGain, outerCellShare, seaThermalShare,
- * warmLimitK and thermalHeightM), and three moved by hand for other
- * reasons: earthContrastK, set to the simulated Earth's own contrast and
- * not tuned; poleTaperDeg, moved from 15° to 10° to keep more of the polar
- * cell, not against the observed Earth; and sideContrastK, set by hand
- * against the case tilted 60°.
+ * `searchOrder`, in that order. Which settings those are, and why, is said
+ * in their entries in `WIND_CONFIG`.
  */
-export const TUNED_SETTINGS: readonly WindSettingName[] = WIND_ENTRIES.filter(
-	([, entry]) => entry.searchOrder !== undefined,
-)
-	.sort(([, a], [, b]) => (a.searchOrder as number) - (b.searchOrder as number))
-	.map(([name]) => name);
+export const TUNED_SETTINGS: readonly WindSettingName[] =
+	entriesOf<WindSettingName>(WIND_CONFIG.groups)
+		.flatMap(([name, entry]) =>
+			entry.searchOrder === undefined
+				? []
+				: [{ name, order: entry.searchOrder }],
+		)
+		.sort((a, b) => a.order - b.order)
+		.map(({ name }) => name);
 
 /**
  * The values a search may give each setting, as its entry in the config
@@ -44,11 +34,14 @@ export const TUNED_SETTINGS: readonly WindSettingName[] = WIND_ENTRIES.filter(
  * and at most 90°, a width in longitude above 0 and at most 360°, and every
  * other setting above 0.
  */
-export const SETTING_BOUNDS: Readonly<Record<WindSettingName, SettingBounds>> =
+export const SETTING_BOUNDS: Readonly<Record<WindSettingName, ConfigBounds>> =
 	Object.freeze(
 		Object.fromEntries(
-			WIND_ENTRIES.map(([name, entry]) => [name, entry.bounds ?? {}]),
-		) as Record<WindSettingName, SettingBounds>,
+			entriesOf<WindSettingName>(WIND_CONFIG.groups).map(([name, entry]) => [
+				name,
+				entry.bounds ?? {},
+			]),
+		) as Record<WindSettingName, ConfigBounds>,
 	);
 
 /** What the script is asked to do. */

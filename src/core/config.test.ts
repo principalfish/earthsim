@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+	type ConfigGroup,
 	type ConfigSection,
 	constantsOf,
 	defineSection,
+	entriesOf,
 	formatConfigValue,
 	TEMPERATURE_CONFIG,
 	valuesOf,
@@ -84,6 +86,23 @@ describe('valuesOf', () => {
 	});
 });
 
+describe('entriesOf', () => {
+	it('lists every setting of the groups with its name, in order', () => {
+		const groups: ConfigGroup[] = [
+			{ title: 'A', settings: { b: entry(2), a: entry(1) } },
+			{ title: 'B', settings: { c: entry(3) } },
+		];
+		expect(
+			entriesOf(groups).map(([name, setting]) => [name, setting.value]),
+		).toEqual([
+			['b', 2],
+			['a', 1],
+			['c', 3],
+		]);
+		expect(entriesOf([])).toEqual([]);
+	});
+});
+
 describe('defineSection', () => {
 	it('refuses a name that appears twice, across groups or constants', () => {
 		const fixed = { title: 'Fixed', settings: {} };
@@ -124,10 +143,7 @@ describe('defineSection', () => {
 
 describe('TEMPERATURE_CONFIG', () => {
 	const section: ConfigSection = TEMPERATURE_CONFIG;
-	const entries = [
-		...section.groups.flatMap((group) => Object.entries(group.settings)),
-		...Object.entries(section.constants.settings),
-	];
+	const entries = entriesOf([...section.groups, section.constants]);
 
 	it('gives the model the same values, in the same order, frozen', () => {
 		expect(TEMPERATURE_MODEL).toEqual(TEMPERATURE_LITERAL);
@@ -262,10 +278,7 @@ const WIND_LITERAL = {
 
 describe('WIND_CONFIG', () => {
 	const section: ConfigSection = WIND_CONFIG;
-	const entries = [
-		...section.groups.flatMap((group) => Object.entries(group.settings)),
-		...Object.entries(section.constants.settings),
-	];
+	const entries = entriesOf([...section.groups, section.constants]);
 
 	it('gives the model the same values, in the same order, frozen', () => {
 		expect(DEFAULT_WIND_SETTINGS).toEqual(WIND_LITERAL);

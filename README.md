@@ -39,7 +39,7 @@ Open the address Vite prints. The first visit shows the New world dialog; press 
 | [User guide](docs/user-guide.md) | Every control on the page: the layers, winds, sun, timeline and info box over the globe, then the panel's world, view, planet, tools, statistics and settings, and what the browser remembers |
 | [Temperature](docs/temperature.md) | How the temperature is worked out, when it is recalculated, its colours, and the Earth comparison |
 | [Winds](docs/winds.md) | How the surface winds and sea-level pressure are worked out, which planet settings they read, and how far to trust them |
-| [Model settings](src/core/config.md) | Every setting of the temperature and wind models, also on the page under Settings, beside the climate process diagram: its value and unit, what it controls, what raising and lowering it do, where its value comes from, and whether it was tuned |
+| [Model settings](src/core/config.md) | Every setting of the temperature and wind models, also on the page under Settings |
 | [Development](docs/development.md) | Commands, the Earth temperature baseline, the climate process diagram, and the source layout |
 | [Data](docs/data.md) | The Earth data files: formats, sources, licences and how to rebuild them |
 

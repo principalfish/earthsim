@@ -15,12 +15,13 @@ import {
 	DIAGRAM_WIDTH,
 } from './processDiagram';
 
-// What the first page of the climate process PDF drew, written out from its
-// drawing code and not from the data the diagram is built from: each box as
-// [id, x, y, width, height, lines, kind], with `y` counted up from the page's
-// foot. The first line of a box is in the strong voice and the rest in the
-// quiet one, but for the sea ice box, whose two lines are one name.
-type PdfBox = readonly [
+// The designed drawing, written out again here and not read from the data the
+// diagram is built from, so that a box, arrow or label that moves, changes or
+// goes missing is caught. The page is 842 units wide with `y` counted up from
+// its foot. Each box is [id, x, y, width, height, lines, kind]. The first
+// line of a box is in the strong voice and the rest in the quiet one, but
+// for the sea ice box, whose two lines are one name.
+type ExpectedBox = readonly [
 	string,
 	number,
 	number,
@@ -30,7 +31,7 @@ type PdfBox = readonly [
 	'input' | 'loop' | 'downstream',
 ];
 
-const PDF_BOXES: readonly PdfBox[] = [
+const EXPECTED_BOXES: readonly ExpectedBox[] = [
 	['star', 150, 492, 220, 30, ['Star, orbit, tilt, day length'], 'input'],
 	['terrain', 400, 492, 160, 30, ['Terrain and sea level'], 'input'],
 	['temperature', 60, 330, 130, 50, ['Temperature', 'twelve months'], 'loop'],
@@ -76,8 +77,8 @@ const PDF_BOXES: readonly PdfBox[] = [
 	],
 ];
 
-// Each arrow as [id, kind, corners], the corners as the PDF drew them.
-const PDF_ARROWS: readonly (readonly [
+// Each arrow as [id, kind, corners], the corners as designed.
+const EXPECTED_ARROWS: readonly (readonly [
 	string,
 	'forward' | 'feedback',
 	readonly (readonly [number, number])[],
@@ -210,8 +211,8 @@ const PDF_ARROWS: readonly (readonly [
 
 // Every piece of free text of the page as [text, x, y, tone, size, bold,
 // centred]: its left or middle and its baseline, `y` counted up from the
-// page's foot, and how the PDF set it.
-type PdfText = readonly [
+// page's foot, and how it is set.
+type ExpectedText = readonly [
 	string,
 	number,
 	number,
@@ -221,7 +222,7 @@ type PdfText = readonly [
 	boolean,
 ];
 
-const PDF_TEXTS: readonly PdfText[] = [
+const EXPECTED_TEXTS: readonly ExpectedText[] = [
 	['THE LOOP', 54, 453, 'loop', 10.5, true, false],
 	[
 		'repeats until the temperature stops changing',
@@ -309,9 +310,9 @@ describe('createProcessDiagram', () => {
 			(element) => attr(element, 'data-node') !== 'loop',
 		);
 		expect(boxes.map((box) => attr(box, 'data-node'))).toEqual(
-			PDF_BOXES.map(([id]) => id),
+			EXPECTED_BOXES.map(([id]) => id),
 		);
-		for (const [id, x, y, width, height, lines, kind] of PDF_BOXES) {
+		for (const [id, x, y, width, height, lines, kind] of EXPECTED_BOXES) {
 			const box = node(id);
 			const [rect] = findAll(box, (inner) => inner.tagName === 'RECT');
 			expect(
@@ -356,8 +357,8 @@ describe('createProcessDiagram', () => {
 			edges()
 				.map((edge) => attr(edge, 'data-edge'))
 				.sort(),
-		).toEqual(PDF_ARROWS.map(([id]) => id).sort());
-		for (const [id, kind, corners] of PDF_ARROWS) {
+		).toEqual(EXPECTED_ARROWS.map(([id]) => id).sort());
+		for (const [id, kind, corners] of EXPECTED_ARROWS) {
 			const edge = edges().find(
 				(element) => attr(element, 'data-edge') === id,
 			) as FakeElement;
@@ -426,8 +427,8 @@ describe('createProcessDiagram', () => {
 			Number(label.getAttribute('x')),
 			Number(label.getAttribute('y')),
 		]);
-		expect(found.length).toBe(PDF_TEXTS.length);
-		for (const [text, x, y] of PDF_TEXTS) {
+		expect(found.length).toBe(EXPECTED_TEXTS.length);
+		for (const [text, x, y] of EXPECTED_TEXTS) {
 			expect(found, text).toContainEqual([text, x, flipped(y)]);
 		}
 	});
@@ -441,7 +442,7 @@ describe('createProcessDiagram', () => {
 					(box) => box.children.includes(element),
 				),
 		);
-		for (const [text, x, y, tone, size, bold, centred] of PDF_TEXTS) {
+		for (const [text, x, y, tone, size, bold, centred] of EXPECTED_TEXTS) {
 			const label = labels.find(
 				(element) =>
 					element.textContent === text &&

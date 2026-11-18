@@ -15,6 +15,7 @@ import {
 	type ConfigEntry,
 	type ConfigGroup,
 	type ConfigSection,
+	entriesOf,
 	formatConfigValue,
 	TEMPERATURE_CONFIG,
 	WIND_CONFIG,
@@ -90,7 +91,7 @@ const groupText = (group: ConfigGroup): string =>
 	].join('\n');
 
 const settingsIn = (groups: readonly ConfigGroup[]): readonly ConfigEntry[] =>
-	groups.flatMap((group) => Object.values(group.settings));
+	entriesOf(groups).map(([, entry]) => entry);
 
 /** `1 setting`, `2 settings`. */
 const counted = (count: number, one: string, many: string): string =>

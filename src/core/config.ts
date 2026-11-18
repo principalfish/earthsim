@@ -69,7 +69,7 @@ export type ConfigSection<
 	G extends readonly ConfigGroup[] = readonly ConfigGroup[],
 	C extends ConfigGroup = ConfigGroup,
 > = {
-	/** The model's name, as a list of the settings titles it. */
+	/** The model's name, which titles its settings where they are listed. */
 	readonly name: string;
 	readonly groups: G;
 	readonly constants: C;
@@ -107,6 +107,17 @@ export const formatConfigValue = (entry: ConfigEntry): string => {
 	return `${number}${entry.unit === '°' ? '' : ' '}${entry.unit}`;
 };
 
+/**
+ * Every setting of some groups with its name, in the order the groups list
+ * them. The name's type may be narrowed to the names the groups hold.
+ */
+export const entriesOf = <K extends string = string>(
+	groups: readonly ConfigGroup[],
+): (readonly [K, ConfigEntry])[] =>
+	groups.flatMap(
+		(group) => Object.entries(group.settings) as [K, ConfigEntry][],
+	);
+
 const deepFreeze = <T extends object>(value: T): T => {
 	for (const inner of Object.values(value)) {
 		if (typeof inner === 'object' && inner !== null) {
@@ -131,15 +142,13 @@ export const defineSection = <
 	constants: C,
 ): ConfigSection<G, C> => {
 	const seen = new Set<string>();
-	for (const group of [...groups, constants]) {
-		for (const [key, entry] of Object.entries(group.settings)) {
-			if (seen.has(key)) {
-				throw new RangeError(`${name}: the setting ${key} appears twice`);
-			}
-			seen.add(key);
-			if (!Number.isFinite(entry.value)) {
-				throw new RangeError(`${name}: the setting ${key} is not finite`);
-			}
+	for (const [key, entry] of entriesOf([...groups, constants])) {
+		if (seen.has(key)) {
+			throw new RangeError(`${name}: the setting ${key} appears twice`);
+		}
+		seen.add(key);
+		if (!Number.isFinite(entry.value)) {
+			throw new RangeError(`${name}: the setting ${key} is not finite`);
 		}
 	}
 	return deepFreeze({ name, groups, constants });
@@ -151,10 +160,8 @@ export const defineSection = <
  */
 export const valuesOf = <S extends ConfigSection>(section: S): ValuesOf<S> => {
 	const values: Record<string, number> = {};
-	for (const group of section.groups) {
-		for (const [key, entry] of Object.entries(group.settings)) {
-			values[key] = entry.value;
-		}
+	for (const [key, entry] of entriesOf(section.groups)) {
+		values[key] = entry.value;
 	}
 	return Object.freeze(values) as ValuesOf<S>;
 };
@@ -164,7 +171,7 @@ export const constantsOf = <S extends ConfigSection>(
 	section: S,
 ): ConstantsOf<S> => {
 	const values: Record<string, number> = {};
-	for (const [key, entry] of Object.entries(section.constants.settings)) {
+	for (const [key, entry] of entriesOf([section.constants])) {
 		values[key] = entry.value;
 	}
 	return Object.freeze(values) as ConstantsOf<S>;
