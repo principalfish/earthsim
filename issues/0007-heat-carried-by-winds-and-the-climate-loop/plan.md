@@ -140,7 +140,7 @@ Rejected (with the user's choices): putting the winds into the main symmetric so
    - Manual review: open the page on the Earth with Temperature on; watch the status go from "Calculating climate" to "Refining climate (pass 2…)" and settle; compare January's map with today's (western Europe milder, East Asia and eastern North America colder; Difference view against the observed); press Pause during a refinement and resume; sculpt during a refinement; open the Model settings screen and check the new settings and the diagram's lines. How: the user runs `npm run dev` themselves from the builder's worktree, whose path the planner gives them; the builder leaves no server running for it.
 
 ## Checkpoints
-- [ ] 1. The wind's flowing part
+- [x] 1. The wind's flowing part
 - [ ] 2. Heat carried by the wind, in the temperature solve
 - [ ] 3. The climate loop in the core
 - [ ] 4. The setting's value, and the baselines
@@ -155,3 +155,12 @@ After every piece: `npm run check`, `npm run typecheck`, `npm test`, `npm run bu
 
 ### How the pieces run (2026-11-18)
 - Straight through, as the user chose: commit and push each piece after its review round (the verifier on every finding, then a light re-check), fix every verified finding, record each choice the plan leaves open under its piece as "Decided by the builder", and list them all at the end. Stop for piece 6's manual review; for piece 4 if the Earth's west–east coast contrast is far from believable (report, don't tune); and for anything that changes behaviour beyond the plan, departs from the settled ledger, touches shared state or cannot be undone, or a check that cannot be made to pass.
+
+### Piece 1: the wind's flowing part (2026-11-18)
+Decided by the builder:
+- **`flowingPart` returns edge flows only**, not also a cell-centred east/north wind (the plan said "same units and layout as the winds"). A wind rebuilt at the centres from the corrected flows keeps about a third of the original's divergence (by rms; the cubic edge values and the two-point exchange operator are not inverses), so it would look divergence-free and not be. The flows are `4 * cellCount` entries laid out like `grid.neighbours`, in m²/s on the planet's radius, antisymmetric exactly. `removeConvergence(grid, flows)` is the edge-level projection, exported so idempotence can be tested exactly.
+- **A purely converging wind comes back as about an eighth of itself, not zero** (plan acceptance). The exchange solver's two-point couplings are not a consistent gradient on skewed cube cells; measured 0.13 of the rms at 64, 128 and 256 (0.32 within 0.15 rad of a corner). The net flow out of every cell is zero to 1e-7 of the input's rms flow, which is what the heat step needs; the leftover goes round, so it carries heat and makes none. A skew-corrected flux (the along-edge slope term, with the exchange solver as preconditioner of an outer iteration) would remove it, but is a bigger design and was left. The verifier dropped it as out of scope; open for the user if the leftover shows up in the maps.
+- `edgeFlows(grid, vectors, radius, into)` in `grid/vector.ts` (4 per cell like `grid.neighbours`); `edgeSum` was refactored into `edgeFluxes` plus accumulation, same arithmetic and order, and `Operators` gained the side index of each edge's two ends.
+- Solver constants (mass 1e-2 per unit area, each round solved to 0.1 of the largest net flow it starts from, 1e-7 target, at most 12 rounds), chosen by a measured sweep: about 60 ms per month at 64 (about 0.7 s a year of winds), 3–4 rounds. At 128 and 256 one month took 0.77 s and 3.2 s on random winds (first call included), so for finer worlds piece 3 should take the flowing part on the 64 grid and carry it to the solve grid rather than solve it there.
+- Uncovered changed lines (flowing.ts, the two defensive throws: 12 rounds without reaching the tolerance; the exchange solve not converging): defensive, real winds take 3–4 rounds; accepted by the coverage check. Not reachable with finite, antisymmetric input unless flows are near the float range's ends.
+- docs/winds.md says heat "is to be carried by" the flowing part; piece 2 or 3 makes it "is carried" and updates "What it leaves out" (the winds do not change the temperature) when they wire it in.

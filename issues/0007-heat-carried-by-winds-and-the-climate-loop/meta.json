@@ -3,13 +3,13 @@
   "slug": "heat-carried-by-winds-and-the-climate-loop",
   "title": "Heat carried by winds, and the climate loop",
   "mode": "build",
-  "state": "planned",
-  "branch": "heat-carried-by-winds-and-the-climate-loop",
+  "state": "building",
+  "branch": "claude/heat-carried-by-winds-and-the-climate-loop-4c86af",
   "base": "main",
   "gh_issue": 13,
   "build_model": null,
   "created": "2026-11-18 11:49",
-  "updated": "2026-11-18 13:12",
+  "updated": "2026-11-18 13:39",
   "done": null,
   "local": [
     {
@@ -17,6 +17,16 @@
       "name": "local_e928166b-ef1e-4442-bcd6-e0f934a0abb0",
       "added": "2026-11-18 13:12",
       "note": "builder: heat-carried-by-winds-and-the-climate-loop"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/philiph/workspace/earth_sim/.claude/worktrees/heat-carried-by-winds-and-the-climate-loop-4c86af",
+      "added": "2026-11-18 13:39"
+    },
+    {
+      "kind": "branch",
+      "name": "claude/heat-carried-by-winds-and-the-climate-loop-4c86af",
+      "added": "2026-11-18 13:39"
     }
   ]
 }
