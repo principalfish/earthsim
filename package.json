@@ -13,6 +13,7 @@
     "baseline:winds": "node scripts/run-with-vite.mjs scripts/update-earth-winds-baseline.ts",
     "time:temperature": "node scripts/run-with-vite.mjs scripts/time-temperature.ts",
     "time:winds": "node scripts/run-with-vite.mjs scripts/time-winds.ts",
+    "time:climate": "node scripts/run-with-vite.mjs scripts/time-climate.ts",
     "docs:config": "node scripts/run-with-vite.mjs scripts/write-config-doc.ts",
     "report:winds": "node scripts/run-with-vite.mjs scripts/wind-report.ts",
     "tune:winds": "node scripts/run-with-vite.mjs scripts/tune-winds.ts",

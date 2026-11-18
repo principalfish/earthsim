@@ -140,8 +140,15 @@ describe('the one-continent world’s oceanic swing', () => {
 	it('is much less with the bands placed by longitude than with one pattern round the globe', () => {
 		const world = oneContinentWorld();
 		const months = solveTemperature(world).months;
+		// At 3 hPa a kelvin of thermal response, the strength the figures
+		// below were measured at; the model's default is now the physical 0.7.
 		const swingOf = (settings = {}) =>
-			oceanicSwing(grid, solveWinds(world, months, { settings })).change;
+			oceanicSwing(
+				grid,
+				solveWinds(world, months, {
+					settings: { thermalHpaPerK: 3, ...settings },
+				}),
+			).change;
 		// With one pattern round the globe, as before the bands varied by
 		// longitude, the open ocean's southern high moved 18.2° from January
 		// to July, its band low 29.7° and its northern high 22.8°.

@@ -18,6 +18,7 @@ Requires Node.js and npm. Run `npm install` once.
 | `npm run baseline:winds` | Write the Earth winds baseline afresh; see [Winds](winds.md#the-earth-winds-baseline) |
 | `npm run docs:config` | Write `src/core/config.md`, the list of every model's settings, from `src/core/config.ts`; a test fails when the committed page is not the one this writes |
 | `npm run time:temperature` | Time the temperature solver at every resolution and print the simulated Earth's error figures, as Markdown tables. Takes a few minutes |
+| `npm run time:climate` | Time the climate loop on the Earth at every resolution, pass by pass, from nothing and carried on from the settled result, as Markdown tables. Takes about a minute; see [Temperature](temperature.md#the-climate-loop) |
 | `npm run time:winds` | Time a year of the Earth's winds at every resolution, as `solveWinds` solves them by default (the pressure on the 64 grid) and wholly on the world's own grid beside it, and print how far the two lie apart, as Markdown tables. Takes about half a minute; see [Winds](winds.md#the-pressure-of-finer-worlds-is-worked-out-on-the-64-grid) |
 | `npm run tune:winds` | Run the wind model many times with its settings changed, on the wind report's nine cases, and print the Earth's error figures and every case's measures, as Markdown tables: a sweep of one setting, a search over several, every case for some settings, or the model run on the observed temperature; run with nothing after it to list the settings and the forms. It changes no setting; see [Winds](winds.md#the-settings-and-the-tuning-script) |
 | `npm run report:winds` | Write the wind report, `reports/winds/index.html`, to open in a browser: the observed Earth's winds and sea-level pressure in January and July, the nine worlds the wind models are run on, and each registered model's maps, error figures and solve times, and its section against published studies: how each paper was read, and for three checks (winds and the pressure low at a 60° tilt, and the tropical cell and bands of wind with a faster and a slower day) the papers' words beside what the model shows. The file is not committed |
@@ -26,8 +27,8 @@ Requires Node.js and npm. Run `npm install` once.
 
 `src/core/temperature/baseline/earthTemperature.json` records how far the simulated Earth is from the observed one, so that a change to the model cannot make it worse unnoticed.
 
-- **What it holds:** for the Earth at 64 cells per face edge, the mean and root-mean-square difference (simulated less observed, in kelvin) for the annual average, each month, the warmest month, the coldest month and the seasonal range.
-- **The test:** a test solves that Earth and fails, naming each figure, if any is worse than the file's by more than 0.05 K. A figure that has improved passes.
+- **What it holds:** for the Earth at 64 cells per face edge solved by the climate loop, the mean and root-mean-square difference (simulated less observed, in kelvin) for the annual average, each month, the warmest month, the coldest month and the seasonal range; and the west–east coast contrasts, simulated and observed, for the year and January: western Europe against East Asia and the west of North America against its east, both at 40–60°N.
+- **The test:** a test solves that Earth and fails, naming each figure, if any is worse than the file's by more than 0.05 K, or a simulated coast contrast is smaller than the file's by more than 0.25 K, so that a later step cannot quietly lose the winds' effect on the coasts. A figure that has improved passes.
 - **When a change is meant to move the figures:** run `npm run baseline:temperature`, which rewrites the file and prints what moved, and commit the file with the change.
 - **The winds follow the temperature,** so a change to the temperature model moves the Earth winds baseline too: run `npm run baseline:winds` as well; see [Winds](winds.md#the-earth-winds-baseline).
 
@@ -74,7 +75,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `temperature/temperature.ts` | The temperature model, its values read from `config.ts`, and its solve, which may be given a year of winds to carry heat along |
 | `temperature/advection.ts` | Heat carried along by the winds: an implicit upwind step on the grid that keeps the heat exactly, and the flows' interpolation between months; see [Temperature](temperature.md#heat-carried-by-the-winds) |
 | `temperature/exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
-| `temperature/baseline/` | The Earth temperature baseline (`earthTemperature.ts`, the figures in `earthTemperature.json`) and its check |
+| `temperature/baseline/` | The Earth temperature baseline (`earthTemperature.ts`, the figures in `earthTemperature.json`), the west–east coast contrasts it holds (`coastContrast.ts`) and its check |
 | `wind/flowing.ts` | The flowing part of a wind: what it carries across every edge, with the converging part taken out so every cell has as much going in as out, and its form for the grid the temperature is solved on; see [Winds](winds.md) |
 | `wind/model.ts` | The shape every wind model shares, its error figures against the observed winds and pressure, and the mean of a field by bands of latitude |
 | `wind/rules.ts` | The rules wind model on a world's own grid, its settings read from `config.ts`, and its parts: sea-level pressure from zonal bands placed by the temperature and the day length plus thermal highs and lows, and the wind from it by a balance of pressure gradient, turning and friction; see [Winds](winds.md) |
@@ -141,6 +142,7 @@ Run with Node, not in the browser.
 | `earth/` | The parts of the build that touch no file: reading TIFF and netCDF, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data files |
 | `time-temperature.ts` | The solver's timings and the simulated Earth's error figures |
 | `time-winds.ts` | The wind model's timings, and how far its solve with the pressure on the 64 grid lies from one wholly on the world's own grid |
+| `time-climate.ts` | Times the climate loop pass by pass |
 | `update-earth-temperature-baseline.ts` | Writes the Earth temperature baseline afresh |
 | `update-earth-winds-baseline.ts` | Writes the Earth winds baseline afresh |
 | `write-config-doc.ts` | Writes `src/core/config.md` from the config |

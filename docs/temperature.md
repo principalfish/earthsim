@@ -22,18 +22,29 @@ The model's settings are listed, with what each does and where its value comes f
 
 A solve may be given a year of winds, as the flows they carry across every cell edge (the flowing part of the winds: see [Winds](winds.md#the-flowing-part)). After each time step's heat exchange, a second step moves heat downwind: each cell takes the temperature of the air flowing in from its upwind neighbours, weighted by how much flows in against the cell's own heat capacity. The step is stable however long it is, makes no new extreme (to within the solver's tolerance), keeps the heat exactly, and leaves a uniform temperature as it is. The flows are those of the time each step ends, as the sunlight is, interpolated between the months'; only the flows are interpolated, the sunlight is worked out for that time.
 
-How strongly the wind carries heat is one setting, the heat capacity of the air that moves it (about a kilometre of air to start with); at 0 the solve is the one with no winds, exactly. A world of 128 or 256 is solved on a coarser grid, so its flows must be on that grid; `flowingPartForSolve` finds them there from the world's own winds (see [Winds](winds.md#the-flowing-part)). On the Earth at 64, with the winds the model itself gives, January comes out about 2 °C milder in western Europe and 4 °C in western North America, and about 5 °C colder in eastern North America and 13 °C in East Asia, than without the winds; the solve takes 1.6 to 2 times as long.
+How strongly the wind carries heat is one setting, the heat capacity of the air that moves it (about a kilometre of air); at 0 the solve is the one with no winds, exactly. A world of 128 or 256 is solved on a coarser grid, so its flows must be on that grid; `flowingPartForSolve` finds them there from the world's own winds (see [Winds](winds.md#the-flowing-part)).
 
 ### The climate loop
 
 `solveClimate` works the temperature and the winds out together, in passes. The first pass is the temperature without winds and the winds from it, exactly as before. Each later pass solves the temperature again, carried on from the last pass's and with heat carried along the last pass's winds, then works out the winds from the new temperature.
 
-- It stops when a pass changes no cell's monthly temperature by more than 0.1 °C, or after 6 passes.
-- A pass that changes the temperature by more than the one before did is an overshoot, and only half its change is applied.
+- It stops when the root-mean-square change a pass makes to the monthly temperature, over the globe and the year, is no more than 0.1 °C, or after 8 passes. The largest change in a single cell is left out of the rule: a few cells of spring snow and ice keep moving by more than a degree for many passes.
+- A pass whose change is larger than the one before's is an overshoot, and only half its change is applied.
 - A result that settled can be carried on from: a solve for the same world again settles in one pass.
 - The day length now changes the settled temperature, through the winds, though not the first pass.
-- A pass after the first takes about 1.6 s on a world of 64 (0.3 s of temperature, 0.7 s for the flowing part of the winds and 0.6 s for the winds), and about 1.8 s on a world of 128; the first takes the temperature from nothing and the winds, about 1.8 s.
-- How many passes the Earth needs depends on how strongly the wind carries heat: with a kilometre of air, as the setting starts, its coasts are still changing by degrees after 6; with a tenth of that, about 4 settle it.
+- On the Earth at 64 the loop settles in 4 passes, about 8 s from nothing (1.4 s for the first pass, which is the temperature from nothing and the winds, then about 2 s for each later pass), and in one pass, about 2 s, carried on from the settled result; on a world of 128 about 9 s and 2 s, and on one of 256 about 27 s and 4 s. A later pass is the temperature carried on (0.3 s for a year), the flowing part of the winds (0.5–0.7 s, a tenth to a third less than from nothing because each month starts from the last pass's answer) and the winds (0.6 s). `npm run time:climate` measures it.
+- How fast the passes settle depends on how strongly the winds feed back. The thermal highs and lows are at their physical 0.7 hPa a kelvin for that reason: at the 3 they were tuned to before the winds carried heat, each pass shrank by about 0.7 and the Earth did not settle in 8. At 0.7 each pass shrinks by about 0.2 to 0.3.
+
+### Heat carried along the winds, on the Earth
+
+How strongly the wind carries heat is the heat capacity of the air that moves it, 1.2e6 J/m²/K: about a kilometre of air at the sea-level density, the depth the surface wind blows in. It is set from that physical estimate and not tuned. Its check is the Earth's west–east coast contrast at 40–60°N, kept in the [baseline](development.md#the-earth-temperature-baseline):
+
+| | Simulated, annual | Observed, annual | Simulated, January | Observed, January |
+|-|-|-|-|-|
+| Western Europe less East Asia | 2.9 K | 11.5 K | 7.8 K | 22.9 K |
+| West less east North America | 0.0 K | 5.8 K | 3.5 K | 15.1 K |
+
+Without the winds the model gave 0.7 and 2.4 K for Europe against Asia and about −0.8 and −0.6 K for North America. So the winds make a contrast, in the right places and a quarter to a third of the observed size, and the rest is not theirs to make: the sea's own heat transport, ocean currents, is a later step. East Asia's January comes out 0.8 °C against an observed −4.0. The Earth's error against the observed falls from 3.93 to 3.66 K root-mean-square for the year.
 
 The loop's three settings are in the [Model settings](../src/core/config.md).
 
@@ -114,4 +125,4 @@ On the **measured Earth**, the comparison control in the top bar over the globe 
 - **Error figures** show under the legend, for the month or summary on screen: the mean difference and the root-mean-square difference, such as `Mean −0.1 °C · RMS 3.9 °C`.
 - The observed temperature is fetched the first time it is needed: when Observed or Difference is chosen in Temperature view, or Temperature is chosen while either is on. If that fails while Temperature is on screen, the view goes back to Simulated and the next choice tries again; if Temperature has been left meanwhile, the choice is kept and the fetch is tried again on coming back to it.
 
-The model's constants were tuned against the observed Earth when it was built, and were not tuned again for this comparison. The Earth's error figures are kept as a baseline for later steps, such as winds and ocean currents, to improve on; see [Development](development.md#the-earth-temperature-baseline).
+The model's constants were tuned against the observed Earth when it was built, and were not tuned again for this comparison. The Earth's error figures, and its west–east coast contrasts, are kept as a baseline for later steps, such as ocean currents, to improve on; see [Development](development.md#the-earth-temperature-baseline).

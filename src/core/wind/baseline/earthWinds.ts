@@ -5,17 +5,18 @@
  * `earthWinds.json`.
  *
  * The committed figures are for the Earth preset at 64 cells per face edge,
- * with Earth's planet settings and the preset's sea level, its winds worked
- * out from the temperature model's own temperatures with the wind model's
- * default settings, against the observed winds and pressure on the same
- * cells, rounded to {@link WIND_BASELINE_DECIMALS} decimals. The test beside
- * this module solves that world and fails if any figure is worse than its
- * committed value by more than its tolerance in
+ * with Earth's planet settings and the preset's sea level, its winds those
+ * of the climate loop that works the temperature and the winds out together,
+ * with the wind model's default settings, against the observed winds and
+ * pressure on the same cells, rounded to {@link WIND_BASELINE_DECIMALS}
+ * decimals. The test beside this module solves that world and fails if any
+ * figure is worse than its committed value by more than its tolerance in
  * {@link WIND_BASELINE_TOLERANCES}; `npm run baseline:winds` writes the
  * figures afresh, to be committed when a change is meant to move them.
  *
- * The winds follow the temperature, so a change to the temperature model
- * moves these figures as well as the temperature's own baseline.
+ * The winds follow the temperature and the temperature the winds, so a
+ * change to the temperature model moves these figures as well as the
+ * temperature's own baseline.
  */
 
 import type { Grid, Resolution } from '../../grid/grid';

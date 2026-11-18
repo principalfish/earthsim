@@ -27,13 +27,6 @@ const COARSE = {
 	solverToleranceK: 0.05,
 };
 
-/**
- * A heat capacity of the moving air weak enough for the Earth's loop to
- * settle within the passes allowed: with the model's own, about a kilometre
- * of air, the Earth's coasts are still changing by degrees after six.
- */
-const WEAK = { ...COARSE, windHeatCapacity: 1e5 };
-
 const DATA = decodeEarth(readEarthDataFile());
 const EARTH = earthWorld(DATA, 64);
 
@@ -63,7 +56,7 @@ const run = (
 	return { result, passes };
 };
 
-const earth = shared(() => run(EARTH, { model: WEAK }));
+const earth = shared(() => run(EARTH, { model: COARSE }));
 
 /** The largest difference between two years of monthly fields. */
 const largestDifference = (
@@ -88,7 +81,7 @@ const largestDifference = (
 describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 	it('has a first pass that is today’s temperature and winds exactly', () => {
 		const first = earth().passes[0] as ClimateProgress;
-		const temperature = solveTemperature(EARTH, { model: WEAK });
+		const temperature = solveTemperature(EARTH, { model: COARSE });
 		expect(first.temperature.months).toEqual(temperature.months);
 		expect(first.temperature.state).toEqual(temperature.state);
 		expect(first.winds).toEqual(solveWinds(EARTH, temperature.months));
@@ -107,14 +100,20 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		expect(passes.map((pass) => pass.pass)).toEqual(
 			Array.from({ length: result.passes }, (_, index) => index + 1),
 		);
-		expect(passes.every((pass) => pass.maxPasses === 6)).toBe(true);
+		expect(
+			passes.every(
+				(pass) => pass.maxPasses === TEMPERATURE_MODEL.climateMaxPasses,
+			),
+		).toBe(true);
 		// Only the last pass is the last, and it is the one that settled.
 		expect(passes.map((pass) => pass.last)).toEqual(
 			passes.map((_, index) => index === passes.length - 1),
 		);
 		const final = passes[passes.length - 1] as ClimateProgress;
 		expect(final.settled).toBe(true);
-		expect(final.changeC).toBeLessThan(TEMPERATURE_MODEL.climateToleranceC);
+		expect(final.changeC).toBeLessThanOrEqual(
+			TEMPERATURE_MODEL.climateToleranceC,
+		);
 		// The change falls from pass to pass on the way, and no pass before
 		// the last had settled.
 		const changes = passes.slice(1).map((pass) => pass.changeC as number);
@@ -149,18 +148,21 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 	});
 
 	it('settles in one pass when carried on from a settled result for the world as it is', () => {
-		const again = run(EARTH, { model: WEAK, start: earth().result });
+		const again = run(EARTH, { model: COARSE, start: earth().result });
 		expect(again.passes).toHaveLength(1);
 		expect(again.result.settled).toBe(true);
 		expect(again.result.changeC).toBeLessThan(
 			TEMPERATURE_MODEL.climateToleranceC,
 		);
-		expect(
-			largestDifference(
-				again.result.temperature.months,
-				earth().result.temperature.months,
-			),
-		).toBeLessThan(TEMPERATURE_MODEL.climateToleranceC);
+		// The root-mean-square change is within the tolerance while the
+		// largest in some cell is above it, a few times that: the rule is the
+		// rms, not the largest change.
+		const largest = largestDifference(
+			again.result.temperature.months,
+			earth().result.temperature.months,
+		);
+		expect(largest).toBeGreaterThan(TEMPERATURE_MODEL.climateToleranceC);
+		expect(largest).toBeLessThan(0.5);
 	});
 
 	it('solves from nothing, as the first pass of a cold solve does, when the start is for another day length or sea level', () => {
@@ -170,13 +172,13 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 			planet: { ...EARTH.planet, dayLengthHours: 30 },
 		};
 		const afterDay = run(otherDay, {
-			model: { ...WEAK, climateMaxPasses: 1 },
+			model: { ...COARSE, climateMaxPasses: 1 },
 			start: earth().result,
 		});
 		expect(afterDay.passes[0]?.temperature.months).toEqual(first);
 		const otherSea: World = { ...EARTH, seaLevel: EARTH.seaLevel + 50 };
 		const afterSea = run(otherSea, {
-			model: { ...WEAK, climateMaxPasses: 1 },
+			model: { ...COARSE, climateMaxPasses: 1 },
 			start: earth().result,
 		});
 		expect(afterSea.passes[0]?.temperature.months).not.toEqual(first);
@@ -186,7 +188,7 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 	it('stops on a change of no more than the tolerance, not on one above it, and on the most passes', () => {
 		const second = earth().passes[1] as ClimateProgress;
 		const change = second.changeC as number;
-		const twoPasses = { ...WEAK, climateMaxPasses: 2 };
+		const twoPasses = { ...COARSE, climateMaxPasses: 2 };
 		const at = run(EARTH, {
 			model: { ...twoPasses, climateToleranceC: change },
 		});
@@ -200,7 +202,7 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		expect(below.result.settled).toBe(false);
 		expect(below.result.passes).toBe(2);
 		// Too few passes to compare: the cap ends a first pass of one.
-		const one = run(EARTH, { model: { ...WEAK, climateMaxPasses: 1 } });
+		const one = run(EARTH, { model: { ...COARSE, climateMaxPasses: 1 } });
 		expect(one.result.passes).toBe(1);
 		expect(one.result.settled).toBe(false);
 		expect(one.passes[0]?.last).toBe(true);
@@ -213,7 +215,7 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 			planet: { ...EARTH.planet, greenhouseStrength: 1.2 },
 		};
 		const cold = run(warmer, {
-			model: { ...WEAK, climateMaxPasses: 1 },
+			model: { ...COARSE, climateMaxPasses: 1 },
 			start: earth().result,
 		});
 		expect(cold.passes[0]?.changeC).toBeNull();
@@ -221,7 +223,7 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		const { solvedFor: _gone, ...unrecorded } = earth().result.temperature;
 		expect(() =>
 			solveClimate(EARTH, {
-				model: WEAK,
+				model: COARSE,
 				start: { ...earth().result, temperature: unrecorded as never },
 			}),
 		).toThrow(RangeError);
@@ -232,7 +234,7 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 			...EARTH,
 			planet: { ...EARTH.planet, dayLengthHours: 72 },
 		};
-		const two = run(slow, { model: { ...WEAK, climateMaxPasses: 2 } });
+		const two = run(slow, { model: { ...COARSE, climateMaxPasses: 2 } });
 		const base = earth().passes;
 		expect(two.passes[0]?.temperature.months).toEqual(
 			(base[0] as ClimateProgress).temperature.months,
@@ -290,7 +292,7 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 	});
 
 	it('ends the solve with whatever the callbacks throw', () => {
-		const model = { ...WEAK, climateMaxPasses: 1 };
+		const model = { ...COARSE, climateMaxPasses: 1 };
 		expect(() =>
 			solveClimate(EARTH, {
 				model,
@@ -333,35 +335,40 @@ describe('solveClimate with no winds to carry heat', {
 describe('solveClimate when the winds and the temperature chase each other', {
 	timeout: SOLVE_TIMEOUT_MS,
 }, () => {
-	// A generated world at a heat capacity of moving air between the Earth's
-	// weak setting and the model's own: the change grows from the second pass
-	// to the third, and, left whole, goes on growing.
+	// A generated world with the thermal highs and lows at 3 hPa a kelvin,
+	// the strength the winds were tuned at before the temperature depended on
+	// them: the loop does not settle, its change grows from the fourth pass to
+	// the fifth and, left whole, goes on growing.
 	const WORLD = generateWorld({ resolution: 64, seed: 1, landFraction: 0.3 });
-	const MODEL = { ...COARSE, windHeatCapacity: 8e5, climateMaxPasses: 4 };
+	const MODEL = { ...COARSE, climateMaxPasses: 6 };
+	const WINDS = { thermalHpaPerK: 3 };
 
 	const whole = shared(() =>
-		run(WORLD, { model: { ...MODEL, climateOvershootShare: 1 } }),
+		run(WORLD, {
+			model: { ...MODEL, climateOvershootShare: 1 },
+			windSettings: WINDS,
+		}),
 	);
-	const half = shared(() => run(WORLD, { model: MODEL }));
+	const half = shared(() => run(WORLD, { model: MODEL, windSettings: WINDS }));
 
 	it('applies only half of a pass that changes the temperature by more than the one before, and the winds of what is applied', () => {
-		const [, secondWhole, thirdWhole] = whole().passes as ClimateProgress[];
-		const [, secondHalf, thirdHalf] = half().passes as ClimateProgress[];
-		// The first overshoot is the third pass.
-		expect((thirdWhole as ClimateProgress).changeC).toBeGreaterThan(
-			(secondWhole as ClimateProgress).changeC as number,
+		const wholePasses = whole().passes as ClimateProgress[];
+		const halfPasses = half().passes as ClimateProgress[];
+		// The first overshoot is the fifth pass.
+		expect((wholePasses[4] as ClimateProgress).changeC).toBeGreaterThan(
+			(wholePasses[3] as ClimateProgress).changeC as number,
 		);
 		// Until then the two runs are the same.
-		expect((secondHalf as ClimateProgress).temperature.months).toEqual(
-			(secondWhole as ClimateProgress).temperature.months,
+		expect((halfPasses[3] as ClimateProgress).temperature.months).toEqual(
+			(wholePasses[3] as ClimateProgress).temperature.months,
 		);
 		// The change is reported before it is damped, in both.
-		expect((thirdHalf as ClimateProgress).changeC).toBe(
-			(thirdWhole as ClimateProgress).changeC,
+		expect((halfPasses[4] as ClimateProgress).changeC).toBe(
+			(wholePasses[4] as ClimateProgress).changeC,
 		);
-		const before = (secondHalf as ClimateProgress).temperature;
-		const pass = (thirdWhole as ClimateProgress).temperature;
-		const applied = (thirdHalf as ClimateProgress).temperature;
+		const before = (halfPasses[3] as ClimateProgress).temperature;
+		const pass = (wholePasses[4] as ClimateProgress).temperature;
+		const applied = (halfPasses[4] as ClimateProgress).temperature;
 		for (let month = 0; month < MONTHS_PER_YEAR; month++) {
 			for (let cell = 0; cell < 64 * 64 * 6; cell += 7) {
 				const from = (before.months[month] as Float32Array)[cell] as number;
@@ -384,28 +391,30 @@ describe('solveClimate when the winds and the temperature chase each other', {
 		// What is not blended is the pass's own.
 		expect(applied.yearsRun).toBe(pass.yearsRun);
 		expect(applied.solvedFor).toEqual(pass.solvedFor);
-		expect((thirdHalf as ClimateProgress).winds).toEqual(
-			solveWinds(WORLD, applied.months),
+		const winds = (settings: object, months: Float32Array[]) =>
+			solveWinds(WORLD, months, { settings });
+		expect((halfPasses[4] as ClimateProgress).winds).toEqual(
+			winds(WINDS, applied.months),
 		);
-		expect((thirdWhole as ClimateProgress).winds).toEqual(
-			solveWinds(WORLD, pass.months),
+		expect((wholePasses[4] as ClimateProgress).winds).toEqual(
+			winds(WINDS, pass.months),
 		);
 	});
 
 	it('keeps the change from growing: the pass after a damped one changes less than the same pass left whole', () => {
 		const wholeChanges = whole().passes.map((pass) => pass.changeC as number);
 		const halfChanges = half().passes.map((pass) => pass.changeC as number);
-		// Left whole, the change keeps growing after the second pass.
-		expect(wholeChanges[3]).toBeGreaterThan(wholeChanges[1] as number);
-		// Damped, the fourth pass changes the temperature by much less.
-		expect(halfChanges[3]).toBeLessThan(0.9 * (wholeChanges[3] as number));
+		// Left whole, the change goes on growing after the overshoot.
+		expect(wholeChanges[5]).toBeGreaterThan(wholeChanges[4] as number);
+		// Damped, the sixth pass changes the temperature by much less.
+		expect(halfChanges[5]).toBeLessThan(0.9 * (wholeChanges[5] as number));
 	});
 
 	it('stops at the most passes when the climate does not settle', () => {
 		const { result, passes } = half();
-		expect(result.passes).toBe(4);
+		expect(result.passes).toBe(6);
 		expect(result.settled).toBe(false);
-		expect((passes[3] as ClimateProgress).last).toBe(true);
-		expect((passes[3] as ClimateProgress).settled).toBe(false);
+		expect((passes[5] as ClimateProgress).last).toBe(true);
+		expect((passes[5] as ClimateProgress).settled).toBe(false);
 	});
 });

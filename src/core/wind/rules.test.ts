@@ -939,6 +939,10 @@ describe('localBands', () => {
 });
 
 describe('thermalPressure', () => {
+	// The figures these tests expect are those of 3 hPa a kelvin, the strength
+	// the thermal response was tuned at, not the model's default.
+	const STRONG = { thermalHpaPerK: 3 };
+
 	it('gives a cold place a high and a hot place a low against their latitude, more on land than at sea', () => {
 		const world = continentWorld();
 		const field = zonalField(0);
@@ -950,6 +954,7 @@ describe('thermalPressure', () => {
 			world,
 			field,
 			zonalMean(grid, field, PROFILE_BANDS),
+			STRONG,
 		);
 		const middle = cellAt(grid, latLonToDirection(52, 90));
 		expect(thermal[middle]).toBeGreaterThan(5);
@@ -988,6 +993,7 @@ describe('thermalPressure', () => {
 				world,
 				field,
 				zonalMean(grid, field, PROFILE_BANDS),
+				STRONG,
 			);
 			const winds = windsFromPressure(
 				world,
@@ -1016,7 +1022,8 @@ describe('thermalPressure', () => {
 	});
 
 	it('limits the high of a place far colder than its latitude, and leaves a cold short of the knee as it was', () => {
-		const { thermalHpaPerK, coldKneeK, coldLimitK } = DEFAULT_WIND_SETTINGS;
+		const { coldKneeK, coldLimitK } = DEFAULT_WIND_SETTINGS;
+		const { thermalHpaPerK } = STRONG;
 		const world = continentWorld();
 		const thermalOf = (cold: number, settings = {}) => {
 			const field = zonalField(0);
@@ -1027,7 +1034,7 @@ describe('thermalPressure', () => {
 				world,
 				field,
 				zonalMean(grid, field, PROFILE_BANDS),
-				settings,
+				{ ...STRONG, ...settings },
 			);
 		};
 		// No limit at all: a knee beyond any cold.

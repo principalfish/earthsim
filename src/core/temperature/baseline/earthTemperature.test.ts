@@ -3,26 +3,28 @@ import {
 	readEarthDataFile,
 	readObservedTemperatureFile,
 } from '../../../../scripts/earth/dataFile.mjs';
+import { solveClimate } from '../../climate';
 import { compareField, compareFields } from '../../compare';
 import { decodeEarth, earthWorld, isMeasuredEarth } from '../../earth/earth';
 import { getGrid } from '../../grid/grid';
 import { decodeObservedTemperature, observedTemperature } from '../observed';
-import { solveTemperature, summariseTemperature } from '../temperature';
+import { summariseTemperature } from '../temperature';
 import {
 	BASELINE_RESOLUTION,
 	BASELINE_TOLERANCE_K,
 	baselineRegressions,
 	baselineText,
+	COAST_CONTRAST_TOLERANCE_K,
 	type EarthTemperatureFigures,
 	earthTemperatureFigures,
 } from './earthTemperature';
 import committed from './earthTemperature.json';
 
 /**
- * Time allowed for the test that solves the Earth's year: about a second,
- * and up to seven times that under coverage instrumentation.
+ * Time allowed for the test that solves the Earth's climate: about ten
+ * seconds, and up to seven times that under coverage instrumentation.
  */
-const SOLVE_TIMEOUT_MS = 30_000;
+const SOLVE_TIMEOUT_MS = 180_000;
 
 /** Figures that are all the same pair, for the tests of the check. */
 const uniform = (meanDifference: number, rmsDifference: number) => {
@@ -70,9 +72,10 @@ describe('the Earth temperature baseline', () => {
 				BASELINE_RESOLUTION,
 			);
 			const now = earthTemperatureFigures(
-				solveTemperature(earth).months,
+				solveClimate(earth).temperature.months,
 				observed,
 				getGrid(BASELINE_RESOLUTION),
+				earth,
 			);
 			const worse = baselineRegressions(now, committed);
 			expect(
@@ -89,6 +92,18 @@ describe('the Earth temperature baseline', () => {
 		expect(committed.resolution).toBe(BASELINE_RESOLUTION);
 		expect(committed.months).toHaveLength(12);
 		expect(JSON.parse(baselineText(committed))).toEqual(committed);
+	});
+
+	it('holds the west–east coast contrasts, and the winds’ heat carrying keeps them well above what the winds-free model gave', () => {
+		// Without the winds the model gave Europe against Asia 0.7 K for the
+		// year and 2.4 K in January, and North America −0.8 and −0.6 K: almost
+		// nothing, against the observed 11.5 and 22.9, and 5.8 and 15.1.
+		const { europeAsia, northAmerica } = committed.coastContrast;
+		expect(europeAsia.simulated.annual).toBeGreaterThan(2);
+		expect(europeAsia.simulated.january).toBeGreaterThan(6);
+		expect(northAmerica.simulated.january).toBeGreaterThan(3);
+		expect(europeAsia.observed.annual).toBeGreaterThan(11);
+		expect(europeAsia.observed.january).toBeGreaterThan(22);
 	});
 });
 
@@ -271,5 +286,79 @@ describe('baselineRegressions', () => {
 				months: baseline.months.slice(1),
 			}),
 		).toThrow(RangeError);
+	});
+});
+
+describe('the west–east coast contrasts in the baseline check', () => {
+	const contrast = (annual: number, january: number) => ({
+		simulated: { annual, january },
+		observed: { annual: 11.5, january: 22.9 },
+	});
+	const coast = (europeAsia: number, northAmerica: number) => ({
+		europeAsia: contrast(europeAsia, 2 * europeAsia),
+		northAmerica: contrast(northAmerica, 2 * northAmerica),
+	});
+	const baseline = { ...uniform(-0.5, 4), coastContrast: coast(3, 1) };
+
+	it('passes contrasts as large as the baseline’s, or larger, or smaller by no more than the tolerance', () => {
+		expect(baselineRegressions(baseline, baseline)).toEqual([]);
+		expect(
+			baselineRegressions(
+				{ ...baseline, coastContrast: coast(5, 4) },
+				baseline,
+			),
+		).toEqual([]);
+		const within = COAST_CONTRAST_TOLERANCE_K * 0.9;
+		expect(
+			baselineRegressions(
+				{ ...baseline, coastContrast: coast(3 - within / 2, 1 - within / 2) },
+				baseline,
+			),
+		).toEqual([]);
+	});
+
+	it('names a contrast that has shrunk by more than the tolerance, or is not a number, or is missing', () => {
+		const shrunk = baselineRegressions(
+			{ ...baseline, coastContrast: coast(2, 1) },
+			baseline,
+		);
+		expect(shrunk.map(({ figure }) => figure)).toEqual([
+			'Europe–Asia annual coast contrast',
+			'Europe–Asia January coast contrast',
+		]);
+		expect(shrunk[0]).toEqual({
+			figure: 'Europe–Asia annual coast contrast',
+			baseline: 3,
+			now: 2,
+		});
+		expect(
+			baselineRegressions(
+				{ ...baseline, coastContrast: coast(Number.NaN, 1) },
+				baseline,
+			).map(({ figure }) => figure),
+		).toEqual([
+			'Europe–Asia annual coast contrast',
+			'Europe–Asia January coast contrast',
+		]);
+		expect(
+			baselineRegressions(uniform(-0.5, 4), baseline).map(
+				({ figure }) => figure,
+			),
+		).toHaveLength(4);
+		// A baseline with no contrasts holds none to lose.
+		expect(baselineRegressions(baseline, uniform(-0.5, 4))).toEqual([]);
+	});
+
+	it('writes the contrasts rounded to three decimals, and none when there are none', () => {
+		const text = baselineText({
+			...uniform(0, 1),
+			coastContrast: coast(2.92149, 0.03849),
+		});
+		const read = JSON.parse(text) as EarthTemperatureFigures;
+		expect(read.coastContrast?.europeAsia.simulated.annual).toBe(2.921);
+		expect(read.coastContrast?.northAmerica.simulated.annual).toBe(0.038);
+		expect(JSON.parse(baselineText(uniform(0, 1)))).not.toHaveProperty(
+			'coastContrast',
+		);
 	});
 });

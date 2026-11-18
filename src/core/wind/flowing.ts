@@ -170,16 +170,24 @@ const assertAntisymmetric = (grid: Grid, flows: ArrayLike<number>): void => {
  * {@link edgeFlows} gives it: `4 * cellCount` finite values, each the
  * negative of the entry for the same edge seen from the other cell. Not
  * changed.
+ * @param guess - A place for the potential the converging part is the flow
+ * down: on entry a first guess at it, one value per cell, which the
+ * potential found for flows close to these, such as the last pass's, makes
+ * a good one; on return the potential that was found. Left out, the guess
+ * is zero and the potential is not kept. The flowing part found is the
+ * same to the tolerance whatever the guess.
  * @returns The flowing part, in a new array laid out the same way: the
  * entries leaving any cell sum to zero, to a ten-millionth of the
  * input's root-mean-square flow across an edge.
- * @throws RangeError if `flows` has the wrong length, a value that is not
- * finite, or an edge whose two entries are not each other's negatives.
+ * @throws RangeError if `flows` or `guess` has the wrong length or a value
+ * that is not finite, or an edge of `flows` has two entries that are not each
+ * other's negatives.
  * @throws Error if the potential could not be solved well enough.
  */
 export const removeConvergence = (
 	grid: Grid,
 	flows: ArrayLike<number>,
+	guess?: Float64Array,
 ): Float64Array => {
 	const { cellCount } = grid;
 	if (flows.length !== SIDES * cellCount) {
@@ -189,6 +197,14 @@ export const removeConvergence = (
 	}
 	assertFinite(flows, 'flow');
 	assertAntisymmetric(grid, flows);
+	if (guess !== undefined) {
+		if (guess.length !== cellCount) {
+			throw new RangeError(
+				`A grid of ${cellCount} cells has ${cellCount} potentials; got ${guess.length}`,
+			);
+		}
+		assertFinite(guess, 'potential');
+	}
 	const kept = Float64Array.from(flows);
 	const { solver, couplings, net, rhs, step, potential } = working(grid);
 	let squares = 0;
@@ -216,7 +232,11 @@ export const removeConvergence = (
 		}
 		return largest;
 	};
-	potential.fill(0);
+	if (guess === undefined) {
+		potential.fill(0);
+	} else {
+		potential.set(guess);
+	}
 	let largest = remaining();
 	for (let round = 0; largest > limit; round++) {
 		if (round === MAX_ROUNDS) {
@@ -255,6 +275,7 @@ export const removeConvergence = (
 					((potential[neighbour] as number) - (potential[cell] as number));
 		}
 	}
+	guess?.set(potential);
 	return kept;
 };
 
@@ -326,6 +347,10 @@ export const FLOWING_RESOLUTION: Resolution = 64;
  * @param east - The eastward wind at each cell of the world's grid, in
  * metres a second; finite. Not changed.
  * @param north - The northward wind, in the same way.
+ * @param guess - A first guess at the potential of the converging part, one
+ * value per cell of the grid of {@link FLOWING_RESOLUTION}, and a place for
+ * the potential found, as for {@link removeConvergence}: kept from one
+ * pass's winds to the next's, which are close, it saves most of the solving.
  * @returns The flows across the edges of the grid of `solveResolution`, in
  * a new array.
  * @throws RangeError if an array has the wrong length or a value that is
@@ -336,6 +361,7 @@ export const flowingPartForSolve = (
 	solveResolution: Resolution,
 	east: ArrayLike<number>,
 	north: ArrayLike<number>,
+	guess?: Float64Array,
 ): Float64Array => {
 	if (
 		solveResolution < FLOWING_RESOLUTION ||
@@ -363,7 +389,7 @@ export const flowingPartForSolve = (
 		flows = coarsenFlows(flows, size);
 		size /= 2;
 	}
-	flows = removeConvergence(getGrid(size), flows);
+	flows = removeConvergence(getGrid(size), flows, guess);
 	while (size < solveResolution) {
 		size *= 2;
 		flows = refineFlows(flows, size);

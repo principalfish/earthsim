@@ -69,27 +69,33 @@ describe('markdownTable', () => {
 	});
 });
 
+/** The thermal response the figures below were tuned at. */
+const TUNED = { thermalHpaPerK: 3 };
+
 describe('the tuning runs', () => {
 	// A solve of the Earth's temperature, about a second, and five runs of
 	// a year of winds, about half a second each, more under coverage, hence
 	// the longer time allowed.
 	it('give the Earth’s figures, its measures and the diagnostic, and print them', () => {
 		const tuning = earthOnly();
-		const figures = earthFigures(tuning, {});
-		// The figures docs/winds.md gives for the model as it stands.
+		// The figures are those of 3 hPa a kelvin of thermal response, the
+		// strength the model was tuned at, and of the temperature without winds,
+		// which the tuning script works from; the model's own default is now
+		// the physical 0.7.
+		const figures = earthFigures(tuning, TUNED);
 		expect(figures.windRms).toBeCloseTo(3.822, 3);
 		expect(figures.directionShare).toBeCloseTo(0.6091, 4);
 		expect(figures.pressureRms).toBeCloseTo(7.085, 3);
 		// With the bands one pattern round the globe, the figures of the model
 		// before they varied by longitude: 3.813 m/s, 60.60% and 7.113 hPa.
-		const zonal = earthFigures(tuning, { localBandsShare: 0 });
+		const zonal = earthFigures(tuning, { ...TUNED, localBandsShare: 0 });
 		expect(zonal.windRms).toBeCloseTo(3.813, 3);
 		expect(zonal.directionShare).toBeCloseTo(0.606, 3);
 		expect(zonal.pressureRms).toBeCloseTo(7.113, 3);
-		const changed = earthFigures(tuning, { bandAmplitudeHpa: 7 });
+		const changed = earthFigures(tuning, { ...TUNED, bandAmplitudeHpa: 7 });
 		expect(changed.windRms).not.toBe(figures.windRms);
 
-		const run = runCases(tuning, {});
+		const run = runCases(tuning, TUNED);
 		expect(run.earth).toEqual(figures);
 		expect(run.cases).toHaveLength(1);
 		expect(run.cases[0]?.bands).toEqual({ southern: 3, northern: 3 });
@@ -118,7 +124,7 @@ describe('the tuning runs', () => {
 			withSwing.indexOf('Check (a)'),
 		);
 
-		const diagnostic = diagnose(tuning, readObservedTemperatureFile(), {});
+		const diagnostic = diagnose(tuning, readObservedTemperatureFile(), TUNED);
 		expect(diagnostic.simulated.figures).toEqual(figures);
 		expect(diagnostic.observed.figures).toBeNull();
 		const observedRun = diagnostic.observedTemperature;

@@ -173,9 +173,10 @@ export type TemperatureModel = {
 	 */
 	readonly correctionRefineK: number;
 	/**
-	 * How small a pass of the climate loop must change the monthly
-	 * temperature, in every cell and month, in degrees Celsius, for the
-	 * climate to count as settled. Above 0.
+	 * How small the root-mean-square change a pass of the climate loop makes
+	 * to the monthly temperature, weighted by area and over the twelve
+	 * months, must be, in degrees Celsius, for the climate to count as
+	 * settled. Above 0.
 	 */
 	readonly climateToleranceC: number;
 	/**

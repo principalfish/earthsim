@@ -1,7 +1,8 @@
 /**
  * Writes the Earth temperature baseline afresh: the error figures of the
- * Earth preset, as the model solves it now, against the observed
- * temperature, into `src/core/temperature/baseline/earthTemperature.json`.
+ * Earth preset, as the climate loop solves it now, against the observed
+ * temperature, and its west–east coast contrasts, into
+ * `src/core/temperature/baseline/earthTemperature.json`.
  *
  * Run with `npm run baseline:temperature` after a change that is meant to
  * move the figures, and commit the file with the change. It prints each
@@ -16,7 +17,7 @@ import {
 	earthWorld,
 	getGrid,
 	observedTemperature,
-	solveTemperature,
+	solveClimate,
 } from '../src/core/index';
 import {
 	BASELINE_RESOLUTION,
@@ -58,9 +59,10 @@ export const main = (args: readonly string[]): void => {
 		BASELINE_RESOLUTION,
 	);
 	const figures: EarthTemperatureFigures = earthTemperatureFigures(
-		solveTemperature(world).months,
+		solveClimate(world).temperature.months,
 		observed,
 		getGrid(BASELINE_RESOLUTION),
+		world,
 	);
 	writeBaseline(BASELINE_FILE, baselineText(figures));
 };

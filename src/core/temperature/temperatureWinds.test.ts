@@ -112,9 +112,11 @@ describe('solveTemperature with winds', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		// The winds carry the sea's warmth over western Europe and western
 		// North America, and the continents' cold over East Asia and the
 		// east of North America.
-		expect(change(result, WESTERN_EUROPE)).toBeGreaterThan(1);
-		expect(change(result, WESTERN_NORTH_AMERICA)).toBeGreaterThan(1);
-		expect(change(result, EAST_ASIA)).toBeLessThan(-5);
+		// Measured with the wind model's own default: +1.0, +3.5, −4.0 and
+		// −3.3 K.
+		expect(change(result, WESTERN_EUROPE)).toBeGreaterThan(0.5);
+		expect(change(result, WESTERN_NORTH_AMERICA)).toBeGreaterThan(2);
+		expect(change(result, EAST_ASIA)).toBeLessThan(-2);
 		expect(change(result, EASTERN_NORTH_AMERICA)).toBeLessThan(-1);
 	});
 

@@ -11,10 +11,11 @@
  * pass's winds (their flowing part: see {@link flowingPartForSolve}), and
  * then the winds from the new temperature.
  *
- * The loop stops when a pass changes the monthly temperature by no more than
- * {@link TemperatureModel.climateToleranceC} in every cell and month, or
- * after {@link TemperatureModel.climateMaxPasses}. A pass that changes it
- * by more than the pass before did is an overshoot, the winds and the
+ * The loop stops when the root-mean-square change a pass makes to the
+ * monthly temperature, over the area and the twelve months, is no more than
+ * {@link TemperatureModel.climateToleranceC}, or after
+ * {@link TemperatureModel.climateMaxPasses}. A pass whose change is larger
+ * than the pass before's is an overshoot, the winds and the
  * temperature chasing each other, and only
  * {@link TemperatureModel.climateOvershootShare} of its change is applied:
  * its temperature, and the state it ends in, are that share of the way from
@@ -26,6 +27,7 @@
  * there.
  */
 
+import { getGrid } from './grid/grid';
 import { MONTHS_PER_YEAR } from './planet/insolation';
 import { normalisePlanet } from './planet/planet';
 import {
@@ -39,10 +41,10 @@ import {
 	type TemperatureProgress,
 	type TemperatureResult,
 } from './temperature/temperature';
-import { flowingPartForSolve } from './wind/flowing';
+import { FLOWING_RESOLUTION, flowingPartForSolve } from './wind/flowing';
 import type { WindResult } from './wind/model';
 import type { MonthlyWind } from './wind/observedWind';
-import { solveWinds } from './wind/solve';
+import { solveWinds, type WindSettings } from './wind/solve';
 import type { World } from './world/world';
 
 /** A solved climate: the last pass's temperature and winds. */
@@ -56,15 +58,17 @@ export type ClimateResult = {
 	/** The passes taken, from 1. */
 	readonly passes: number;
 	/**
-	 * Whether the last pass changed the monthly temperature by no more than
-	 * {@link TemperatureModel.climateToleranceC} in every cell and month:
-	 * the loop ended on the tolerance, not on its most passes. Only a
+	 * Whether the root-mean-square change the last pass made to the monthly
+	 * temperature was no more than
+	 * {@link TemperatureModel.climateToleranceC}: the loop ended on the
+	 * tolerance, not on its most passes. Only a
 	 * settled climate is worth carrying on from.
 	 */
 	readonly settled: boolean;
 	/**
-	 * The most the last pass changed any cell's monthly temperature, in
-	 * degrees Celsius; null for a first pass with nothing before it.
+	 * The root-mean-square change the last pass made to the monthly
+	 * temperature, weighted by area and over the twelve months, in degrees
+	 * Celsius; null for a first pass with nothing before it.
 	 */
 	readonly changeC: number | null;
 };
@@ -98,9 +102,10 @@ export type ClimateProgress = {
 	/** The winds worked out from that temperature. */
 	readonly winds: WindResult;
 	/**
-	 * The most the pass changed any cell's monthly temperature, in degrees
-	 * Celsius, before an overshoot was damped; null for a first pass with
-	 * nothing before it.
+	 * The root-mean-square change the pass made to the monthly temperature,
+	 * weighted by area and over the twelve months, in degrees Celsius,
+	 * before an overshoot was damped; null for a first pass with nothing
+	 * before it.
 	 */
 	readonly changeC: number | null;
 	/** Whether the pass settled the climate. */
@@ -121,6 +126,15 @@ export type SolveClimateOptions = {
 	/** The model's constants; defaults to {@link TEMPERATURE_MODEL}. */
 	readonly model?: TemperatureModel;
 	/**
+	 * Settings of the wind model to change from its defaults for this run,
+	 * by name, as {@link solveWinds} takes them in its options.
+	 *
+	 * @remarks
+	 * For the tests and the tuning script; the page and its worker never
+	 * pass any.
+	 */
+	readonly windSettings?: Partial<WindSettings>;
+	/**
 	 * Called as each pass finishes, with the pass. It is given what the
 	 * solve itself holds, so whatever it does to it is the caller's own
 	 * risk; whatever it throws ends the solve and is thrown from
@@ -134,23 +148,27 @@ export type SolveClimateOptions = {
 	readonly onYear?: (progress: TemperatureProgress, pass: number) => void;
 };
 
-/** The largest absolute difference between two years of monthly fields. */
-const largestChange = (
+/**
+ * The root-mean-square difference between two years of monthly fields,
+ * weighted by the cells' areas, the months equally.
+ */
+const rmsChange = (
+	areas: Float64Array,
 	a: readonly Float32Array[],
 	b: readonly Float32Array[],
 ): number => {
-	let largest = 0;
+	let squares = 0;
+	let area = 0;
 	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
 		const first = a[month] as Float32Array;
 		const second = b[month] as Float32Array;
 		for (let cell = 0; cell < first.length; cell++) {
-			largest = Math.max(
-				largest,
-				Math.abs((first[cell] as number) - (second[cell] as number)),
-			);
+			const difference = (first[cell] as number) - (second[cell] as number);
+			squares += (areas[cell] as number) * difference * difference;
+			area += areas[cell] as number;
 		}
 	}
-	return largest;
+	return Math.sqrt(squares / area);
 };
 
 /** A field `share` of the way from `from` to `to`, in the type of `to`. */
@@ -266,7 +284,7 @@ export const solveClimate = (
 	world: World,
 	options: SolveClimateOptions = {},
 ): ClimateResult => {
-	const { model = TEMPERATURE_MODEL, onPass, onYear } = options;
+	const { model = TEMPERATURE_MODEL, windSettings, onPass, onYear } = options;
 	assertModel(model);
 	assertSolvableWorld(world);
 	const dayLengthHours = normalisePlanet(world.planet).dayLengthHours;
@@ -284,6 +302,13 @@ export const solveClimate = (
 		}
 	}
 	const { climateMaxPasses, climateToleranceC, climateOvershootShare } = model;
+	const { areas } = getGrid(resolution);
+	// Each month's potential of the winds' converging part, kept from pass to
+	// pass: the next pass's winds are close, and start from it.
+	const potentials = Array.from(
+		{ length: MONTHS_PER_YEAR },
+		() => new Float64Array(getGrid(FLOWING_RESOLUTION).cellCount),
+	);
 	for (let pass = 1; ; pass++) {
 		const flows =
 			windsBefore === undefined
@@ -294,6 +319,7 @@ export const solveClimate = (
 							solvedOn,
 							east,
 							(windsBefore as MonthlyWind).north[month] as Float32Array,
+							potentials[month],
 						),
 					);
 		const solved = solveTemperature(world, {
@@ -306,14 +332,18 @@ export const solveClimate = (
 			onYear: onYear === undefined ? undefined : (p) => onYear(p, pass),
 		});
 		const change =
-			before === undefined ? null : largestChange(before.months, solved.months);
+			before === undefined
+				? null
+				: rmsChange(areas, before.months, solved.months);
 		const overshoot =
 			change !== null && lastChange !== null && change > lastChange;
 		const temperature =
 			before !== undefined && overshoot
 				? dampened(before, solved, climateOvershootShare)
 				: solved;
-		const winds = solveWinds(world, temperature.months);
+		const winds = solveWinds(world, temperature.months, {
+			settings: windSettings,
+		});
 		const settled = change !== null && change <= climateToleranceC;
 		const last = settled || pass === climateMaxPasses;
 		onPass?.({

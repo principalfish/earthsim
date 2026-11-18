@@ -375,3 +375,51 @@ describe('flowingPartForSolve', () => {
 		);
 	});
 });
+
+describe('removeConvergence from a first guess', () => {
+	const flowsOfWind = (seed: number) => {
+		const wind = randomWind(seed);
+		return flowsOf(fromEastNorth(grid, wind));
+	};
+
+	it('keeps the potential it found, and finds the same flowing part from it as from nothing', () => {
+		const first = flowsOfWind(31);
+		const potential = new Float64Array(grid.cellCount);
+		const once = removeConvergence(grid, first, potential);
+		expect(potential.some((value) => value !== 0)).toBe(true);
+		expect(once).toEqual(removeConvergence(grid, first));
+		// Flows close to the first, as the next pass's winds are: a tenth of
+		// the way to another wind.
+		const other = flowsOfWind(32);
+		const near = Float64Array.from(
+			first,
+			(flow, entry) => 0.9 * flow + 0.1 * (other[entry] as number),
+		);
+		const guess = Float64Array.from(potential);
+		const warm = removeConvergence(grid, near, guess);
+		const cold = removeConvergence(grid, near);
+		const difference = Float64Array.from(
+			warm,
+			(flow, entry) => flow - (cold[entry] as number),
+		);
+		expect(largest(difference) / rms(cold)).toBeLessThan(1e-6);
+		expect(largest(netFlows(warm)) / rms(warm)).toBeLessThan(2e-7);
+		// The guess now holds the new potential, not the one it began with.
+		expect(guess).not.toEqual(potential);
+	});
+
+	it('is passed on by flowingPartForSolve, and refuses a guess of the wrong length or not finite', () => {
+		const wind = randomWind(33);
+		const potential = new Float64Array(grid.cellCount);
+		const flows = flowingPartForSolve(64, 64, wind.east, wind.north, potential);
+		expect(flows).toEqual(flowingPart(grid, wind.east, wind.north));
+		expect(potential.some((value) => value !== 0)).toBe(true);
+		const flowsIn = flowsOfWind(34);
+		expect(() => removeConvergence(grid, flowsIn, new Float64Array(5))).toThrow(
+			RangeError,
+		);
+		const broken = new Float64Array(grid.cellCount);
+		broken[3] = Number.NaN;
+		expect(() => removeConvergence(grid, flowsIn, broken)).toThrow(RangeError);
+	});
+});
