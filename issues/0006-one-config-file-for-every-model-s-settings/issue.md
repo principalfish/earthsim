@@ -10,7 +10,7 @@ No value changes: the Earth's temperature and wind figures come out exactly as b
 
 ## Plan
 
-_2026-11-18 · 5 of 5 pieces done · now: all done, in review; self review done_
+_2026-11-18 · 5 of 5 pieces done · now: PR #12 ready_
 
 - [x] **1/5 The temperature's settings in config.ts** · `279f599`
   The temperature's 18 settings, with their explanations, move into one config file the model reads from.
