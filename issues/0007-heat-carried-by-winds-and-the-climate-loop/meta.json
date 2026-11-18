@@ -22,12 +22,14 @@
     {
       "kind": "worktree",
       "name": "/home/philiph/workspace/earth_sim/.claude/worktrees/heat-carried-by-winds-and-the-climate-loop-4c86af",
-      "added": "2026-11-18 13:39"
+      "added": "2026-11-18 13:39",
+      "removed": "2026-11-18 19:31"
     },
     {
       "kind": "branch",
       "name": "claude/heat-carried-by-winds-and-the-climate-loop-4c86af",
-      "added": "2026-11-18 13:39"
+      "added": "2026-11-18 13:39",
+      "removed": "2026-11-18 19:31"
     }
   ],
   "pr": 14
