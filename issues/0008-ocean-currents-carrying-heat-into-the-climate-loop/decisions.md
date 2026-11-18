@@ -11,13 +11,18 @@
 - **Sea temperature first:** piece 1 adds the sea's own temperature and the air–sea exchange, with no currents, measured against observed sea temperatures; then the corner grid and gyres, upwelling, overturning, and the page, each measured on its own. The first climate pass is no longer today's model bit for bit, and both baselines are re-recorded. The user: "Sea temperature first (Recommended)" (2026-11-18)
 - **On screen:** a Sea temperature layer (colour map, with Difference against observed sea temperatures, OISST v2 1991–2020 1°, public domain) and a Currents overlay drawn with arrows like the winds (compared with the drifter climatology, CC-BY, credited in docs/data.md). The user: "Sea temp layer + currents overlay (Recommended)" (2026-11-18)
 - **Monthly currents:** 12 gyre solves a pass, following the winds; cost measured in the piece. The user: "Monthly (Recommended)" (2026-11-18)
+- **The sea-ice stand-in follows the sea temperature:** the sea becomes icy as it nears freezing (about −1.8 °C), and the ice then cuts the sea off from the air, so the air above can get very cold while the sea stays at freezing; land keeps the air-driven stand-in; real sea ice is still step 6. The user asked "We don't have sea ice yet?" and, after the stand-in was explained, chose "The sea temperature (Recommended)" (2026-11-18)
+- **The Temperature layer stays the air's** everywhere, compared with the observed air temperature as now; the sea's own is on the new Sea temperature layer. The user: "The air's, as today (Recommended)" (2026-11-18)
 
 ## Open
 
-- Sea ice with a sea temperature: which temperature decides the ice share (the user asked "We don't have sea ice yet?": explained the stand-in, asked again).
-- What the Temperature layer shows over the sea once there are two temperatures (the air's, as today, compared with the observed air temperature).
-- The air–sea exchange strength (a physical bulk value expected).
-- The loop: settling with a second feedback within the 8-pass cap.
-
 ## Assumed
+
+- **Air–sea exchange:** a physical bulk value (sensible, latent and long-wave together, of order 15–30 W/m²/K), with its source in the config entry; the air over the sea keeps the air's own heat store.
+- **Upwelling's cold water:** a physical estimate of the water below the mixed layer, chosen by the builder with its source and measured against Peru, Benguela, California and the Canaries.
+- **The overturning rule on invented maps:** the builder measures two or three candidate rules on the Earth and the generated worlds and stops for the user to choose before it ships, as 3b's piece 4 did.
+- **Gyre details left to the builder, measured:** the friction that sets the western boundary current's width per grid size, island constants (the island rule), the circumpolar channel's clamp, the equatorial floor on the Coriolis term, and which grid the gyres are solved on.
+- **The loop:** if it does not settle within the 8-pass cap at physical values, the builder measures options and stops for the user, as in 3b.
+- **Manual review** at the page piece only (the Sea temperature layer and Currents overlay), as in 3b.
+- **`ui/layerPanel.ts` grows** with the two new entries before the deferred split.
 
