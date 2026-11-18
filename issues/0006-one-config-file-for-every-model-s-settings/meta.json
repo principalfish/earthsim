@@ -9,7 +9,7 @@
   "gh_issue": 11,
   "build_model": null,
   "created": "2026-11-18 09:04",
-  "updated": "2026-11-18 09:53",
+  "updated": "2026-11-18 10:01",
   "done": null,
   "local": [
     {
@@ -28,5 +28,6 @@
       "name": "claude/one-config-file-for-every-model-s-settings-3f9895",
       "added": "2026-11-18 09:53"
     }
-  ]
+  ],
+  "pr": 12
 }
