@@ -105,3 +105,4 @@
 - 2026-11-17 19:46 · core-folders-by-component-page-folders-by-role (0005) · planned → building
 - 2026-11-17 20:03 · core-folders-by-component-page-folders-by-role (0005) · PR #10
 - 2026-11-17 21:50 · core-folders-by-component-page-folders-by-role (0005) · building → review
+- 2026-11-18 09:02 · core-folders-by-component-page-folders-by-role (0005) · review → ready
