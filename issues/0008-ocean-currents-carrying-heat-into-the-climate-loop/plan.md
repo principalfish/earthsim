@@ -134,7 +134,7 @@ Rejected (with the user's choices): gyres alone (the North Atlantic barely warms
    - Manual review: open the Earth, turn on Currents over Temperature and over Sea temperature; check the Gulf Stream, Kuroshio, the circumpolar current and the Peru current; switch to the observed currents and compare; sculpt a new continent across an ocean and watch the gyres change as the passes land; open Model settings and check the new settings and the diagram's lines. The user runs `npm run dev` from the builder's worktree; the builder leaves no server running.
 
 ## Checkpoints
-- [ ] 1. Observed sea temperatures and currents
+- [x] 1. Observed sea temperatures and currents
 - [ ] 2. The sea's own temperature
 - [ ] 3. Grid corners
 - [ ] 4. Wind-driven gyres
@@ -152,3 +152,17 @@ After every piece: `npm run check`, `npm run typecheck`, `npm test`, `npm run bu
 
 ### How the pieces run (2026-11-18)
 Straight through, as in 3b (the user: "Straight through, as 3b (Recommended)"): commit and push after each piece's review round and light re-check, with the verifier on every finding; fix verified findings; record each choice the plan leaves open as "Decided by the builder" here. Stop for: the manual reviews of pieces 8 and 9 (the user: "Pieces 8 and 9 (Recommended)"); the overturning rule choice in piece 7; any region of the Earth getting clearly worse in pieces 2, 5, 6 and 7; the loop not settling within the cap; a data source in piece 1 that can't be reached or whose terms forbid shipping; anything beyond the plan, against the ledger, touching shared state or that can't be undone; a check that can't be passed. Re-check findings the verifier upholds go to the user unfixed. Pieces 3 and 4 do not depend on 2 and may be built in either order after 1.
+
+### Piece 1 (2026-11-18)
+
+Built on Sonnet (the piece's `Model:`). Decided by the builder:
+- **OISST source route.** The file at `downloads.psl.noaa.gov` is NetCDF-4/HDF5, which the project's netCDF-3 reader cannot read. The build reads the same file as netCDF-3 from NOAA PSL's THREDDS NetCDF Subset Service (`temporal=all`), checked bit-identical to the HDF5 original with GDAL. No HDF5 reader was written. The per-request `history` attribute changes, so the build pins a SHA-256 of the decoded values (equal to GDAL's decode of the original).
+- **OISST land mask.** The long-term-mean file has no land marking, so land comes from NOAA's `lsmask.nc` (same dataset, netCDF-3, pinned by file SHA-256).
+- **Drifter route.** AOML's page cannot be fetched from this machine (TLS), so the climatology is read from AOML's ERDDAP (`drifter_monthlymeans`, version 3.10, through 2023-02-28) as netCDF-3 subsets, pinned by a SHA-256 of the decoded U and V values. Its licence, CC BY 4.0, is quoted from the ERDDAP metadata (read 2026-11-18). AOML's page lists version 3.11, which was not read.
+- **Grids.** Both files are 180 x 360 cell-centred 1 degree grids (latitudes 89.5 to -89.5, longitudes 0.5 to 359.5 eastward), unlike the 181 x 360 node grid of the older files, so no interpolation is needed at build time. The drifters' 0.25 degree cells average exactly 4 x 4 into them; rows with no drifter data are no-data.
+- **Encodings.** Sea: unsigned byte, -2 + 0.25 b degC, 255 = land/no data (max storing error 0.125). Currents: signed byte, b/32 m/s, -128 = no data (max error 0.0156). Both steps are powers of two so decoded values are exact. Files are 777,600 and 1,555,200 bytes.
+- **Sampler.** `observedSeaTemperatureOn(grid, data)` and `observedCurrentsOn(grid, data)`, bilinear on the cell-centred grid with longitude wrapping and latitude clamping, only valid neighbours weighted, no data when none; the vector sampling is shared with the observed winds in `src/core/earth/observedVectors.ts` (winds bit-identical on 64, 128 and 256).
+- **No `--verify-with-gdal` for the currents build** (GDAL would read longitude as rows); the sea build has it and matches bit for bit. The currents' 1 degree cell at 35.5 N, 285.5 E in January was checked by hand against the mean of its 16 fine cells.
+- **OISST licence.** No explicit public-domain or CC0 text was found: the PSL page asks for acknowledgement and NOAA's ERDDAP record for the product says "may be used and redistributed for free". Both are quoted in `docs/data.md`; shipping on that basis is the builder's reading and is flagged for the user.
+- Accepted reason for the coverage tool's scope: it measures only `src/`; the build scripts under `scripts/` have their own tests but are not in the changed-lines report (as for the existing observed builds). Under coverage instrumentation two tests exceeded Vitest's 5 s default; they got cheaper inputs and 60 s timeouts like the wind test.
+- Re-check findings left unfixed for the user (four, all low): the renormalisation test in `observedVectors.test.ts` passes without renormalisation (medium, test); `docs/development.md` lacks rows for `earth/observedVectors.ts` and `ocean/observed.ts`; `downloadRetry.ts` should swallow a rejected `cancel()` so an over-cap body is refused, not retried; a ragged comment wrap in `regrid.ts`.
