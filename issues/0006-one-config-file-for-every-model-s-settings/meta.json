@@ -22,12 +22,14 @@
     {
       "kind": "worktree",
       "name": "/home/philiph/workspace/earth_sim/.claude/worktrees/one-config-file-for-every-model-s-settings-3f9895",
-      "added": "2026-11-18 09:53"
+      "added": "2026-11-18 09:53",
+      "removed": "2026-11-18 11:33"
     },
     {
       "kind": "branch",
       "name": "claude/one-config-file-for-every-model-s-settings-3f9895",
-      "added": "2026-11-18 09:53"
+      "added": "2026-11-18 09:53",
+      "removed": "2026-11-18 11:33"
     }
   ],
   "pr": 12
