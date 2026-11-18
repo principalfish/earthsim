@@ -28,6 +28,8 @@ The user's brief (2026-11-18): "Plan 3b", roadmap step 3b in `investigations/202
 
 - Piece 1's two departures accepted: the flowing part comes back as edge flows only (a wind rebuilt at cell centres would keep about a third of its divergence); a purely converging wind comes back as about an eighth of itself rather than zero, because the exchange solver's two-point couplings are not a consistent gradient on skewed cube cells, while the net flow out of every cell is zero to 1e-7 of the input's rms, so no heat is made. The more exact skew-corrected fix is out of scope. The cost (about 60 ms a month at 64, about 0.7 s a year of winds) and the proposal to work out the flowing part on the 64 grid for finer worlds are noted for piece 3. The open wording nit at `flowing.ts:168` stays open. The user: "Accept, carry on" (2026-11-18)
 
+- The six open docs and test nits (piece 1's `flowing.ts:168` wording and piece 2's five: `docs/temperature.md:23` interpolation wording and its "no new extreme" caveat, `advection.ts:19` tolerance claim, the `temperatureWinds.test.ts:186` assertion that cannot fail and its 2.7 K comment, `docs/winds.md:190` saying the page does not yet give the temperature the winds) are fixed now, in one small commit. The user: "Fix them now" (2026-11-18)
+
 ## Open
 - None.
 
