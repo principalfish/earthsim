@@ -10,7 +10,7 @@ Winds explain about a quarter of the Earth's temperature error, so its overall f
 
 ## Plan
 
-_2026-11-18 · 6 of 6 pieces done · self review done · now: PR text_
+_2026-11-18 · 6 of 6 pieces done · PR #14 ready_
 
 - [x] **1/6 The wind's flowing part** · `26e4dcb`
   The part of the surface wind that converges into lows is removed, so the rest can carry heat without making any.
