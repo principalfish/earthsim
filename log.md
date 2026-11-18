@@ -126,3 +126,4 @@
 - 2026-11-18 11:33 · one-config-file-for-every-model-s-settings (0006) · cleanup: removed worktree /home/philiph/workspace/earth_sim/.claude/worktrees/one-config-file-for-every-model-s-settings-3f9895, branch claude/one-config-file-for-every-model-s-settings-3f9895
 - 2026-11-18 11:49 · heat-carried-by-winds-and-the-climate-loop (0007) · created (build): Heat carried by winds, and the climate loop
 - 2026-11-18 12:55 · heat-carried-by-winds-and-the-climate-loop (0007) · GitHub issue #13
+- 2026-11-18 12:56 · heat-carried-by-winds-and-the-climate-loop (0007) · investigating → planned
