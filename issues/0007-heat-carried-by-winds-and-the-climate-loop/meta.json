@@ -3,13 +3,13 @@
   "slug": "heat-carried-by-winds-and-the-climate-loop",
   "title": "Heat carried by winds, and the climate loop",
   "mode": "build",
-  "state": "review",
+  "state": "ready",
   "branch": "claude/heat-carried-by-winds-and-the-climate-loop-4c86af",
   "base": "main",
   "gh_issue": 13,
   "build_model": null,
   "created": "2026-11-18 11:49",
-  "updated": "2026-11-18 18:06",
+  "updated": "2026-11-18 19:17",
   "done": null,
   "local": [
     {
