@@ -8,14 +8,15 @@
 - **The gyre is solved on grid corners:** a shared corner index across the cube's faces, with the gyre's flow pattern (streamfunction) solved there, so the flows are exact (nothing leaks onto land, nothing piles up). The user: "Add grid corners (Recommended)" (2026-11-18)
 - **The sea gets a temperature of its own:** a sea-surface temperature beside the air's over sea cells, exchanging heat with it; currents carry the sea's. The user: "Separate sea temperature" (2026-11-18). Saved worlds hold no climate (`src/core/world/serialize.ts`), so no saved file changes.
 - **Judged by physics, then a sanity check:** settings start from physical values; the builder measures the Earth by region and the coast contrasts and stops for the user if a region gets clearly worse; no chasing the Earth's figures until step 6b. The user: "Physics, then a sanity check (Recommended)" (2026-11-18)
+- **Sea temperature first:** piece 1 adds the sea's own temperature and the air–sea exchange, with no currents, measured against observed sea temperatures; then the corner grid and gyres, upwelling, overturning, and the page, each measured on its own. The first climate pass is no longer today's model bit for bit, and both baselines are re-recorded. The user: "Sea temperature first (Recommended)" (2026-11-18)
+- **On screen:** a Sea temperature layer (colour map, with Difference against observed sea temperatures, OISST v2 1991–2020 1°, public domain) and a Currents overlay drawn with arrows like the winds (compared with the drifter climatology, CC-BY, credited in docs/data.md). The user: "Sea temp layer + currents overlay (Recommended)" (2026-11-18)
+- **Monthly currents:** 12 gyre solves a pass, following the winds; cost measured in the piece. The user: "Monthly (Recommended)" (2026-11-18)
 
 ## Open
 
-- What the separate sea temperature changes: the order of pieces (sea temperature first?), pass 1 no longer today's model, the air–sea exchange, what the Temperature layer shows over the sea.
-- Sea ice with a sea temperature: which temperature decides the ice share.
-
-- Monthly or yearly currents.
-- What is shown: a currents layer (arrows like the winds), a sea-temperature view, an Earth comparison; observed data and its licence.
+- Sea ice with a sea temperature: which temperature decides the ice share (the user asked "We don't have sea ice yet?": explained the stand-in, asked again).
+- What the Temperature layer shows over the sea once there are two temperatures (the air's, as today, compared with the observed air temperature).
+- The air–sea exchange strength (a physical bulk value expected).
 - The loop: settling with a second feedback within the 8-pass cap.
 
 ## Assumed
