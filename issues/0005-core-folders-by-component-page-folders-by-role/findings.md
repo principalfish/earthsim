@@ -62,3 +62,18 @@
 | round | correctness | - | - | - | - | - | Clean: moved declarations identical apart from `export` and one `{@link}` reworded; everything from `startPage`'s doc comment to the end of `wiring.ts` byte-identical |
 | round | security | - | - | - | - | - | Clean |
 | round | coverage | - | - | - | - | - | Clean |
+
+## review 01 · 2026-11-18
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | - | - | dropped | - | `src/app/wiring.ts:49` | `PageGlobe`, `PageStatsOptions` no longer re-exported from `./wiring` — dropped: nothing imports them; the plan re-exports only what is used |
+| round | correctness | - | - | dropped | - | `src/app/ui/main/legend.ts` | Fitting names no longer exported from the legend — dropped: settled in piece 4 |
+| round | common-mistakes | - | - | dropped | - | `src/app/ui/layerPanel.winds.test.ts:330` | `monthsOf` defined in two test files — dropped: already duplicated on main; moved bodies stay unchanged |
+| round | common-mistakes | - | - | dropped | - | `src/app/ui/layerPanel/figures.ts` | Single-caller files `figures.ts`, `lighting.ts` — dropped: named or allowed by the plan, covered |
+| round | common-mistakes | - | - | dropped | - | `src/app/layers/scalar/fit.ts` | Exports with no other user — dropped: exported the same way on main |
+| round | common-mistakes | - | - | dropped | - | `src/app/layers/scalar/spec.test.ts` | 13-line test files — dropped: follow the one-test-file-per-source rule |
+| round | common-mistakes | - | - | dropped | - | `src/app/testing/glsl.ts` | Two files named `glsl.ts` — dropped: different folders and roles |
+| round | security | - | - | - | - | - | Clean |
+| round | docs | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | Clean: 98% of 466 changed lines; 5 uncovered test-helper guard lines, reason accepted |
