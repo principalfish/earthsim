@@ -12,7 +12,7 @@ _None._
 - 0002 [Add seasonal temperature layer and planet controls](issues/0002-add-seasonal-temperature-layer-and-planet-controls/) · build · branch `claude/add-seasonal-temperature-layer-and-planet-controls-f645fa` · gh #3 · PR #4 · 1 review · done 2026-11-13 07:35
 - 0003 [Add winds, air pressure and day length](issues/0003-add-winds-layer/) · build · branch `claude/add-winds-layer-991a60` · gh #5 · PR #6 · 1 review · done 2026-11-15 12:00
 - 0004 [Move layers and overlays into the main view](issues/0004-move-layers-and-overlays-into-the-main-view/) · build · branch `claude/move-layers-and-overlays-into-the-main-view-d898bd` · gh #7 · PR #8 · 1 review · done 2026-11-17 18:48
-- 0005 [Core folders by component, page folders by role](issues/0005-core-folders-by-component-page-folders-by-role/) · refactor · branch `claude/core-folders-by-component-page-folders-by-role-c9bcc4` · gh #9 · PR #10 · 1 review · 3 local leftovers (`cleanup`) · done 2026-11-18 09:02
+- 0005 [Core folders by component, page folders by role](issues/0005-core-folders-by-component-page-folders-by-role/) · refactor · branch `claude/core-folders-by-component-page-folders-by-role-c9bcc4` · gh #9 · PR #10 · 1 review · 2 local leftovers (`cleanup`) · done 2026-11-18 09:02
 
 ## Quick builds (latest 1 of 1; [all](quick-builds.md))
 

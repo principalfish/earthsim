@@ -9,14 +9,15 @@
   "gh_issue": 9,
   "build_model": null,
   "created": "2026-11-17 18:50",
-  "updated": "2026-11-18 09:02",
+  "updated": "2026-11-18 09:03",
   "done": "2026-11-18 09:02",
   "local": [
     {
       "kind": "session",
       "name": "local_771afecd-71f4-4b84-9a42-3353235082da",
       "added": "2026-11-17 19:35",
-      "note": "builder: core-folders-by-component-page-folders-by-role"
+      "note": "builder: core-folders-by-component-page-folders-by-role",
+      "removed": "2026-11-18 09:03"
     },
     {
       "kind": "worktree",
