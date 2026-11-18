@@ -14,6 +14,8 @@ Requires Node.js and npm. Run `npm install` once.
 | `npm run build:earth` | Rebuild the Earth's elevation data from its source; see [Data](data.md) |
 | `npm run build:observed-temperature` | Rebuild the Earth's observed temperature data; see [Data](data.md) |
 | `npm run build:observed-winds` | Rebuild the Earth's observed winds and sea-level pressure data; see [Data](data.md) |
+| `npm run build:observed-sea-temperature` | Rebuild the Earth's observed sea-surface temperature data; see [Data](data.md) |
+| `npm run build:observed-currents` | Rebuild the Earth's observed surface currents data; see [Data](data.md) |
 | `npm run baseline:temperature` | Write the Earth temperature baseline afresh; see below |
 | `npm run baseline:winds` | Write the Earth winds baseline afresh; see [Winds](winds.md#the-earth-winds-baseline) |
 | `npm run docs:config` | Write `src/core/config.md`, the list of every model's settings, from `src/core/config.ts`; a test fails when the committed page is not the one this writes |
@@ -136,10 +138,13 @@ Run with Node, not in the browser.
 | `build-earth-data.ts` | Downloads the source and writes `public/data/earth-256.bin` |
 | `build-observed-temperature.ts` | Downloads the source and writes `public/data/earth-temperature-1deg.bin` |
 | `build-observed-winds.ts` | Downloads the three sources and writes `public/data/earth-wind-1deg.bin` and `public/data/earth-pressure-1deg.bin` |
-| `observedGdalRun.ts` | Runs GDAL's `gdallocationinfo` on an observed source and compares it with this project's reader, for both observed builds |
-| `observedBuild.ts` | What both observed builds share: the option, reading a source, and writing the data file; their range and storing-error checks are `earth/storedValues.ts` |
+| `build-observed-sea-temperature.ts` | Downloads the two sources and writes `public/data/earth-sea-temperature-1deg.bin` |
+| `build-observed-currents.ts` | Downloads the two sources and writes `public/data/earth-currents-1deg.bin` |
+| `observedGdalRun.ts` | Runs GDAL's `gdallocationinfo` on an observed source and compares it with this project's reader, for the air temperature and wind builds; `oceanGdalRun.ts` does the same for the sea temperature build |
+| `observedBuild.ts` | What the observed builds share: the option, reading a source, and writing the data file; their range and storing-error checks are `earth/storedValues.ts` |
 | `download.ts` | Downloads a source file into `.cache/` once, checked against its pinned length and SHA-256 |
-| `earth/` | The parts of the build that touch no file: reading TIFF and netCDF, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data files |
+| `downloadRetry.ts` | Downloads a file a server cuts afresh at each request, waiting and asking again when the server is busy |
+| `earth/` | The parts of the build that touch no file: reading TIFF and netCDF, averaging pixels into cells, the sea sources (`oceanSource.ts`), the one-degree averaging of the currents (`regrid.ts`), and the comparison with GDAL. `dataFile.mjs` reads the finished data files |
 | `time-temperature.ts` | The solver's timings and the simulated Earth's error figures |
 | `time-winds.ts` | The wind model's timings, and how far its solve with the pressure on the 64 grid lies from one wholly on the world's own grid |
 | `time-climate.ts` | Times the climate loop pass by pass |
@@ -155,4 +160,4 @@ Run with Node, not in the browser.
 
 ### `public/data/`
 
-The four Earth data files, served beside the page as they are; see [Data](data.md).
+The six Earth data files, served beside the page as they are; see [Data](data.md).

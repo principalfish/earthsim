@@ -59,5 +59,7 @@ The other scripts (data, baselines, timing, the wind report and tuning) are list
 
 - **Elevation:** NOAA's ETOPO 2022 global relief model (CC0-1.0).
 - **Observed temperature, winds and pressure:** NOAA/CIRES/DOE 20th Century Reanalysis V3, provided by the NOAA PSL, Boulder, Colorado, USA (CC0-1.0).
+- **Observed sea-surface temperature:** NOAA Optimum Interpolation SST V2, provided by the NOAA PSL, Boulder, Colorado, USA.
+- **Observed surface currents:** the Global Drifter Program's drifter-derived climatology (Laurindo, Mariano and Lumpkin, 2017; CC BY 4.0), regridded to 1°.
 
 Full citations, licences and caveats are in [Data](docs/data.md).

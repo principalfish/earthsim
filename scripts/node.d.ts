@@ -18,6 +18,9 @@ declare module 'node:fs' {
 	export const openSync: (path: string, flags: 'r' | 'w' | 'a') => number;
 	export const closeSync: (fd: number) => void;
 	export const unlinkSync: (path: string) => void;
+	export const existsSync: (path: string) => boolean;
+	/** Moves a file, replacing any file at the new path. */
+	export const renameSync: (from: string, to: string) => void;
 	/** Reads into `buffer` from `position` of the file; gives the bytes read. */
 	export const readSync: (
 		fd: number,
@@ -146,3 +149,6 @@ declare const fetch: (
 	url: string,
 	init?: { readonly headers?: Readonly<Record<string, string>> },
 ) => Promise<ScriptResponse>;
+
+/** Calls `callback` once after `ms` milliseconds. */
+declare const setTimeout: (callback: () => void, ms: number) => unknown;

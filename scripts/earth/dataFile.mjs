@@ -44,3 +44,21 @@ const OBSERVED_PRESSURE_FILE = new URL(
 /** The bytes of the observed pressure file, read afresh at each call. */
 export const readObservedPressureFile = () =>
 	new Uint8Array(readFileSync(OBSERVED_PRESSURE_FILE));
+
+const OBSERVED_SEA_TEMPERATURE_FILE = new URL(
+	'../../public/data/earth-sea-temperature-1deg.bin',
+	import.meta.url,
+);
+
+/** The bytes of the observed sea temperature file, read afresh at each call. */
+export const readObservedSeaTemperatureFile = () =>
+	new Uint8Array(readFileSync(OBSERVED_SEA_TEMPERATURE_FILE));
+
+const OBSERVED_CURRENTS_FILE = new URL(
+	'../../public/data/earth-currents-1deg.bin',
+	import.meta.url,
+);
+
+/** The bytes of the observed currents file, read afresh at each call. */
+export const readObservedCurrentsFile = () =>
+	new Uint8Array(readFileSync(OBSERVED_CURRENTS_FILE));

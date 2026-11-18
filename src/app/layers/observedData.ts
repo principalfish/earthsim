@@ -5,15 +5,24 @@
  */
 
 import {
+	decodeObservedCurrents,
 	decodeObservedPressure,
+	decodeObservedSeaTemperature,
 	decodeObservedTemperature,
 	decodeObservedWind,
+	getGrid,
+	type MonthlyCurrents,
+	type MonthlySeaTemperature,
 	type MonthlyTemperature,
 	type MonthlyWind,
+	type ObservedCurrents,
 	type ObservedPressure,
+	type ObservedSeaTemperature,
 	type ObservedTemperature,
 	type ObservedWind,
+	observedCurrentsOn,
 	observedPressure,
+	observedSeaTemperatureOn,
 	observedTemperature,
 	observedWind,
 	type Resolution,
@@ -28,6 +37,13 @@ export const OBSERVED_PRESSURE_PATH = 'data/earth-pressure-1deg.bin';
 
 /** Where the observed winds file is, from the page's base address. */
 export const OBSERVED_WIND_PATH = 'data/earth-wind-1deg.bin';
+
+/** Where the observed sea-surface temperature file is, from the page's base address. */
+export const OBSERVED_SEA_TEMPERATURE_PATH =
+	'data/earth-sea-temperature-1deg.bin';
+
+/** Where the observed surface currents file is, from the page's base address. */
+export const OBSERVED_CURRENTS_PATH = 'data/earth-currents-1deg.bin';
 
 /**
  * A file of an observed year, and how its contents are read and taken onto
@@ -84,9 +100,38 @@ export const OBSERVED_WIND_FILE: ObservedFile<ObservedWind, MonthlyWind> = {
 };
 
 /**
+ * The observed sea-surface temperature file: twelve months of the
+ * temperature of the sea, in degrees Celsius, NaN where there is land or no
+ * data.
+ */
+export const OBSERVED_SEA_TEMPERATURE_FILE: ObservedFile<
+	ObservedSeaTemperature,
+	MonthlySeaTemperature
+> = {
+	name: 'sea temperature',
+	decode: decodeObservedSeaTemperature,
+	onGrid: (data, resolution) =>
+		observedSeaTemperatureOn(getGrid(resolution), data),
+};
+
+/**
+ * The observed surface currents file: twelve months of the eastward and
+ * northward current at the sea's surface, in metres a second, NaN where
+ * there is land or no data.
+ */
+export const OBSERVED_CURRENTS_FILE: ObservedFile<
+	ObservedCurrents,
+	MonthlyCurrents
+> = {
+	name: 'currents',
+	decode: decodeObservedCurrents,
+	onGrid: (data, resolution) => observedCurrentsOn(getGrid(resolution), data),
+};
+
+/**
  * How long a fetch may take before it is given up, in milliseconds. The
- * largest file, the winds', is under two megabytes, so only a connection
- * that has stalled takes longer.
+ * largest files, the winds' and the currents', are under two megabytes, so
+ * only a connection that has stalled takes longer.
  */
 export const OBSERVED_FETCH_TIMEOUT_MS = 60_000;
 
@@ -231,6 +276,42 @@ export const loadObservedWinds: ObservedLoader<MonthlyWind> =
 	createObservedLoader({
 		url: `${import.meta.env.BASE_URL}${OBSERVED_WIND_PATH}`,
 		file: OBSERVED_WIND_FILE,
+		fetchFile: (url) =>
+			fetch(url, { signal: AbortSignal.timeout(OBSERVED_FETCH_TIMEOUT_MS) }),
+	});
+
+/**
+ * The Earth's observed sea-surface temperature on a world's grid, in degrees
+ * Celsius, fetched and kept as {@link loadObservedTemperature} fetches and
+ * keeps the air temperature, from {@link OBSERVED_SEA_TEMPERATURE_PATH}.
+ *
+ * @param resolution - Cells along a face edge of the world's grid.
+ * @returns A promise of the twelve months, which must be treated as
+ * read-only and hold NaN where a cell has no data; it rejects as the air
+ * temperature's does.
+ */
+export const loadObservedSeaTemperature: ObservedLoader<MonthlySeaTemperature> =
+	createObservedLoader({
+		url: `${import.meta.env.BASE_URL}${OBSERVED_SEA_TEMPERATURE_PATH}`,
+		file: OBSERVED_SEA_TEMPERATURE_FILE,
+		fetchFile: (url) =>
+			fetch(url, { signal: AbortSignal.timeout(OBSERVED_FETCH_TIMEOUT_MS) }),
+	});
+
+/**
+ * The Earth's observed surface currents on a world's grid, in metres a
+ * second, fetched and kept as {@link loadObservedTemperature} fetches and
+ * keeps the air temperature, from {@link OBSERVED_CURRENTS_PATH}.
+ *
+ * @param resolution - Cells along a face edge of the world's grid.
+ * @returns A promise of the twelve months of each component, which must be
+ * treated as read-only and hold NaN where a cell has no data; it rejects as
+ * the air temperature's does.
+ */
+export const loadObservedCurrents: ObservedLoader<MonthlyCurrents> =
+	createObservedLoader({
+		url: `${import.meta.env.BASE_URL}${OBSERVED_CURRENTS_PATH}`,
+		file: OBSERVED_CURRENTS_FILE,
 		fetchFile: (url) =>
 			fetch(url, { signal: AbortSignal.timeout(OBSERVED_FETCH_TIMEOUT_MS) }),
 	});
