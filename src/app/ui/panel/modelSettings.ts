@@ -2,7 +2,8 @@
  * The Model settings screen: every setting the climate models run on,
  * read from the config the models themselves are built from, with what it
  * controls, what raising and lowering it do, where its value comes from
- * and whether it was tuned.
+ * and whether it was tuned, and, as its first tab, the diagram of how the
+ * climate is to be worked out.
  *
  * It only shows. A setting is changed in `src/core/config.ts`, and nothing
  * on this screen reaches the models.
@@ -17,6 +18,7 @@ import {
 	WIND_CONFIG,
 } from '../../../core/index';
 import { createButton, createElement } from '../fields';
+import { createProcessDiagram } from './processDiagram';
 
 /** The sections the screen shows, a tab each, in order. */
 export const MODEL_SETTINGS_SECTIONS: readonly ConfigSection[] = [
@@ -29,7 +31,7 @@ export const MODEL_SETTINGS_TITLE = 'Model settings';
 
 /** What the screen says under its title. */
 export const MODEL_SETTINGS_INTRO =
-	'The numbers the temperature and wind models run on. They are shown here to read, not to change: a setting is changed in the code, in src/core/config.ts.';
+	'How the climate is to be worked out, and the numbers the temperature and wind models run on. The settings are shown here to read, not to change: a setting is changed in the code, in src/core/config.ts.';
 
 /** What the Close button says. */
 export const CLOSE_LABEL = 'Close';
@@ -54,10 +56,18 @@ export const tabId = (index: number): string => `model-settings-tab-${index}`;
 export const panelId = (index: number): string =>
 	`model-settings-panel-${index}`;
 
+/** What the first tab, the climate process diagram, is called. */
+export const DIAGRAM_TAB_LABEL = 'Climate process';
+
 /** What the screen is built from and where it goes. */
 export type ModelSettingsOptions = {
 	/** The sections to show, a tab each; the temperature's and the winds'. */
 	readonly sections?: readonly ConfigSection[];
+	/**
+	 * Builds the diagram of the climate process, the first tab's content; the
+	 * page's own by default.
+	 */
+	readonly diagram?: () => HTMLElement;
 	/** Where the screen is added to the page; the body by default. */
 	readonly parent?: HTMLElement;
 };
@@ -110,19 +120,30 @@ const createGroup = (group: ConfigGroup): HTMLElement => {
 	return element;
 };
 
-/** What a section's panel holds: its groups, then its fixed choices. */
-const createPanel = (section: ConfigSection, index: number): HTMLElement => {
+/** A tab's panel, holding what it is given. */
+const createPanel = (
+	index: number,
+	...content: readonly HTMLElement[]
+): HTMLElement => {
 	const panel = createElement('div', 'model-settings__panel');
 	panel.id = panelId(index);
 	panel.setAttribute('role', 'tabpanel');
 	panel.setAttribute('aria-labelledby', tabId(index));
 	panel.tabIndex = 0;
-	panel.append(
+	panel.append(...content);
+	return panel;
+};
+
+/** A model's panel: its groups, then its fixed choices. */
+const createSectionPanel = (
+	section: ConfigSection,
+	index: number,
+): HTMLElement =>
+	createPanel(
+		index,
 		...section.groups.map(createGroup),
 		createGroup(section.constants),
 	);
-	return panel;
-};
 
 /**
  * Opens the screen.
@@ -131,12 +152,14 @@ const createPanel = (section: ConfigSection, index: number): HTMLElement => {
  * It is a modal dialog laid over most of the page, with the globe showing
  * at its edges: the rest of the page cannot be used while it is open, the
  * keyboard's focus stays inside it, and Escape or Close closes it, after
- * which the focus is back where it was. Each model has a tab, with the
- * arrow keys, Home and End moving between them, and in it the model's
- * groups of settings, then the fixed choices the code reads directly. The
- * screen holds nothing that changes a setting.
+ * which the focus is back where it was. The first tab is the diagram of the
+ * climate process; each model has a tab after it, with the arrow keys, Home
+ * and End moving between them, and in it the model's groups of settings,
+ * then the fixed choices the code reads directly. The screen holds nothing
+ * that changes a setting.
  *
- * @param options - The sections to show and where to put the screen.
+ * @param options - The sections to show, how to build the diagram and where
+ * to put the screen.
  * @returns The dialog, already open.
  */
 export const openModelSettings = (
@@ -159,15 +182,22 @@ export const openModelSettings = (
 
 	const tabs = createElement('div', 'model-settings__tabs');
 	tabs.setAttribute('role', 'tablist');
-	tabs.setAttribute('aria-label', 'Model');
-	const panels = sections.map(createPanel);
-	const tabButtons = sections.map((section, index) => {
+	tabs.setAttribute('aria-label', 'Climate process and models');
+	const panels = [
+		createPanel(0, (options.diagram ?? createProcessDiagram)()),
+		...sections.map((section, index) => createSectionPanel(section, index + 1)),
+	];
+	const labels = [
+		DIAGRAM_TAB_LABEL,
+		...sections.map((section) => section.name),
+	];
+	const tabButtons = labels.map((label, index) => {
 		const tab = createElement('button', 'model-settings__tab');
 		tab.type = 'button';
 		tab.id = tabId(index);
 		tab.setAttribute('role', 'tab');
 		tab.setAttribute('aria-controls', panelId(index));
-		tab.textContent = section.name;
+		tab.textContent = label;
 		return tab;
 	});
 

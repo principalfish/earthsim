@@ -137,8 +137,8 @@ const createUnitSelect = <Q extends Quantity>(
  * and depths and Distances, whose first choice, As the system, follows
  * the system and names the unit it gives, and whose others are the
  * quantity's units. All are shown whether or not the winds are. Last is the
- * Model settings button, which opens the screen that lists the models'
- * settings.
+ * Model settings button, which opens the screen that shows the climate
+ * process diagram and lists the models' settings.
  *
  * @param body - The section's body, to add the controls to, after what it
  * holds.

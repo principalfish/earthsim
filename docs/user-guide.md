@@ -365,9 +365,11 @@ A wind speed unit saved by an older version of the page is kept once as the wind
 
 #### Model settings
 
-**Model settings**, under the units, opens a screen laid over the page, with the dimmed globe showing at its edges in a wide window, that lists every number the temperature and wind models run on. It is for reading only: nothing on it changes a setting, which is changed in the code, in `src/core/config.ts`.
+**Model settings**, under the units, opens a screen laid over the page, with the dimmed globe showing at its edges in a wide window, that shows how the climate is to be worked out and lists every number the temperature and wind models run on. It is for reading only: nothing on it changes a setting, which is changed in the code, in `src/core/config.ts`.
 
-- **Tabs:** **Temperature** and **Winds**, each with its settings in groups, then the fixed choices the code reads directly. The left and right arrow keys, Home and End move between the tabs.
+- **Tabs:** **Climate process** first, then **Temperature** and **Winds**. The left and right arrow keys, Home and End move between them.
+- **Climate process** is a diagram of how the climate is to be worked out once every part up to the biomes is built: the inputs, the loop of temperature, pressure, winds and ocean currents with the heat and ice that feed back into the temperature, what is worked out from the settled state, the layers you can view and what lies outside the loop. Under it are the lines **Built today** and **Planned, not built**. In a narrow window the diagram scrolls sideways.
+- **Temperature and Winds** each list their settings in groups, then the fixed choices the code reads directly.
 - **Each setting** shows its name, its value and unit, what it controls, what raising it does, what lowering it does, and where its value comes from. A setting tuned against the observed Earth carries a **Tuned** mark and says what it was tuned against.
 - **Close** or Escape closes it and returns to the page, with the keyboard focus back on the **Model settings** button. While it is open the rest of the page cannot be used.
 - **The same list** is written in [Model settings](../src/core/config.md), to read without opening the page.

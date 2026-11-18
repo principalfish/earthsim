@@ -1241,6 +1241,7 @@ body {
 
 .model-settings__panel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-lg);
 }
 
@@ -1344,6 +1345,132 @@ body {
   .model-settings[open] {
     padding: var(--space-md);
   }
+}
+
+/* The climate process diagram, the first tab of the Model settings screen:
+   an SVG drawn in code, in the page's colours plus three of its own. It
+   keeps its full size, 842 units across, and scrolls sideways in a window
+   too narrow for it, on its own and not the whole panel. */
+.process-diagram {
+  --diagram-input: #c9b46a;
+  --diagram-downstream: #6fbf7b;
+  --diagram-feedback: #e8955a;
+  --diagram-min-width: 52rem;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+}
+
+.process-diagram__intro,
+.process-diagram__status-line {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.process-diagram__status {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.process-diagram__status-lead {
+  color: var(--color-text);
+}
+
+.process-diagram__scroll {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.process-diagram__drawing {
+  display: block;
+  width: 100%;
+  min-width: var(--diagram-min-width);
+  height: auto;
+  font-family: inherit;
+}
+
+.process-diagram__loop rect {
+  fill: color-mix(in srgb, var(--color-accent) 12%, var(--color-panel-bg));
+  stroke: var(--color-accent);
+  stroke-width: 1.6;
+}
+
+.process-diagram__panel rect {
+  fill: var(--color-bg);
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.process-diagram__box rect {
+  fill: var(--color-panel-bg);
+  stroke-width: 1.1;
+}
+
+.process-diagram__box--loop rect {
+  stroke: var(--color-accent);
+}
+
+.process-diagram__box--input rect {
+  fill: color-mix(in srgb, var(--diagram-input) 14%, var(--color-panel-bg));
+  stroke: var(--diagram-input);
+}
+
+.process-diagram__box--downstream rect {
+  fill: color-mix(
+    in srgb,
+    var(--diagram-downstream) 14%,
+    var(--color-panel-bg)
+  );
+  stroke: var(--diagram-downstream);
+}
+
+.process-diagram__arrow path {
+  fill: none;
+  stroke-width: 1.3;
+}
+
+.process-diagram__arrow--forward path {
+  stroke: var(--color-text-muted);
+}
+
+.process-diagram__arrow--feedback path {
+  stroke: var(--diagram-feedback);
+  stroke-width: 1.5;
+}
+
+.process-diagram__head--forward path {
+  fill: var(--color-text-muted);
+}
+
+.process-diagram__head--feedback path {
+  fill: var(--diagram-feedback);
+}
+
+.process-diagram__text {
+  fill: var(--color-text-muted);
+}
+
+.process-diagram__text--ink {
+  fill: var(--color-text);
+}
+
+.process-diagram__text--loop {
+  fill: var(--color-accent-strong);
+}
+
+.process-diagram__text--feedback {
+  fill: var(--diagram-feedback);
+}
+
+.process-diagram__text--downstream {
+  fill: var(--diagram-downstream);
+}
+
+.process-diagram__text--bold {
+  font-weight: 600;
 }
 
 /* Utilities */

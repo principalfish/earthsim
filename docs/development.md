@@ -33,25 +33,10 @@ Requires Node.js and npm. Run `npm install` once.
 
 ## The climate process diagram
 
-`docs/climate-process.pdf` is drawn by `scripts/docs/climate-process.py`. Its first page is a diagram of how the climate is to be worked out when every part up to the biomes is built: the loop of temperature, pressure, winds and ocean currents, and what is worked out from its settled state. The pages after it list the settings of the temperature and wind models, each with its value, what it controls, what raising or lowering it does, and where the value comes from.
+The first tab of the Model settings screen is a diagram of how the climate is to be worked out when every part up to the biomes is built: the loop of temperature, pressure, winds and ocean currents, and what is worked out from its settled state. It is drawn as an SVG from the data in `src/app/ui/panel/processDiagram.ts`: the boxes, the arrows and the labels, in the units of a page 842 wide, with the vertical position counted up from its foot.
 
-It needs Python 3 and the `reportlab` library, which the project does not otherwise use, so run it from a throwaway environment outside the repository, `<dir>` being any folder there:
-
-```bash
-python3 -m venv <dir>
-```
-
-```bash
-<dir>/bin/pip install reportlab
-```
-
-```bash
-<dir>/bin/python scripts/docs/climate-process.py docs/climate-process.pdf
-```
-
-- **Re-running it with nothing changed** leaves the PDF byte-identical, so the PDF changes in a commit only when the script does. The committed PDF was drawn with reportlab 5.1.0; another version may write the same pages as different bytes.
-- **The diagram is a design,** mostly of parts not built yet. Redraw it when one of them, once built, changes it.
-- **The settings pages are a dated snapshot,** kept by hand in the script, with the date set once at its top. When a setting is added, removed or changed in `src/core/config.ts`, bring the pages up to the code. `src/core/config.md`, written from the config, is the living list of the settings.
+- **The diagram is a design,** mostly of parts not built yet. Edit the data when one of them, once built, changes it, and the "Built today" and "Planned, not built" lines under the drawing with it.
+- **The settings are not in it.** Every setting of the temperature and wind models is on the screen's other tabs and in [`src/core/config.md`](../src/core/config.md), both written from `src/core/config.ts`.
 
 ## Type-checking rules
 
@@ -121,7 +106,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `settings/units.ts` | The five quantities (temperature, pressure, wind speed, heights, distances), their units with each one's conversion from metric and decimals, the Metric and Imperial systems, the choice of a system with an override per quantity and the store that tells its listeners of each change, where choosing a system clears the overrides; also the eight compass points and a wind in words |
 | `globe/` | The renderer, the material and its shaders (`material/`), camera, picking, colour ramps, the wind arrows and the wind streaks (`streaks.ts`: the trails moved along the wind, and their ribbons), when the globe is drawn (`frameLoop.ts`: on demand, or at every frame while animating) and the rule for when the streaks move (`windMotion.ts`) |
 | `ui/main/` | What sits over the globe: the regions laid over it (`mainView.ts`), the dock of tiles there that choose the layer and switch the overlays (`layerDock.ts`), the top bar beside it with the layer's Show choice and the one comparison control (`topBar.ts`, `comparison.ts`), the timeline along the bottom with the month and Play (`timeline.ts`), the Pause button in the top-right corner (`pauseButton.ts`), the info box in the bottom-right corner (`infoBox.ts`), made of the legend (`legend.ts`: its ramp, marked at round values, on the scale the layer panel fits with `layers/scalar/`), one status line for the calculation, the layer and the winds (`windKey.ts` words where the winds stand) and the cursor readout (`cursorReadout.ts`) |
-| `ui/panel/` | The side panel's sections, in the order the panel shows them (`panelSections.ts`): the world controls (`worldPanel.ts`) and the date line under the world's description (`dateLine.ts`), the view controls (`viewPanel.ts`), the planet controls (`planetPanel.ts`), the tool controls (`toolPanel.ts`), the statistics readout (`statsPanel.ts`), the Settings section's wind style, units and the button that opens the Model settings screen (`settingsPanel.ts`), that screen, a read-only dialog of every setting of the temperature and wind models read from `src/core/config.ts` (`modelSettings.ts`), and the New world dialog (`newWorldDialog.ts`) |
+| `ui/panel/` | The side panel's sections, in the order the panel shows them (`panelSections.ts`): the world controls (`worldPanel.ts`) and the date line under the world's description (`dateLine.ts`), the view controls (`viewPanel.ts`), the planet controls (`planetPanel.ts`), the tool controls (`toolPanel.ts`), the statistics readout (`statsPanel.ts`), the Settings section's wind style, units and the button that opens the Model settings screen (`settingsPanel.ts`), that screen, a read-only dialog with the climate process diagram (`processDiagram.ts`) and every setting of the temperature and wind models read from `src/core/config.ts` (`modelSettings.ts`), and the New world dialog (`newWorldDialog.ts`) |
 | `ui/` | What stays at the top of the folder: the labelled controls the panels are built from (`fields.ts`), the page's icons, which only the main view uses (`icons.ts`), a section of the side panel that opens and closes (`section.ts`), and the layer panel, which takes the layer, month, source and winds chosen on the dock, top bar and timeline and decides what the globe and the info box show (`layerPanel.ts`), with its types, the state it keeps, and the differences and error figures it works out against an observed year in `layerPanel/` (`types.ts`, `internal.ts`, `figures.ts`); its tests are split by theme, `layerPanel.test.ts` and `layerPanel.<theme>.test.ts` for the month, the comparison, the winds and the units |
 | `styles.css` | The page's styles |
 | `testing/` | Stand-ins for the canvas, document, storage, timers and animation frames, a made-up layer description, the reading of a shader's functions from its source (`glsl.ts`), years of Earth-like temperature and pressure for fitting scales (`earthLikeFixtures.ts`), and the layer panel on a real store with the results, observed years and winds its tests give it (`layerPanelStage.ts`), which only the tests use |
@@ -137,9 +122,9 @@ It computes from a copy of the world, and its answers depend on the request alon
 | `client.ts` | The page's side of the channel |
 | `testing/` | A stand-in worker for the tests |
 
-### `scripts/`: building the data, the reports and the climate diagram
+### `scripts/`: building the data and the reports
 
-Run with Node, not in the browser; `docs/` alone is Python.
+Run with Node, not in the browser.
 
 | File | What it does |
 |-|-|
@@ -161,7 +146,6 @@ Run with Node, not in the browser; `docs/` alone is Python.
 | `tune/` | The parts of the tuning script that touch no file: its command line (`command.ts`), the sweep and the search (`search.ts`), the cases and their temperatures worked out once and the runs on them (`tuning.ts`), the numbers that show each known fault on the Earth (`faults.ts`), and the printout (`text.ts`) |
 | `report/` | The parts of the wind report that touch no file: the cases (`cases.ts`), the maps (`map.ts`), the zonal-mean chart (`chart.ts`), the PNG writer (`png.ts`), the page (`page.ts`), the measures and checks against published studies (`summary.ts`) and the papers' words they are set beside (`literature.ts`), running the models on the cases (`run.ts`), and in `testing/` the XML and PNG readers only its tests use |
 | `run-with-vite.mjs` | Runs a TypeScript script through Vite, so it can import the core |
-| `docs/` | `climate-process.py`, which draws `docs/climate-process.pdf`; see [The climate process diagram](#the-climate-process-diagram) |
 
 ### `public/data/`
 

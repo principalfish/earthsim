@@ -16,6 +16,7 @@ import {
 } from '../../testing/fakeDocument';
 import {
 	CLOSE_LABEL,
+	DIAGRAM_TAB_LABEL,
 	ENTRY_TEXTS,
 	MODEL_SETTINGS_SECTIONS,
 	MODEL_SETTINGS_TITLE,
@@ -127,6 +128,26 @@ describe('openModelSettings', () => {
 		expect(dialog.getAttribute('aria-labelledby')).toBe(title.id);
 	});
 
+	it('puts the diagram of the climate process in the first tab, built by the page unless given', () => {
+		const { panels } = open();
+		expect(byClass(panels[0] as FakeElement, 'process-diagram')).toHaveLength(
+			1,
+		);
+		const made: FakeElement[] = [];
+		const parent = fake.createElement('div');
+		const own = openModelSettings({
+			sections: [small],
+			parent: parent as unknown as HTMLElement,
+			diagram: () => {
+				const element = fake.createElement('div');
+				made.push(element);
+				return element as unknown as HTMLElement;
+			},
+		}) as unknown as FakeElement;
+		expect(made).toHaveLength(1);
+		expect(byClass(own, 'model-settings__panel')[0]?.children).toEqual(made);
+	});
+
 	it('goes in the body of the page when no parent is given', () => {
 		const body = fake.createElement('body');
 		vi.stubGlobal('document', { ...document, body });
@@ -145,22 +166,29 @@ describe('openModelSettings', () => {
 		expect(body.scrollTop).toBe(0);
 	});
 
-	it('has a tab for each model, the first chosen, each controlling its panel', () => {
+	it('has the climate process first, then a tab for each model, the first chosen, each controlling its panel', () => {
 		const { dialog, tabs, panels } = open();
 		expect(tabs.map((tab) => tab.textContent)).toEqual([
+			DIAGRAM_TAB_LABEL,
 			'Temperature',
 			'Winds',
 		]);
+		expect(DIAGRAM_TAB_LABEL).toBe('Climate process');
 		expect(
 			oneByClass(dialog, 'model-settings__tabs').getAttribute('role'),
 		).toBe('tablist');
-		expect(tabs.map((tab) => tab.getAttribute('role'))).toEqual(['tab', 'tab']);
+		expect(tabs.map((tab) => tab.getAttribute('role'))).toEqual([
+			'tab',
+			'tab',
+			'tab',
+		]);
 		expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual([
 			'true',
 			'false',
+			'false',
 		]);
-		expect(tabs.map((tab) => tab.tabIndex)).toEqual([0, -1]);
-		expect(panels.map((panel) => panel.hidden)).toEqual([false, true]);
+		expect(tabs.map((tab) => tab.tabIndex)).toEqual([0, -1, -1]);
+		expect(panels.map((panel) => panel.hidden)).toEqual([false, true, true]);
 		tabs.forEach((tab, index) => {
 			expect(tab.id).toBe(tabId(index));
 			expect(tab.getAttribute('aria-controls')).toBe(panelId(index));
@@ -175,7 +203,7 @@ describe('openModelSettings', () => {
 		const { panels } = open();
 		expect(MODEL_SETTINGS_SECTIONS).toEqual([TEMPERATURE_CONFIG, WIND_CONFIG]);
 		MODEL_SETTINGS_SECTIONS.forEach((section, index) => {
-			const panel = panels[index] as FakeElement;
+			const panel = panels[index + 1] as FakeElement;
 			expect(
 				byClass(panel, 'model-setting__name').map((name) => name.textContent),
 			).toEqual(namesOf(section));
@@ -193,7 +221,7 @@ describe('openModelSettings', () => {
 	it('shows every field of every setting, and the Tuned mark only on tuned ones', () => {
 		const { panels } = open();
 		MODEL_SETTINGS_SECTIONS.forEach((section, index) => {
-			const cards = byClass(panels[index] as FakeElement, 'model-setting');
+			const cards = byClass(panels[index + 1] as FakeElement, 'model-setting');
 			const entries = [
 				...section.groups.flatMap((group) => Object.entries(group.settings)),
 				...Object.entries(section.constants.settings),
@@ -220,8 +248,11 @@ describe('openModelSettings', () => {
 
 	it('shows a made-up section as it is given, tuned and plain settings apart', () => {
 		const { tabs, panels } = open([small]);
-		expect(tabs.map((tab) => tab.textContent)).toEqual(['Made up']);
-		const cards = byClass(panels[0] as FakeElement, 'model-setting').map(
+		expect(tabs.map((tab) => tab.textContent)).toEqual([
+			DIAGRAM_TAB_LABEL,
+			'Made up',
+		]);
+		const cards = byClass(panels[1] as FakeElement, 'model-setting').map(
 			cardOf,
 		);
 		expect(cards.map((card) => [card.name, card.value, card.marked])).toEqual([
@@ -248,11 +279,14 @@ describe('openModelSettings', () => {
 		expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual([
 			'false',
 			'true',
+			'false',
 		]);
-		expect(tabs.map((tab) => tab.tabIndex)).toEqual([-1, 0]);
-		expect(panels.map((panel) => panel.hidden)).toEqual([true, false]);
+		expect(tabs.map((tab) => tab.tabIndex)).toEqual([-1, 0, -1]);
+		expect(panels.map((panel) => panel.hidden)).toEqual([true, false, true]);
+		tabs[2]?.fire('click');
+		expect(panels.map((panel) => panel.hidden)).toEqual([true, true, false]);
 		tabs[0]?.fire('click');
-		expect(panels.map((panel) => panel.hidden)).toEqual([false, true]);
+		expect(panels.map((panel) => panel.hidden)).toEqual([false, true, true]);
 	});
 
 	it('moves between tabs with the arrow keys, Home and End, wrapping, and focuses the one chosen', () => {
@@ -263,18 +297,20 @@ describe('openModelSettings', () => {
 			return stopped;
 		};
 		expect(press(tabs[0], 'ArrowRight')).toBe(true);
-		expect(panels.map((panel) => panel.hidden)).toEqual([true, false]);
+		expect(panels.map((panel) => panel.hidden)).toEqual([true, false, true]);
 		expect(fake.document.activeElement).toBe(tabs[1]);
 		expect(press(tabs[1], 'ArrowRight')).toBe(true);
-		expect(panels.map((panel) => panel.hidden)).toEqual([false, true]);
+		expect(fake.document.activeElement).toBe(tabs[2]);
+		expect(press(tabs[2], 'ArrowRight')).toBe(true);
+		expect(panels.map((panel) => panel.hidden)).toEqual([false, true, true]);
 		expect(press(tabs[0], 'ArrowLeft')).toBe(true);
-		expect(fake.document.activeElement).toBe(tabs[1]);
-		expect(press(tabs[1], 'Home')).toBe(true);
+		expect(fake.document.activeElement).toBe(tabs[2]);
+		expect(press(tabs[2], 'Home')).toBe(true);
 		expect(fake.document.activeElement).toBe(tabs[0]);
 		expect(press(tabs[0], 'End')).toBe(true);
-		expect(fake.document.activeElement).toBe(tabs[1]);
-		expect(press(tabs[1], 'a')).toBe(false);
-		expect(panels.map((panel) => panel.hidden)).toEqual([true, false]);
+		expect(fake.document.activeElement).toBe(tabs[2]);
+		expect(press(tabs[2], 'a')).toBe(false);
+		expect(panels.map((panel) => panel.hidden)).toEqual([true, true, false]);
 	});
 
 	it('closes by its Close button and takes itself out of the page', () => {
