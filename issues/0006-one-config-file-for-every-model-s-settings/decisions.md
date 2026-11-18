@@ -26,6 +26,9 @@ The user's brief (2026-11-18): "Plan 3d", roadmap step 3d in `investigations/202
 
 - The config screen is read-only for now: it shows every setting with its explanations, and settings are changed by editing `config.ts` in a chat. No `settings.json`, no saving from the page, and the page and its workers still never override the models' settings. This narrows the earlier "allows me to edit them". The user: "ok for now lets not make it editable to make this simpler - keep as ts if you wish. we edit through chats here. just having the screen to reference is enough" (2026-11-18)
 
+- Manual reviews kept for piece 4 (the screen) and piece 5 (the diagram against the PDF's first page). The user: "Piece 4: the screen (Recommended),Piece 5: the diagram (Recommended)" (2026-11-18)
+- The builder runs the pieces straight through: each piece is committed and pushed after its review round and light re-check, verified findings are fixed rather than left open, and choices the plan does not settle are made by the builder, recorded in `plan.md` Notes as "Decided by the builder" and listed at the end; it still stops for the two manual reviews, and for anything that changes a value, departs from the ledger, touches shared state or cannot be undone, or a check it cannot pass. The user: "Straight through, stop for manual reviews" (2026-11-18)
+
 ## Open
 - None.
 

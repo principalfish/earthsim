@@ -122,3 +122,6 @@ After every piece: `npm run check`, `npm run typecheck`, `npm test`, `npm run bu
 Docs: `config.md` (generated) and pointers to it in `docs/temperature.md` and `docs/winds.md`; the screen in `docs/user-guide.md`; `docs/development.md`'s tables for the new files; the PDF's mentions removed from `README.md` and `docs/development.md`.
 
 ## Notes
+
+### How the pieces run (2026-11-18)
+- Straight through, as the user chose: commit and push each piece after its review round and light re-check, fix every verified finding, record each choice the plan leaves open under its piece as "Decided by the builder", and list them all at the end. Stop for the manual reviews of pieces 4 and 5, and for anything that changes a value, departs from the settled ledger, touches shared state or cannot be undone, or a check that cannot be made to pass.
