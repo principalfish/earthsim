@@ -88,7 +88,7 @@ Keep this section current when a step is merged.
 | 3a Core folders by component, page folders by role (refactor, no behaviour change) | Done 2026-11-18 (PR #10 merged at 33f027c) | 0005, GitHub #9 |
 | 3d One config.ts for every model's settings, with config.md; also a read-only Model settings screen with the climate process diagram, replacing the PDF | Done 2026-11-18 (PR #12 merged at 9463afa) | 0006, GitHub #11 |
 | 3a follow-up: the deeper splits of `ui/layerPanel.ts` and `wiring.ts`, and the `ui/` type dependency (see under step 3a) | Not started; before step 5, the next step to add a layer to the panel | |
-| 3b Heat carried by winds, and the climate loop | Next. Could instead open step 5; decide when planned | |
+| 3b Heat carried by winds, and the climate loop | Next; before step 5, which plugs its currents into the loop 3b builds (the user, 2026-11-18) | |
 | 5 Ocean currents | Next after 3b; before step 4 (the user, 2026-11-18) | |
 | 4 Moisture, rainfall and Köppen zones | Not started; after step 5, so rain and the Köppen zones are built and tuned against sea temperatures that the currents have already set (the user, 2026-11-18). Before planning it, settle fixed or fitted colour scales (see the open follow-ups), since rainfall is the next colour layer | |
 | 6 Ice sheets and sea ice | Not started | |
