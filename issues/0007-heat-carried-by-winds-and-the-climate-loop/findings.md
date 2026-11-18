@@ -120,11 +120,15 @@
 
 | Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
 |-|-|-|-|-|-|-|-|
-| round | correctness | low | defect | verified | open | `src/core/climate.ts:356` | After an edit a warm start's pass 1 carries heat along the pre-edit winds; a local sculpt moves the global rms by under 0.1 °C, so the loop settles at pass 1 and the edited region never sees winds of its own new temperature |
-| round | carried over | low | defect | verified | open | `src/core/climate.ts:311` | The half-step on overshoot does not damp the oscillation at stronger feedback (old 3 hPa/K); cannot arise with shipped settings. Raised as medium in the piece reviews; the verifier set it low |
-| round | coverage | low | cleanup | verified | open | `src/worker/handle.ts:213` | The `pass === undefined` arms (also `src/app/layers/refresh.ts:588`) are dead: only the climate reports progress, always with a pass |
-| round | docs | low | docs | verified | open | `src/core/temperature/temperature.ts:268` | `TemperatureStart` remark "the temperature does not depend on it" (day length) now ambiguous |
-| round | docs | - | docs | verified | open | `docs/temperature.md:36` | About ten measured timings that will go out of date |
+| round | correctness | low | defect | verified | fixed | `src/core/climate.ts:356` | After an edit a warm start's pass 1 carries heat along the pre-edit winds; a local sculpt moves the global rms by under 0.1 °C, so the loop settles at pass 1 and the edited region never sees winds of its own new temperature |
+| round | carried over | low | defect | verified | fixed | `src/core/climate.ts:311` | The half-step on overshoot does not damp the oscillation at stronger feedback (old 3 hPa/K); cannot arise with shipped settings. Raised as medium in the piece reviews; the verifier set it low |
+| round | coverage | low | cleanup | verified | fixed | `src/worker/handle.ts:213` | The `pass === undefined` arms (also `src/app/layers/refresh.ts:588`) are dead: only the climate reports progress, always with a pass |
+| round | docs | low | docs | verified | fixed | `src/core/temperature/temperature.ts:268` | `TemperatureStart` remark "the temperature does not depend on it" (day length) now ambiguous |
+| round | docs | - | docs | verified | fixed | `docs/temperature.md:36` | About ten measured timings that will go out of date |
 | round | correctness | low | - | dropped | - | `src/app/layers/refresh.ts:574` | Raw `world.planet.dayLengthHours` vs the clamped one in `suits()` — dropped: `world.planet` is always normalised and files reject out-of-limits settings |
 | round | docs | low | - | dropped | - | `docs/development.md:69` | The `planet/planet.ts` row doesn't say the climate record carries the day length — dropped: accurate as written |
 | round | coverage | - | - | - | - | coverage | 98% of changed lines (746/756); reasons accepted for flows.ts:95, flowing.ts:247, 263, temperature.ts:1346, main.ts:189-190, handle.ts:193, testing/climateStore.ts:23; rejected for handle.ts:213 and refresh.ts:588 (remove, finding 3) |
+| re-check | docs | low | docs | verified | open | `src/app/ui/main/infoBox.test.ts:421` | The test name "as for a climate carried on that settles at once" describes a case that can no longer happen; rename (when the first pass is the last, as at a cap of one pass) |
+| re-check | docs | low | docs | verified | open | `src/core/config.ts:501` | At a cap of one pass nothing settles and no start is kept; the `climateMaxPasses` entry (and the TemperatureStart doc) doesn't say so; regenerate config.md |
+| re-check | docs | low | docs | verified | open | `docs/temperature.md:81` | A resumed run's first pass can't settle, so it may take one more pass than a run never paused; add a clause (and in climate.ts's settled comment) |
+| re-check | docs | - | cleanup | verified | open | `src/core/temperature/temperature.ts:269` | The reworded doc line is 84 characters; re-wrap |
