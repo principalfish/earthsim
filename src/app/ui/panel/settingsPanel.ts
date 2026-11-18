@@ -26,12 +26,14 @@ import {
 	unitsOf,
 } from '../../settings/units';
 import {
+	createButton,
 	createElement,
 	createSegmentedChoice,
 	createSelectChoice,
 	createSelectField,
 	type SelectChoice,
 } from '../fields';
+import { MODEL_SETTINGS_TITLE } from './modelSettings';
 
 /** What a unit drop-down holds for following the system. */
 export const AS_THE_SYSTEM = 'system';
@@ -83,6 +85,8 @@ export type SettingsPanelOptions = {
 		quantity: Q,
 		unit: UnitOf<Q> | null,
 	) => void;
+	/** Called when the Model settings button is pressed. */
+	readonly onModelSettings: () => void;
 };
 
 /** The settings, with a way to show units chosen elsewhere. */
@@ -132,7 +136,9 @@ const createUnitSelect = <Q extends Quantity>(
  * drop-down for each quantity, Temperature, Pressure, Wind speed, Heights
  * and depths and Distances, whose first choice, As the system, follows
  * the system and names the unit it gives, and whose others are the
- * quantity's units. All are shown whether or not the winds are.
+ * quantity's units. All are shown whether or not the winds are. Last is the
+ * Model settings button, which opens the screen that shows the climate
+ * process diagram and lists the models' settings.
  *
  * @param body - The section's body, to add the controls to, after what it
  * holds.
@@ -185,6 +191,11 @@ export const createSettingsPanel = (
 			onChange: options.onWindStyle,
 		}),
 		group,
+		createButton({
+			label: MODEL_SETTINGS_TITLE,
+			title: 'Read the numbers the temperature and wind models run on',
+			onClick: options.onModelSettings,
+		}),
 	);
 	return {
 		showUnits: (choice) => {

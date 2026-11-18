@@ -38,6 +38,7 @@
  * physical truth.
  */
 
+import { constantsOf, TEMPERATURE_CONFIG, valuesOf } from '../config';
 import { coarsenWorld, refineField } from '../grid/coarsen';
 import {
 	edgeGeometry,
@@ -57,7 +58,6 @@ import {
 import {
 	clampSetting,
 	DEFAULT_PLANET,
-	GREENHOUSE_FACTOR,
 	normalisePlanet,
 	PLANET_LIMITS,
 	type PlanetSettings,
@@ -67,11 +67,7 @@ import {
 	yearLengthDays,
 } from '../planet/planet';
 import { MAX_ELEVATION_M, MIN_ELEVATION_M, type World } from '../world/world';
-import {
-	createExchangeSolver,
-	EXCHANGE_MAX_ITERATIONS,
-	type ExchangeSolver,
-} from './exchange';
+import { createExchangeSolver, type ExchangeSolver } from './exchange';
 import type { MonthlyTemperature } from './observed';
 
 /**
@@ -79,7 +75,7 @@ import type { MonthlyTemperature } from './observed';
  *
  * @remarks
  * All of them are tuning parameters. Where the physical ones start from is
- * given in {@link TEMPERATURE_MODEL}; the numerical ones were chosen by
+ * given in {@link TEMPERATURE_CONFIG}; the numerical ones were chosen by
  * measurement.
  */
 export type TemperatureModel = {
@@ -164,88 +160,10 @@ export type TemperatureModel = {
  * The model's constants as tuned against the observed Earth.
  *
  * @remarks
- * Where each one starts from:
- *
- * - `diffusivity`: 0.55 W m⁻² K⁻¹, a little below the value North, Cahalan
- *   and Coakley (1981), "Energy balance climate models", Reviews of
- *   Geophysics 19, use for diffusion on the unit sphere with outgoing heat
- *   linear in temperature.
- * - `landDiffusivity`: tuned down to 0.35 so that continents keep more of
- *   their own seasons; with one diffusivity everywhere, the ocean's heat
- *   reaches too far inland and halves the seasonal range of the continents'
- *   interiors.
- * - `oceanHeatCapacity`: a mixed layer of 60 m of sea water at
- *   4.18 MJ m⁻³ K⁻¹.
- * - `landHeatCapacity`: about the atmosphere's column alone, 10⁴ kg m⁻² of
- *   air at 1004 J kg⁻¹ K⁻¹, as simple seasonal models with continents take
- *   it.
- * - `seaIceHeatCapacity`: taken equal to land's, as ice insulates the water
- *   below; without it the Arctic winter is 10 K too warm.
- * - `lapseRate`: the standard atmosphere's 6.5 K km⁻¹ (ICAO, 1993).
- * - `greenhouseFactor`: chosen so Earth (`g = 1`) radiates with emissivity
- *   about 0.61, the ratio of its outgoing 239 W m⁻² (Trenberth, Fasullo
- *   and Kiehl, 2009, "Earth's global energy budget", BAMS 90) to a black
- *   body at its mean surface temperature of 288 K.
- * - `albedo`, `albedoPoleward` and `iceAlbedo`: tuned, starting from the
- *   form North, Cahalan and Coakley (1981) use for ground clear of ice, a
- *   constant plus a multiple of the second Legendre polynomial of the sine
- *   of latitude, with a higher value over ice. `albedo` sets the global
- *   mean, here to the observed one; ice comes in over a smooth ramp from
- *   0 °C to −10 °C rather than at a single temperature.
- * - `landAlbedoExtra`: 0, no starting point; left for tuning.
- * - `solverMaxIterations`: the solver normally needs 5 to 25, so 200 only
- *   stops a solve that would not converge.
- * - `stepsPerMonth` and `solverToleranceK`: chosen by measurement on the
- *   Earth at 64 cells per face edge against 24 steps a month solved to
- *   1e-4 K: two steps a month differ from it by at most 0.4 K in any
- *   month's root-mean-square and 0.07 K in the annual mean, about a tenth
- *   of the model's error against the observed Earth, for half the time of
- *   four steps.
- * - `terrainDriftLimitK`: chosen, not derived. Measured at 64 cells per
- *   face edge on the Earth, a generated world and worlds near freezing: away
- *   from a freezing tipping point, a state carried on agrees with a solve
- *   from nothing within 0.3 K at every drift tried, up to 5.7 K (every land
- *   cell raised 3 km). On a world that sits at such a point no limit keeps
- *   them together: a wholly frozen Earth whose surface is lowered until a
- *   solve from nothing thaws stays frozen when carried on, 45 K out in
- *   places, and stays so until a solve from nothing. The limit sets how long
- *   that can last. 0.25 K is about 40 m of height over the whole surface.
- *   On the Earth's land it is about 25 patches of 500 km radius raised
- *   1,000 m throughout (0.01 K each), so about every twenty-fifth such edit
- *   is solved from nothing; or about 80 dabs of that radius raising 1,000 m
- *   at the centre (0.003 K each), which is what the page's default brush
- *   lays in a second, so some 80 seconds of it swept over land; or about 17
- *   strokes of five such dabs (0.015 K each). The whole surface raised to a
- *   3 km plateau moves the drift by 18 K.
- *
- *   No limit reaches one case: an edit that tips a partly frozen world to a
- *   wholly frozen one can leave the carried solve stopped while the world
- *   is still freezing (44 K out in places on an Earth with its sea 5 km
- *   down), until the next solve finishes it.
- * - `correctionRefineK`: chosen by measurement. On the Earth at 64 cells per
- *   face edge, solving only the first pass of a correction under 1 K moves
- *   no monthly value by more than 0.001 K.
+ * Built from {@link TEMPERATURE_CONFIG}, where each setting's value, unit
+ * and explanation, and where it starts from, are written down.
  */
-export const TEMPERATURE_MODEL: TemperatureModel = Object.freeze({
-	diffusivity: 0.55,
-	landDiffusivity: 0.35,
-	oceanHeatCapacity: 2.5e8,
-	landHeatCapacity: 1e7,
-	seaIceHeatCapacity: 1e7,
-	lapseRate: 6.5e-3,
-	greenhouseFactor: GREENHOUSE_FACTOR,
-	albedo: 0.27,
-	albedoPoleward: 0.078,
-	landAlbedoExtra: 0,
-	iceAlbedo: 0.62,
-	iceStartC: 0,
-	iceFullC: -10,
-	stepsPerMonth: 2,
-	solverToleranceK: 5e-3,
-	solverMaxIterations: EXCHANGE_MAX_ITERATIONS,
-	terrainDriftLimitK: 0.25,
-	correctionRefineK: 1,
-});
+export const TEMPERATURE_MODEL: TemperatureModel = valuesOf(TEMPERATURE_CONFIG);
 
 /**
  * The sea level and planet a temperature result was solved for, in the
@@ -534,18 +452,20 @@ const SUNLIGHT_STEP_DEG = 0.1;
 /** Rows of that table, from the south pole to the north inclusive. */
 const SUNLIGHT_ROWS = Math.round(180 / SUNLIGHT_STEP_DEG) + 1;
 
+const FIXED_CHOICES = constantsOf(TEMPERATURE_CONFIG);
+
 /**
  * The least share of its outgoing heat's rise with temperature that a
  * cell's damping is taken to be when the year's end is corrected.
  */
-const MIN_DAMPING_SHARE = 0.5;
+const MIN_DAMPING_SHARE: number = FIXED_CHOICES.minDampingShare;
 
 /** Times the year-end correction is solved, each with a better slope. */
-const CORRECTION_PASSES = 4;
+const CORRECTION_PASSES: number = FIXED_CHOICES.correctionPasses;
 
 /** Steps of the first guess at most, and the change at which it stops. */
-const GUESS_ITERATIONS = 20;
-const GUESS_CHANGE_K = 0.1;
+const GUESS_ITERATIONS: number = FIXED_CHOICES.guessIterations;
+const GUESS_CHANGE_K: number = FIXED_CHOICES.guessChangeK;
 
 /**
  * Air temperature from sea-level temperature, both in kelvin, for a cell
@@ -1415,10 +1335,14 @@ const largestMagnitude = (values: Float64Array): number => {
 
 /**
  * The most of the year before's change that a year's change may be for the
- * two to give a guess at the years left: a change that shrank by less than
- * a quarter says too little about how fast the solve is settling.
+ * two to give a guess at the years left, as a ratio of the two: a change
+ * that is a larger share of the one before says too little about how fast
+ * the solve is settling.
+ *
+ * Its value and where it comes from are the `slowestShrinkTrusted` entry of
+ * {@link TEMPERATURE_CONFIG}.
  */
-const SLOWEST_SHRINK_TRUSTED = 0.75;
+const SLOWEST_SHRINK_TRUSTED: number = FIXED_CHOICES.slowestShrinkTrusted;
 
 /**
  * A guess at how many more years a solve that has not finished will run,
@@ -1431,10 +1355,10 @@ const SLOWEST_SHRINK_TRUSTED = 0.75;
  * a guess and no more: the factor itself changes from year to year, and in
  * the first year or two after a start far from the answer it is a poor
  * guide. Where the change did not shrink there is no basis for one at all,
- * and where it shrank by less than a quarter there is none worth giving: a
- * year that barely moved the change, as the second or third of a solve
- * sometimes does before the next settles it, would otherwise be read as
- * dozens of years still to run.
+ * and where it shrank by too little (see {@link SLOWEST_SHRINK_TRUSTED})
+ * there is none worth giving: a year that barely moved the change, as the
+ * second or third of a solve sometimes does before the next settles it,
+ * would otherwise be read as dozens of years still to run.
  *
  * A year whose change is already below the tolerance but that did not end
  * the solve, because some of its steps were not solved to their accuracy,
@@ -1450,8 +1374,8 @@ const SLOWEST_SHRINK_TRUSTED = 0.75;
  * @returns 1 when the change of the year just finished is below the
  * tolerance, in the first year or any other. Otherwise a whole number of
  * years from 1 to `yearsLeftUnderCap`, or null in the first year, or when
- * the change shrank by less than a quarter or not at all, or either change
- * is not a finite number.
+ * the change shrank by too little or not at all, or either change is not a
+ * finite number.
  */
 export const estimateYearsLeft = (
 	previousChangeK: number | null,

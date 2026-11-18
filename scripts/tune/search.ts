@@ -6,6 +6,8 @@
  * tried on a made-up one; neither reads or writes a file.
  */
 
+import type { ConfigBounds } from '../../src/core/index';
+
 /** The Earth's three whole-year error figures for one run of the model. */
 export type EarthFigures = {
 	/** The root-mean-square of the wind's difference as vectors, in m/s. */
@@ -105,17 +107,8 @@ export const isAccepted = (
  */
 export const MAX_STEPS_PER_SETTING = 20;
 
-/**
- * The values a setting may take in a search: above `above` and no more
- * than `atMost`, either left out for no bound on that side.
- */
-export type SettingBounds = {
-	readonly above?: number;
-	readonly atMost?: number;
-};
-
 /** Whether a value lies within a setting's bounds. */
-export const isWithin = (value: number, bounds: SettingBounds = {}): boolean =>
+export const isWithin = (value: number, bounds: ConfigBounds = {}): boolean =>
 	(bounds.above === undefined || value > bounds.above) &&
 	(bounds.atMost === undefined || value <= bounds.atMost);
 
@@ -123,7 +116,7 @@ export const isWithin = (value: number, bounds: SettingBounds = {}): boolean =>
 export type BoundStop = {
 	readonly name: string;
 	readonly value: number;
-	readonly bounds: SettingBounds;
+	readonly bounds: ConfigBounds;
 };
 
 /** One step a search took. */
@@ -182,7 +175,7 @@ export type SearchOptions = {
 	 * no bounds. A step outside them is not tried, as if it had not been
 	 * accepted, and is noted in the result.
 	 */
-	readonly bounds?: Readonly<Record<string, SettingBounds>>;
+	readonly bounds?: Readonly<Record<string, ConfigBounds>>;
 };
 
 /**

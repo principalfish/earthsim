@@ -265,13 +265,18 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		onStrokeEnd: (changes) => edits.commit(changes),
 		onWorldChange: (next) => edits.setWorld(next),
 	});
-	const openDialog = (values: NewWorldValues, notice?: string): void => {
-		// A stroke is driven by animation frames, which a modal dialog
-		// does not stop, so one left under way would keep sculpting
-		// behind the dialog. The readout goes too: the canvas no longer
-		// hears the pointer, so it would not hear it leave.
+	/**
+	 * Before a modal dialog or screen opens: a stroke is driven by animation
+	 * frames, which a modal does not stop, so one left under way would keep
+	 * sculpting behind it; and the canvas no longer hears the pointer, so the
+	 * readout would not hear it leave.
+	 */
+	const beforeModal = (): void => {
 		sculpt.endStroke();
 		readout.clear();
+	};
+	const openDialog = (values: NewWorldValues, notice?: string): void => {
+		beforeModal();
 		parts.openNewWorldDialog({
 			values,
 			createWorld: (choice) =>
@@ -393,6 +398,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		},
 		onUnitSystem: units.chooseSystem,
 		onUnitOverride: units.setOverride,
+		onModelSettings: () => {
+			beforeModal();
+			parts.openModelSettings();
+		},
 	});
 	const dock = parts.createLayerDock({
 		view: startView,

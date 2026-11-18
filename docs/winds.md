@@ -207,7 +207,7 @@ Nearly all the time is the smoothing of the thermal highs and lows; placing the 
 
 ## The settings and the tuning script
 
-The model's settings, its rough figures, are one set with values by default, each with where it comes from and whether it was tuned in its doc comment (`DEFAULT_WIND_SETTINGS` in `src/core/wind/rules.ts`). A run may change any of them, through `solveWinds`'s `settings` option; the page and its worker never do, and with none changed the run is the default one exactly.
+The model's settings, listed in [Model settings](../src/core/config.md), are its rough figures: one set with values by default (`DEFAULT_WIND_SETTINGS` in `src/core/wind/rules.ts`). They are written down as data in `WIND_CONFIG` in `src/core/config.ts`, each with its unit, what it controls, what raising and lowering it do, where it comes from, whether it was tuned, and the bounds a search keeps it within; the entries given a place in the tuning search are the ones `search tuned` takes. A run may change any of them, through `solveWinds`'s `settings` option; the page and its worker never do, and with none changed the run is the default one exactly.
 
 `npm run tune:winds` runs the model many times with settings changed, on the wind report's nine cases, their temperatures solved once at the start (about ten seconds; a run of the Earth then takes about half a second). Run with nothing after it, it lists the settings and how to run it:
 

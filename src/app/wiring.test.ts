@@ -637,6 +637,7 @@ const createStage = (
 			log.push(`openNewWorldDialog ${options.notice ?? 'no notice'}`);
 			dialogs.push(options);
 		},
+		openModelSettings: () => log.push('openModelSettings'),
 		loadEarth: () => Promise.reject(new Error('The Earth is not asked for')),
 		loadObserved: () =>
 			Promise.reject(new Error('The observed temperature is not asked for')),
@@ -1436,6 +1437,19 @@ describe('the tool controls', () => {
 			'sculpt.setStrength 2000',
 			'sculpt.setSmoothSetting 70',
 		]);
+	});
+});
+
+describe('the Model settings button', () => {
+	it('ends a stroke, clears the readout, then opens the screen', async () => {
+		const stage = await createStartedStage();
+		stage.strokeActive = true;
+		stage.readoutCalls.length = 0;
+		stage.settingsPanelOptions.onModelSettings();
+
+		expect(stage.log).toEqual(['sculpt.endStroke', 'openModelSettings']);
+		expect(stage.readoutCalls).toEqual(['clear']);
+		expect(stage.strokeActive).toBe(false);
 	});
 });
 

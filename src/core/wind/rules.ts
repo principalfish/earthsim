@@ -48,6 +48,7 @@
  * world's own grid.
  */
 
+import { constantsOf, type ValuesOf, valuesOf, WIND_CONFIG } from '../config';
 import { type Grid, getGrid } from '../grid/grid';
 import {
 	createVectorField,
@@ -68,6 +69,9 @@ import { type WindResult, type ZonalMean, zonalMean } from './model';
 
 const RADIANS_PER_DEGREE = Math.PI / 180;
 
+/** The model's fixed choices, which a run cannot override: see {@link WIND_CONFIG}. */
+const FIXED_CHOICES = constantsOf(WIND_CONFIG);
+
 /** Pascals in a hectopascal, for gradients in pascals a metre. */
 const PASCALS_PER_HPA = 100;
 
@@ -76,19 +80,22 @@ const RADIUS_M = PLANET_RADIUS_KM * 1000;
 
 /**
  * The globe's area-weighted mean sea-level pressure, in hectopascals, that
- * every month's pressure is shifted to. The observed Earth's mean of 1981
- * to 2010, over every month, on the 64 grid, rounded to a whole
- * hectopascal; it is below the standard atmosphere's 1,013.25 hPa because
- * the observed pressure is reduced to sea level over high ground too.
+ * every month's pressure is shifted to.
+ *
+ * Its value and where it comes from are the `referencePressureHpa` entry of
+ * {@link WIND_CONFIG}.
  */
-export const REFERENCE_PRESSURE_HPA = 1011;
+export const REFERENCE_PRESSURE_HPA: number =
+	FIXED_CHOICES.referencePressureHpa;
 
 /**
- * The density of the air near the surface, in kilograms a cubic metre: the
- * standard atmosphere's 1.225 kg m⁻³ at sea level and 15 °C, rounded down
- * for air a little warmer and higher on average.
+ * The density of the air near the surface, in kilograms a cubic metre,
+ * which turns a pressure gradient into the push on the wind.
+ *
+ * Its value and where it comes from are the `airDensityKgM3` entry of
+ * {@link WIND_CONFIG}.
  */
-export const AIR_DENSITY_KG_M3 = 1.2;
+export const AIR_DENSITY_KG_M3: number = FIXED_CHOICES.airDensityKgM3;
 
 /**
  * How many bands of latitude, of 2° each, the month's zonal-mean
@@ -102,11 +109,13 @@ const EARTH_ROTATION_RATE = rotationRate(DEFAULT_PLANET);
 
 /**
  * The width of the Earth's tropical (Hadley) cell, in degrees of latitude
- * from the low to the subtropical high: the observed subtropical highs lie
- * near 30° in both hemispheres. It is also the width of each cell beyond:
- * the observed subpolar lows lie near 60° and the polar highs at the poles.
+ * from the low to the subtropical high, and of each cell beyond it: the
+ * width every other planet's cells are scaled from.
+ *
+ * Its value and where it comes from are the `earthCellWidthDeg` entry of
+ * {@link WIND_CONFIG}.
  */
-export const EARTH_CELL_WIDTH_DEG = 30;
+export const EARTH_CELL_WIDTH_DEG: number = FIXED_CHOICES.earthCellWidthDeg;
 
 /**
  * The step, in degrees of latitude, at which {@link zonalBands} tabulates
@@ -116,524 +125,19 @@ export const EARTH_CELL_WIDTH_DEG = 30;
 export const TABLE_STEP_DEG = 0.25;
 
 /**
- * The model's settings at their values by default, each with where it
- * comes from and whether it was tuned: see {@link DEFAULT_WIND_SETTINGS}.
- */
-const DEFAULT_VALUES = {
-	/**
-	 * The Earth's equator-to-pole contrast of zonal-mean sea-level
-	 * temperature, in kelvin, as {@link zonalBands} measures it: the
-	 * temperature at the hottest latitude less the mean of the two polar
-	 * bands'. The contrast of other planets is taken against it. The
-	 * simulated Earth's on the 64 grid is 41.8 K in January and 39.9 K in
-	 * July, and 41.6 K over the twelve months; this is the mean of January's
-	 * and July's, rounded. Not tuned.
-	 */
-	earthContrastK: 41,
-
-	/**
-	 * How the cells' width follows the rotation rate: as `(Ω_E / Ω)` to this
-	 * power.
-	 *
-	 * @remarks
-	 * The power ½ is the eddy-limited Hadley cell of Held (2000), "The
-	 * general circulation of the atmosphere" (Woods Hole lectures), whose
-	 * edge lies at `φ_H ≈ (g H Δ_v / (Ω² a²))^¼` radians: where the shear of
-	 * a wind that keeps its angular momentum first becomes baroclinically
-	 * unstable. It sits between the axisymmetric cell of Held and Hou (1980),
-	 * whose width goes as `1/Ω`, and the weaker dependence general
-	 * circulation models find at fast rotation. The same power for the cells
-	 * beyond follows the Rhines scale, `π (2U / β)^½` with
-	 * `β = 2Ω cos φ / a`, which sets the spacing of eddy-driven jets. It
-	 * gives about 17° and five cells in each hemisphere for an 8-hour day,
-	 * 30° and three for 24 hours, 60° and one and a half for 96 hours, and
-	 * one cell reaching the pole from about 216 hours. Not tuned.
-	 */
-	rotationPower: 0.5,
-
-	/**
-	 * How the cells' width follows the equator-to-pole contrast: as the
-	 * contrast over `earthContrastK` to this power.
-	 *
-	 * @remarks
-	 * Held's (2000) edge goes as the quarter power of the vertical contrast
-	 * of potential temperature, and Held and Hou's (1980) as the half power
-	 * of the horizontal one; the horizontal contrast is what the model has,
-	 * so it takes the quarter power, the weaker of the two. A guess, not
-	 * tuned.
-	 */
-	contrastPower: 0.25,
-
-	/**
-	 * The lowest contrast taken, as a share of `earthContrastK`, so that a
-	 * planet with almost none, or a negative one, keeps cells of a sane
-	 * width: about 0.7 times the Earth's at the Earth's rotation. A guess,
-	 * not tuned.
-	 */
-	minContrastRatio: 0.25,
-
-	/**
-	 * The highest contrast taken, as a share of `earthContrastK`, so that a
-	 * planet with a huge one keeps cells of a sane width: about 1.4 times
-	 * the Earth's at the Earth's rotation. A guess, not tuned.
-	 */
-	maxContrastRatio: 4,
-
-	/**
-	 * How far below the hottest band, in kelvin, a band still counts towards
-	 * the hottest latitude: the mean latitude of the bands within this of
-	 * the hottest, each weighted by how far above that it is and by its
-	 * area. It keeps the hottest latitude from jumping between two bands
-	 * about as hot as each other. Started at 2 K; tuned by hand to 4 K, which
-	 * moves the simulated Earth's hottest latitude a little further from the
-	 * equator.
-	 */
-	hotWindowK: 4,
-
-	/**
-	 * How many times as far from the equator as the hottest latitude the low
-	 * lies, near the equator.
-	 *
-	 * @remarks
-	 * On the observed Earth the zonal-mean low moves from about 5°S in
-	 * January to about 15°N in July, with the hottest latitude. The simulated
-	 * Earth's hottest latitude moves only from about 4°S to 5°N, a bias of
-	 * the temperature model (its July land in the northern subtropics is too
-	 * cool against its sea), so without this the low sits too near the
-	 * equator in July and South Asia has no south-westerly monsoon. Tuned by
-	 * hand against the observed Earth; 1 would be the rule as it stands.
-	 *
-	 * The low lies at `φ (1 + (G − 1) exp(−(φ / F)²))` for the hottest
-	 * latitude `φ`, this `G` and `lowShiftFadeDeg` `F`: about `G φ` near the
-	 * equator, where the temperature model's seasons are too weak, and the
-	 * hottest latitude itself well away from it, short of the limit
-	 * `lowLimitDeg` sets.
-	 */
-	lowShiftGain: 2.5,
-
-	/**
-	 * Over how many degrees from the equator `lowShiftGain` fades: by a
-	 * factor of e at this latitude, to almost nothing at twice it. The
-	 * simulated Earth's hottest latitude stays within 5° of the equator,
-	 * where the gain is almost whole; a planet with a steep tilt, whose
-	 * hottest latitude can reach a pole, has its low at the hottest latitude
-	 * or held short of it by `lowLimitDeg`.
-	 * A guess, not tuned; the mapping from the hottest latitude to the low
-	 * rises at every latitude with it.
-	 */
-	lowShiftFadeDeg: 20,
-
-	/**
-	 * How far the tropical cell's edges follow the low off the equator, as a
-	 * share of the low's latitude, at the Earth's cell width: on the observed
-	 * Earth the subtropical highs move about half as far through the year as
-	 * the band of low pressure between them. The share falls to nothing as
-	 * the cell widens to reach the poles. Not tuned.
-	 */
-	edgeShiftShare: 0.5,
-
-	/**
-	 * The farthest from the equator, in degrees, the low may lie on a planet
-	 * whose cells are no wider than the Earth's: a low whose place would lie
-	 * further out is held short of it.
-	 *
-	 * @remarks
-	 * On a planet with a steep tilt the hottest latitude can lie near the
-	 * summer pole, but how far from the equator the rising branch of the
-	 * tropical cell can lie is bounded mainly by the rotation rate.
-	 * Guendelman and Kaspi, "An axisymmetric limit for the width of the
-	 * Hadley cell on planets with large obliquity and long seasonality"
-	 * (arXiv:1903.11656, version 1, a manuscript submitted to Geophysical
-	 * Research Letters), state in their key points that "The Hadley cell
-	 * ascending branch position in planets with strong seasonal variation of
-	 * temperature is mainly bounded by the rotation rate", and from their
-	 * simulations of ocean-covered planets tilted 90°, at the Earth's
-	 * rotation rate and at a quarter of it, that shifting the hottest
-	 * temperature poleward "does not result in a global pole-to-pole Hadley
-	 * circulation for simulations with an Earth-like rotation rate (Fig.
-	 * 4b), even when the temperature gradient is increased (Fig. 4c).
-	 * However, slowing down the rotation rate, allows the ascending branch
-	 * to reach the pole". The paper gives no such limit as a number: the 70°,
-	 * and the way the limit moves to the pole as the cells widen (see
-	 * `lowLimitFromWidthDeg`), are this project's own choices. A guess, not
-	 * tuned.
-	 */
-	lowLimitDeg: 70,
-
-	/**
-	 * The cells' width, in degrees, up to which the low's limit is
-	 * `lowLimitDeg`: the Earth's, {@link EARTH_CELL_WIDTH_DEG}, so a planet
-	 * turning as fast as the Earth or faster has its low held at about 70°.
-	 * As the cells widen beyond it the limit moves smoothly, as `s²(3 − 2s)`
-	 * of the share `s` of the way to `lowLimitToWidthDeg`, to the pole.
-	 * Not tuned.
-	 */
-	lowLimitFromWidthDeg: 30,
-
-	/**
-	 * The cells' width, in degrees, from which the low's limit is the pole:
-	 * 60°, the cells' width at a 4-day day, a quarter of the Earth's
-	 * rotation rate, the slower of the two rotation rates whose simulations
-	 * Guendelman and Kaspi report (see `lowLimitDeg`). A guess, not tuned.
-	 */
-	lowLimitToWidthDeg: 60,
-
-	/**
-	 * How the low is held short of its limit, as a share of the limit's
-	 * distance from the pole: a low whose place lies within that share
-	 * of that distance below the limit, or beyond the limit, is brought in
-	 * by `K + E tanh((φ − K) / E)` for its place `φ` from the equator, the
-	 * ease `E` this share times the limit's distance from the pole and the
-	 * knee `K` the limit less it. The low follows its place in full up to
-	 * the knee, 60° for a limit of 70°, and nears the limit smoothly beyond
-	 * it, so neither the low nor the bands make a step or a corner as the
-	 * hottest latitude moves; with the limit at the pole the low is not
-	 * held at all. A guess, not tuned.
-	 */
-	lowLimitEaseShare: 0.5,
-
-	/**
-	 * The narrowest the tropical cell may be on the side of the low towards
-	 * the summer pole, as a share of the cells' width, so that a low far from
-	 * the equator still has a side of some width; a side that would reach
-	 * beyond the pole is cut short there. A guess, not tuned.
-	 */
-	minSummerCellShare: 0.3,
-
-	/**
-	 * How far from the equator the low lies, as a share of the cells' width,
-	 * when the narrowest side of the tropical cell starts to widen from
-	 * `minSummerCellShare` of a cell: up to a whole cell at
-	 * `wideSummerToShare`.
-	 *
-	 * @remarks
-	 * The summer side of a cell carries a whole band's rise of pressure
-	 * whatever its width, so squeezed to a third of a cell it rises three
-	 * times as steeply as a band in full: on the case tilted 60°, whose July
-	 * low lies near 58°N, it made a ridge 12.5 hPa high within 8° of the low,
-	 * over air only 3 K cooler. Widening it as the low moves out past where
-	 * the subtropical high would be keeps the rise as gentle as a band's,
-	 * reaching the pole, the coolest place on that side, as a high. On the
-	 * simulated Earth the low as a whole lies at most 0.51 of a cell from the
-	 * equator, where the widened side is still narrower than the band's own,
-	 * so those bands are unchanged. The lows placed by longitude lie up to
-	 * 0.79 of a cell out over hot land from July to September, and there the
-	 * widening acts. Set by hand against the tilted case, not against the
-	 * observed Earth.
-	 */
-	wideSummerFromShare: 0.4,
-
-	/**
-	 * How far from the equator the low lies, as a share of the cells' width,
-	 * when the narrowest side of the tropical cell is a whole cell: see
-	 * `wideSummerFromShare`. Set by hand with it.
-	 */
-	wideSummerToShare: 0.8,
-
-	/**
-	 * How much cooler, in kelvin, a side's pole must be than the low for the
-	 * bands on that side to be in full.
-	 *
-	 * @remarks
-	 * The bands stand for the overturning driven by the warmth of the low
-	 * against the cold towards the poles. On the side of a low near a summer
-	 * pole as warm as itself, nothing drives a cell, and a high there would
-	 * cap the hottest place on the planet. Each side's slope is scaled by
-	 * `s²(3 − 2s)` of `s`, its pole's drop below the low's temperature over
-	 * this, from 0 to 1, fading to none as the pole on its side warms to the
-	 * low's temperature.
-	 *
-	 * Started at 20 K; set by hand to 30 K against the case tilted 60°, whose
-	 * July Arctic, 16 K cooler than its hottest latitude near 58°N, had a
-	 * high rising 15 hPa within 8° of the low. Both sides of the simulated
-	 * Earth's low keep their bands all but in full: its poles are about 30 K
-	 * and more cooler than it in every month.
-	 */
-	sideContrastK: 30,
-
-	/**
-	 * The share of the bands' slope that is kept in the bands beyond
-	 * `fullBandsReachDeg` (and never within two cells of the low), eased in
-	 * over the first quarter of a cell beyond: the observed surface polar
-	 * easterlies are weak, about a fifth as strong in the zonal mean as the
-	 * westerlies. Started at 1; tuned by hand against the observed Earth's
-	 * polar winds.
-	 */
-	outerCellShare: 0.3,
-
-	/**
-	 * How far from the low, in degrees of latitude at the Earth's contrast,
-	 * the bands keep their full strength on a planet spinning faster than
-	 * the Earth: two of the Earth's cell widths, the reach of its tropical
-	 * cell and the cell beyond.
-	 *
-	 * @remarks
-	 * In the bands' phase, the cells counted from the low, the weakening to
-	 * `outerCellShare` starts at the larger of 2 and this over the cells'
-	 * width as the spin alone sets it ({@link EARTH_CELL_WIDTH_DEG} times
-	 * `(Ω_E / Ω)` to `rotationPower`, the contrast left out), the two joined
-	 * smoothly over {@link FULL_BANDS_EASE_CELLS}: so at 2, as when every
-	 * band beyond the second was weakened, at the Earth's spin and slower,
-	 * whatever the contrast, and at about 3.3 for an 8-hour day, whose extra
-	 * bands are then as strong as the Earth's westerlies. The contrast is
-	 * left out so that every planet with the Earth's spin, the Earth itself
-	 * and the Earth tilted 60° among them, keeps its bands beyond the second
-	 * weak, the winter's weak winds included, and nothing changes at the
-	 * Earth's spin. Since the phase is counted in cells of the width the
-	 * contrast scales, the reach in latitude is this times the contrast's
-	 * share of the Earth's to `contrastPower`, less an eighth of a cell for
-	 * the easing: from about 42° to 85° over the contrasts taken, 60° at the
-	 * Earth's. A guess, not tuned.
-	 */
-	fullBandsReachDeg: 60,
-
-	/**
-	 * Over how many degrees from each pole the bands' slope is eased to
-	 * nothing, so that the pressure has no point at the pole when the cells
-	 * do not fit a whole number of times between the tropical cell and the
-	 * pole. Started at 15°; 10° keeps more of the polar cell. Not tuned
-	 * against the observed Earth.
-	 */
-	poleTaperDeg: 10,
-
-	/**
-	 * The share, 0 to 1, of where the low lies, and with it the tropical
-	 * cell's edges, that is taken from the temperature near each longitude
-	 * rather than from the whole latitude's, at its full in the tropics and
-	 * subtropics (see `localBandsFullToDeg`).
-	 *
-	 * @remarks
-	 * With the low placed from the whole globe's hottest latitude, a large
-	 * continent's seasons move the bands over the open ocean on the far side
-	 * of the planet as far as over the land: on the one-continent world the
-	 * oceanic subtropical highs moved about 20° of latitude between January
-	 * and July, where the observed Earth's move 5° to 10°. Placed from the
-	 * temperature within `localWindowDeg` of longitude, the low over the
-	 * open ocean follows the ocean's own seasons, and over land the land's.
-	 * Only the low's place varies by longitude: the cells' width, each
-	 * side's strength, the low's limit and the outer bands are still worked
-	 * out from the whole latitude's temperature, and so are the thermal highs
-	 * and lows. At 0 the bands are one pattern round the globe, the model as
-	 * it was before they varied by longitude, exactly. This project's
-	 * choice, not tuned against the observed Earth.
-	 */
-	localBandsShare: 1,
-
-	/**
-	 * The full width, in degrees of longitude, of the window the
-	 * temperature is taken in to place the low at a longitude: long enough
-	 * that the low follows a continent or an ocean as a whole rather than
-	 * its coasts, and short enough that the far side of a planet with one
-	 * large continent sees mostly its ocean. Its weight is whole over the
-	 * middle half of the window and tapers to nothing at its ends (see
-	 * `localWindowTaperShare`).
-	 *
-	 * @remarks
-	 * 120° and 180° were tried. Both leave the one-continent world's open
-	 * ocean much the same, its subtropical highs moving about 5° and 7°
-	 * between January and July against 18° and 23° with one pattern round
-	 * the globe. 120° follows the land more closely, which strengthens the
-	 * Earth's July south-west monsoon more, but it weakens the annual mean
-	 * winds of the Earth tilted 60° in the north to under 0.5 m/s at every
-	 * latitude, so that its one band there is no longer counted; 180° keeps
-	 * every case's bands as they were, and moves the Earth's whole-year
-	 * figures less. This project's choice, not tuned against the observed
-	 * Earth.
-	 */
-	localWindowDeg: 180,
-
-	/**
-	 * The share of each half of the window, from its ends inwards, over
-	 * which its weight tapers, as the square of a cosine, from whole to
-	 * nothing: the window's smoothing round the globe, so that the low moves
-	 * gently as the window slides from sea onto land. This project's
-	 * choice, not tuned against the observed Earth.
-	 */
-	localWindowTaperShare: 0.5,
-
-	/**
-	 * The latitude, in degrees from the equator, up to which the bands'
-	 * place follows the temperature near each longitude in full
-	 * (`localBandsShare` of it): the tropics and subtropics, the tropical
-	 * cell's edges and the subtropical highs among them. Beyond it the local
-	 * bands blend into the one pattern round the globe, as `s²(3 − 2s)` of
-	 * the share `s` of the way to `localBandsGlobalFromDeg`, which must lie
-	 * beyond it, or the share would fall at once to none here and leave a
-	 * step in the pressure ({@link windSettings} refuses such a pair). This
-	 * project's choice, not tuned against the observed Earth.
-	 */
-	localBandsFullToDeg: 40,
-
-	/**
-	 * The latitude, in degrees from the equator, from which the bands are
-	 * the one pattern round the globe: towards a pole every longitude meets,
-	 * so the pressure there must not depend on the side it is approached
-	 * from. Past the subpolar lows, and short of where the bands fade to
-	 * nothing at the poles (see `poleTaperDeg`). It must lie beyond
-	 * `localBandsFullToDeg`, so that the blend between them has some width
-	 * ({@link windSettings} refuses it otherwise). This project's choice, not
-	 * tuned against the observed Earth.
-	 */
-	localBandsGlobalFromDeg: 70,
-
-	/**
-	 * Half the rise of the Earth's tropical cell, in hectopascals, before the
-	 * rise is scaled by latitude (see {@link zonalBands}): it sets the speed
-	 * of the bands' winds, about 6.5 m/s over the sea at the middle of the
-	 * first two cells, and a third of that in the cells beyond. The observed
-	 * zonal-mean sea-level pressure rises about 8 hPa from the low to the
-	 * subtropical highs and falls 15 to 25 hPa from them to the subpolar
-	 * lows. Started at 5; tuned by hand against the observed Earth's winds.
-	 */
-	bandAmplitudeHpa: 9,
-
-	/**
-	 * Hectopascals of pressure for each kelvin a place's sea-level
-	 * temperature lies below its latitude's mean, on low land.
-	 *
-	 * @remarks
-	 * By the hypsometric equation, a layer of air `h` deep colder by `ΔT`
-	 * than its surroundings at temperature `T` weighs more by
-	 * `p h ΔT / (T H)` at the ground, with `H` the scale height, about 8 km.
-	 * For a layer 1.5 km deep, as the shallow cold highs over winter
-	 * continents are, that is about 0.7 hPa a kelvin at 1,000 hPa and 270 K,
-	 * which is where it started. Tuned by hand to 3 against the observed
-	 * Earth's Siberian high and its summer low over South Asia, which the
-	 * simulated temperature makes too weak at the start's value.
-	 */
-	thermalHpaPerK: 3,
-
-	/**
-	 * How far the thermal highs and lows are smoothed, in kilometres, as
-	 * {@link smoothField} takes it: about the size of the observed Siberian
-	 * high and the summer lows over the continents. Started at 750 km; tuned
-	 * by hand to 900.
-	 */
-	thermalSmoothingKm: 900,
-
-	/**
-	 * The share of the thermal response over the sea.
-	 *
-	 * @remarks
-	 * Air over a sea warmer or colder than its latitude is mixed deep by
-	 * convection or sits over a sea whose warmth lies in the water, not the
-	 * air, so it does not make the shallow dome of cold or hot air that land
-	 * does; and in winter the subtropical oceans, warm against cold land,
-	 * would otherwise carry lows where the observed Earth has its
-	 * subtropical highs and trade winds. A guess, brought in at 0.3 while
-	 * tuning by hand against the observed Earth's Pacific trades and kept
-	 * there; 1, the land's, was the rule before it.
-	 */
-	seaThermalShare: 0.3,
-
-	/**
-	 * The warmth, in kelvin above a latitude's mean, at which a warm place's
-	 * low stops deepening as fast: a warmth `w` counts as `W tanh(w / W)`.
-	 *
-	 * @remarks
-	 * Cold air pools in a shallow, stable dome, so a cold high keeps growing
-	 * with the cold, up to `coldKneeK`; hot air mixes deep, and the low it makes is partly
-	 * undone by a high above it. The simulated Earth's continental interiors
-	 * are far hotter in summer than its coasts at the same latitude, which
-	 * without a limit gives a deep low over Siberia and none to speak of over
-	 * South Asia. A guess, first tried at 5 K, then at 4, 6 and 8 K by hand
-	 * against the observed Earth's July, and kept at 6; with no limit at all,
-	 * the rule before it, a warm place's low deepens without end.
-	 */
-	warmLimitK: 6,
-
-	/**
-	 * The cold, in kelvin below a latitude's mean, up to which a cold place's
-	 * high grows in full with the cold: beyond it the cold counts less and
-	 * less, levelling off at `coldLimitK`.
-	 *
-	 * @remarks
-	 * Without a limit a cold high grows without end, `thermalHpaPerK` for
-	 * every kelvin, so an extreme world could carry a high far beyond any on
-	 * the Earth, whose record is about 1,084 hPa. The simulated Earth's
-	 * coldest place against its latitude, on the 64 grid over the year, is
-	 * 17.0 K below it (in January, at 43°N 88°E, in the basins north of
-	 * Tibet), so a knee at 20 K leaves the Earth's pressure exactly as it
-	 * was; the Earth tilted 60° reaches 24.3 K, and is limited a little. A
-	 * guess, not tuned.
-	 */
-	coldKneeK: 20,
-
-	/**
-	 * The most cold, in kelvin below a latitude's mean, that a cold place's
-	 * high counts, however cold the place: a cold `c` beyond `coldKneeK` `K`
-	 * counts as `K + (L − K) tanh((c − K) / (L − K))` for this `L`, which
-	 * follows the cold in full at the knee and levels off smoothly. At
-	 * `thermalHpaPerK`'s 3 hPa a kelvin it gives a high on low land at most
-	 * 75 hPa above its latitude before smoothing, which with the reference
-	 * pressure of 1,011 hPa is about the Earth's record of 1,084 hPa. A
-	 * guess, not tuned.
-	 */
-	coldLimitK: 25,
-
-	/**
-	 * The height, in metres, over which the thermal response of high ground
-	 * falls by a factor of e.
-	 *
-	 * @remarks
-	 * The temperature of a plateau brought down to sea level stands for air
-	 * that is not there: the cold of the Tibetan Plateau in winter is not a
-	 * dome of cold air above the sea, and taken in full it centres the Asian
-	 * winter high on the plateau rather than on Mongolia and Siberia, with
-	 * winds of 15 to 20 m/s down into India. A guess, first tried at 1,500 m,
-	 * which took too much of the Siberian high on the Mongolian plateau, then
-	 * set by hand to 2,500 m; with no fall at all, the rule before it, high
-	 * ground counts in full.
-	 */
-	thermalHeightM: 2500,
-
-	/**
-	 * The linear friction on the wind over the sea, per second.
-	 *
-	 * @remarks
-	 * With friction `k` and Coriolis parameter `f` the wind crosses the
-	 * isobars at `atan(k / f)`. The 10-metre wind over the sea crosses them
-	 * at about 20° in mid-latitudes, where `f` is about 1.0e-4 s⁻¹, which
-	 * gives `k` about 3.7e-5 s⁻¹, a spin-down time of about 7.5 hours; that
-	 * is where it started. Tuned by hand to 2.5e-5 s⁻¹, about 14° in
-	 * mid-latitudes and 34° at 15°, for trade winds less across the isobars.
-	 */
-	seaFrictionPerS: 2.5e-5,
-
-	/**
-	 * How many times the sea's friction the land's is. Started at 2, for the
-	 * 10-metre wind over land crossing the isobars at about 35° against the
-	 * sea friction's starting value of 3.7e-5 s⁻¹; tuned by hand to 5, which
-	 * brings the simulated Earth's mean speed over land near the observed
-	 * 1.8 m/s, at the cost of crossing the isobars at about 50° in
-	 * mid-latitudes.
-	 */
-	landFrictionFactor: 5,
-
-	/**
-	 * The slope of the ground, rise over run, at which high ground takes
-	 * away half of the wind's part up or down that slope, turning the wind
-	 * along it: a rise of 1 km over 200 km, a little over a cell's width on
-	 * the 64 grid. A guess, not tuned.
-	 */
-	blockingSlope: 0.005,
-};
-
-/**
  * The model's settings, each a number, under the names
  * {@link DEFAULT_WIND_SETTINGS} gives them, each with what it is.
  */
-export type WindSettings = Readonly<typeof DEFAULT_VALUES>;
+export type WindSettings = ValuesOf<typeof WIND_CONFIG>;
 
 /**
  * The model's settings as it runs by default: the rough figures it is
- * built on, each with where it comes from and whether it was tuned. A run
- * may override any of them (see {@link windSettings}); the page and its
- * worker never do, and the tuning script, `npm run tune:winds`, does.
+ * built on, written down in {@link WIND_CONFIG} with where each comes from
+ * and whether it was tuned. A run may override any of them (see
+ * {@link windSettings}); the page and its worker never do, and the tuning
+ * script, `npm run tune:winds`, does.
  */
-export const DEFAULT_WIND_SETTINGS: WindSettings = Object.freeze({
-	...DEFAULT_VALUES,
-});
+export const DEFAULT_WIND_SETTINGS: WindSettings = valuesOf(WIND_CONFIG);
 
 /** The name of one of the model's settings. */
 export type WindSettingName = keyof WindSettings;
@@ -818,9 +322,12 @@ const smoothStep = (x: number): number => {
 /**
  * Over how many cells of phase the start of the outer bands' weakening
  * turns from the third band to `fullBandsReachDeg` from the low, so that
- * the bands have no corner as the day length changes. A guess, not tuned.
+ * the bands have no corner as the day length changes.
+ *
+ * Its value and where it comes from are the `fullBandsEaseCells` entry of
+ * {@link WIND_CONFIG}.
  */
-export const FULL_BANDS_EASE_CELLS = 0.25;
+export const FULL_BANDS_EASE_CELLS: number = FIXED_CHOICES.fullBandsEaseCells;
 
 /**
  * The larger of 0 and a number, eased over {@link FULL_BANDS_EASE_CELLS}

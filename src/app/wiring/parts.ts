@@ -289,6 +289,8 @@ export type PageParts = {
 		ViewPreferences;
 	/** Opens the dialog that starts a new world. */
 	readonly openNewWorldDialog: (options: NewWorldDialogOptions) => void;
+	/** Opens the screen that lists the models' settings. */
+	readonly openModelSettings: () => void;
 	/** Gives the Earth's elevation data, for a world that starts as Earth. */
 	readonly loadEarth: WorldSources['loadEarth'];
 	/**

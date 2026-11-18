@@ -29,6 +29,7 @@ import { createMainView } from './ui/main/mainView';
 import { createPauseButton } from './ui/main/pauseButton';
 import { createTimeline } from './ui/main/timeline';
 import { createTopBar } from './ui/main/topBar';
+import { openModelSettings } from './ui/panel/modelSettings';
 import { openNewWorldDialog } from './ui/panel/newWorldDialog';
 import { createPanelSections } from './ui/panel/panelSections';
 import { createPlanetPanel } from './ui/panel/planetPanel';
@@ -220,6 +221,9 @@ if (globe !== null) {
 			}),
 		preferences,
 		openNewWorldDialog,
+		openModelSettings: () => {
+			openModelSettings();
+		},
 		loadEarth: loadEarthData,
 		loadObserved: loadLayerObserved,
 		loadObservedWinds,

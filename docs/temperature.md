@@ -15,6 +15,8 @@ The temperature is a seasonal energy balance: the year is stepped through month 
 
 There are no ocean currents yet, and the winds do not yet carry heat back into the temperature, so the aim is the right broad pattern, not a match to the real Earth.
 
+The model's settings are listed, with what each does and where its value comes from, in [Model settings](../src/core/config.md).
+
 ### Finer worlds are solved on a coarser grid
 
 A world of 128 or 256 cells per face edge is solved on the grid one step coarser (64 or 128), then carried back to its own grid, where each place is cooled by its own height.
