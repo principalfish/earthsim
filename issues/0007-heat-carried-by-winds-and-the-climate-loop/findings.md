@@ -111,6 +111,7 @@
 | round | correctness | - | cleanup | verified | fixed | `src/app/wiring.ts:174` | Over-long comment lines re-wrapped (wiring.ts, layerPanel.ts) |
 | round | correctness | - | - | dropped | - | `src/app/layers/refresh.ts:559` | The raw `world.planet` day length — dropped: appState normalises the planet, and `suits` would only set a start aside |
 | round | coverage | - | - | dropped | - | `src/app/main.ts:189` | The entry file that starts a real Worker is not run by any test — dropped: accepted |
-| re-check | coverage | medium | test | verified | open | `src/app/layers/refresh.test.ts:1337` | The bar test skips a null bar after a number (`if (content.bar === null) continue`), so it cannot fail on a bar that goes unknown; only the last entry is asserted full |
-| re-check | correctness | low | test | verified | open | `src/app/layers/refresh.test.ts:1354` | The pass numbering's reset after a world change or reset while paused is not asserted (three tests check only where the request starts; add `store.temperature.pass` is 1) |
-| re-check | docs | low | docs | verified | open | `src/app/layers/refresh.ts:548` | The doc comment of `stop` has `@param pass` but no `@param solved` |
+| re-check | coverage | medium | test | verified | fixed | `src/app/layers/refresh.test.ts:1337` | The bar test skips a null bar after a number (`if (content.bar === null) continue`), so it cannot fail on a bar that goes unknown; only the last entry is asserted full |
+| re-check | correctness | low | test | verified | fixed | `src/app/layers/refresh.test.ts:1354` | The pass numbering's reset after a world change or reset while paused is not asserted (three tests check only where the request starts; add `store.temperature.pass` is 1) |
+| re-check | docs | low | docs | verified | fixed | `src/app/layers/refresh.ts:548` | The doc comment of `stop` has `@param pass` but no `@param solved` |
+| manual | user | - | - | - | fixed | `src/app/layers/refresh.test.ts`, `refresh.ts` | After the manual review of piece 6 the user asked for the three re-check findings to be fixed ("Tried it, fix all", 2026-11-18) |

@@ -131,3 +131,4 @@
 - 2026-11-18 13:39 · heat-carried-by-winds-and-the-climate-loop (0007) · branch = claude/heat-carried-by-winds-and-the-climate-loop-4c86af
 - 2026-11-18 13:39 · heat-carried-by-winds-and-the-climate-loop (0007) · planned → building
 - 2026-11-18 13:39 · heat-carried-by-winds-and-the-climate-loop (0007) · PR #14
+- 2026-11-18 18:06 · heat-carried-by-winds-and-the-climate-loop (0007) · building → review

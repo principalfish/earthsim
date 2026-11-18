@@ -145,7 +145,7 @@ Rejected (with the user's choices): putting the winds into the main symmetric so
 - [x] 3. The climate loop in the core
 - [x] 4. The setting's value, and the baselines
 - [x] 5. One climate request in the worker
-- [ ] 6. The page: one scheduler, passes shown as they land
+- [x] 6. The page: one scheduler, passes shown as they land
 
 ## Verification
 
