@@ -12,9 +12,11 @@ import { MONTHS_PER_YEAR } from '../planet/insolation';
 import { flowingPart } from '../wind/flowing';
 import { solveWinds } from '../wind/solve';
 import {
+	conditionsMatch,
 	type SolveTemperatureOptions,
 	solveTemperature,
 	TEMPERATURE_MODEL,
+	temperatureConditions,
 } from './temperature';
 
 /** Allows for coverage instrumentation, which makes the solves slower. */
@@ -220,6 +222,49 @@ describe('solveTemperature with winds', { timeout: SOLVE_TIMEOUT_MS }, () => {
 				fullResolution: true,
 				winds: { flows: good },
 			}),
+		).toThrow(RangeError);
+	});
+});
+
+describe('conditionsMatch', () => {
+	const record = temperatureConditions(EARTH);
+
+	it('names the world’s own record, in any key order and with keys to spare, and any day length', () => {
+		expect(conditionsMatch(EARTH, record)).toBe(true);
+		const reordered = {
+			planet: Object.fromEntries(Object.entries(record.planet).reverse()),
+			seaLevel: record.seaLevel,
+			extra: 1,
+		};
+		expect(conditionsMatch(EARTH, reordered as never)).toBe(true);
+		const slower = {
+			...EARTH,
+			planet: { ...EARTH.planet, dayLengthHours: 90 },
+		};
+		expect(conditionsMatch(slower, record)).toBe(true);
+	});
+
+	it('does not name a world of another sea level or another setting the temperature reads', () => {
+		expect(
+			conditionsMatch({ ...EARTH, seaLevel: EARTH.seaLevel + 10 }, record),
+		).toBe(false);
+		expect(
+			conditionsMatch(
+				{ ...EARTH, planet: { ...EARTH.planet, axialTiltDeg: 30 } },
+				record,
+			),
+		).toBe(false);
+	});
+
+	it('refuses a record that is not a sea level and the planet’s settings', () => {
+		expect(() => conditionsMatch(EARTH, undefined as never)).toThrow(
+			RangeError,
+		);
+		expect(() =>
+			conditionsMatch(EARTH, { seaLevel: Number.NaN, planet: record.planet }),
+		).toThrow(RangeError);
+		expect(() =>
+			conditionsMatch(EARTH, { seaLevel: 0, planet: undefined as never }),
 		).toThrow(RangeError);
 	});
 });

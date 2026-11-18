@@ -92,8 +92,10 @@ export const PLANET_SETTINGS: readonly PlanetSetting[] = Object.freeze([
 
 /**
  * The names of the settings the temperature reads, in the order of
- * {@link PLANET_SETTINGS}: every setting but the day length, which the
- * temperature does not depend on.
+ * {@link PLANET_SETTINGS}: every setting but the day length, which a solve
+ * of the temperature alone does not depend on. The climate does: its winds
+ * turn with the day length and carry heat, so a climate's record names it
+ * too (see `solveClimate`).
  */
 export const TEMPERATURE_SETTINGS: readonly TemperatureSetting[] =
 	Object.freeze([

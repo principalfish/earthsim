@@ -69,7 +69,9 @@ The wind follows from the pressure by one balance everywhere: the push of the pr
 
 ### The flowing part
 
-The surface wind runs in towards the lows, which a model of the surface alone cannot follow: what flows in rises and is gone. Heat carried by the wind as it stands would pile up where it converges and be made from nothing. So heat is to be carried by the wind's **flowing part**, `flowingPart` in `src/core/wind/flowing.ts`: what the wind carries across every edge between cells, with the converging and spreading part taken out so that every cell has as much going in as coming out, to a ten-millionth of the typical flow across an edge. The part taken out is the flow down the gradient of a potential, found with the same solver as the temperature's heat exchange. It is returned as the flows across the edges, in square metres a second, not as a wind at the cell centres: a wind at the centres cannot be made to have no net flow in or out of every cell.
+The surface wind runs in towards the lows, which a model of the surface alone cannot follow: what flows in rises and is gone. Heat carried by the wind as it stands would pile up where it converges and be made from nothing. So heat is carried, in the climate loop (see [Temperature](temperature.md#the-climate-loop)), by the wind's **flowing part**, `flowingPart` in `src/core/wind/flowing.ts`: what the wind carries across every edge between cells, with the converging and spreading part taken out so that every cell has as much going in as coming out, to a ten-millionth of the typical flow across an edge. The part taken out is the flow down the gradient of a potential, found with the same solver as the temperature's heat exchange. It is returned as the flows across the edges, in square metres a second, not as a wind at the cell centres: a wind at the centres cannot be made to have no net flow in or out of every cell.
+
+For the temperature solve, `flowingPartForSolve` adds the flows of a world of 128 or 256 up onto the 64 grid, takes the converging part out there (a month costs 60 ms whatever the world's size), and for a world of 256, which is solved on 128, shares the result back up.
 
 On the Earth at 64, July's flowing part keeps about two thirds of the surface wind's flow (by squared size) in the same pattern, and a month takes about 60 ms. The grid's skewed cells, at the cube's corners above all, leave about an eighth of a purely converging wind's flow in place, going round and not in; that part carries heat but makes none.
 
@@ -187,7 +189,7 @@ These are recorded, not tuned. The model is not fitted any closer to the observe
 - **The air above the surface.** There is one level, the surface, and no upper winds or jet streams.
 - **Weather.** The winds are monthly means of a steady balance: no storms, fronts or day-to-day change.
 - **The air's own motion.** The wind does not carry itself along, so nothing is steered by the flow upstream, and there is no difference between the hemispheres other than what their land and temperature give.
-- **The ocean.** There are no ocean currents, and the winds do not change the temperature.
+- **The ocean.** There are no ocean currents. On their own the winds do not change the temperature; the climate loop feeds them back, though the page does not use it yet.
 
 ## The pressure of finer worlds is worked out on the 64 grid
 

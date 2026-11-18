@@ -8,7 +8,7 @@ Raising it and Lowering it say what moving a setting away from the value shown d
 
 The settings of the temperature model, read from `TEMPERATURE_CONFIG` into `TEMPERATURE_MODEL`. How the model works is in [Temperature](../../docs/temperature.md).
 
-19 settings: 14 physical and 5 for the solver, 4 of them tuned against the observed Earth. A run may override these. Beyond them the code reads 5 fixed choices directly, which a run cannot override.
+22 settings: 14 physical and 8 numerical, 4 of them tuned against the observed Earth. A run may override these. Beyond them the code reads 5 fixed choices directly, which a run cannot override.
 
 ### How heat moves and is stored
 
@@ -33,6 +33,14 @@ The settings of the temperature model, read from `TEMPERATURE_CONFIG` into `TEMP
 | `iceAlbedo` | 0.62 fraction | The share of sunlight reflected by ground wholly covered in ice or snow. | Icy places are colder and the ice spreads further, as the cold makes more ice: a stronger feedback, so a planet near freezing freezes over more easily. | Ice cools its surroundings less and spreads less: milder poles and winters. | A published form (North, Cahalan and Coakley, 1981). | Tuned against the observed Earth. |
 | `iceStartC` | 0 °C | The air temperature below which ice and snow start to come in. | Ice starts in milder places: more ice and snow, and so colder. | Ice starts only in colder places: less ice, and milder high latitudes. It must stay above iceFullC; the model refuses it otherwise. | A smooth ramp rather than a single freezing point. | No |
 | `iceFullC` | -10 °C | The air temperature at and below which a place is wholly covered in ice or snow. | Places are wholly icy at milder temperatures: more ice, and so colder, with a sharper switch from clear to icy. It must stay below iceStartC; the model refuses it otherwise. | A wider, gentler ramp: less ice at a given temperature. | A smooth ramp rather than a single freezing point. | No |
+
+### The climate loop
+
+| Setting | Value | What it controls | Raising it | Lowering it | Where it comes from | Tuned |
+|-|-|-|-|-|-|-|
+| `climateToleranceC` | 0.1 °C | How small a pass of the climate loop must change the monthly temperature, in every place and month, for the climate to count as settled. | The loop stops sooner, on a climate a little less settled. | More passes, to a climate settled more finely; below about 0.05 the temperature's own tolerance sets the limit. | Chosen: below what a map of the temperature shows. | No |
+| `climateMaxPasses` | 6 passes | The most passes of the loop, each a temperature solve with the last pass's winds and then the winds from the new temperature. | A world whose climate settles slowly gets further; the climate takes longer to appear. | The loop gives up sooner, leaving the climate less settled on such a world. | Chosen: the Earth settles within about four at a tenth of the heat capacity of moving air the model starts from, and does not within six at the starting value. | No |
+| `climateOvershootShare` | 0.5 fraction | How much of a pass's change is applied when the pass changes the temperature by more than the pass before did (an overshoot, where the winds and the temperature chase each other). | Overshoots are damped less; at 1 they are not damped at all. | Overshoots are damped harder; the loop moves more slowly. | Chosen: half. | No |
 
 ### The solver (numerical, not physical)
 

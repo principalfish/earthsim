@@ -14,7 +14,12 @@ import {
 } from '../grid/vector';
 import { solveTemperature } from '../temperature/temperature';
 import { PLANET_RADIUS_KM } from '../world/world';
-import { flowingPart, removeConvergence } from './flowing';
+import {
+	FLOWING_RESOLUTION,
+	flowingPart,
+	flowingPartForSolve,
+	removeConvergence,
+} from './flowing';
 import { decodeObservedWind, observedWind } from './observedWind';
 import { solveWinds } from './solve';
 
@@ -290,5 +295,83 @@ describe('flowingPart', () => {
 			observed.north[0] as Float32Array,
 		);
 		expect(largest(netFlows(flows)) / rms(flows)).toBeLessThan(2e-7);
+	});
+});
+
+describe('flowingPartForSolve', () => {
+	it('is flowingPart for a world of 64', () => {
+		const wind = randomWind(21);
+		const flows = flowingPartForSolve(64, 64, wind.east, wind.north);
+		expect(flows).toEqual(flowingPart(grid, wind.east, wind.north));
+		expect(FLOWING_RESOLUTION).toBe(64);
+	});
+
+	it.each([
+		[128, 64],
+		[256, 128],
+	] as const)(
+		'gives a world of %d the flowing part on the grid it is solved on, %d, with no net flow out of any cell',
+		(resolution, solved) => {
+			const fine = getGrid(resolution);
+			const random = createRandom(22);
+			const east = Float64Array.from(
+				{ length: fine.cellCount },
+				() => 20 * random() - 10,
+			);
+			const north = Float64Array.from(
+				{ length: fine.cellCount },
+				() => 20 * random() - 10,
+			);
+			const flows = flowingPartForSolve(resolution, solved, east, north);
+			expect(flows).toHaveLength(4 * getGrid(solved).cellCount);
+			expect(largest(netFlows(flows)) / rms(flows)).toBeLessThan(1e-6);
+		},
+		60_000,
+	);
+
+	it('carries the pattern of a smooth wind of a finer world onto the grid solved on', () => {
+		// The same smooth, flowing wind on grids of 64 and 128: the flows
+		// found for the world of 128 on 64 are those of 64's own.
+		const smooth = (resolution: number) => {
+			const g = getGrid(resolution);
+			const east = new Float64Array(g.cellCount);
+			for (let cell = 0; cell < g.cellCount; cell++) {
+				const z = g.centres[3 * cell + 2] as number;
+				east[cell] = 12 * Math.sin(3 * Math.asin(z));
+			}
+			return { east, north: new Float64Array(g.cellCount) };
+		};
+		const own = smooth(64);
+		const coarse = flowingPartForSolve(64, 64, own.east, own.north);
+		const fine = smooth(128);
+		const carried = flowingPartForSolve(128, 64, fine.east, fine.north);
+		const difference = Float64Array.from(
+			coarse,
+			(flow, entry) => flow - (carried[entry] as number),
+		);
+		// Not the same to rounding: each grid's own flux of the wind differs by
+		// its accuracy, and the corners' skewed cells most.
+		expect(rms(difference) / rms(coarse)).toBeLessThan(0.05);
+	});
+
+	it('refuses resolutions that are not the world’s or the one a step coarser, and winds that do not fit', () => {
+		const wind = randomWind(23);
+		expect(() => flowingPartForSolve(64, 128, wind.east, wind.north)).toThrow(
+			RangeError,
+		);
+		expect(() =>
+			flowingPartForSolve(128, 32 as never, wind.east, wind.north),
+		).toThrow(RangeError);
+		expect(() => flowingPartForSolve(256, 64, wind.east, wind.north)).toThrow(
+			RangeError,
+		);
+		expect(() =>
+			flowingPartForSolve(64, 64, new Float64Array(5), wind.north),
+		).toThrow(RangeError);
+		const broken = Float64Array.from(wind.east);
+		broken[1] = Number.NaN;
+		expect(() => flowingPartForSolve(64, 64, broken, wind.north)).toThrow(
+			RangeError,
+		);
 	});
 });

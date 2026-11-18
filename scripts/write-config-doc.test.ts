@@ -78,7 +78,7 @@ describe('the config page', () => {
 				'',
 				'A made-up model.',
 				'',
-				'3 settings: 2 physical and 1 for the solver, 1 of them tuned against the observed Earth. A run may override these. Beyond them the code reads 1 fixed choice directly, which a run cannot override.',
+				'3 settings: 2 physical and 1 numerical, 1 of them tuned against the observed Earth. A run may override these. Beyond them the code reads 1 fixed choice directly, which a run cannot override.',
 				'',
 				'### Physical',
 				'',

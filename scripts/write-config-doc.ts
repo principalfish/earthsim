@@ -107,7 +107,7 @@ const countText = (section: ConfigSection): string => {
 	const split =
 		numerical === 0
 			? ''
-			: `: ${all.length - numerical} physical and ${numerical} for the solver`;
+			: `: ${all.length - numerical} physical and ${numerical} numerical`;
 	const fixed = Object.keys(section.constants.settings).length;
 	return (
 		`${counted(all.length, 'setting', 'settings')}${split}, ${tuned} of them` +

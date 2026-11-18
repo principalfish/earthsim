@@ -469,6 +469,58 @@ export const TEMPERATURE_CONFIG = defineSection(
 			},
 		},
 		{
+			title: 'The climate loop',
+			numerical: true,
+			settings: {
+				/** Below the 0.1 °C that a map of the temperature can show. */
+				climateToleranceC: {
+					value: 0.1,
+					unit: '°C',
+					what:
+						'How small a pass of the climate loop must change the monthly' +
+						' temperature, in every place and month, for the climate to count' +
+						' as settled.',
+					raising: 'The loop stops sooner, on a climate a little less settled.',
+					lowering:
+						'More passes, to a climate settled more finely; below about 0.05' +
+						" the temperature's own tolerance sets the limit.",
+					source: 'Chosen: below what a map of the temperature shows.',
+					tuned: null,
+				},
+				climateMaxPasses: {
+					value: 6,
+					unit: 'passes',
+					what:
+						'The most passes of the loop, each a temperature solve with the' +
+						" last pass's winds and then the winds from the new temperature.",
+					raising:
+						'A world whose climate settles slowly gets further; the climate' +
+						' takes longer to appear.',
+					lowering:
+						'The loop gives up sooner, leaving the climate less settled on' +
+						' such a world.',
+					source:
+						'Chosen: the Earth settles within about four at a tenth of the' +
+						' heat capacity of moving air the model starts from, and does not' +
+						' within six at the starting value.',
+					tuned: null,
+				},
+				climateOvershootShare: {
+					value: 0.5,
+					unit: 'fraction',
+					what:
+						"How much of a pass's change is applied when the pass changes" +
+						' the temperature by more than the pass before did (an' +
+						' overshoot, where the winds and the temperature chase each other).',
+					raising:
+						'Overshoots are damped less; at 1 they are not damped at all.',
+					lowering: 'Overshoots are damped harder; the loop moves more slowly.',
+					source: 'Chosen: half.',
+					tuned: null,
+				},
+			},
+		},
+		{
 			title: 'The solver (numerical, not physical)',
 			numerical: true,
 			settings: {

@@ -14,7 +14,7 @@ The temperature is a seasonal energy balance: the year is stepped through month 
 - the greenhouse strength;
 - heat carried along by the winds, when a solve is given them (see below).
 
-There are no ocean currents yet, and the page does not yet give the temperature the winds, so the aim is the right broad pattern, not a match to the real Earth.
+There are no ocean currents yet, and the page does not yet use the climate loop below, so the aim is the right broad pattern, not a match to the real Earth.
 
 The model's settings are listed, with what each does and where its value comes from, in [Model settings](../src/core/config.md).
 
@@ -22,7 +22,20 @@ The model's settings are listed, with what each does and where its value comes f
 
 A solve may be given a year of winds, as the flows they carry across every cell edge (the flowing part of the winds: see [Winds](winds.md#the-flowing-part)). After each time step's heat exchange, a second step moves heat downwind: each cell takes the temperature of the air flowing in from its upwind neighbours, weighted by how much flows in against the cell's own heat capacity. The step is stable however long it is, makes no new extreme, keeps the heat exactly, and leaves a uniform temperature as it is. Flows are interpolated between the months' as the sunlight is.
 
-How strongly the wind carries heat is one setting, the heat capacity of the air that moves it (about a kilometre of air to start with); at 0 the solve is the one with no winds, exactly. A world of 128 or 256 is solved on a coarser grid, so its flows must be on that grid. On the Earth at 64, with the winds the model itself gives, January comes out about 2 °C milder in western Europe and 4 °C in western North America, and about 5 °C colder in eastern North America and 13 °C in East Asia, than without the winds; the solve takes 1.6 to 2 times as long.
+How strongly the wind carries heat is one setting, the heat capacity of the air that moves it (about a kilometre of air to start with); at 0 the solve is the one with no winds, exactly. A world of 128 or 256 is solved on a coarser grid, so its flows must be on that grid; `flowingPartForSolve` finds them there from the world's own winds (see [Winds](winds.md#the-flowing-part)). On the Earth at 64, with the winds the model itself gives, January comes out about 2 °C milder in western Europe and 4 °C in western North America, and about 5 °C colder in eastern North America and 13 °C in East Asia, than without the winds; the solve takes 1.6 to 2 times as long.
+
+### The climate loop
+
+`solveClimate` works the temperature and the winds out together, in passes. The first pass is the temperature without winds and the winds from it, exactly as before. Each later pass solves the temperature again, carried on from the last pass's and with heat carried along the last pass's winds, then works out the winds from the new temperature.
+
+- It stops when a pass changes no cell's monthly temperature by more than 0.1 °C, or after 6 passes.
+- A pass that changes the temperature by more than the one before did is an overshoot, and only half its change is applied.
+- A result that settled can be carried on from: a solve for the same world again settles in one pass.
+- The day length now changes the settled temperature, through the winds, though not the first pass.
+- A pass after the first takes about 1.6 s on a world of 64 (0.3 s of temperature, 0.7 s for the flowing part of the winds and 0.6 s for the winds), and about 1.8 s on a world of 128; the first takes the temperature from nothing and the winds, about 1.8 s.
+- How many passes the Earth needs depends on how strongly the wind carries heat: with a kilometre of air, as the setting starts, its coasts are still changing by degrees after 6; with a tenth of that, about 4 settle it.
+
+The loop's three settings are in the [Model settings](../src/core/config.md).
 
 ### Finer worlds are solved on a coarser grid
 

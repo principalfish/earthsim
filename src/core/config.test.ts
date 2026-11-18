@@ -50,6 +50,9 @@ const TEMPERATURE_LITERAL = {
 	iceAlbedo: 0.62,
 	iceStartC: 0,
 	iceFullC: -10,
+	climateToleranceC: 0.1,
+	climateMaxPasses: 6,
+	climateOvershootShare: 0.5,
 	stepsPerMonth: 2,
 	solverToleranceK: 5e-3,
 	solverMaxIterations: 200,
@@ -188,12 +191,13 @@ describe('TEMPERATURE_CONFIG', () => {
 		}
 	});
 
-	it('lists each setting once, with the solver group numerical and last', () => {
+	it('lists each setting once, with the loop group and the solver group numerical, the solver last', () => {
 		const names = entries.map(([name]) => name);
 		expect(new Set(names).size).toBe(names.length);
 		expect(section.groups.map((group) => group.numerical === true)).toEqual([
 			false,
 			false,
+			true,
 			true,
 		]);
 		expect(section.groups.map((group) => Object.keys(group.settings))).toEqual([
@@ -215,6 +219,7 @@ describe('TEMPERATURE_CONFIG', () => {
 				'iceStartC',
 				'iceFullC',
 			],
+			['climateToleranceC', 'climateMaxPasses', 'climateOvershootShare'],
 			[
 				'stepsPerMonth',
 				'solverToleranceK',

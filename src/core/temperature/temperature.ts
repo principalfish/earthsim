@@ -172,6 +172,22 @@ export type TemperatureModel = {
 	 * 0 every pass is solved.
 	 */
 	readonly correctionRefineK: number;
+	/**
+	 * How small a pass of the climate loop must change the monthly
+	 * temperature, in every cell and month, in degrees Celsius, for the
+	 * climate to count as settled. Above 0.
+	 */
+	readonly climateToleranceC: number;
+	/**
+	 * The most passes of the climate loop, a whole number from 1 to
+	 * {@link MAX_CLIMATE_PASSES}.
+	 */
+	readonly climateMaxPasses: number;
+	/**
+	 * The share of a pass's change that is applied when the pass changes
+	 * the temperature by more than the pass before: above 0 and at most 1.
+	 */
+	readonly climateOvershootShare: number;
 };
 
 /**
@@ -196,7 +212,8 @@ export type TemperatureConditions = {
 	/**
 	 * The planet's settings that the temperature reads, as
 	 * {@link normalisePlanet} gives them. The day length is not one of
-	 * them: the temperature does not depend on it.
+	 * them: a solve of the temperature alone does not depend on it. A
+	 * climate's record names it separately.
 	 */
 	readonly planet: TemperaturePlanet;
 };
@@ -443,6 +460,9 @@ export const MAX_STEPS_PER_MONTH = 48;
 /** The most iterations the model may allow one solve. */
 export const MAX_SOLVER_ITERATIONS = 10_000;
 
+/** The most passes the climate loop may be set to take. */
+export const MAX_CLIMATE_PASSES = 100;
+
 const SECONDS_PER_DAY = 86_400;
 
 /**
@@ -591,7 +611,7 @@ export const assertSolvableWorld = (world: World): void => {
 	}
 };
 
-const assertModel = (model: TemperatureModel): void => {
+export const assertModel = (model: TemperatureModel): void => {
 	if (typeof model !== 'object' || model === null) {
 		throw new RangeError("A model's constants must be an object");
 	}
@@ -666,6 +686,25 @@ const assertModel = (model: TemperatureModel): void => {
 	) {
 		throw new RangeError(
 			`The model's stepsPerMonth must be a whole number from 1 to ${MAX_STEPS_PER_MONTH}`,
+		);
+	}
+	if (!(model.climateToleranceC > 0)) {
+		throw new RangeError("The model's climateToleranceC must be above zero");
+	}
+	if (
+		!(
+			Number.isInteger(model.climateMaxPasses) &&
+			model.climateMaxPasses >= 1 &&
+			model.climateMaxPasses <= MAX_CLIMATE_PASSES
+		)
+	) {
+		throw new RangeError(
+			`The model's climateMaxPasses must be a whole number from 1 to ${MAX_CLIMATE_PASSES}`,
+		);
+	}
+	if (!(model.climateOvershootShare > 0 && model.climateOvershootShare <= 1)) {
+		throw new RangeError(
+			"The model's climateOvershootShare must be above zero and at most one",
 		);
 	}
 	if (!(model.iceStartC > model.iceFullC)) {
@@ -1657,26 +1696,53 @@ const assertConditions = (value: unknown): void => {
 };
 
 /**
- * Whether a start's record, already checked, names the sea level and
- * planet of the world being solved, both brought to the forms the solver
- * uses and compared exactly. Only the settings the temperature reads,
- * {@link TEMPERATURE_SETTINGS}, are compared, each brought within its
- * limits by {@link clampSetting}, so a record of another day length, or of
- * none, names the same planet.
+ * Whether a record, already checked, names the given sea level and planet,
+ * both brought to the forms the solver uses and compared exactly. Only the
+ * settings the temperature reads, {@link TEMPERATURE_SETTINGS}, are
+ * compared, each brought within its limits by {@link clampSetting}, so a
+ * record of another day length, or of none, names the same planet.
  */
-const sameConditions = (
-	setup: Setup,
+const recordNames = (
+	seaLevel: number,
+	planet: TemperaturePlanet,
 	conditions: TemperatureConditions,
 ): boolean => {
-	if (Math.fround(conditions.seaLevel) !== setup.seaLevel) {
+	if (Math.fround(conditions.seaLevel) !== seaLevel) {
 		return false;
 	}
 	// Setting by setting rather than through normalisePlanet, which refuses
 	// settings without a day length, as a record's may be.
 	return TEMPERATURE_SETTINGS.every(
-		(name) =>
-			clampSetting(name, conditions.planet[name]) === setup.planet[name],
+		(name) => clampSetting(name, conditions.planet[name]) === planet[name],
 	);
+};
+
+/** {@link recordNames} for the world being solved. */
+const sameConditions = (
+	setup: Setup,
+	conditions: TemperatureConditions,
+): boolean => recordNames(setup.seaLevel, setup.planet, conditions);
+
+/**
+ * Whether a record of the conditions a result was solved for names a
+ * world's sea level and planet, as {@link solveTemperature} judges a start
+ * by its record: each brought to the forms the solver uses and compared
+ * exactly, only the settings the temperature reads compared, the day length
+ * not among them.
+ *
+ * @param world - The world. It is not changed.
+ * @param conditions - The record, such as {@link TemperatureResult.solvedFor}.
+ * @throws RangeError if the record does not hold a finite sea level and a
+ * finite number for each of the planet's {@link TEMPERATURE_SETTINGS}, or
+ * the world's planet has a setting that is not a number.
+ */
+export const conditionsMatch = (
+	world: World,
+	conditions: TemperatureConditions,
+): boolean => {
+	assertConditions(conditions);
+	const wanted = temperatureConditions(world);
+	return recordNames(wanted.seaLevel, wanted.planet, conditions);
 };
 
 /**

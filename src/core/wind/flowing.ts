@@ -25,7 +25,13 @@
  * a cell. What carries heat is the flows.
  */
 
-import { type Grid, NEIGHBOUR_COUNT } from '../grid/grid';
+import { coarsenFlows, refineFlows } from '../grid/flows';
+import {
+	type Grid,
+	getGrid,
+	NEIGHBOUR_COUNT,
+	type Resolution,
+} from '../grid/grid';
 import { edgeFlows, fromEastNorth } from '../grid/vector';
 import {
 	createExchangeSolver,
@@ -290,4 +296,77 @@ export const flowingPart = (
 		grid,
 		edgeFlows(grid, fromEastNorth(grid, { east, north }), RADIUS_M),
 	);
+};
+
+/**
+ * The grid the flowing part of a wind is found on, in cells per face edge,
+ * whatever the world's: the one the wind model's pressure is worked out on,
+ * the finest the flowing part is worth finding on, since a month takes 60 ms
+ * there and four times that on the next.
+ */
+export const FLOWING_RESOLUTION: Resolution = 64;
+
+/**
+ * The flowing part of a wind on a world's grid, as the temperature solve
+ * takes it: on the grid the world's temperature is solved on.
+ *
+ * @remarks
+ * The wind's flows across the edges of the world's own grid are added up,
+ * grid by grid, onto the grid of {@link FLOWING_RESOLUTION} (which loses no
+ * net flow: see {@link coarsenFlows}), their converging part is taken out
+ * there by {@link removeConvergence}, and if the temperature is solved on a
+ * finer grid than that, which it is for a world of 256, the flowing part is
+ * carried up to it by {@link refineFlows}, as smooth as the coarse flows
+ * are. For a world of 64 this is {@link flowingPart}.
+ *
+ * @param resolution - The world's cells along a face edge.
+ * @param solveResolution - The cells along a face edge of the grid the
+ * temperature is solved on: the world's or the grid a step coarser, and at
+ * least {@link FLOWING_RESOLUTION}.
+ * @param east - The eastward wind at each cell of the world's grid, in
+ * metres a second; finite. Not changed.
+ * @param north - The northward wind, in the same way.
+ * @returns The flows across the edges of the grid of `solveResolution`, in
+ * a new array.
+ * @throws RangeError if an array has the wrong length or a value that is
+ * not finite, or the resolutions are not as above.
+ */
+export const flowingPartForSolve = (
+	resolution: Resolution,
+	solveResolution: Resolution,
+	east: ArrayLike<number>,
+	north: ArrayLike<number>,
+): Float64Array => {
+	if (
+		solveResolution < FLOWING_RESOLUTION ||
+		(solveResolution !== resolution && solveResolution !== resolution / 2)
+	) {
+		throw new RangeError(
+			`A world of ${resolution} cells per face edge is not solved on ${solveResolution}`,
+		);
+	}
+	const grid = getGrid(resolution);
+	if (east.length !== grid.cellCount || north.length !== grid.cellCount) {
+		throw new RangeError(
+			`A grid of ${grid.cellCount} cells has ${grid.cellCount} winds of each direction; got ${east.length} eastward and ${north.length} northward`,
+		);
+	}
+	assertFinite(east, 'eastward wind');
+	assertFinite(north, 'northward wind');
+	let flows: Float64Array = edgeFlows(
+		grid,
+		fromEastNorth(grid, { east, north }),
+		RADIUS_M,
+	);
+	let size: number = resolution;
+	while (size > FLOWING_RESOLUTION) {
+		flows = coarsenFlows(flows, size);
+		size /= 2;
+	}
+	flows = removeConvergence(getGrid(size), flows);
+	while (size < solveResolution) {
+		size *= 2;
+		flows = refineFlows(flows, size);
+	}
+	return flows;
 };
