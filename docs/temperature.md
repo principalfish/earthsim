@@ -11,11 +11,18 @@ The temperature is a seasonal energy balance: the year is stepped through month 
 - heat spreading between neighbouring cells;
 - cooling with height;
 - snow and ice brightening cold surfaces;
-- the greenhouse strength.
+- the greenhouse strength;
+- heat carried along by the winds, when a solve is given them (see below).
 
-There are no ocean currents yet, and the winds do not yet carry heat back into the temperature, so the aim is the right broad pattern, not a match to the real Earth.
+There are no ocean currents yet, and the page does not yet give the temperature the winds, so the aim is the right broad pattern, not a match to the real Earth.
 
 The model's settings are listed, with what each does and where its value comes from, in [Model settings](../src/core/config.md).
+
+### Heat carried by the winds
+
+A solve may be given a year of winds, as the flows they carry across every cell edge (the flowing part of the winds: see [Winds](winds.md#the-flowing-part)). After each time step's heat exchange, a second step moves heat downwind: each cell takes the temperature of the air flowing in from its upwind neighbours, weighted by how much flows in against the cell's own heat capacity. The step is stable however long it is, makes no new extreme, keeps the heat exactly, and leaves a uniform temperature as it is. Flows are interpolated between the months' as the sunlight is.
+
+How strongly the wind carries heat is one setting, the heat capacity of the air that moves it (about a kilometre of air to start with); at 0 the solve is the one with no winds, exactly. A world of 128 or 256 is solved on a coarser grid, so its flows must be on that grid. On the Earth at 64, with the winds the model itself gives, January comes out about 2 °C milder in western Europe and 4 °C in western North America, and about 5 °C colder in eastern North America and 13 °C in East Asia, than without the winds; the solve takes 1.6 to 2 times as long.
 
 ### Finer worlds are solved on a coarser grid
 

@@ -293,6 +293,33 @@ export const TEMPERATURE_CONFIG = defineSection(
 					source: "Taken equal to land's.",
 					tuned: null,
 				},
+				/**
+				 * A placeholder: the heat capacity of about a kilometre of air at
+				 * the sea-level density of 1.2 kg m⁻³ and 1004 J kg⁻¹ K⁻¹. Its
+				 * value is set from physics, and checked against the Earth's
+				 * west-east coast contrast, when the climate loop is complete.
+				 */
+				windHeatCapacity: {
+					value: 1.2e6,
+					unit: 'J/m²/K',
+					what:
+						'How strongly the wind carries heat: the heat the moving air' +
+						' holds for each kelvin, per square metre, which is set by the' +
+						' depth of the air the wind moves heat in. It only matters once' +
+						' the winds are fed back into the temperature.',
+					raising:
+						'The wind carries more heat: milder west coasts and colder' +
+						' east coasts at mid-latitudes, the sea reaching further' +
+						' inland downwind, and a smaller difference between the tropics' +
+						' and the poles.',
+					lowering:
+						'The wind carries less heat, down to none at 0, where the' +
+						' temperature is what it is without the winds.',
+					source:
+						'About a kilometre of air at the sea-level density, 1.2 kg/m³' +
+						' at 1004 J/kg/K: a placeholder until set from physics.',
+					tuned: null,
+				},
 				/** The standard atmosphere's 6.5 K km⁻¹ (ICAO, 1993). */
 				lapseRate: {
 					value: 6.5e-3,

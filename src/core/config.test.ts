@@ -32,14 +32,16 @@ const entry = (value: number) => ({
 	tuned: null,
 });
 
-// A literal copy of the temperature model's values as they were before they
-// moved into the config, in the order the model listed them.
+// A literal copy of the temperature model's values, in the order the model
+// lists them: the first eighteen as they were before they moved into the
+// config, then those added since.
 const TEMPERATURE_LITERAL = {
 	diffusivity: 0.55,
 	landDiffusivity: 0.35,
 	oceanHeatCapacity: 2.5e8,
 	landHeatCapacity: 1e7,
 	seaIceHeatCapacity: 1e7,
+	windHeatCapacity: 1.2e6,
 	lapseRate: 6.5e-3,
 	greenhouseFactor: 0.633,
 	albedo: 0.27,
@@ -201,6 +203,7 @@ describe('TEMPERATURE_CONFIG', () => {
 				'oceanHeatCapacity',
 				'landHeatCapacity',
 				'seaIceHeatCapacity',
+				'windHeatCapacity',
 				'lapseRate',
 				'greenhouseFactor',
 			],
