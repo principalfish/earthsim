@@ -176,6 +176,8 @@ const assertAntisymmetric = (grid: Grid, flows: ArrayLike<number>): void => {
  * a good one; on return the potential that was found. Left out, the guess
  * is zero and the potential is not kept. The flowing part found is the
  * same to the tolerance whatever the guess.
+ * @param tally - Told, in its `rounds`, how many rounds of solving it took:
+ * fewer from a good guess. For tests and measuring; left out, nobody is told.
  * @returns The flowing part, in a new array laid out the same way: the
  * entries leaving any cell sum to zero, to a ten-millionth of the
  * input's root-mean-square flow across an edge.
@@ -188,6 +190,7 @@ export const removeConvergence = (
 	grid: Grid,
 	flows: ArrayLike<number>,
 	guess?: Float64Array,
+	tally?: { rounds: number },
 ): Float64Array => {
 	const { cellCount } = grid;
 	if (flows.length !== SIDES * cellCount) {
@@ -238,6 +241,7 @@ export const removeConvergence = (
 		potential.set(guess);
 	}
 	let largest = remaining();
+	let rounds = 0;
 	for (let round = 0; largest > limit; round++) {
 		if (round === MAX_ROUNDS) {
 			throw new Error(
@@ -264,6 +268,10 @@ export const removeConvergence = (
 			potential[cell] = (potential[cell] as number) + (step[cell] as number);
 		}
 		largest = remaining();
+		rounds++;
+	}
+	if (tally !== undefined) {
+		tally.rounds = rounds;
 	}
 	for (let cell = 0; cell < cellCount; cell++) {
 		for (let side = 0; side < SIDES; side++) {

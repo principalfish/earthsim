@@ -151,7 +151,7 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		const again = run(EARTH, { model: COARSE, start: earth().result });
 		expect(again.passes).toHaveLength(1);
 		expect(again.result.settled).toBe(true);
-		expect(again.result.changeC).toBeLessThan(
+		expect(again.result.changeC).toBeLessThanOrEqual(
 			TEMPERATURE_MODEL.climateToleranceC,
 		);
 		// The root-mean-square change is within the tolerance while the

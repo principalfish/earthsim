@@ -139,7 +139,8 @@ export type SolveClimateOptions = {
 	 * Where to start from, usually the previous result for the world. It is
 	 * used only for a world it suits: its day length must be the world's
 	 * and its temperature's record, as for {@link solveTemperature}'s start,
-	 * must be the world's, or the climate is solved from nothing.
+	 * must be the world's, or the climate is solved from nothing. A start
+	 * whose temperature has no valid record is refused, not set aside.
 	 */
 	readonly start?: ClimateStart;
 	/** The model's constants; defaults to {@link TEMPERATURE_MODEL}. */
@@ -295,8 +296,10 @@ const suits = (
  * @returns New arrays the caller owns.
  * @throws RangeError for whatever {@link solveTemperature} and
  * {@link solveWinds} refuse, if a model constant is missing or out of
- * range, or if a start is not twelve months of one value per cell in each
- * of its temperature, eastward wind and northward wind.
+ * range, if a start is not twelve months of one value per cell in each of
+ * its temperature, eastward wind and northward wind, or if a start's
+ * temperature does not record a finite sea level and the planet's
+ * temperature settings, as {@link solveTemperature}'s start must.
  * @throws Whatever `onPass` or `onYear` throws, as it is.
  */
 export const solveClimate = (

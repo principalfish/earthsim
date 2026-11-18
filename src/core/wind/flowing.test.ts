@@ -408,6 +408,23 @@ describe('removeConvergence from a first guess', () => {
 		expect(guess).not.toEqual(potential);
 	});
 
+	it('takes fewer rounds of solving from the potential of nearby flows than from nothing', () => {
+		const first = flowsOfWind(41);
+		const other = flowsOfWind(42);
+		const potential = new Float64Array(grid.cellCount);
+		removeConvergence(grid, first, potential);
+		const near = Float64Array.from(
+			first,
+			(flow, entry) => 0.999 * flow + 0.001 * (other[entry] as number),
+		);
+		const cold = { rounds: 0 };
+		const warm = { rounds: 0 };
+		removeConvergence(grid, near, undefined, cold);
+		removeConvergence(grid, near, Float64Array.from(potential), warm);
+		expect(cold.rounds).toBeGreaterThan(1);
+		expect(warm.rounds).toBeLessThan(cold.rounds);
+	});
+
 	it('is passed on by flowingPartForSolve, and refuses a guess of the wrong length or not finite', () => {
 		const wind = randomWind(33);
 		const potential = new Float64Array(grid.cellCount);

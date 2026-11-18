@@ -323,8 +323,9 @@ export const TEMPERATURE_CONFIG = defineSection(
 						'Physics: about a kilometre of air, the depth the surface wind' +
 						' blows in, at the sea-level density of 1.2 kg/m³ and 1004' +
 						" J/kg/K. Checked against the Earth's west-east coast contrast:" +
-						' about a quarter to a third of the observed, in the right' +
-						' places.',
+						' about a quarter to a third of the observed in three of the' +
+						" four figures, in the right places, and none for North America's" +
+						' year.',
 					tuned: null,
 				},
 				/** The standard atmosphere's 6.5 K km⁻¹ (ICAO, 1993). */
@@ -1747,8 +1748,8 @@ export const WIND_CONFIG = defineSection(
 					what:
 						"Caps how deep a hot place's low gets: warmth above the" +
 						" latitude's average counts less and less beyond about this" +
-						' many kelvin, so a low is at most 18 hPa deep before' +
-						' smoothing.',
+						' many kelvin, so a low is at most about 4 hPa deep before' +
+						' smoothing at 0.7 hPa/K (18 hPa at 3 hPa/K).',
 					raising:
 						"Hot places' lows deepen further. With no cap, the Earth's" +
 						' hot continental interiors give a deep summer low over' +

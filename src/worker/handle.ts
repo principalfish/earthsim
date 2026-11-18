@@ -177,8 +177,9 @@ const reasonOf = (error: unknown): string =>
  * back as a failure like any other. Its planet settings are brought within
  * their limits by the solver, as for any other caller. While it runs,
  * `onProgress` hears of each year as it finishes, and of a climate's each
- * year of each pass with that pass; nothing else reports progress. A winds request is solved from the world and the twelve months
- * of temperature it carries; temperatures the solver refuses, such as
+ * year of each pass with that pass; nothing else reports progress. A winds
+ * request is solved from the world and the twelve months of temperature it
+ * carries; temperatures the solver refuses, such as
  * months of the wrong length, come back as a failure. A climate request is
  * solved from the world and the start it carries, if any, and `onPass`
  * hears of each pass of its loop as it finishes, in order, with the buffers

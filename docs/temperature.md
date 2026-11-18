@@ -35,6 +35,8 @@ How strongly the wind carries heat is one setting, the heat capacity of the air 
 - On the Earth at 64 the loop settles in 4 passes, about 8 s from nothing (1.4 s for the first pass, which is the temperature from nothing and the winds, then about 2 s for each later pass), and in one pass, about 2 s, carried on from the settled result; on a world of 128 about 9 s and 2 s, and on one of 256 about 27 s and 4 s. A later pass is the temperature carried on (0.3 s for a year), the flowing part of the winds (0.5–0.7 s, a tenth to a third less than from nothing because each month starts from the last pass's answer) and the winds (0.6 s). `npm run time:climate` measures it.
 - How fast the passes settle depends on how strongly the winds feed back. The thermal highs and lows are at their physical 0.7 hPa a kelvin for that reason: at the 3 they were tuned to before the winds carried heat, each pass shrank by about 0.7 and the Earth did not settle in 8. At 0.7 each pass shrinks by about 0.2 to 0.3.
 
+The loop's three settings are in the [Model settings](../src/core/config.md).
+
 ### Heat carried along the winds, on the Earth
 
 How strongly the wind carries heat is the heat capacity of the air that moves it, 1.2e6 J/m²/K: about a kilometre of air at the sea-level density, the depth the surface wind blows in. It is set from that physical estimate and not tuned. Its check is the Earth's west–east coast contrast at 40–60°N, kept in the [baseline](development.md#the-earth-temperature-baseline):
@@ -44,9 +46,7 @@ How strongly the wind carries heat is the heat capacity of the air that moves it
 | Western Europe less East Asia | 2.9 K | 11.5 K | 7.8 K | 22.9 K |
 | West less east North America | 0.0 K | 5.8 K | 3.5 K | 15.1 K |
 
-Without the winds the model gave 0.7 and 2.4 K for Europe against Asia and about −0.8 and −0.6 K for North America. So the winds make a contrast, in the right places and a quarter to a third of the observed size, and the rest is not theirs to make: the sea's own heat transport, ocean currents, is a later step. East Asia's January comes out 0.8 °C against an observed −4.0. The Earth's error against the observed falls from 3.93 to 3.66 K root-mean-square for the year.
-
-The loop's three settings are in the [Model settings](../src/core/config.md).
+Without the winds the model gave 0.7 and 2.4 K for Europe against Asia and about −0.8 and −0.6 K for North America. So the winds make a contrast, in the right places: a quarter to a third of the observed size in three of the four figures, and none for North America's year; the rest is not theirs to make: the sea's own heat transport, ocean currents, is a later step. East Asia's January comes out 0.8 °C against an observed −4.0. The Earth's error against the observed falls from 3.93 to 3.66 K root-mean-square for the year.
 
 ### Finer worlds are solved on a coarser grid
 
