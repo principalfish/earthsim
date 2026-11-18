@@ -283,8 +283,12 @@ const suits = (
  *
  * A start that suits the world makes the first pass carry on from its
  * temperature's state with heat carried along its winds, and compare its
- * result with the start's months: a start that was settled and whose world
- * has not changed settles in that one pass.
+ * result with the start's months. The first pass never settles the
+ * climate: the start's winds may be those of a world since edited, and a
+ * local edit moves the global change by less than the tolerance, so the
+ * winds of the new temperature are tried once more. A start that was
+ * settled and whose world has not changed therefore settles at the second
+ * pass.
  *
  * The temperature of a settled climate depends on the day length, through
  * the winds, which turn with it and are as wide as it sets; the first pass
@@ -366,7 +370,12 @@ export const solveClimate = (
 		const winds = solveWinds(world, temperature.months, {
 			settings: windSettings,
 		});
-		const settled = change !== null && change <= climateToleranceC;
+		// A pass settles only from the second: the first of a start that suits
+		// carries heat along the start's winds, which may be those of a world
+		// since edited, and a local edit moves the global rms change by less
+		// than the tolerance, so the winds of the new temperature are tried
+		// once before the climate can settle.
+		const settled = pass > 1 && change !== null && change <= climateToleranceC;
 		const last = settled || pass === climateMaxPasses;
 		onPass?.({
 			pass,

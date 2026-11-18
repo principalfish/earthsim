@@ -330,7 +330,7 @@ export type ClimateCallbacks = {
 	 * Told how far the year's solve under way has come, with the pass of the
 	 * loop it is in.
 	 */
-	readonly onProgress: (progress: TemperatureProgress, pass?: number) => void;
+	readonly onProgress: (progress: TemperatureProgress, pass: number) => void;
 	/** Told of each pass of the loop as it finishes, in order. */
 	readonly onPass: (pass: ClimateProgress) => void;
 };
@@ -583,10 +583,7 @@ export const createClimateScheduler = <H>(
 				const outcome = await options.request(world, start, {
 					onProgress: (progress, pass) => {
 						if (wanted === mine) {
-							store.setProgress(
-								progress,
-								pass === undefined ? undefined : before + pass,
-							);
+							store.setProgress(progress, before + pass);
 						}
 					},
 					onPass: (pass) => {

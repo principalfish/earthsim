@@ -521,7 +521,10 @@ export const TEMPERATURE_CONFIG = defineSection(
 					what:
 						"How much of a pass's change is applied when the pass changes" +
 						' the temperature by more than the pass before did (an' +
-						' overshoot, where the winds and the temperature chase each other).',
+						' overshoot, where the winds and the temperature chase each other).' +
+						' It only stops a pass from growing on the one before; it does' +
+						' not bring down an oscillation at a stronger feedback than the' +
+						" model's, which the loop then leaves unsettled at its limit.",
 					raising:
 						'Overshoots are damped less; at 1 they are not damped at all.',
 					lowering: 'Overshoots are damped harder; the loop moves more slowly.',

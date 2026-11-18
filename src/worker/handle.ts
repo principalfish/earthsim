@@ -36,10 +36,10 @@ export type HandledRequest = {
 /** What a computation may tell of itself as it goes. */
 type Reports = {
 	/**
-	 * How far a year of a temperature solve has come, with the pass of a
-	 * climate's loop it is in.
+	 * How far a year of a climate's temperature solve has come, with the
+	 * pass of its loop it is in.
 	 */
-	readonly progress: (progress: TemperatureProgress, pass?: number) => void;
+	readonly progress: (progress: TemperatureProgress, pass: number) => void;
 	/** That a pass of a climate's loop has finished. */
 	readonly pass: (pass: ClimateProgress) => void;
 };
@@ -208,12 +208,7 @@ export const handleRequest = (
 			report: Reports,
 		) => SimResults[SimKind];
 		const result = compute(parsed, {
-			progress: (progress, pass) =>
-				onProgress(
-					pass === undefined
-						? { ...known, progress }
-						: { ...known, progress, pass },
-				),
+			progress: (progress, pass) => onProgress({ ...known, progress, pass }),
 			pass: (pass) => {
 				// The last pass is the one nothing reads again.
 				const sent = pass.last ? pass : copyOfPass(pass);

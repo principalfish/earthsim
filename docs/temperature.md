@@ -30,10 +30,10 @@ How strongly the wind carries heat is one setting, the heat capacity of the air 
 
 - It stops when the root-mean-square change a pass makes to the monthly temperature, over the globe and the year, is no more than 0.1 °C, or after 8 passes. The largest change in a single cell is left out of the rule: a few cells of spring snow and ice keep moving by more than a degree for many passes.
 - A pass whose change is larger than the one before's is an overshoot, and only half its change is applied.
-- A result that settled can be carried on from: a solve for the same world again settles in one pass.
+- A result that settled can be carried on from: a solve for the same world again settles at the second pass at the earliest, since the first carries heat along the start's winds, which may be those of a world since edited, and a local edit moves the global change by less than the tolerance.
 - The page works the temperature out this way, as the climate; see [When it is recalculated](#when-it-is-recalculated).
 - The day length now changes the settled temperature, through the winds, though not the first pass.
-- On the Earth at 64 the loop settles in 4 passes, about 8 s from nothing (1.4 s for the first pass, which is the temperature from nothing and the winds, then about 2 s for each later pass), and in one pass, about 2 s, carried on from the settled result; on a world of 128 about 9 s and 2 s, and on one of 256 about 27 s and 4 s. A later pass is the temperature carried on (0.3 s for a year), the flowing part of the winds (0.5–0.7 s, a tenth to a third less than from nothing because each month starts from the last pass's answer) and the winds (0.6 s). `npm run time:climate` measures it.
+- On the Earth at 64 the loop settles in 4 passes, about 8 s from nothing, and carried on from the settled result in 2 passes, about 3 s. `npm run time:climate` measures every resolution and the parts of a pass.
 - How fast the passes settle depends on how strongly the winds feed back. The thermal highs and lows are at their physical 0.7 hPa a kelvin for that reason: at the 3 they were tuned to before the winds carried heat, each pass shrank by about 0.7 and the Earth did not settle in 8. At 0.7 each pass shrinks by about 0.2 to 0.3.
 
 The loop's three settings are in the [Model settings](../src/core/config.md).

@@ -145,11 +145,8 @@ export type SimProgress = {
 	readonly kind: SimKind;
 	/** How far the computation has come. */
 	readonly progress: TemperatureProgress;
-	/**
-	 * For a climate request, the pass of its loop the progress is within,
-	 * from 1; absent for any other kind.
-	 */
-	readonly pass?: number;
+	/** The pass of the climate loop the progress is within, from 1. */
+	readonly pass: number;
 };
 
 /**
@@ -442,9 +439,9 @@ export const isSimResponse = (value: unknown): value is SimResponse => {
  *
  * @remarks
  * As for a response, only the fields that route it are checked: its id and
- * kind, and that it has no `ok`, which every response has. What it says of
- * the progress is taken on trust from the worker, beyond its being an
- * object.
+ * kind and pass, and that it has no `ok`, which every response has. What
+ * it says of the progress is taken on trust from the worker, beyond its
+ * being an object.
  *
  * @param value - Anything, such as the data of a message just received.
  */
@@ -453,6 +450,7 @@ export const isSimProgress = (value: unknown): value is SimProgress =>
 	!('ok' in value) &&
 	typeof value.id === 'number' &&
 	isSimKind(value.kind) &&
+	typeof value.pass === 'number' &&
 	isRecord(value.progress);
 
 /**

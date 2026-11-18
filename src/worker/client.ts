@@ -50,7 +50,7 @@ export type RequestOptions = {
 	 * before it answers, with the pass of a climate's loop it is in. Only a
 	 * climate says so; for anything else this is never called.
 	 */
-	readonly onProgress?: (progress: TemperatureProgress, pass?: number) => void;
+	readonly onProgress?: (progress: TemperatureProgress, pass: number) => void;
 	/**
 	 * Told of each pass of a climate as the worker finishes it, before it
 	 * answers, in order: the pass's temperature and winds, which are the

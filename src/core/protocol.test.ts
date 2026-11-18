@@ -501,6 +501,7 @@ describe('isSimProgress', () => {
 		id: 1,
 		kind: 'climate',
 		progress: PROGRESS,
+		pass: 1,
 	};
 
 	it('accepts a message about progress', () => {
@@ -513,6 +514,8 @@ describe('isSimProgress', () => {
 		expect(isSimProgress({ ...progress, kind: 'erosion' })).toBe(false);
 		expect(isSimProgress({ ...progress, progress: 3 })).toBe(false);
 		expect(isSimProgress({ id: 1, kind: 'climate' })).toBe(false);
+		expect(isSimProgress({ ...progress, pass: undefined })).toBe(false);
+		expect(isSimProgress({ ...progress, pass: '1' })).toBe(false);
 	});
 
 	it('refuses responses and values that are not objects', () => {

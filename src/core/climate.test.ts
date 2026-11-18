@@ -147,9 +147,16 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		).toBeGreaterThan(1);
 	});
 
-	it('settles in one pass when carried on from a settled result for the world as it is', () => {
+	it('settles at the second pass, not the first, when carried on from a settled result for the world as it is', () => {
 		const again = run(EARTH, { model: COARSE, start: earth().result });
-		expect(again.passes).toHaveLength(1);
+		// The first pass is small enough in change, and still does not settle.
+		const first = again.passes[0] as ClimateProgress;
+		expect(first.changeC).toBeLessThanOrEqual(
+			TEMPERATURE_MODEL.climateToleranceC,
+		);
+		expect(first.settled).toBe(false);
+		expect(first.last).toBe(false);
+		expect(again.passes).toHaveLength(2);
 		expect(again.result.settled).toBe(true);
 		expect(again.result.changeC).toBeLessThanOrEqual(
 			TEMPERATURE_MODEL.climateToleranceC,
@@ -158,7 +165,7 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		// largest in some cell is above it, a few times that: the rule is the
 		// rms, not the largest change.
 		const largest = largestDifference(
-			again.result.temperature.months,
+			first.temperature.months,
 			earth().result.temperature.months,
 		);
 		expect(largest).toBeGreaterThan(TEMPERATURE_MODEL.climateToleranceC);

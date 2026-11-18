@@ -330,7 +330,7 @@ describe('handleRequest for climate', {
 		);
 	});
 
-	it('carries on from the start it is given, a result as the page keeps it, and settles in one pass', () => {
+	it('carries on from the start it is given, a result as the page keeps it, and settles at the second pass', () => {
 		const last = answered().passes.at(-1)?.climatePass;
 		if (last === undefined) {
 			throw new Error('no pass was told');
@@ -350,10 +350,10 @@ describe('handleRequest for climate', {
 			(pass) => passes.push(pass),
 		);
 		expect(response.ok && response.result).toMatchObject({
-			passes: 1,
+			passes: 2,
 			settled: true,
 		});
-		expect(passes).toHaveLength(1);
+		expect(passes).toHaveLength(2);
 		// The start's record is carried through the copy and back.
 		expect(passes[0]?.climatePass.temperature.solvedFor).toEqual(
 			last.temperature.solvedFor,
