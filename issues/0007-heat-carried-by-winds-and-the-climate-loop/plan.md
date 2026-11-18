@@ -144,7 +144,7 @@ Rejected (with the user's choices): putting the winds into the main symmetric so
 - [x] 2. Heat carried by the wind, in the temperature solve
 - [x] 3. The climate loop in the core
 - [x] 4. The setting's value, and the baselines
-- [ ] 5. One climate request in the worker
+- [x] 5. One climate request in the worker
 - [ ] 6. The page: one scheduler, passes shown as they land
 
 ## Verification
@@ -200,3 +200,13 @@ The user chose, after measuring a strength-by-rule grid and a `thermalHpaPerK` 0
 - **Timings** (`npm run time:climate`, new): the Earth at 64: 4 passes, 8.3 s from nothing (first pass 1.4 s, a later pass about 2.3 s on average, with the early ones longest), 1.7 s carried on from the settled result; 128: 4 passes, 9.3 s and 1.8 s; 256: 4 passes, 27.2 s (first pass 5.6 s, a later pass 7.2 s) and 4.0 s.
 - **The regional error table** (`temperature-errors.ts`, through the loop; old → new): W Europe −6.5 → −5.7 K annual; E North America +3.6 → +3.5, January +10.8 → +8.2; W coast North America −4.4 → −3.2; East Asia January +6.3 → +4.8; Siberian interior −2.5 → −2.1; N Atlantic −7.7 → −7.4; Barents/Norwegian −12.2 → −10.9, January −19.1 → −17.6; Himalaya/Tibet −11.9 → −10.9; Antarctica +8.3 → +8.5; Sahara −5.5 → −5.3. West minus east coasts 40–60°N, simulated / observed: Europe W vs Asia E annual +2.9 / +11.5, January +7.8 / +22.9 (was +0.7 / +2.4); North America W vs E annual +0.0 / +5.8, January +3.5 / +15.1 (was −0.8 / −0.6).
 - **Left open:** the optional test that a warm guess takes fewer rounds (the count is not exposed). Uncovered changed lines are the defensive throws accepted before, and the advection-sweep guard.
+
+### Piece 5: one climate request in the worker (2026-11-18)
+Decided by the builder:
+- **The `climate` kind is added beside `temperature` and `winds`, not instead of them** (the plan said replace). The page's `refresh.ts` schedulers still use the two old kinds, so replacing them now would have left the page broken for a piece; piece 6 switches the page to one climate scheduler and removes the old kinds, with their tests. For the same reason the climate service (it needs the scheduler) and `main.ts`'s one worker are piece 6's; `workerService.latest` already carries any kind.
+- **The response holds only `ClimateSummary`** ({dayLengthHours, passes, settled, changeC}); the arrays are the last pass's, sent with its pass message. A buffer cannot be transferred twice, so the last pass is the one transferred (the loop reads nothing after it) and earlier passes are sent as copies (`slice`; the loop reads them on its next pass). The consumer (piece 6) keeps the last pass message. The correctness check suggested sending the last pass's arrays in a full `ClimateResult` response instead if stitching them together gets awkward in `refresh.ts`.
+- **Protocol.** `SimResults.climate`, `SimExtras.climate` (`start?: ClimateStart`), `SimPass` ({id, kind: 'climate', climatePass: ClimateProgress}) and `isSimPass`; `SimProgress.pass` (optional; the climate's progress carries the pass its year is in). `ClimateStart` was loosened to what the loop reads ({temperature: months, state, solvedFor; winds: east, north; dayLengthHours}), so the page sends no pressure and no scalar fields; a `ClimateResult` still fits. The parser builds the request afresh from a whitelist: no model or wind settings from a message.
+- **Worker and client.** `handleRequest(request, onProgress, onPass)`; `sim.worker.ts` posts the pass with its transfer list; the client has `onPass` and `onProgress(progress, pass?)`; `workerService.latest` wraps both so a call that has been overtaken hears nothing more (a behaviour change for the temperature path too: its progress is dropped once overtaken). With `restartWhenOvertaken` the overtaken worker is ended, as for the temperature.
+- **The winds' grid tables are built once per worker** already (per-grid caches in `wind/rules.ts`, `wind/flowing.ts` and `grid.ts`); nothing to change.
+- Tests: climate cases in the protocol, handle (one real run of ten seconds or so, each pass posted with its transfer list so a loop that read a posted array would fail), client and workerService tests; a new `sim.worker.test.ts` (the handler mocked); `core/testing/climateFixtures.ts`; the fake worker routes passes. The old kinds' tests are untouched until piece 6.
+- Uncovered changed lines: only the fake worker's pass route (a helper) and the defensive lines accepted before.

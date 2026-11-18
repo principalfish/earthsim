@@ -81,3 +81,17 @@
 | re-check | docs | low | docs | verified | open | `docs/temperature.md:47` | "A quarter to a third of the observed" (also in the `windHeatCapacity` source in config.ts and config.md:22) is wrong for North America's year, 0.0 against 5.8 K; true of the other three figures |
 | re-check | correctness | low | docs | verified | open | `src/core/config.ts:1750` | `warmLimitK`'s "at most 18 hPa deep" assumes 3 hPa/K; about 4 hPa at 0.7 (and config.md:134) |
 | re-check | correctness | low | docs | verified | open | `docs/winds.md:220` | The tuning-script paragraph reads as though the What-it-gets-wrong figures were at 0.7; they were at 3 |
+
+## piece 5 · 2026-11-18 · One climate request in the worker
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | docs | verified | fixed | `src/worker/handle.ts:59` | The remark said a climate uses only the start's state and winds; it also uses the temperature's months, record and the day length |
+| round | docs | low | docs | verified | fixed | `src/worker/handle.ts:178` | "Nothing else reports progress" — a climate reports each year of each pass with its pass |
+| round | docs | low | docs | verified | fixed | `src/worker/handle.ts:170` | An error thrown by `onPass` also ends the computation; the doc named only `onProgress` |
+| round | coverage | low | test | verified | fixed | `src/app/layers/workerService.test.ts:297` | The overtaken call had only `onPass`; the `onProgress` filter was never checked |
+| round | correctness | low | cleanup | verified | fixed | `src/core/protocol.ts:280` | `isClimateStartShaped` repeated the state and record checks; now reuses `isTemperatureStartShaped` |
+| round | correctness | - | cleanup | verified | fixed | `src/core/protocol.ts:347` | The climate error string hard-coded "twelve"; now `${MONTHS_PER_YEAR}` |
+| round | correctness | - | cleanup | dropped | - | `src/worker/handle.ts:111` | `copyOfPass` copies the pressure arrays too — dropped: skipping 12 small copies isn't worth one pass message mixing copied and transferred arrays |
+| round | coverage | - | - | dropped | - | `src/worker/testing/fakeWorker.ts:76` | The stand-in's pass route is reachable only through a full climate on the fake — dropped: helper-only line; the real handler's pass path is covered in handle.test.ts |
+| re-check | correctness | low | cleanup | verified | open | `src/worker/handle.ts:180` | The reworded `handleRequest` remark left one comment line 130 characters long mid-paragraph; re-wrap |
