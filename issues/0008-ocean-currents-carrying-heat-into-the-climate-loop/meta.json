@@ -6,9 +6,9 @@
   "state": "investigating",
   "branch": "ocean-currents-carrying-heat-into-the-climate-loop",
   "base": "main",
-  "gh_issue": null,
+  "gh_issue": 15,
   "build_model": null,
   "created": "2026-11-18 19:50",
-  "updated": "2026-11-18 19:50",
+  "updated": "2026-11-18 20:17",
   "done": null
 }
