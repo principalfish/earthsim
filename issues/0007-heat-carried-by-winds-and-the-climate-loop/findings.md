@@ -18,7 +18,7 @@
 | round | security | - | - | dropped | - | `src/core/grid/vector.ts:905` | Unbounded side-search loop on asymmetric neighbours — dropped: same pattern as existing loops, grids are built in-library |
 | round | coverage | - | - | dropped | - | `src/core/wind/flowing.test.ts:219` | Assert the zonal-mean eastward wind changes little — dropped: optional, correlation and rms ratio already check the pattern |
 | round | - | - | docs | noticed | fixed | `src/core/wind/flowing.ts:131` | The leftover is nearer an eighth (0.13) than a tenth |
-| re-check | correctness | low | docs | verified | open | `src/core/wind/flowing.ts:168` | "to ten millionths of the input's rms flow" can be misread as 10 × 1e-6; should read "a ten-millionth" (1e-7) |
+| re-check | correctness | low | docs | verified | fixed | `src/core/wind/flowing.ts:168` | "to ten millionths of the input's rms flow" can be misread as 10 × 1e-6; should read "a ten-millionth" (1e-7) |
 
 ## piece 2 · 2026-11-18 · Heat carried by the wind, in the temperature solve
 
@@ -36,8 +36,29 @@
 | round | correctness | - | - | dropped | - | `src/core/temperature/advection.ts:138` | `setFlows` re-checks finiteness each step — dropped: exported API whose doc promises the RangeError; a few reads a step |
 | round | correctness | - | - | dropped | - | `src/core/temperature/temperature.ts` | Flows on the solve grid differ from the plan (the solve coarsening them) — dropped: recorded builder decision; piece 3 settles the helper |
 | round | docs | - | - | dropped | - | `docs/winds.md:72` | "Is to be carried" reads as future work — dropped: accurate, the page doesn't yet feed winds to the temperature |
-| re-check | correctness | low | docs | verified | open | `docs/temperature.md:23` | "Flows are interpolated between the months' as the sunlight is" is wrong: sunlight is evaluated at each step's end, only the flows are interpolated |
-| re-check | correctness | low | docs | verified | open | `src/core/temperature/advection.ts:19` | The closing shift is "within the sweeps' tolerance" only when they converge; at the 200-sweep cap nothing bounds it |
-| re-check | coverage | low | test | verified | open | `src/core/temperature/temperatureWinds.test.ts:186` | The coldest-world assertion `> -273.15` can't fail (this world's coldest month is about 35 K); the air floor is 1.35 K, not 2.7 K, so the comment is wrong too |
-| re-check | correctness | low | docs | verified | open | `docs/temperature.md:23` | "Makes no new extreme" has no caveat (to within the solver's tolerance) |
-| re-check | docs | low | docs | verified | open | `docs/winds.md:190` | "The winds do not change the temperature" should add that the page does not yet give the temperature the winds |
+| re-check | correctness | low | docs | verified | fixed | `docs/temperature.md:23` | "Flows are interpolated between the months' as the sunlight is" is wrong: sunlight is evaluated at each step's end, only the flows are interpolated |
+| re-check | correctness | low | docs | verified | fixed | `src/core/temperature/advection.ts:19` | The closing shift is "within the sweeps' tolerance" only when they converge; at the 200-sweep cap nothing bounds it |
+| re-check | coverage | low | test | verified | fixed | `src/core/temperature/temperatureWinds.test.ts:186` | The coldest-world assertion `> -273.15` can't fail (this world's coldest month is about 35 K); the air floor is 1.35 K, not 2.7 K, so the comment is wrong too |
+| re-check | correctness | low | docs | verified | fixed | `docs/temperature.md:23` | "Makes no new extreme" has no caveat (to within the solver's tolerance) |
+| re-check | docs | low | docs | verified | fixed | `docs/winds.md:190` | "The winds do not change the temperature" should add that the page does not yet give the temperature the winds |
+| manual | user | low | docs | - | fixed | `docs/temperature.md`, `src/core/` | The user chose to fix the six open re-check nits of pieces 1 and 2 now ("Fix them now", 2026-11-18): one commit of its own |
+
+## piece 3 · 2026-11-18 · The climate loop in the core
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | coverage | medium | test | verified | fixed | `src/core/climate.test.ts:313` | "The half-step damps a forced oscillation" was tested only as arithmetic; now a case (generated world, 8e5, 4 passes) shows the pass after a damped one changes less than the same pass left whole |
+| round | correctness | low | defect | verified | fixed | `src/core/climate.ts:318` | Strict `<` settled test departed from the ledger's "no more than 0.1 °C"; now `<=`, with docs and test |
+| round | correctness | low | docs | verified | fixed | `src/core/config.ts` | "The Earth settles within about four" held only at a tenth of the starting setting; now says so |
+| round | correctness | low | cleanup | verified | fixed | `src/core/climate.ts:221` | `suits` compared records with JSON.stringify; now `conditionsMatch` from temperature.ts, shared with the solve's own start check |
+| round | docs | low | docs | verified | fixed | `docs/temperature.md:25` | Nothing said `flowingPartForSolve` and `grid/flows.ts` find the flows on the solve grid; added in temperature.md, winds.md and development.md |
+| round | correctness | low | docs | verified | fixed | `src/core/climate.ts:171` | A damped result keeps the raw pass's yearsRun, converged and finalChangeK; documented |
+| round | coverage | low | test | verified | fixed | `src/core/climate.test.ts:150` | `suits` branches untested (no record; another planet setting); added |
+| round | coverage | low | test | verified | fixed | `src/core/climate.test.ts:316` | The damped state's previousK blend and carried-over fields not asserted; added |
+| round | correctness | - | docs | verified | fixed | `src/core/config.md:11` | "N for the solver" counted the loop group; the label is now "numerical" |
+| round | correctness | low | - | dropped | - | `src/core/climate.ts:311` | Overshoot needs a strictly growing change; equal or slowly decaying changes aren't damped — dropped: the ledger says "grows rather than shrinks"; damping equal changes would be an enhancement |
+| round | docs | - | - | dropped | - | `src/core/config.ts:486` | "Below about 0.05 the temperature's own tolerance sets the limit" unsupported — dropped: the temperature solve stops a year at DEFAULT_TOLERANCE_K = 0.05 |
+| round | coverage | - | - | dropped | - | `src/core/climate.test.ts` | "A test planet" no-wind case — dropped: the setting at zero is tested, which meets the plan |
+| round | - | medium | defect | noticed | open | `src/core/climate.ts:311` | At the shipped capacity the half-step stops some passes from growing but does not bring the oscillation down; whether the loop settles there rests on the damping (see the notes, and piece 4's table) |
+| re-check | correctness | low | docs | verified | open | `src/core/climate.ts:113` | The `start` option doc and the `@throws` don't say that a start whose temperature has no valid record is refused with a RangeError (since `conditionsMatch`) |
+| re-check | correctness | low | test | verified | open | `src/core/climate.test.ts:117` | `changeC` is checked with `toBeLessThan(tolerance)` at lines 117 and 155, though settling is `<=` |

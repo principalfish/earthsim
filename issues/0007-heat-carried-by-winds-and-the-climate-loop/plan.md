@@ -142,7 +142,7 @@ Rejected (with the user's choices): putting the winds into the main symmetric so
 ## Checkpoints
 - [x] 1. The wind's flowing part
 - [x] 2. Heat carried by the wind, in the temperature solve
-- [ ] 3. The climate loop in the core
+- [x] 3. The climate loop in the core
 - [ ] 4. The setting's value, and the baselines
 - [ ] 5. One climate request in the worker
 - [ ] 6. The page: one scheduler, passes shown as they land
@@ -177,3 +177,13 @@ Decided by the builder:
 
 ### Changed 2026-11-18: piece 4 measures, then stops for the user
 - The loop as agreed does not settle on the Earth at the physical strength (see decisions.md, measured in piece 3). Piece 4 now measures a grid of 2–3 strengths by 2–3 stopping rules (0.1 °C on the largest change; an average-change rule; damping every pass by half), reporting the west–east contrast (annual and January), East Asia's January, passes to settle and seconds, on the Earth and three generated worlds, and stops for the user to choose the strength and the rule before setting the value and re-recording the baselines. The user: "Measure options, then I choose (Recommended)" (2026-11-18)
+
+### Piece 3: the climate loop in the core (2026-11-18)
+Decided by the builder:
+- **The loop's three settings are a group, "The climate loop" (numerical), of `TEMPERATURE_CONFIG`**, so they are fields of `TemperatureModel` (`climateToleranceC` 0.1, `climateMaxPasses` 6, `climateOvershootShare` 0.5) and show on the Model settings screen with no screen change; a new section would have needed that. `assertModel` checks them.
+- **`ClimateStart` is a `Pick` of `ClimateResult`** (the temperature result with its months, state and record; the winds; the day length), so a result is a start as it stands. It is used only if its temperature's record names the world's sea level and temperature settings (`conditionsMatch`, shared with `solveTemperature`'s own check) and its day length is the world's; otherwise the climate is solved from nothing. A malformed start throws a RangeError. Day length is therefore in the climate's record, as the plan said; `TemperatureConditions` is unchanged (the temperature alone still does not depend on it).
+- **A warm start's first pass** carries on from the start's state with heat carried along the start's winds and compares with the start's months, so a settled start settles in one pass (tested). A start whose temperature `solveTemperature` sets aside for terrain drift is still given the start's winds; the later passes correct them.
+- **Damping**: a pass whose raw change is larger than the pass before's (strictly) is blended half-way from the pass before's applied temperature (months, `temperatureK`, `previousK`), its winds solved from the blended months; the raw change is what is reported and what the stop tests. The years run, converged flag and last year's change stay the pass's own. Settled means a change of no more than the tolerance.
+- **Flows for the temperature solve** are found on the 64 grid whatever the world's resolution (`flowingPartForSolve`): the world's edge flows are summed down (`coarsenFlows`, exact, no net flow kept), the converging part taken out at 64, and for a world of 256 (solved on 128) shared back up (`refineFlows`: equal split of each coarse edge, the four inner edges of each 2×2 block the minimum-norm ones that leave no net flow). Timings, Earth at 64: a later pass about 1.6 s (temperature 0.3 s for one warm year, flowing part 0.7 s, winds 0.6 s), the first about 1.8 s; a world of 128 about 1.8 s a later pass. A 256 world was not timed. No `solveClimate` test runs 128 or 256 (the `flowingPartForSolve` and flows tests do).
+- **Measured, and reported to the user (see the piece 3 report): with the starting `windHeatCapacity` 1.2e6 the Earth at 64 does not settle within 6 passes** (largest change per pass 14.2, 12.1, 8.8, 8.0, 6.2 K; the rms change 1.6, 1.1, 0.7, 0.6, 0.4 K; a few spring cell-months in Siberia keep moving; no overshoot, so the half-step never fires). At 6e5 the largest change reaches 0.5 K in 6; at 3e5 the Earth settles in 6, at 1e5 in 4. On generated worlds at 1.2e6 the loop oscillates by 13–27 K and the half-step only stops some passes growing. The tests use 1e5 for the Earth. The user chose "Measure options, then I choose" for piece 4.
+- Uncovered changed line (flows.ts, the defensive throw while building the fine-to-coarse table): unreachable on the cubed-sphere grid.
