@@ -7,3 +7,20 @@ The winds now carry heat. The climate is worked out as a loop: the temperature, 
 The page shows the first pass at once, as the climate looks today, and each later pass as it lands, with the status naming the pass; Pause lets the pass under way finish. The temperature and winds become one climate solve in the worker. The one new setting, how strongly the wind carries heat, starts from a physical estimate and is checked against the Earth's west–east contrast; it appears in the config and on the Model settings screen.
 
 Winds explain about a quarter of the Earth's temperature error, so its overall figures move only modestly; the rest waits for the ocean, ice and the tuning step. Not included: ocean currents, rain, retuning other settings, the cooling with height and Antarctica (both noted for the tuning step).
+
+## Plan
+
+_2026-11-18 · 0 of 6 pieces done · now: waiting on a decision (piece 1)_
+
+- [ ] **1/6 The wind's flowing part** · not started
+  The part of the surface wind that converges into lows is removed, so the rest can carry heat without making any.
+- [ ] **2/6 Heat carried by the wind, in the temperature solve** · not started
+  The temperature solve takes the winds and moves heat downwind each step; with no winds it is exactly today's.
+- [ ] **3/6 The climate loop in the core** · not started
+  Temperature, winds and the heat they carry, repeated until it settles (0.1 °C, at most 6 passes).
+- [ ] **4/6 The setting's value, and the baselines** · not started
+  How strongly the wind carries heat is set from physics and checked against the Earth's coasts; both baselines re-recorded with the coast contrast.
+- [ ] **5/6 One climate request in the worker** · not started
+  The worker answers one climate request with each pass as it lands.
+- [ ] **6/6 The page: one scheduler, passes shown as they land** · not started
+  The page shows the first pass at once and each refinement, with Pause between passes.
