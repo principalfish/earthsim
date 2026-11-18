@@ -39,7 +39,6 @@ Step 5 of the roadmap (`investigations/2026-11-10-simulator-design-and-roadmap.m
 - **The overturning rule on invented maps:** the builder measures two or three candidate rules on the Earth and the generated worlds and stops for the user to choose before it ships, as 3b's piece 4 did.
 - **Gyre details left to the builder, measured:** the friction that sets the western boundary current's width per grid size, island constants (the island rule), the circumpolar channel's clamp, the equatorial floor on the Coriolis term, and which grid the gyres are solved on.
 - **The loop:** if it does not settle within the 8-pass cap at physical values, the builder measures options and stops for the user, as in 3b.
-- **Manual review** at the page piece only (the Sea temperature layer and Currents overlay), as in 3b.
 - **`ui/layerPanel.ts` grows** with the two new entries before the deferred split.
 
 ## Approach
@@ -150,3 +149,6 @@ Rejected (with the user's choices): gyres alone (the North Atlantic barely warms
 After every piece: `npm run check`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run docs:config` leaving `config.md` unchanged after regenerating. Changed-lines coverage with `project.md`'s Coverage command. Pieces 2, 5, 6 and 7 re-record both Earth baselines (`npm run baseline:temperature`, `npm run baseline:winds`) with old and new figures in the review, rerun the region script (`climate-errors.ts` in the issue folder, `node scripts/run-with-vite.mjs <path>`) and report timings with `npm run time:climate`. Pieces 3 and 4 leave both baselines untouched.
 
 ## Notes
+
+### How the pieces run (2026-11-18)
+Straight through, as in 3b (the user: "Straight through, as 3b (Recommended)"): commit and push after each piece's review round and light re-check, with the verifier on every finding; fix verified findings; record each choice the plan leaves open as "Decided by the builder" here. Stop for: the manual reviews of pieces 8 and 9 (the user: "Pieces 8 and 9 (Recommended)"); the overturning rule choice in piece 7; any region of the Earth getting clearly worse in pieces 2, 5, 6 and 7; the loop not settling within the cap; a data source in piece 1 that can't be reached or whose terms forbid shipping; anything beyond the plan, against the ledger, touching shared state or that can't be undone; a check that can't be passed. Re-check findings the verifier upholds go to the user unfixed. Pieces 3 and 4 do not depend on 2 and may be built in either order after 1.

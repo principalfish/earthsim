@@ -10,7 +10,7 @@ Not included: real sea ice (step 6), rain (step 4), the deep ocean beyond the ov
 
 ## Plan
 
-_2026-11-18 · 0 of 9 pieces done · now: waiting on a decision_
+_2026-11-18 · 0 of 9 pieces done · now: piece 1 ready to start_
 
 - [ ] **1/9 Observed sea temperatures and currents** · not started
   The observed sea temperatures (OISST) and drifter currents, built into shipped data files with their loaders.

@@ -13,6 +13,8 @@
 - **Monthly currents:** 12 gyre solves a pass, following the winds; cost measured in the piece. The user: "Monthly (Recommended)" (2026-11-18)
 - **The sea-ice stand-in follows the sea temperature:** the sea becomes icy as it nears freezing (about −1.8 °C), and the ice then cuts the sea off from the air, so the air above can get very cold while the sea stays at freezing; land keeps the air-driven stand-in; real sea ice is still step 6. The user asked "We don't have sea ice yet?" and, after the stand-in was explained, chose "The sea temperature (Recommended)" (2026-11-18)
 - **The Temperature layer stays the air's** everywhere, compared with the observed air temperature as now; the sea's own is on the new Sea temperature layer. The user: "The air's, as today (Recommended)" (2026-11-18)
+- **Nine pieces** (plan.md), with the page split over two; manual reviews at pieces 8 (the Sea temperature layer) and 9 (the Currents overlay and the finished model). The user: "Pieces 8 and 9 (Recommended)" (2026-11-18)
+- **The builder runs straight through, as in 3b:** commit and push after each piece's review round and light re-check (with the verifier), fix verified findings, record "Decided by the builder" choices and list them at the end; it stops for the manual reviews of pieces 8 and 9, the overturning rule choice (piece 7), a region getting clearly worse, the loop not settling within the cap, a data source that can't be reached or shipped, and anything beyond the plan. Re-check findings the verifier upholds come to the user unfixed. The user: "Straight through, as 3b (Recommended)" (2026-11-18)
 
 ## Open
 
@@ -23,6 +25,5 @@
 - **The overturning rule on invented maps:** the builder measures two or three candidate rules on the Earth and the generated worlds and stops for the user to choose before it ships, as 3b's piece 4 did.
 - **Gyre details left to the builder, measured:** the friction that sets the western boundary current's width per grid size, island constants (the island rule), the circumpolar channel's clamp, the equatorial floor on the Coriolis term, and which grid the gyres are solved on.
 - **The loop:** if it does not settle within the 8-pass cap at physical values, the builder measures options and stops for the user, as in 3b.
-- **Manual review** at the page piece only (the Sea temperature layer and Currents overlay), as in 3b.
 - **`ui/layerPanel.ts` grows** with the two new entries before the deferred split.
 
