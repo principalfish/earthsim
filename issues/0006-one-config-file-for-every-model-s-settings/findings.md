@@ -51,3 +51,24 @@
 | round | coverage | low | test | - | accepted | `src/app/main.ts:224` | Two lines of glue in the untested bootstrap, each end tested separately |
 | round | docs | low | docs | - | fixed | `docs/development.md:125` | Same as the ui rows above |
 | round | security | - | - | - | - | - | Clean |
+
+## piece 5 · 2026-11-18 · The climate process diagram on the screen, and the PDF removed
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | medium | defect | verified | fixed | `src/app/styles.css:1372` | The panel and diagram grids had no `min-width: 0`, so the diagram's minimum width could make the whole panel scroll sideways in a narrow window |
+| round | correctness | low | defect | verified | fixed | `src/app/ui/panel/processDiagram.ts:697` | `aria-labelledby` named both the title and the long description, so the description became the accessible name |
+| round | correctness | low | defect | verified | fixed | `src/app/styles.css:1355` | At the 40rem minimum the drawing shrank to about 6px text, against the comment's claim |
+| round | correctness | low | cleanup | verified | accepted | `src/app/ui/panel/processDiagram.ts:512` | The PDF's title and subtitle are not carried over; the tab name and an intro stand for them |
+| round | correctness | low | test | verified | fixed | `src/app/ui/panel/processDiagram.test.ts:23` | Box kind, label tone, size, weight and the sea-ice box's voice, and the heads' class and path were not asserted |
+| round | correctness | low | docs | verified | fixed | `src/app/ui/panel/modelSettings.ts:123` | A stale comment on the generic panel builder |
+| round | correctness | nit | docs | verified | fixed | `src/app/ui/panel/modelSettings.ts:161` | `@param options` left out `diagram`; the tablist's aria-label no longer fit |
+| round | correctness | nit | cleanup | verified | fixed | `src/app/ui/panel/processDiagram.ts:666` | The arrow heads were 9 units; the PDF's are about 6 |
+| round | correctness | nit | cleanup | verified | accepted | `src/app/ui/panel/processDiagram.ts:592` | The sea ice lines sit at 288.5 and 276.5 where the PDF put 288 and 276, from the generic centring; not visible |
+| round | coverage | low | test | verified | fixed | `src/app/ui/panel/processDiagram.test.ts:433` | A counts-only test claimed more than it showed; dropped |
+| round | coverage | low | test | verified | fixed | `src/app/ui/panel/processDiagram.ts:513` | The introduction was never asserted |
+| round | coverage | - | - | dropped | - | - | Built and to-come marks exist only as the two status lines — dropped: the PDF marked them the same way and a test asserts the lines |
+| round | docs | low | docs | verified | fixed | `src/app/ui/panel/processDiagram.ts:12` | "as the diagram was first drawn" and the same in `docs/development.md:36` pointed at a removed file |
+| round | docs | low | docs | verified | fixed | `src/app/ui/panel/settingsPanel.ts:140` | The comment on the button said the screen only lists the settings |
+| round | docs | low | cleanup | verified | fixed | `.gitattributes:2` | The `*.pdf binary` rule was dead with no PDF left |
+| round | security | - | - | - | - | - | Clean |
