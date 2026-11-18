@@ -41,6 +41,7 @@ The user's brief (2026-11-18): "Plan 3b", roadmap step 3b in `investigations/202
 - Piece 4 also warm-starts the flowing-part solve from the previous pass's answer (results unchanged within tolerance) and reports the new per-pass time. The user: "Yes, try it (Recommended)" (2026-11-18)
 
 - The eight open small findings are fixed now, in one small commit: `climate.ts:113` (the `start` doc and `@throws`), `climate.test.ts:117,155` (`<=`), `flowing.test.ts:411` (a warm guess takes fewer rounds, exposing the round count), `docs/temperature.md:47,49` (the loop settings sentence placement; "a quarter to a third" not true of North America's year, also in `config.ts` and `config.md:22`), `config.ts:1750` and `config.md:134` (`warmLimitK` at 0.7), `docs/winds.md:220` (the tuning-script figures were at 3), `handle.ts:180` (re-wrap). The medium noticed finding at `climate.ts:311` (the half-step at the old strength) is left for the self review, since the shipped settings now settle. The user: "Fix them now" (2026-11-18)
+- Piece 6 approved after the manual review, with all three re-check findings fixed before the commit: the bar-never-falls test requires a number after the first entry (apart from while paused), the tests assert pass 1 after resuming from a new world or a reset while paused, and the `stop` doc gets `@param solved`. The user: "Tried it, fix all" (2026-11-18)
 
 ## Open
 - None.
