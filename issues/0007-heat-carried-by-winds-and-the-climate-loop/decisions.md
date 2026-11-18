@@ -37,6 +37,9 @@ The user's brief (2026-11-18): "Plan 3b", roadmap step 3b in `investigations/202
 
 - Before choosing, piece 4 also measures the strong settings (1.2e6 and 6e5) with the winds' `thermalHpaPerK` at about its physical value (0.7 hPa/K, against 3 today, inflated in step 3 to make up for weak land–sea contrasts), under the stopping rules already measured, reporting the same columns: whether the inflated link from colder to stronger high is what keeps the loop from settling. A measurement only; whether to change `thermalHpaPerK` here or in step 6b is decided after. The user: "Yes, measure it" (2026-11-18), after asking how the loop works and what the problem is.
 
+- Option A: heat-carrying strength `windHeatCapacity` 1.2e6 J/m²/K (about 1 km of air, the physical estimate), the winds' `thermalHpaPerK` brought down from 3 to its physical value 0.7 hPa/K now rather than at step 6b, and the loop's stop changed to an average change: the rms of the change between passes at most 0.1 °C, with a cap of 8 passes (replacing the largest-change rule and its cap of 6). Measured: the Earth settles in 4 passes (8.1 s at 64), the three generated worlds in 4–5; Europe W − Asia E 2.9 / 7.8 K annual / January (observed 11.5 / 22.9), North America 0.0 / 3.5 (observed 5.8 / 15.1), East Asia January +0.8 °C (observed −4.0). This reverses "retuning waits for step 6b" for `thermalHpaPerK` only; `lowShiftGain` still waits. Before committing, piece 4 reports the winds' own error against the observed Earth winds at 0.7 and stops for the user if it is much worse. The user: "A: physical, Th 0.7 (Recommended)" (2026-11-18)
+- Piece 4 also warm-starts the flowing-part solve from the previous pass's answer (results unchanged within tolerance) and reports the new per-pass time. The user: "Yes, try it (Recommended)" (2026-11-18)
+
 ## Open
 - None.
 
