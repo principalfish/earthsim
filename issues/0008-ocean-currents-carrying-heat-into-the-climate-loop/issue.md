@@ -7,3 +7,26 @@ The sea gets a temperature of its own, beside the air's, with its top 60 m excha
 The page gains a Sea temperature layer, compared with observed sea temperatures, and a Currents overlay drawn with arrows like the winds, compared with observed drifter currents; the new settings appear in the config and on the Model settings screen. Settings start from physical values and are checked against the Earth by region; retuning waits for step 6b.
 
 Not included: real sea ice (step 6), rain (step 4), the deep ocean beyond the overturning's heat term, and retuning other settings.
+
+## Plan
+
+_2026-11-18 · 0 of 9 pieces done · now: waiting on a decision_
+
+- [ ] **1/9 Observed sea temperatures and currents** · not started
+  The observed sea temperatures (OISST) and drifter currents, built into shipped data files with their loaders.
+- [ ] **2/9 The sea's own temperature** · not started
+  Sea cells get a temperature of their own beside the air's, exchanging heat with it; the ice stand-in follows the sea.
+- [ ] **3/9 Grid corners** · not started
+  A shared corner index on the globe's grid, with exact flows from corner values and a solve that holds each coast.
+- [ ] **4/9 Wind-driven gyres** · not started
+  Monthly gyres from the winds on any coastline, with strong currents on each basin's western side.
+- [ ] **5/9 Currents carry the sea's heat in the loop** · not started
+  Each pass becomes temperature, winds, currents; the sea's heat moves along the currents.
+- [ ] **6/9 Upwelling** · not started
+  Cold water comes up where the wind pushes coastal water offshore, and at the equator.
+- [ ] **7/9 The overturning** · not started
+  Heat taken from a basin's tropics to its open polar end; candidate rules measured, you choose.
+- [ ] **8/9 The worker, the store and the Sea temperature layer** · not started
+  A Sea temperature layer with a Difference view against the observed.
+- [ ] **9/9 The Currents overlay, and the finished model's docs** · not started
+  Current arrows on the sea, with the observed drifter currents to compare; the diagram and guide updated.
