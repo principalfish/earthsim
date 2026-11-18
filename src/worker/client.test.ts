@@ -10,6 +10,7 @@ import {
 	type TerrainStats,
 	type World,
 } from '../core/index';
+import { passMessageOf } from '../core/testing/climateFixtures';
 import {
 	progressMessageOf,
 	temperatureOf,
@@ -291,6 +292,94 @@ describe('request for temperature', () => {
 			result: temperatureOf(1),
 		});
 		await expect(quiet).resolves.toEqual(temperatureOf(1));
+	});
+});
+
+describe('request for climate', () => {
+	const summary = {
+		dayLengthHours: 24,
+		passes: 2,
+		settled: true,
+		changeC: 0.05,
+	};
+
+	it('sends a copy of the start with the world, leaving the caller both', async () => {
+		const worker = createFakeWorker();
+		const client = createSimClient(worker);
+		const world = blank();
+		const start = {
+			temperature: temperatureOf(3),
+			winds: windResultOf(3),
+			dayLengthHours: 24,
+		};
+		const request = client.request('climate', { world, start });
+		expect(worker.posted[0]).toMatchObject({ id: 1, kind: 'climate' });
+		// Posted without a transfer list: the caller's arrays are whole.
+		expect(worker.postCalls[0]).toHaveLength(1);
+		expect(start.temperature.months[0]?.length).toBe(2);
+		worker.respond({ id: 1, kind: 'climate', ok: true, result: summary });
+		await expect(request).resolves.toEqual(summary);
+	});
+
+	it('tells of each pass for its own id, in order, and of the progress with the pass it is in, and settles only on the response', async () => {
+		const worker = createFakeWorker();
+		const client = createSimClient(worker);
+		const passes: number[] = [];
+		const progress: [number, number | undefined][] = [];
+		const other: number[] = [];
+
+		const result = client.request(
+			'climate',
+			{ world: blank() },
+			{
+				onPass: (pass) => passes.push(pass.pass),
+				onProgress: (heard, pass) => progress.push([heard.yearsDone, pass]),
+			},
+		);
+		void client.request(
+			'climate',
+			{ world: blank() },
+			{ onPass: (pass) => other.push(pass.pass) },
+		);
+		worker.respond({ ...progressMessageOf(1, 1), kind: 'climate', pass: 1 });
+		worker.respond(passMessageOf(1, 1));
+		worker.respond({ ...progressMessageOf(1, 1), kind: 'climate', pass: 2 });
+		worker.respond(passMessageOf(1, 2, { last: true, settled: true }));
+		expect(await stateOf(result)).toBe('pending');
+		expect(passes).toEqual([1, 2]);
+		expect(progress).toEqual([
+			[1, 1],
+			[1, 2],
+		]);
+		expect(other).toEqual([]);
+
+		worker.respond({ id: 1, kind: 'climate', ok: true, result: summary });
+		await expect(result).resolves.toEqual(summary);
+
+		// Answered: whatever comes for it later is ignored.
+		worker.respond(passMessageOf(1, 3));
+		expect(passes).toEqual([1, 2]);
+	});
+
+	it('ignores a pass for an id nobody waits on, or with nobody to tell', async () => {
+		const worker = createFakeWorker();
+		const client = createSimClient(worker);
+
+		const quiet = client.request('climate', { world: blank() });
+		expect(() => worker.respond(passMessageOf(1, 1))).not.toThrow();
+		expect(() => worker.respond(passMessageOf(99, 1))).not.toThrow();
+		expect(await stateOf(quiet)).toBe('pending');
+
+		worker.respond({ id: 1, kind: 'climate', ok: true, result: summary });
+		await expect(quiet).resolves.toEqual(summary);
+	});
+
+	it('rejects with the reason when the worker answers with a failure', async () => {
+		const worker = createFakeWorker();
+		const client = createSimClient(worker);
+		const result = client.request('climate', { world: blank() });
+		worker.respond(simFailure(1, 'climate', 'a pass failed'));
+		await expect(result).rejects.toThrow('a pass failed');
 	});
 });
 

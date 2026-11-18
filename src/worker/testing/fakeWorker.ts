@@ -26,8 +26,8 @@ export type FakeWorker = WorkerLike & {
 	respond(message: unknown): void;
 	/**
 	 * Answers the posted request with that id as the real worker would:
-	 * through the handler, its messages about progress first and then its
-	 * response, with the response's arrays transferred.
+	 * through the handler, its messages about progress and about passes
+	 * first and then its response, with the arrays of each transferred.
 	 */
 	answer(id: number): void;
 };
@@ -69,8 +69,11 @@ export const createFakeWorker = (): FakeWorker => {
 		respond: (message) => fake.emit('message', { data: message }),
 		answer: (id) => {
 			const request = fake.posted.find((posted) => posted.id === id);
-			const { response, transfer } = handleRequest(request, (progress) =>
-				fake.respond(structuredClone(progress)),
+			const { response, transfer } = handleRequest(
+				request,
+				(progress) => fake.respond(structuredClone(progress)),
+				(pass, buffers) =>
+					fake.respond(structuredClone(pass, { transfer: buffers })),
 			);
 			fake.respond(structuredClone(response, { transfer }));
 		},

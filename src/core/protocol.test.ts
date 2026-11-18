@@ -7,6 +7,7 @@ import {
 } from './planet/planet';
 import {
 	isSimKind,
+	isSimPass,
 	isSimProgress,
 	isSimResponse,
 	isWorldShaped,
@@ -68,6 +69,7 @@ describe('isSimKind', () => {
 		expect(isSimKind('terrainStats')).toBe(true);
 		expect(isSimKind('temperature')).toBe(true);
 		expect(isSimKind('winds')).toBe(true);
+		expect(isSimKind('climate')).toBe(true);
 	});
 
 	it('refuses other strings', () => {
@@ -643,5 +645,147 @@ describe('isSimResponse', () => {
 		expect(isSimResponse({ id: 1, result: {} })).toBe(false);
 		expect(isSimResponse({ id: 1, ok: 'yes', result: {} })).toBe(false);
 		expect(isSimResponse({ id: 1, kind: 'terrainStats', world })).toBe(false);
+	});
+});
+
+/** A start for a climate of the right form; its lengths and values are for the solver. */
+const climateStart = () => ({
+	temperature: { months: months(), state: state(), solvedFor: solvedFor() },
+	winds: { east: months(), north: months() },
+	dayLengthHours: 24,
+});
+
+const BAD_CLIMATE_START =
+	"A climate request's start must be an object whose temperature has 12 Float32Array months, a state (temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number) and a solvedFor with a finite seaLevel and a planet whose settings, the day length aside, are finite, whose winds have 12 Float32Array months each of east and north, and whose dayLengthHours is a finite number";
+
+describe('parseSimRequest for climate', () => {
+	it('reads a request with no start as a request from nothing', () => {
+		const parsed = parseSimRequest({ id: 4, kind: 'climate', world });
+		expect(parsed).toEqual({ id: 4, kind: 'climate', world });
+		expect('start' in parsed).toBe(false);
+	});
+
+	it('reads a request with a start, taking only what a climate starts from', () => {
+		const start = {
+			...climateStart(),
+			passes: 4,
+			temperature: {
+				...climateStart().temperature,
+				yearsRun: 3,
+				converged: true,
+			},
+			winds: { ...climateStart().winds, pressure: months() },
+		};
+		const parsed = parseSimRequest({
+			id: 4,
+			kind: 'climate',
+			world,
+			start,
+			model: { climateMaxPasses: 100 },
+			windSettings: { thermalHpaPerK: 99 },
+		}) as SimRequest<'climate'>;
+		expect(Object.keys(parsed).sort()).toEqual([
+			'id',
+			'kind',
+			'start',
+			'world',
+		]);
+		expect(Object.keys(parsed.start ?? {}).sort()).toEqual([
+			'dayLengthHours',
+			'temperature',
+			'winds',
+		]);
+		expect(Object.keys(parsed.start?.temperature ?? {}).sort()).toEqual([
+			'months',
+			'solvedFor',
+			'state',
+		]);
+		expect(Object.keys(parsed.start?.winds ?? {}).sort()).toEqual([
+			'east',
+			'north',
+		]);
+		expect(parsed.start?.dayLengthHours).toBe(24);
+		// The very arrays, the winds' in a new array, and a record of the
+		// planet settings the temperature reads.
+		expect(parsed.start?.temperature.state).toBe(start.temperature.state);
+		expect(parsed.start?.winds.east).not.toBe(start.winds.east);
+		expect(parsed.start?.winds.east[3]).toBe(start.winds.east[3]);
+		expect(
+			Object.keys(parsed.start?.temperature.solvedFor.planet ?? {}).sort(),
+		).toEqual([...TEMPERATURE_SETTINGS].sort());
+	});
+
+	it('refuses a start that is there but not of the form of one', () => {
+		const good = climateStart();
+		const bad: unknown[] = [
+			null,
+			'start',
+			{},
+			{ ...good, dayLengthHours: Number.NaN },
+			{ ...good, dayLengthHours: '24' },
+			{ ...good, temperature: undefined },
+			{
+				...good,
+				temperature: { ...good.temperature, months: months().slice(1) },
+			},
+			{
+				...good,
+				temperature: {
+					...good.temperature,
+					months: months().map((m) => Array.from(m)),
+				},
+			},
+			{ ...good, temperature: { ...good.temperature, state: undefined } },
+			{
+				...good,
+				temperature: { ...good.temperature, solvedFor: { seaLevel: 0 } },
+			},
+			{ ...good, winds: undefined },
+			{ ...good, winds: { east: months(), north: months().slice(1) } },
+			{ ...good, winds: { east: months() } },
+		];
+		for (const start of bad) {
+			const failure = refusal({ id: 9, kind: 'climate', world, start });
+			expect(failure).toEqual(simFailure(9, 'climate', BAD_CLIMATE_START));
+		}
+	});
+
+	it('refuses a world that is not of the form of one, as for any kind', () => {
+		expect(refusal({ id: 2, kind: 'climate', world: {} }).kind).toBe('climate');
+	});
+});
+
+describe('isSimPass', () => {
+	const pass = { id: 3, kind: 'climate', climatePass: { pass: 1 } };
+
+	it('accepts a message about a pass of a climate', () => {
+		expect(isSimPass(pass)).toBe(true);
+	});
+
+	it('refuses responses, progress, other kinds and anything else', () => {
+		expect(isSimPass({ ...pass, ok: true })).toBe(false);
+		expect(isSimPass({ ...pass, kind: 'temperature' })).toBe(false);
+		expect(isSimPass({ ...pass, id: '3' })).toBe(false);
+		expect(isSimPass({ ...pass, climatePass: undefined })).toBe(false);
+		expect(isSimPass({ ...pass, climatePass: 4 })).toBe(false);
+		expect(isSimPass({ id: 3, kind: 'climate', progress: PROGRESS })).toBe(
+			false,
+		);
+		expect(isSimPass(null)).toBe(false);
+		expect(isSimPass('pass')).toBe(false);
+		// And it is not progress either.
+		expect(isSimProgress(pass)).toBe(false);
+		expect(isSimResponse(pass)).toBe(false);
+	});
+
+	it('is not taken for progress, which may carry the pass it is within', () => {
+		const progress: SimProgress = {
+			id: 3,
+			kind: 'climate',
+			progress: PROGRESS,
+			pass: 2,
+		};
+		expect(isSimProgress(progress)).toBe(true);
+		expect(isSimPass(progress)).toBe(false);
 	});
 });

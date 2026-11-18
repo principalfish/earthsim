@@ -6,9 +6,11 @@ import {
 	DEFAULT_PLANET,
 	generateWorld,
 	PLANET_LIMITS,
+	type SimPass,
 	type SimProgress,
 	type SimRequest,
 	type SimResponse,
+	solveClimate,
 	solveTemperature,
 	solveWinds,
 	TEMPERATURE_MODEL,
@@ -622,5 +624,201 @@ describe('handleRequest for winds', { timeout: WIND_SOLVE_TIMEOUT_MS }, () => {
 			expect(handledBadly.transfer).toEqual([]);
 			expect(reports).toEqual([]);
 		}
+	});
+});
+
+/** Time allowed for the tests that solve a climate: ten seconds or so a run. */
+const CLIMATE_SOLVE_TIMEOUT_MS = 300_000;
+
+describe('handleRequest for climate', {
+	timeout: CLIMATE_SOLVE_TIMEOUT_MS,
+}, () => {
+	const CLIMATE_WORLD = generated(1977, 0.3);
+	const climateRequest = (extras: Record<string, unknown> = {}) => ({
+		id: 50,
+		kind: 'climate',
+		world: CLIMATE_WORLD,
+		...extras,
+	});
+
+	/** What the core gives directly, which a post must not disturb. */
+	const directClimate = shared(() => solveClimate(CLIMATE_WORLD));
+
+	/**
+	 * A climate request answered as the worker answers it: each pass posted
+	 * with its transfer list, which empties the arrays it names, as soon as
+	 * the loop finishes it, so that the loop must not need them again.
+	 */
+	const answered = shared(() => {
+		const passes: SimPass[] = [];
+		const transfers: ArrayBuffer[][] = [];
+		const reports: SimProgress[] = [];
+		const handledRun = handleRequest(
+			climateRequest(),
+			(progress) => reports.push(progress),
+			(pass, transfer) => {
+				transfers.push(transfer);
+				passes.push(structuredClone(pass, { transfer }));
+			},
+		);
+		return { ...handledRun, passes, transfers, reports };
+	});
+
+	it('answers with the day length, the passes, whether it settled and the last change the core gives, and nothing else', () => {
+		const direct = directClimate();
+		expect(answered().response).toEqual({
+			id: 50,
+			kind: 'climate',
+			ok: true,
+			result: {
+				dayLengthHours: direct.dayLengthHours,
+				passes: direct.passes,
+				settled: direct.settled,
+				changeC: direct.changeC,
+			},
+		});
+		expect(answered().transfer).toEqual([]);
+	});
+
+	it('tells of each pass in order, with its temperature and winds, whatever posting the earlier passes did to the arrays the loop uses', () => {
+		const { passes } = answered();
+		const direct = directClimate();
+		expect(passes).toHaveLength(direct.passes);
+		expect(passes.map((message) => message.climatePass.pass)).toEqual(
+			Array.from({ length: direct.passes }, (_, index) => index + 1),
+		);
+		for (const message of passes) {
+			expect(message.id).toBe(50);
+			expect(message.kind).toBe('climate');
+		}
+		const last = passes[passes.length - 1]?.climatePass;
+		expect(last?.last).toBe(true);
+		expect(last?.settled).toBe(direct.settled);
+		expect(
+			passes.slice(0, -1).every((message) => !message.climatePass.last),
+		).toBe(true);
+		// The loop went on from passes whose arrays had been posted: it
+		// reached the core's answer, so it never read them emptied, and the
+		// last pass's arrays, posted from the loop's own, are that answer.
+		expect(last?.temperature.months).toEqual(direct.temperature.months);
+		expect(last?.winds).toEqual(direct.winds);
+		expect(last?.temperature.state).toEqual(direct.temperature.state);
+		// An earlier pass's arrays arrived whole.
+		const first = passes[0]?.climatePass;
+		expect(first?.changeC).toBeNull();
+		expect(first?.temperature.months.every((month) => month.length > 0)).toBe(
+			true,
+		);
+		expect(first?.winds.pressure.every((month) => month.length > 0)).toBe(true);
+	});
+
+	it('transfers each pass’s fifty-one buffers, the twelve months of temperature, three of state and thirty-six of winds, each once', () => {
+		const { transfers } = answered();
+		expect(transfers).toHaveLength(directClimate().passes);
+		for (const transfer of transfers) {
+			expect(transfer).toHaveLength(51);
+			expect(new Set(transfer).size).toBe(51);
+		}
+		// A pass shares no buffer with another: an earlier pass's are copies.
+		const all = transfers.flat();
+		expect(new Set(all).size).toBe(all.length);
+	});
+
+	it('tells of each year as it finishes with the pass it is in', () => {
+		const { reports } = answered();
+		expect(reports.length).toBeGreaterThan(directClimate().passes - 1);
+		expect(
+			reports.every((report) => report.kind === 'climate' && report.id === 50),
+		).toBe(true);
+		const passNumbers = reports.map((report) => report.pass ?? 0);
+		expect(passNumbers.every((pass) => pass >= 1)).toBe(true);
+		expect([...passNumbers].sort((a, b) => a - b)).toEqual(passNumbers);
+		expect(new Set(passNumbers).size).toBe(directClimate().passes);
+		expect(reports[0]?.progress.yearsDone).toBe(1);
+	});
+
+	it('takes no settings of the model or of the winds from the message', () => {
+		// A message that asked for one pass would stop the loop after one.
+		const { response } = handleRequest(
+			climateRequest({
+				model: { climateMaxPasses: 1 },
+				windSettings: { thermalHpaPerK: 50 },
+				maxPasses: 1,
+			}),
+		);
+		expect(response.ok && response.result).toMatchObject({
+			passes: directClimate().passes,
+		});
+	});
+
+	it('carries on from the start it is given, a result as the page keeps it, and settles in one pass', () => {
+		const last = answered().passes.at(-1)?.climatePass;
+		if (last === undefined) {
+			throw new Error('no pass was told');
+		}
+		const passes: SimPass[] = [];
+		const { response } = handleRequest(
+			structuredClone(
+				climateRequest({
+					start: {
+						temperature: last.temperature,
+						winds: last.winds,
+						dayLengthHours: CLIMATE_WORLD.planet.dayLengthHours,
+					},
+				}),
+			),
+			() => {},
+			(pass) => passes.push(pass),
+		);
+		expect(response.ok && response.result).toMatchObject({
+			passes: 1,
+			settled: true,
+		});
+		expect(passes).toHaveLength(1);
+	});
+
+	it('answers a start of the wrong form with a failure, and tells of no pass', () => {
+		const passes: SimPass[] = [];
+		const { response, transfer } = handleRequest(
+			climateRequest({ start: { dayLengthHours: 24 } }),
+			() => {},
+			(pass) => passes.push(pass),
+		);
+		expect(response).toMatchObject({
+			id: 50,
+			kind: 'climate',
+			ok: false,
+			error: expect.stringContaining("A climate request's start"),
+		});
+		expect(transfer).toEqual([]);
+		expect(passes).toEqual([]);
+	});
+
+	it('answers a world the core refuses with its reason, and tells of no pass', () => {
+		const passes: SimPass[] = [];
+		const { response } = handleRequest(
+			climateRequest({ world: { ...CLIMATE_WORLD, resolution: 63 } }),
+			() => {},
+			(pass) => passes.push(pass),
+		);
+		expect(response).toMatchObject({
+			id: 50,
+			kind: 'climate',
+			ok: false,
+			error: expect.stringContaining('63'),
+		});
+		expect(passes).toEqual([]);
+	});
+
+	it('answers with a failure when a pass cannot be told', () => {
+		const { response } = handleRequest(climateRequest(), undefined, () => {
+			throw new Error('the post failed');
+		});
+		expect(response).toEqual({
+			id: 50,
+			kind: 'climate',
+			ok: false,
+			error: 'the post failed',
+		});
 	});
 });

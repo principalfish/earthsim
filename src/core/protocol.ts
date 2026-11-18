@@ -7,16 +7,21 @@
  * about, and its answer is computed from what the request carries alone.
  * For a temperature request that is the world and, when the page has one,
  * an earlier result to start from; for a winds request, the world and the
- * twelve months of its temperature. The page's world stays the one that
- * is edited.
+ * twelve months of its temperature; for a climate request, the world and,
+ * when the page has one, an earlier climate to start from. The page's
+ * world stays the one that is edited.
  *
  * A request and its response share an id, so that answers can be told apart
  * whatever order they arrive in, and a kind, which says what is computed.
  * A computation that takes a while may also post progress messages before
- * its response, each carrying the request's id and kind. Every message is
- * plain data that survives a structured clone.
+ * its response, each carrying the request's id and kind. A climate request
+ * also posts a pass message as each pass of its loop finishes, carrying
+ * that pass's temperature and winds, and its response then holds only what
+ * the passes do not: the last pass's arrays are the result's. Every message
+ * is plain data that survives a structured clone.
  */
 
+import type { ClimateProgress, ClimateStart, ClimateSummary } from './climate';
 import { MONTHS_PER_YEAR } from './planet/insolation';
 import {
 	PLANET_SETTINGS,
@@ -49,6 +54,12 @@ export type SimResults = {
 	readonly temperature: TemperatureResult;
 	/** The world's surface winds and sea-level pressure through its year. */
 	readonly winds: WindResult;
+	/**
+	 * The world's climate, its temperature and winds solved together: its
+	 * day length, the passes taken and whether it settled. The arrays are
+	 * the last pass's, which the pass messages carried.
+	 */
+	readonly climate: ClimateSummary;
 };
 
 /** What a request can ask the worker to compute. */
@@ -88,6 +99,14 @@ type SimExtras = {
 		 * them, as it does the world.
 		 */
 		readonly temperatures: readonly Float32Array[];
+	};
+	readonly climate: {
+		/**
+		 * Where the climate starts from: usually the previous settled result
+		 * for the world, from before an edit. Left out, it starts from
+		 * nothing.
+		 */
+		readonly start?: ClimateStart;
 	};
 };
 
@@ -151,12 +170,35 @@ export type SimProgress = {
 	readonly kind: SimKind;
 	/** How far the computation has come. */
 	readonly progress: TemperatureProgress;
+	/**
+	 * For a climate request, the pass of its loop the progress is within,
+	 * from 1; absent for any other kind.
+	 */
+	readonly pass?: number;
+};
+
+/**
+ * What the worker sends about a climate request as each pass of its loop
+ * finishes: before the request's response, once for each pass, in order.
+ * Like a progress message it is not a response, and settles nothing.
+ */
+export type SimPass = {
+	/** The id of the request being computed. */
+	readonly id: number;
+	/** The kind of that request, always a climate request. */
+	readonly kind: 'climate';
+	/**
+	 * The pass: its temperature and winds, how much it changed the
+	 * temperature and whether it settled the climate.
+	 */
+	readonly climatePass: ClimateProgress;
 };
 
 const KINDS: { readonly [K in SimKind]: true } = {
 	terrainStats: true,
 	temperature: true,
 	winds: true,
+	climate: true,
 };
 
 /** The most characters of an unknown kind that an error message repeats. */
@@ -220,10 +262,29 @@ const isTemperatureStartShaped = (value: unknown): value is TemperatureStart =>
  * As for a start, how many values each holds and what they are is for the
  * solver to refuse.
  */
-const isTemperaturesShaped = (value: unknown): value is Float32Array[] =>
+const isMonthsShaped = (value: unknown): value is Float32Array[] =>
 	Array.isArray(value) &&
 	value.length === MONTHS_PER_YEAR &&
 	value.every((month) => month instanceof Float32Array);
+
+/**
+ * Whether a value has the form of a start for a climate: its temperature
+ * with twelve months, a state and a record of what it was solved for, its
+ * winds with twelve months each of eastward and northward wind, and a day
+ * length that is a finite number.
+ *
+ * @remarks
+ * As for a temperature start, how many values each array holds and what
+ * they are is for the solver to refuse.
+ */
+const isClimateStartShaped = (value: unknown): value is ClimateStart =>
+	isRecord(value) &&
+	isTemperatureStartShaped(value.temperature) &&
+	isMonthsShaped((value.temperature as { months?: unknown }).months) &&
+	isRecord(value.winds) &&
+	isMonthsShaped(value.winds.east) &&
+	isMonthsShaped(value.winds.north) &&
+	isFiniteNumber(value.dayLengthHours);
 
 /**
  * A copy of a checked record, holding only the sea level and the planet's
@@ -268,12 +329,39 @@ const PAYLOADS: {
 	},
 	winds: (message, world) => {
 		const { temperatures } = message;
-		if (!isTemperaturesShaped(temperatures)) {
+		if (!isMonthsShaped(temperatures)) {
 			return `A winds request's temperatures must be an array of ${MONTHS_PER_YEAR} Float32Arrays, one a month`;
 		}
 		// A new array of the very months, so nothing else the array holds is
 		// taken.
 		return { world, temperatures: [...temperatures] };
+	},
+	climate: (message, world) => {
+		const { start } = message;
+		if (start === undefined) {
+			return { world };
+		}
+		if (!isClimateStartShaped(start)) {
+			return `A climate request's start must be an object whose temperature has ${MONTHS_PER_YEAR} Float32Array months, a state (temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number) and a solvedFor with a finite seaLevel and a planet whose settings, the day length aside, are finite, whose winds have ${MONTHS_PER_YEAR} Float32Array months each of east and north, and whose dayLengthHours is a finite number`;
+		}
+		// Only what a climate starts from is taken, whatever else came with
+		// it: the temperature's months, state and record, the winds' two
+		// components, and the day length.
+		return {
+			world,
+			start: {
+				temperature: {
+					months: [...start.temperature.months],
+					state: start.temperature.state,
+					solvedFor: copyConditions(start.temperature.solvedFor),
+				},
+				winds: {
+					east: [...start.winds.east],
+					north: [...start.winds.north],
+				},
+				dayLengthHours: start.dayLengthHours,
+			},
+		};
 	},
 };
 
@@ -329,7 +417,10 @@ export const simFailure = (
  * to solve on the world's own grid, whatever the message says, and of its
  * start only the state and the record are taken, so the months of a whole
  * result sent as a start are left behind. Of a winds request's temperatures
- * only the twelve months are taken, into a new array.
+ * only the twelve months are taken, into a new array. A climate request is
+ * likewise given no say over the model's settings, and of its start only
+ * the temperature's months, state and record, the winds' two components and
+ * the day length are taken.
  *
  * @param message - What arrived, of any type at all.
  * @returns The request, or the failure to answer it with: for a message
@@ -337,7 +428,8 @@ export const simFailure = (
  * missing or not known, a world that is not {@link isWorldShaped}, or, for
  * a temperature request, a start that is there but not of the form of one,
  * or, for a winds request, temperatures that are not twelve
- * `Float32Array`s.
+ * `Float32Array`s, or, for a climate request, a start that is there but not
+ * of the form of one.
  * The failure carries the message's id and kind where it has usable ones.
  * An unknown kind is repeated in the failure's error, cut short if long.
  */
@@ -418,3 +510,21 @@ export const isSimProgress = (value: unknown): value is SimProgress =>
 	typeof value.id === 'number' &&
 	isSimKind(value.kind) &&
 	isRecord(value.progress);
+
+/**
+ * Whether a value has the form of a message about a pass of a climate
+ * request, and so is neither a response nor a message about progress.
+ *
+ * @remarks
+ * As for the others, only the fields that route it are checked: its id and
+ * that its kind is the climate's, that it has no `ok` and that it holds a
+ * pass. What the pass says is taken on trust from the worker.
+ *
+ * @param value - Anything, such as the data of a message just received.
+ */
+export const isSimPass = (value: unknown): value is SimPass =>
+	isRecord(value) &&
+	!('ok' in value) &&
+	typeof value.id === 'number' &&
+	value.kind === 'climate' &&
+	isRecord(value.climatePass);

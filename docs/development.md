@@ -83,7 +83,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `wind/observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `grid/vector.ts`'s directions east and north |
 | `wind/baseline/` | The Earth winds baseline (`earthWinds.ts`, the figures in `earthWinds.json`) and its check |
 | `index.ts` | What the core exports |
-| `protocol.ts` | The messages between the page and the worker, of three kinds: the terrain statistics, the temperature and the winds |
+| `protocol.ts` | The messages between the page and the worker, of four kinds: the terrain statistics, the temperature, the winds and the climate (the temperature and winds solved together, which tells of each pass as it finishes) |
 | `compare.ts` | One field less another, and area-weighted error figures |
 | `testing/` | Helpers only the tests use |
 
@@ -118,7 +118,7 @@ A pure library with no DOM, Three.js or worker globals.
 
 ### `src/worker/`: the Web Worker
 
-It computes from a copy of the world, and its answers depend on the request alone: it keeps no results between requests, only tables it can build again, such as the grid's. The page runs three: one for the statistics, one for the temperature and one for the winds, which is sent the temperature's twelve months with the world.
+It computes from a copy of the world, and its answers depend on the request alone: it keeps no results between requests, only tables it can build again, such as the grid's. The page runs three: one for the statistics, one for the temperature and one for the winds, which is sent the temperature's twelve months with the world. A fourth kind of request, the climate, solves the temperature and the winds together in one request: the worker tells of each pass of the loop as it finishes, with its temperature and winds, and its response holds only the passes taken and whether it settled, the last pass's arrays being the result. The earlier passes' arrays are copies, since the loop goes on to read them; the last pass's are transferred. The page switches to it when its scheduler replaces the other two.
 
 | File | What it holds |
 |-|-|

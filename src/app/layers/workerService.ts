@@ -76,7 +76,8 @@ export type WorkerService = {
 	 *
 	 * @param kind - What to compute.
 	 * @param payload - What the request carries.
-	 * @param options - Whom to tell of the progress.
+	 * @param options - Whom to tell of the progress and of each pass of a
+	 * climate, while the call is the newest.
 	 * @returns The result, or that the call was superseded. Rejects as
 	 * {@link SimClient.request} does, and with {@link NO_WORKER_MESSAGE} once
 	 * the service is unavailable, without asking any worker.
@@ -202,20 +203,38 @@ export const createWorkerService = (
 			return new Promise((resolve, reject) => {
 				const mine = { supersede: () => resolve({ superseded: true }) };
 				running = mine;
-				client.request(kind, payload, requestOptions).then(
-					(result) => {
-						if (running === mine) {
-							running = null;
-							resolve({ superseded: false, result });
-						}
-					},
-					(error: unknown) => {
-						if (running === mine) {
-							running = null;
-							reject(error);
-						}
-					},
-				);
+				// What a call that is no longer the newest hears of its computation
+				// is dropped, as its result is.
+				const whileNewest = <A extends unknown[]>(
+					tell: ((...args: A) => void) | undefined,
+				): ((...args: A) => void) | undefined =>
+					tell === undefined
+						? undefined
+						: (...args) => {
+								if (running === mine) {
+									tell(...args);
+								}
+							};
+				client
+					.request(kind, payload, {
+						...requestOptions,
+						onProgress: whileNewest(requestOptions?.onProgress),
+						onPass: whileNewest(requestOptions?.onPass),
+					})
+					.then(
+						(result) => {
+							if (running === mine) {
+								running = null;
+								resolve({ superseded: false, result });
+							}
+						},
+						(error: unknown) => {
+							if (running === mine) {
+								running = null;
+								reject(error);
+							}
+						},
+					);
 			});
 		},
 		onUnavailable: (listener) => {

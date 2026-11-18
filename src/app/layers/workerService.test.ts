@@ -9,6 +9,7 @@ import {
 	type TerrainStats,
 	type World,
 } from '../../core/index';
+import { passMessageOf } from '../../core/testing/climateFixtures';
 import {
 	progressMessageOf,
 	temperatureOf,
@@ -291,6 +292,52 @@ describe('createWorkerService latest', () => {
 		workers.last().respond(progressMessageOf(1, 2));
 		expect(heard).toEqual([1, 2]);
 		expect(await stateOf(call)).toBe('pending');
+	});
+
+	it('passes the passes of a climate on, for the call it belongs to, and hears nothing more of a call that has been overtaken', async () => {
+		const { service, workers } = createService();
+		const first: number[] = [];
+		const firstProgress: (number | undefined)[] = [];
+		const second: number[] = [];
+		const progressed: (number | undefined)[] = [];
+		const overtaken = service.latest(
+			'climate',
+			{ world: blank() },
+			{
+				onPass: (pass) => first.push(pass.pass),
+				onProgress: (_progress, pass) => firstProgress.push(pass),
+			},
+		);
+		workers.last().respond(passMessageOf(1, 1));
+		workers
+			.last()
+			.respond({ ...progressMessageOf(1, 1), kind: 'climate', pass: 1 });
+		expect(first).toEqual([1]);
+		expect(firstProgress).toEqual([1]);
+		const newest = service.latest(
+			'climate',
+			{ world: blank() },
+			{
+				onPass: (pass) => second.push(pass.pass),
+				onProgress: (_progress, pass) => progressed.push(pass),
+			},
+		);
+		await expect(overtaken).resolves.toEqual({ superseded: true });
+		// The overtaken call's worker goes on computing it; what it tells
+		// meanwhile is not heard.
+		workers.last().respond(passMessageOf(1, 2));
+		workers
+			.last()
+			.respond({ ...progressMessageOf(1, 1), kind: 'climate', pass: 2 });
+		workers.last().respond(passMessageOf(2, 1));
+		workers
+			.last()
+			.respond({ ...progressMessageOf(2, 1), kind: 'climate', pass: 1 });
+		expect(first).toEqual([1]);
+		expect(firstProgress).toEqual([1]);
+		expect(second).toEqual([1]);
+		expect(progressed).toEqual([1]);
+		expect(await stateOf(newest)).toBe('pending');
 	});
 
 	it('keeps its worker when overtaken, without restarting', async () => {

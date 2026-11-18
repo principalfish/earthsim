@@ -74,18 +74,37 @@ export type ClimateResult = {
 };
 
 /**
+ * What a climate result is without its arrays: the day length it was
+ * solved for, the passes taken, whether it settled and its last change.
+ * The arrays are the last pass's, which {@link SolveClimateOptions.onPass}
+ * hears of.
+ */
+export type ClimateSummary = Omit<ClimateResult, 'temperature' | 'winds'>;
+
+/** The part of a temperature result a climate is carried on from. */
+export type CarriedTemperature = Pick<
+	TemperatureResult,
+	'months' | 'state' | 'solvedFor'
+>;
+
+/**
  * Where to start a climate from instead of a first guess: a previous
  * result for the world, usually before an edit.
  *
  * @remarks
  * A {@link ClimateResult} is one. It carries the temperature to carry on
- * from, the winds to carry heat along in the first pass, and the day length
- * they were solved for.
+ * from, its months to compare the first pass with, the winds to carry heat
+ * along in the first pass, and the day length they were solved for. Only
+ * the winds' eastward and northward parts are read, not the pressure.
  */
-export type ClimateStart = Pick<
-	ClimateResult,
-	'temperature' | 'winds' | 'dayLengthHours'
->;
+export type ClimateStart = {
+	/** The temperature to carry on from: its months, state and record. */
+	readonly temperature: CarriedTemperature;
+	/** The winds to carry heat along in the first pass. */
+	readonly winds: Pick<WindResult, 'east' | 'north'>;
+	/** The day length the winds were solved for, in hours. */
+	readonly dayLengthHours: number;
+};
 
 /** One pass of the loop, as it finishes. */
 export type ClimateProgress = {
@@ -192,7 +211,7 @@ const blend = <T extends Float32Array | Float64Array>(
  * pass's own.
  */
 const dampened = (
-	before: TemperatureResult,
+	before: CarriedTemperature,
 	pass: TemperatureResult,
 	share: number,
 ): TemperatureResult => ({
@@ -291,7 +310,7 @@ export const solveClimate = (
 	const resolution = world.resolution;
 	const solvedOn = solveResolution(resolution);
 	const cells = 6 * resolution * resolution;
-	let before: TemperatureResult | undefined;
+	let before: CarriedTemperature | undefined;
 	let windsBefore: MonthlyWind | undefined;
 	let lastChange: number | null = null;
 	if (options.start !== undefined) {

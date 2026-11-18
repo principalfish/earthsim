@@ -7,6 +7,8 @@
  */
 
 import {
+	type ClimateProgress,
+	isSimPass,
 	isSimProgress,
 	isSimResponse,
 	type SimKind,
@@ -45,10 +47,17 @@ export type WorkerLike = {
 export type RequestOptions = {
 	/**
 	 * Told how far the computation has come, each time the worker says so
-	 * before it answers. Only a temperature solve says so; for anything
-	 * else this is never called.
+	 * before it answers, with the pass of a climate's loop it is in. Only a
+	 * temperature solve and a climate say so; for anything else this is
+	 * never called.
 	 */
-	readonly onProgress?: (progress: TemperatureProgress) => void;
+	readonly onProgress?: (progress: TemperatureProgress, pass?: number) => void;
+	/**
+	 * Told of each pass of a climate as the worker finishes it, before it
+	 * answers, in order: the pass's temperature and winds, which are the
+	 * caller's alone. Only a climate says so.
+	 */
+	readonly onPass?: (pass: ClimateProgress) => void;
 };
 
 /** The channel to one simulation worker. */
@@ -65,9 +74,9 @@ export type SimClient = {
 	 *
 	 * @param kind - What to compute.
 	 * @param payload - What the request carries: the world to compute for,
-	 * for a temperature solve, where to start from, and for the winds, the
-	 * twelve months of temperature.
-	 * @param options - Whom to tell of the progress.
+	 * for a temperature solve or a climate, where to start from, and for the
+	 * winds, the twelve months of temperature.
+	 * @param options - Whom to tell of the progress and of each pass.
 	 * @returns The result. Rejects with an `Error` if the worker answers
 	 * that it could not compute it, if the worker reports an error before
 	 * answering, if the request cannot be sent, or if the client is or
@@ -91,6 +100,7 @@ type Waiter = {
 	resolve(result: SimResults[SimKind]): void;
 	reject(error: Error): void;
 	readonly onProgress: RequestOptions['onProgress'];
+	readonly onPass: RequestOptions['onPass'];
 };
 
 const asError = (thrown: unknown): Error =>
@@ -102,9 +112,9 @@ const asError = (thrown: unknown): Error =>
  * @remarks
  * Each request is posted with an id of its own, and the response carrying
  * that id settles it, whatever order responses arrive in. A message about
- * progress goes to whoever waits on its id and settles nothing. A response
- * or a message about progress whose id nobody is waiting on, and a message
- * that is neither, are ignored.
+ * progress, and one about a pass of a climate, goes to whoever waits on its
+ * id and settles nothing. A response or either of those whose id nobody is
+ * waiting on, and a message that is none of them, are ignored.
  *
  * Requests are posted without a transfer list, so the worker receives a
  * structured clone of the world and of any start or temperatures.
@@ -139,7 +149,11 @@ export const createSimClient = (worker: WorkerLike): SimClient => {
 	const onMessage = (event: WorkerEventLike): void => {
 		const response = event.data;
 		if (isSimProgress(response)) {
-			waiting.get(response.id)?.onProgress?.(response.progress);
+			waiting.get(response.id)?.onProgress?.(response.progress, response.pass);
+			return;
+		}
+		if (isSimPass(response)) {
+			waiting.get(response.id)?.onPass?.(response.climatePass);
 			return;
 		}
 		if (!isSimResponse(response) || response.id === null) {
@@ -187,6 +201,7 @@ export const createSimClient = (worker: WorkerLike): SimClient => {
 					resolve: resolve as (result: SimResults[SimKind]) => void,
 					reject,
 					onProgress: options.onProgress,
+					onPass: options.onPass,
 				});
 				try {
 					// The payload is the one for this kind, so with the kind and
