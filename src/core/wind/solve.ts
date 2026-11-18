@@ -6,12 +6,12 @@
  * winds.
  */
 
-import { coarsenField, coarsenWorld, refineField } from '../coarsen';
-import { getGrid, type Resolution } from '../grid';
-import { MONTHS_PER_YEAR } from '../insolation';
-import { normalisePlanet } from '../planet';
-import { assertSolvableWorld } from '../temperature';
-import type { World } from '../world';
+import { coarsenField, coarsenWorld, refineField } from '../grid/coarsen';
+import { getGrid, type Resolution } from '../grid/grid';
+import { MONTHS_PER_YEAR } from '../planet/insolation';
+import { normalisePlanet } from '../planet/planet';
+import { assertSolvableWorld } from '../temperature/temperature';
+import type { World } from '../world/world';
 import type { WindResult } from './model';
 import {
 	rulesPressure,

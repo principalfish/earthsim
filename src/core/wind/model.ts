@@ -10,10 +10,10 @@
  * Cells differ in area, so every figure weights a cell by its exact area.
  */
 
-import type { Grid } from '../grid';
-import { cellLatitudes, MONTHS_PER_YEAR } from '../insolation';
-import type { MonthlyPressure, MonthlyWind } from '../observedWind';
-import type { World } from '../world';
+import type { Grid } from '../grid/grid';
+import { cellLatitudes, MONTHS_PER_YEAR } from '../planet/insolation';
+import type { World } from '../world/world';
+import type { MonthlyPressure, MonthlyWind } from './observedWind';
 
 /**
  * Twelve months of surface wind and sea-level pressure on a world's cells,

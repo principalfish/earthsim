@@ -114,7 +114,7 @@ The page shows the same comparison on an untouched Earth, at the world's own res
 
 ### The Earth winds baseline
 
-`src/core/baseline/earthWinds.json` records the figures above, so that a change to the model cannot make them worse unnoticed.
+`src/core/wind/baseline/earthWinds.json` records the figures above, so that a change to the model cannot make them worse unnoticed.
 
 - **What it holds:** for the Earth at 64 cells per face edge, given the temperature model's own temperatures, for the whole year, January and July: the RMS of the wind's difference as vectors (m/s), the share within 45° in direction (as a percentage) and the RMS pressure difference (hPa).
 - **The test:** a test solves that Earth and fails, naming each figure, if any is worse than the file's by more than its tolerance, or is not a number:

@@ -17,21 +17,21 @@
  * plain data that survives a structured clone.
  */
 
-import { MONTHS_PER_YEAR } from './insolation';
+import { MONTHS_PER_YEAR } from './planet/insolation';
 import {
 	PLANET_SETTINGS,
 	TEMPERATURE_SETTINGS,
 	temperaturePlanet,
-} from './planet';
-import type { TerrainStats } from './stats';
+} from './planet/planet';
 import type {
 	TemperatureConditions,
 	TemperatureProgress,
 	TemperatureResult,
 	TemperatureStart,
-} from './temperature';
+} from './temperature/temperature';
 import type { WindResult } from './wind/model';
-import type { World } from './world';
+import type { TerrainStats } from './world/stats';
+import type { World } from './world/world';
 
 /**
  * What each kind of request computes.

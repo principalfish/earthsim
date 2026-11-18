@@ -1,7 +1,7 @@
 /**
  * Writes the Earth temperature baseline afresh: the error figures of the
  * Earth preset, as the model solves it now, against the observed
- * temperature, into `src/core/baseline/earthTemperature.json`.
+ * temperature, into `src/core/temperature/baseline/earthTemperature.json`.
  *
  * Run with `npm run baseline:temperature` after a change that is meant to
  * move the figures, and commit the file with the change. It prints each
@@ -11,12 +11,6 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-	BASELINE_RESOLUTION,
-	baselineText,
-	type EarthTemperatureFigures,
-	earthTemperatureFigures,
-} from '../src/core/baseline/earthTemperature';
-import {
 	decodeEarth,
 	decodeObservedTemperature,
 	earthWorld,
@@ -24,6 +18,12 @@ import {
 	observedTemperature,
 	solveTemperature,
 } from '../src/core/index';
+import {
+	BASELINE_RESOLUTION,
+	baselineText,
+	type EarthTemperatureFigures,
+	earthTemperatureFigures,
+} from '../src/core/temperature/baseline/earthTemperature';
 import { writeBaseline } from './baselineUpdate';
 import {
 	readEarthDataFile,
@@ -35,6 +35,7 @@ const BASELINE_FILE = join(
 	ROOT,
 	'src',
 	'core',
+	'temperature',
 	'baseline',
 	'earthTemperature.json',
 );

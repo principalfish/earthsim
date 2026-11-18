@@ -5,8 +5,8 @@
  * Cells differ in area, so every figure weights a cell by its exact area.
  */
 
-import type { Grid } from './grid';
-import { MONTHS_PER_YEAR } from './insolation';
+import type { Grid } from './grid/grid';
+import { MONTHS_PER_YEAR } from './planet/insolation';
 
 /** How far one field is from another over the whole globe. */
 export type FieldDifference = {

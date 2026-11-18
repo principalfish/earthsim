@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { cellAt, getGrid, latLonToDirection } from '../grid';
-import { cellLatitudes, MONTHS_PER_YEAR } from '../insolation';
-import { DEFAULT_PLANET, normalisePlanet, rotationRate } from '../planet';
-import { lapseCooling } from '../temperature';
-import { createBlankWorld, PLANET_RADIUS_KM, type World } from '../world';
+import { cellAt, getGrid, latLonToDirection } from '../grid/grid';
+import { cellLatitudes, MONTHS_PER_YEAR } from '../planet/insolation';
+import {
+	DEFAULT_PLANET,
+	normalisePlanet,
+	rotationRate,
+} from '../planet/planet';
+import { lapseCooling } from '../temperature/temperature';
+import { createBlankWorld, PLANET_RADIUS_KM, type World } from '../world/world';
 import { type ZonalMean, zonalMean } from './model';
 import {
 	AIR_DENSITY_KG_M3,
