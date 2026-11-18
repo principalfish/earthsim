@@ -181,7 +181,8 @@ export type TemperatureModel = {
 	readonly climateToleranceC: number;
 	/**
 	 * The most passes of the climate loop, a whole number from 1 to
-	 * {@link MAX_CLIMATE_PASSES}.
+	 * {@link MAX_CLIMATE_PASSES}. At 1, no climate settles, and none is
+	 * carried on from.
 	 */
 	readonly climateMaxPasses: number;
 	/**
@@ -266,8 +267,8 @@ export type TemperatureState = {
  * A {@link TemperatureResult} is one. The state is used only for the sea
  * level and planet in `solvedFor`; for any other the start is set aside.
  * The planet's day length is not part of this: a solve of the temperature
- * alone does not depend on it. It is also set aside once its terrain has drifted to
- * {@link TemperatureModel.terrainDriftLimitK} or past it. A start set aside
+ * alone does not depend on it. It is also set aside once its terrain has
+ * drifted to {@link TemperatureModel.terrainDriftLimitK} or past it. A start set aside
  * leaves the solve starting from nothing: see {@link solveTemperature} for
  * the rules and their order.
  */

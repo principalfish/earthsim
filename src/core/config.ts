@@ -509,7 +509,8 @@ export const TEMPERATURE_CONFIG = defineSection(
 						' takes longer to appear.',
 					lowering:
 						'The loop gives up sooner, leaving the climate less settled on' +
-						' such a world.',
+						' such a world. At 1, no climate settles, and none is carried on' +
+						' from.',
 					source:
 						'Chosen: the Earth settles in about four passes, and a generated' +
 						' world in four or five.',

@@ -78,7 +78,7 @@ The temperature is worked out with the winds, as the [climate loop](#the-climate
 - **Pass by pass.** The first pass shows on the globe as soon as it is done, and each later pass refines it, the temperature and the winds always of the same pass, until the loop settles.
 - **Whatever is on screen,** Terrain included, so the result is ready when Temperature is chosen.
 - **After every change:** a stroke, undo, redo, a move of the Sea level or a Planet slider, the day length's included, or a new world. It starts a little under half a second after the change, and a change made during the loop stops it and starts a new one. A new world, and the world the page opens on, are asked for at once.
-- **Not while paused.** The [Pause button](user-guide.md#the-pause-button) stops it: a change only marks the result out of date, a new world stays uncalculated, and a loop under way finishes the pass under way, shows it and stops. Resume carries on from that pass if nothing changed meanwhile, and otherwise asks once for everything changed.
+- **Not while paused.** The [Pause button](user-guide.md#the-pause-button) stops it: a change only marks the result out of date, a new world stays uncalculated, and a loop under way finishes the pass under way, shows it and stops. Resume carries on from that pass if nothing changed meanwhile (the first pass after a Resume cannot settle the climate, so a paused loop can take one pass more than one never paused), and otherwise asks once for everything changed.
 - **After a terrain edit it carries on from the last climate that settled,** which settles in fewer passes and years. One that ran out of passes is shown but not carried on from.
 - **After a change of sea level or planet it starts afresh,** as it does for a new world.
 

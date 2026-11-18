@@ -374,7 +374,9 @@ export const solveClimate = (
 		// carries heat along the start's winds, which may be those of a world
 		// since edited, and a local edit moves the global rms change by less
 		// than the tolerance, so the winds of the new temperature are tried
-		// once before the climate can settle.
+		// once before the climate can settle. For the same reason the first
+		// pass of a run carried on after a pause cannot settle either, so
+		// such a run can take one pass more than one never paused.
 		const settled = pass > 1 && change !== null && change <= climateToleranceC;
 		const last = settled || pass === climateMaxPasses;
 		onPass?.({

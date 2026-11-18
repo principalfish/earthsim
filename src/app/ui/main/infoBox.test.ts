@@ -418,7 +418,7 @@ describe('calculationContent', () => {
 		expect(fractions.at(-1)).toBe(1);
 	});
 
-	it('keeps its bar where it was when the first pass is the last, as for a climate carried on that settles at once', () => {
+	it('keeps its bar where it was when the first pass is the last, as at a cap of one pass', () => {
 		const fractions = barThrough([
 			(store) => store.setProgress(yearsOf(1, 1), 1),
 			(store) => store.setProgress(yearsOf(2, 0), 1),
