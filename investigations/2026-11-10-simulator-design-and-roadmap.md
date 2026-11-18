@@ -71,6 +71,8 @@ Each step adds a viewable map layer and gets its own issue.
 8. Biome map
 9. Plate tectonics and time stepping
 
+Reordered by the user on 2026-11-18: step 5 (ocean currents) comes before step 4 (rainfall), as "3b, then 5, then 4". The reason: 3b and 5 both feed heat into the temperature through the same loop, and the currents do most of the work on coastal climates (warm and cold currents, mild west coasts); rain and the Köppen zones depend on those sea temperatures (coastal deserts beside cold currents, wet coasts beside warm ones), so building and tuning them after the currents avoids doing it twice. Rain's code would not have changed after the currents, only its results and tuning.
+
 Added since (see the status table): 3c, the layers brought into the main view; 3a, the core and page folders; 3d, one config file for every model's settings; and 3b, heat carried by winds and the climate loop; all between steps 3 and 4, in that order. Also 10, an optional simulated atmosphere, after step 9.
 
 ## Status and carried-over items (as of 2026-11-18)
@@ -85,10 +87,10 @@ Keep this section current when a step is merged.
 | 3c Layers in the main view, out of the side panel; also the climate worked out after every change with a Pause (brought forward from 3b), a Settings section and units | Done 2026-11-17 (PR #8 merged at 5627e02) | 0004, GitHub #7 |
 | 3a Core folders by component, page folders by role (refactor, no behaviour change) | Done 2026-11-18 (PR #10 merged at 33f027c) | 0005, GitHub #9 |
 | 3d One config.ts for every model's settings, with config.md; also a read-only Model settings screen with the climate process diagram, replacing the PDF | Done 2026-11-18 (PR #12 merged at 9463afa) | 0006, GitHub #11 |
-| 3a follow-up: the deeper splits of `ui/layerPanel.ts` and `wiring.ts`, and the `ui/` type dependency (see under step 3a) | Not started; before step 4 | |
+| 3a follow-up: the deeper splits of `ui/layerPanel.ts` and `wiring.ts`, and the `ui/` type dependency (see under step 3a) | Not started; before step 5, the next step to add a layer to the panel | |
 | 3b Heat carried by winds, and the climate loop | Next. Could instead open step 5; decide when planned | |
-| 4 Moisture, rainfall and Köppen zones | Not started. Before planning it, settle fixed or fitted colour scales (see the open follow-ups), since rainfall is the next colour layer | |
-| 5 Ocean currents | Not started | |
+| 5 Ocean currents | Next after 3b; before step 4 (the user, 2026-11-18) | |
+| 4 Moisture, rainfall and Köppen zones | Not started; after step 5, so rain and the Köppen zones are built and tuned against sea temperatures that the currents have already set (the user, 2026-11-18). Before planning it, settle fixed or fitted colour scales (see the open follow-ups), since rainfall is the next colour layer | |
 | 6 Ice sheets and sea ice | Not started | |
 | 6b Tune the whole climate loop against the Earth | Not started; after steps 3b, 5 and 6, when every part of the loop is in | |
 | 7 Tropical storm zones | Not started | |
