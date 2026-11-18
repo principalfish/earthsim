@@ -65,6 +65,7 @@ describe('core', () => {
 	it('exports the config sections and their helpers', () => {
 		for (const name of [
 			'TEMPERATURE_CONFIG',
+			'WIND_CONFIG',
 			'defineSection',
 			'valuesOf',
 			'constantsOf',

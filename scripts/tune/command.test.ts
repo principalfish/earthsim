@@ -87,6 +87,25 @@ describe('parseCommand', () => {
 });
 
 describe('TUNED_SETTINGS', () => {
+	it('lists the fourteen names the script always searched, in that order', () => {
+		expect([...TUNED_SETTINGS]).toEqual([
+			'earthContrastK',
+			'bandAmplitudeHpa',
+			'thermalHpaPerK',
+			'thermalSmoothingKm',
+			'hotWindowK',
+			'seaFrictionPerS',
+			'landFrictionFactor',
+			'poleTaperDeg',
+			'sideContrastK',
+			'lowShiftGain',
+			'outerCellShare',
+			'seaThermalShare',
+			'warmLimitK',
+			'thermalHeightM',
+		]);
+	});
+
 	it('names settings of the model, at least the eleven tuned against the observed Earth', () => {
 		expect(TUNED_SETTINGS.length).toBeGreaterThanOrEqual(11);
 		for (const name of TUNED_SETTINGS) {
@@ -97,6 +116,27 @@ describe('TUNED_SETTINGS', () => {
 });
 
 describe('SETTING_BOUNDS', () => {
+	it('gives every setting the bounds the script always applied', () => {
+		const latitudes = [
+			'lowLimitDeg',
+			'lowLimitFromWidthDeg',
+			'lowLimitToWidthDeg',
+			'poleTaperDeg',
+			'localBandsFullToDeg',
+			'localBandsGlobalFromDeg',
+		];
+		for (const name of WIND_SETTING_NAMES) {
+			const expected = name.endsWith('Share')
+				? { above: 0, atMost: 1 }
+				: latitudes.includes(name)
+					? { above: 0, atMost: 90 }
+					: name === 'localWindowDeg'
+						? { above: 0, atMost: 360 }
+						: { above: 0 };
+			expect(SETTING_BOUNDS[name], name).toEqual(expected);
+		}
+	});
+
 	it('bounds every setting, its default within them: shares to (0, 1], latitudes to (0°, 90°], widths in longitude to (0°, 360°], the rest above 0', () => {
 		for (const name of WIND_SETTING_NAMES) {
 			const bounds = SETTING_BOUNDS[name];

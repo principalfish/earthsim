@@ -3,16 +3,27 @@
  */
 
 import {
+	type ConfigEntry,
+	type ConfigSection,
 	DEFAULT_WIND_SETTINGS,
+	WIND_CONFIG,
 	WIND_SETTING_NAMES,
 	type WindSettingName,
 	type WindSettings,
 } from '../../src/core/index';
 import { type SettingBounds, sweepValues } from './search';
 
+/** Every wind setting's entry in the config, by name, in the config's order. */
+const WIND_ENTRIES: readonly (readonly [WindSettingName, ConfigEntry])[] = (
+	WIND_CONFIG as ConfigSection
+).groups.flatMap(
+	(group) => Object.entries(group.settings) as [WindSettingName, ConfigEntry][],
+);
+
 /**
- * What `search tuned` searches: the eleven settings whose doc comments say
- * they were tuned by hand against the observed Earth (bandAmplitudeHpa,
+ * What `search tuned` searches: the settings the config gives a
+ * `searchOrder`, in that order. They are the eleven whose entries say they
+ * were tuned by hand against the observed Earth (bandAmplitudeHpa,
  * thermalHpaPerK, thermalSmoothingKm, hotWindowK, seaFrictionPerS,
  * landFrictionFactor, lowShiftGain, outerCellShare, seaThermalShare,
  * warmLimitK and thermalHeightM), and three moved by hand for other
@@ -21,55 +32,22 @@ import { type SettingBounds, sweepValues } from './search';
  * cell, not against the observed Earth; and sideContrastK, set by hand
  * against the case tilted 60°.
  */
-export const TUNED_SETTINGS: readonly WindSettingName[] = [
-	'earthContrastK',
-	'bandAmplitudeHpa',
-	'thermalHpaPerK',
-	'thermalSmoothingKm',
-	'hotWindowK',
-	'seaFrictionPerS',
-	'landFrictionFactor',
-	'poleTaperDeg',
-	'sideContrastK',
-	'lowShiftGain',
-	'outerCellShare',
-	'seaThermalShare',
-	'warmLimitK',
-	'thermalHeightM',
-];
-
-/** The settings whose values are degrees of latitude, at most 90. */
-const LATITUDE_SETTINGS: readonly WindSettingName[] = [
-	'lowLimitDeg',
-	'lowLimitFromWidthDeg',
-	'lowLimitToWidthDeg',
-	'poleTaperDeg',
-	'localBandsFullToDeg',
-	'localBandsGlobalFromDeg',
-];
-
-/** The settings whose values are degrees of longitude, at most 360. */
-const LONGITUDE_SETTINGS: readonly WindSettingName[] = ['localWindowDeg'];
+export const TUNED_SETTINGS: readonly WindSettingName[] = WIND_ENTRIES.filter(
+	([, entry]) => entry.searchOrder !== undefined,
+)
+	.sort(([, a], [, b]) => (a.searchOrder as number) - (b.searchOrder as number))
+	.map(([name]) => name);
 
 /**
- * The values a search may give each setting, as its meaning requires: a
- * share (a name ending in `Share`) above 0 and at most 1, a latitude or a
- * cells' width above 0 and at most 90°, a width in longitude above 0 and at
- * most 360°, and every other setting above 0.
+ * The values a search may give each setting, as its entry in the config
+ * says: a share above 0 and at most 1, a latitude or a cells' width above 0
+ * and at most 90°, a width in longitude above 0 and at most 360°, and every
+ * other setting above 0.
  */
 export const SETTING_BOUNDS: Readonly<Record<WindSettingName, SettingBounds>> =
 	Object.freeze(
 		Object.fromEntries(
-			WIND_SETTING_NAMES.map((name) => [
-				name,
-				name.endsWith('Share')
-					? { above: 0, atMost: 1 }
-					: LATITUDE_SETTINGS.includes(name)
-						? { above: 0, atMost: 90 }
-						: LONGITUDE_SETTINGS.includes(name)
-							? { above: 0, atMost: 360 }
-							: { above: 0 },
-			]),
+			WIND_ENTRIES.map(([name, entry]) => [name, entry.bounds ?? {}]),
 		) as Record<WindSettingName, SettingBounds>,
 	);
 

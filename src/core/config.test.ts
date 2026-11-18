@@ -5,10 +5,19 @@ import {
 	defineSection,
 	TEMPERATURE_CONFIG,
 	valuesOf,
+	WIND_CONFIG,
 } from './config';
 import { GREENHOUSE_FACTOR } from './planet/planet';
 import { EXCHANGE_MAX_ITERATIONS } from './temperature/exchange';
 import { TEMPERATURE_MODEL } from './temperature/temperature';
+import {
+	AIR_DENSITY_KG_M3,
+	DEFAULT_WIND_SETTINGS,
+	EARTH_CELL_WIDTH_DEG,
+	FULL_BANDS_EASE_CELLS,
+	REFERENCE_PRESSURE_HPA,
+	windSettings,
+} from './wind/rules';
 
 const entry = (value: number) => ({
 	value,
@@ -206,5 +215,152 @@ describe('TEMPERATURE_CONFIG', () => {
 			'albedoPoleward',
 			'iceAlbedo',
 		]);
+	});
+});
+
+// A literal copy of the wind model's settings as they were before they moved
+// into the config, in the order the model listed them.
+const WIND_LITERAL = {
+	earthContrastK: 41,
+	rotationPower: 0.5,
+	contrastPower: 0.25,
+	minContrastRatio: 0.25,
+	maxContrastRatio: 4,
+	hotWindowK: 4,
+	lowShiftGain: 2.5,
+	lowShiftFadeDeg: 20,
+	edgeShiftShare: 0.5,
+	lowLimitDeg: 70,
+	lowLimitFromWidthDeg: 30,
+	lowLimitToWidthDeg: 60,
+	lowLimitEaseShare: 0.5,
+	minSummerCellShare: 0.3,
+	wideSummerFromShare: 0.4,
+	wideSummerToShare: 0.8,
+	sideContrastK: 30,
+	outerCellShare: 0.3,
+	fullBandsReachDeg: 60,
+	poleTaperDeg: 10,
+	localBandsShare: 1,
+	localWindowDeg: 180,
+	localWindowTaperShare: 0.5,
+	localBandsFullToDeg: 40,
+	localBandsGlobalFromDeg: 70,
+	bandAmplitudeHpa: 9,
+	thermalHpaPerK: 3,
+	thermalSmoothingKm: 900,
+	seaThermalShare: 0.3,
+	warmLimitK: 6,
+	coldKneeK: 20,
+	coldLimitK: 25,
+	thermalHeightM: 2500,
+	seaFrictionPerS: 2.5e-5,
+	landFrictionFactor: 5,
+	blockingSlope: 0.005,
+};
+
+describe('WIND_CONFIG', () => {
+	const section: ConfigSection = WIND_CONFIG;
+	const entries = [
+		...section.groups.flatMap((group) => Object.entries(group.settings)),
+		...Object.entries(section.constants.settings),
+	];
+
+	it('gives the model the same values, in the same order, frozen', () => {
+		expect(DEFAULT_WIND_SETTINGS).toEqual(WIND_LITERAL);
+		expect(Object.keys(DEFAULT_WIND_SETTINGS)).toEqual(
+			Object.keys(WIND_LITERAL),
+		);
+		expect(Object.isFrozen(DEFAULT_WIND_SETTINGS)).toBe(true);
+		expect(windSettings()).toBe(DEFAULT_WIND_SETTINGS);
+	});
+
+	it('keeps the fixed choices it moved in', () => {
+		expect(constantsOf(WIND_CONFIG)).toEqual({
+			referencePressureHpa: 1011,
+			airDensityKgM3: 1.2,
+			earthCellWidthDeg: 30,
+			fullBandsEaseCells: 0.25,
+		});
+		expect(REFERENCE_PRESSURE_HPA).toBe(1011);
+		expect(AIR_DENSITY_KG_M3).toBe(1.2);
+		expect(EARTH_CELL_WIDTH_DEG).toBe(30);
+		expect(FULL_BANDS_EASE_CELLS).toBe(0.25);
+	});
+
+	it('explains every setting', () => {
+		for (const [name, setting] of entries) {
+			expect(Number.isFinite(setting.value), name).toBe(true);
+			for (const text of [
+				setting.unit,
+				setting.what,
+				setting.raising,
+				setting.lowering,
+				setting.source,
+			]) {
+				expect(text.trim(), name).not.toBe('');
+			}
+			expect(setting.tuned === null || setting.tuned.trim() !== '', name).toBe(
+				true,
+			);
+		}
+	});
+
+	it('lists each setting once, in eight groups, none numerical', () => {
+		const names = entries.map(([name]) => name);
+		expect(new Set(names).size).toBe(names.length);
+		expect(section.groups.map((group) => group.title)).toEqual([
+			'How wide the circulation cells are',
+			'Where the band of low pressure sits',
+			'Steep tilts',
+			'The bands far from the low',
+			'Bands that follow land and sea',
+			'How strong the bands are',
+			'Highs and lows over land and sea',
+			'The wind from the pressure',
+		]);
+		expect(section.groups.some((group) => group.numerical)).toBe(false);
+	});
+
+	it('marks the eleven settings tuned against the Earth', () => {
+		const tuned = entries
+			.filter(([, setting]) => setting.tuned !== null)
+			.map(([name]) => name);
+		expect(tuned.sort()).toEqual(
+			[
+				'bandAmplitudeHpa',
+				'hotWindowK',
+				'landFrictionFactor',
+				'lowShiftGain',
+				'outerCellShare',
+				'seaFrictionPerS',
+				'seaThermalShare',
+				'thermalHeightM',
+				'thermalHpaPerK',
+				'thermalSmoothingKm',
+				'warmLimitK',
+			].sort(),
+		);
+	});
+
+	it('numbers the fourteen settings a search varies from 1, each once', () => {
+		const orders = entries
+			.map(([, setting]) => setting.searchOrder)
+			.filter((order) => order !== undefined)
+			.sort((a, b) => (a as number) - (b as number));
+		expect(orders).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
+	});
+
+	it('bounds every setting with its value within', () => {
+		for (const group of section.groups) {
+			for (const [name, setting] of Object.entries(group.settings)) {
+				const { above, atMost } = setting.bounds ?? {};
+				expect(above, name).toBe(0);
+				expect(setting.value, name).toBeGreaterThan(above as number);
+				if (atMost !== undefined) {
+					expect(setting.value, name).toBeLessThanOrEqual(atMost);
+				}
+			}
+		}
 	});
 });

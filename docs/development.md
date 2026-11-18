@@ -50,7 +50,7 @@ python3 -m venv <dir>
 
 - **Re-running it with nothing changed** leaves the PDF byte-identical, so the PDF changes in a commit only when the script does. The committed PDF was drawn with reportlab 5.1.0; another version may write the same pages as different bytes.
 - **The diagram is a design,** mostly of parts not built yet. Redraw it when one of them, once built, changes it.
-- **The settings pages are a dated snapshot,** kept by hand in the script, with the date set once at its top. When a setting is added, removed or changed in `src/core/wind/rules.ts` or `src/core/temperature/temperature.ts`, bring the pages up to the code. A future `src/core/config.md` is to become the living list of the settings.
+- **The settings pages are a dated snapshot,** kept by hand in the script, with the date set once at its top. When a setting is added, removed or changed in `src/core/config.ts`, bring the pages up to the code. A future `src/core/config.md` is to become the living list of the settings.
 
 ## Type-checking rules
 
@@ -69,7 +69,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `grid/coarsen.ts` | A world or a field averaged onto the grid a step coarser, and a field or a vector field carried back from it |
 | `grid/vector.ts` | Vector fields on the grid, east and north at every cell, and the gradient, divergence, curl, Laplacian and smoothing of fields |
 | `grid/quantile.ts` | Area-weighted quantiles of values on the grid |
-| `config.ts` | The models' settings as data, a section per model: each setting's value, unit, what it controls, what raising and lowering it do, where its value comes from and whether it was tuned, in titled groups; the temperature's 18 settings and its fixed choices. The models build their value objects from it, and it imports nothing from them |
+| `config.ts` | The models' settings as data, a section per model: each setting's value, unit, what it controls, what raising and lowering it do, where its value comes from and whether it was tuned, in titled groups; the temperature's 18 settings and the wind model's 36, each with its fixed choices beside them, and which of the wind settings a tuning search varies. The models build their value objects from it, and it imports nothing from them |
 | `world/world.ts` | A world: its settings, its date and the elevation of every cell |
 | `world/generate.ts`, `world/noise.ts` | Worlds with noise-shaped continents, and the seeded noise behind them |
 | `world/brush.ts` | The sculpting brushes: raise, lower and smooth |
@@ -86,7 +86,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `temperature/exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
 | `temperature/baseline/` | The Earth temperature baseline (`earthTemperature.ts`, the figures in `earthTemperature.json`) and its check |
 | `wind/model.ts` | The shape every wind model shares, its error figures against the observed winds and pressure, and the mean of a field by bands of latitude |
-| `wind/rules.ts` | The rules wind model on a world's own grid, and its parts: sea-level pressure from zonal bands placed by the temperature and the day length plus thermal highs and lows, and the wind from it by a balance of pressure gradient, turning and friction; see [Winds](winds.md) |
+| `wind/rules.ts` | The rules wind model on a world's own grid, its settings read from `config.ts`, and its parts: sea-level pressure from zonal bands placed by the temperature and the day length plus thermal highs and lows, and the wind from it by a balance of pressure gradient, turning and friction; see [Winds](winds.md) |
 | `wind/solve.ts` | The winds of a world: its input checked, the rules model's pressure worked out on the 64 grid and carried back to the world's grid, the winds from it there, and the annual mean of a year of winds |
 | `wind/observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `grid/vector.ts`'s directions east and north |
 | `wind/baseline/` | The Earth winds baseline (`earthWinds.ts`, the figures in `earthWinds.json`) and its check |
