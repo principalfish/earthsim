@@ -30,6 +30,9 @@ The user's brief (2026-11-18): "Plan 3b", roadmap step 3b in `investigations/202
 
 - The six open docs and test nits (piece 1's `flowing.ts:168` wording and piece 2's five: `docs/temperature.md:23` interpolation wording and its "no new extreme" caveat, `advection.ts:19` tolerance claim, the `temperatureWinds.test.ts:186` assertion that cannot fail and its 2.7 K comment, `docs/winds.md:190` saying the page does not yet give the temperature the winds) are fixed now, in one small commit. The user: "Fix them now" (2026-11-18)
 
+- Measured in piece 3 (the builder, 2026-11-18): the agreed loop (0.1 °C on the largest change, at most 6 passes) does not settle on the Earth at the placeholder strength `windHeatCapacity` 1.2e6 J/m²/K (about 1 km of air), which gave about the right west–east contrast in piece 2's probe: the largest change per pass falls 14.2, 12.1, 8.8, 8.0, 6.2 K (a few Siberian spring cell-months), the rms 1.6 to 0.4 K; generated worlds oscillate 13–27 K a pass and the half-step does not rescue them within 6. About 3e5 settles on the Earth on pass 6; 1e5 in 4. A later pass costs about 1.6 s at 64 (temperature 0.3 s, flowing part 0.7 s, winds 0.6 s), the first about 1.8 s; a world of 128 about 1.8 s a later pass. Finer worlds sum their edge flows to the 64 grid, take the flowing part there and carry it up.
+- Piece 4 measures before anything is chosen: a small grid of 2–3 strengths (including the physical estimate and the strongest that settles) by 2–3 stopping rules (today's 0.1 °C on the largest change; an average-change rule; damping every pass by half), reporting for each the west–east coast contrast (annual and January), East Asia's January, passes to settle and seconds, on the Earth and three generated worlds; then it stops for the user to choose the strength and the rule. The user: "Measure options, then I choose (Recommended)" (2026-11-18)
+
 ## Open
 - None.
 

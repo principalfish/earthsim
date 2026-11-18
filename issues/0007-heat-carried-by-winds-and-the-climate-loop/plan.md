@@ -174,3 +174,6 @@ Decided by the builder:
 - Effect on the Earth at 64 with the model's own winds, default setting, January: western Europe +2.4 K, western North America +4.1 K, eastern North America −4.6 K, East Asia −12.8 K (from 7.6 to −8.5 °C against an observed about 1 °C: it overshoots; piece 4 judges).
 - Uncovered changed line (temperature.ts, `solved = false` when a step's advection sweeps hit the cap): a defensive guard; real winds converge in a handful of sweeps, and the advector's cap path is tested directly.
 - `config.test.ts`'s literal copy of the temperature values gains the new setting; docs/development.md says the temperature model has 19 settings.
+
+### Changed 2026-11-18: piece 4 measures, then stops for the user
+- The loop as agreed does not settle on the Earth at the physical strength (see decisions.md, measured in piece 3). Piece 4 now measures a grid of 2–3 strengths by 2–3 stopping rules (0.1 °C on the largest change; an average-change rule; damping every pass by half), reporting the west–east contrast (annual and January), East Asia's January, passes to settle and seconds, on the Earth and three generated worlds, and stops for the user to choose the strength and the rule before setting the value and re-recording the baselines. The user: "Measure options, then I choose (Recommended)" (2026-11-18)
