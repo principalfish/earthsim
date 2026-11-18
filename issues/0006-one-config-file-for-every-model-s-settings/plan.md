@@ -113,7 +113,7 @@ Rejected:
 - [x] 2. The winds' settings in `config.ts`, and the tuning list
 - [x] 3. `config.md`, written from the config
 - [x] 4. The "Model settings" screen
-- [ ] 5. The climate process diagram on the screen, and the PDF removed
+- [x] 5. The climate process diagram on the screen, and the PDF removed
 
 ## Verification
 
@@ -174,7 +174,7 @@ Decided by the builder:
 - Not verified in a real browser: this environment has no browser and the Chrome extension was not connected, so open/close, Escape, focus return, inertness and the layout at both widths are for the manual review. The tests use the stand-in document, which has no dialogs, and say only what they show.
 - Review: security clean; correctness, coverage and docs raised low findings (above), all fixed except one accepted (the two glue lines in `main.ts`).
 
-### Piece 5: the climate process diagram on the screen, and the PDF removed (built, awaiting the manual review, 2026-11-18)
+### Piece 5: the climate process diagram on the screen, and the PDF removed (committed 1e201c3 after the user's manual review, 2026-11-18)
 
 Decided by the builder:
 - The diagram is `src/app/ui/panel/processDiagram.ts`: data for the 11 boxes, 13 arrows (plus 2 legend arrows), 2 plain settled-state lines, the loop frame, 2 side panels and the free labels, drawn as an SVG by `createProcessDiagram()` (DOM and `createElementNS`, no `innerHTML`). It sits in its own first tab, "Climate process", which is also the tab selected on opening; `openModelSettings` takes an optional `diagram` builder for tests.
@@ -186,3 +186,5 @@ Decided by the builder:
 - Removed: `docs/climate-process.pdf`, `scripts/docs/climate-process.py` (the `scripts/docs` folder with it), the README row, `docs/development.md`'s section on drawing it, its `docs/` row in the scripts table and the Python setup, and the `*.pdf binary` line in `.gitattributes`. `docs/development.md` keeps a short "The climate process diagram" section saying where the data is and that it is a design to edit when a part is built. A grep for `climate-process` and `reportlab` outside `.git`, `node_modules`, `dist` and the planner folders finds nothing.
 - Not verified in a real browser (none here): the layout, the tab, the sideways scroll and the colours are for the manual review.
 - Review: security clean; correctness raised one medium (the grids' `min-width`), four low and three nits, coverage three low and a note, docs three low: the verifier ruled on all of them (as the planner chat asked), 14 stood and were fixed or accepted (above in findings.md), 1 was dropped; the light re-check was clean.
+- The commit title was shortened to "the diagram on the screen" to stay within the 100-character limit; the body is as proposed.
+- Departures from the review rule: in pieces 2, 3 and 4 the verifier was not run on the checks' findings and fixes (I fixed every finding myself; piece 3 and 4's fixes got a light re-check, piece 2's did not); piece 5 ran the verifier as asked. Piece 1 ran the full process.

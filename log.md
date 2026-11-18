@@ -118,3 +118,4 @@
 - 2026-11-18 09:53 · one-config-file-for-every-model-s-settings (0006) · branch = claude/one-config-file-for-every-model-s-settings-3f9895
 - 2026-11-18 09:53 · one-config-file-for-every-model-s-settings (0006) · planned → building
 - 2026-11-18 10:01 · one-config-file-for-every-model-s-settings (0006) · PR #12
+- 2026-11-18 10:59 · one-config-file-for-every-model-s-settings (0006) · building → review
