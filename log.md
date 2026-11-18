@@ -120,3 +120,4 @@
 - 2026-11-18 10:01 · one-config-file-for-every-model-s-settings (0006) · PR #12
 - 2026-11-18 10:59 · one-config-file-for-every-model-s-settings (0006) · building → review
 - 2026-11-18 11:32 · one-config-file-for-every-model-s-settings (0006) · review → ready
+- 2026-11-18 11:32 · one-config-file-for-every-model-s-settings (0006) · PR #12 description final
