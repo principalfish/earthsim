@@ -84,7 +84,7 @@ Keep this section current when a step is merged.
 | 3 Winds | Done 2026-11-15 | 0003, GitHub #5, PR #6 (merged) |
 | 3c Layers in the main view, out of the side panel; also the climate worked out after every change with a Pause (brought forward from 3b), a Settings section and units | Done 2026-11-17 (PR #8 merged at 5627e02) | 0004, GitHub #7 |
 | 3a Core folders by component, page folders by role (refactor, no behaviour change) | Done 2026-11-18 (PR #10 merged at 33f027c) | 0005, GitHub #9 |
-| 3d One config.ts for every model's settings, with config.md; also a read-only Model settings screen with the climate process diagram, replacing the PDF | Built 2026-11-18, in review (PR #12) | 0006, GitHub #11 |
+| 3d One config.ts for every model's settings, with config.md; also a read-only Model settings screen with the climate process diagram, replacing the PDF | Done 2026-11-18 (PR #12 merged at 9463afa) | 0006, GitHub #11 |
 | 3b Heat carried by winds, and the climate loop | Not started; after 3a. Could instead open step 5; decide when planned | |
 | 4 Moisture, rainfall and Köppen zones | Not started. Before planning it, settle fixed or fitted colour scales (see the open follow-ups), since rainfall is the next colour layer | |
 | 5 Ocean currents | Not started | |
