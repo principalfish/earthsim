@@ -112,7 +112,7 @@ Rejected:
 - [x] 1. The temperature's settings in `config.ts`
 - [x] 2. The winds' settings in `config.ts`, and the tuning list
 - [x] 3. `config.md`, written from the config
-- [ ] 4. The "Model settings" screen
+- [x] 4. The "Model settings" screen
 - [ ] 5. The climate process diagram on the screen, and the PDF removed
 
 ## Verification
@@ -160,7 +160,7 @@ Decided by the builder:
 - Pointers: `docs/temperature.md` and `docs/winds.md` link to the page; `docs/development.md` lists the command, the script and the page; the README docs table gained a "Model settings" row, which is a link to a file outside `docs/` and so a small departure from "one line per docs file".
 - Review: security, docs clean; correctness raised five low findings (singular/plural in the count sentence, a clumsy join, no hint in the drift test's failure, a sentence with two colons, README row), coverage three (a line break in a text, number-form boundaries, `main`'s write path), all fixed except `main`'s write path and the missing-file branch, accepted as a thin wrapper over `writeFileSync` that the drift test and `npm run docs:config` exercise. The re-check raised one more singular/plural wording, fixed. Scripts are outside the coverage tool, so coverage is judged from the tests.
 
-### Piece 4: the "Model settings" screen (built, awaiting the manual review, 2026-11-18)
+### Piece 4: the "Model settings" screen (committed 2957d36 after the user's manual review, 2026-11-18)
 
 Decided by the builder:
 - The screen is `src/app/ui/panel/modelSettings.ts` (not `ui/`), beside the New world dialog it follows; the plan allowed either.
