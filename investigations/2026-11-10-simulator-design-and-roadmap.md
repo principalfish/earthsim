@@ -73,7 +73,7 @@ Each step adds a viewable map layer and gets its own issue.
 
 Added since (see the status table): 3c, the layers brought into the main view; 3a, the core and page folders; 3d, one config file for every model's settings; and 3b, heat carried by winds and the climate loop; all between steps 3 and 4, in that order. Also 10, an optional simulated atmosphere, after step 9.
 
-## Status and carried-over items (as of 2026-11-13)
+## Status and carried-over items (as of 2026-11-18)
 
 Keep this section current when a step is merged.
 
@@ -85,7 +85,8 @@ Keep this section current when a step is merged.
 | 3c Layers in the main view, out of the side panel; also the climate worked out after every change with a Pause (brought forward from 3b), a Settings section and units | Done 2026-11-17 (PR #8 merged at 5627e02) | 0004, GitHub #7 |
 | 3a Core folders by component, page folders by role (refactor, no behaviour change) | Done 2026-11-18 (PR #10 merged at 33f027c) | 0005, GitHub #9 |
 | 3d One config.ts for every model's settings, with config.md; also a read-only Model settings screen with the climate process diagram, replacing the PDF | Done 2026-11-18 (PR #12 merged at 9463afa) | 0006, GitHub #11 |
-| 3b Heat carried by winds, and the climate loop | Not started; after 3a. Could instead open step 5; decide when planned | |
+| 3a follow-up: the deeper splits of `ui/layerPanel.ts` and `wiring.ts`, and the `ui/` type dependency (see under step 3a) | Not started; before step 4 | |
+| 3b Heat carried by winds, and the climate loop | Next. Could instead open step 5; decide when planned | |
 | 4 Moisture, rainfall and Köppen zones | Not started. Before planning it, settle fixed or fitted colour scales (see the open follow-ups), since rainfall is the next colour layer | |
 | 5 Ocean currents | Not started | |
 | 6 Ice sheets and sea ice | Not started | |
@@ -154,10 +155,10 @@ Step 3 planned to prototype two wind models and choose. After the rules prototyp
 - **Planet settings on the world:** axial tilt, the star's brightness and mass, the orbit's distance and the greenhouse strength, saved with the world. A note in the Planet panel warns when they are outside the range the temperature model is trusted for.
 - **Monthly temperature fields** for the twelve months, solved in a Web Worker only while the Temperature layer shows. A world finer than 64 cells per face edge is solved on the grid one step coarser and carried back, so coasts are smoothed over about one coarse cell.
 - **Earth comparison:** on an untouched Earth preset the layer shows simulated, observed or difference. It was built so each later step can add its own observed layer.
-- **Earth error baseline:** annual mean −0.15 °C and RMS 3.93 °C at 64, committed in `src/core/baseline/earthTemperature.json`, with a test that fails if the figures get worse. The model's constants were tuned against the observed Earth when the solver was built (step 2, piece 4); they were not tuned again when the comparison was added. Step 3's winds only read the temperature and do not change it (the user's choice, 2026-11-13). Heat carried by winds (step 3b) and above all ocean currents (step 5) are expected to improve it, most of all the seasonal figures (monthly RMS 3.6 to 6.5 °C, coldest month 5.2 °C, against 3.9 °C for the annual average); re-run `npm run baseline:temperature` when a step changes the temperature.
+- **Earth error baseline:** annual mean −0.15 °C and RMS 3.93 °C at 64, committed in `src/core/temperature/baseline/earthTemperature.json` (the winds' in `src/core/wind/baseline/earthWinds.json`; the models' settings in `src/core/config.ts` since step 3d), with a test that fails if the figures get worse. The model's constants were tuned against the observed Earth when the solver was built (step 2, piece 4); they were not tuned again when the comparison was added. Step 3's winds only read the temperature and do not change it (the user's choice, 2026-11-13). Heat carried by winds (step 3b) and above all ocean currents (step 5) are expected to improve it, most of all the seasonal figures (monthly RMS 3.6 to 6.5 °C, coldest month 5.2 °C, against 3.9 °C for the annual average); re-run `npm run baseline:temperature` when a step changes the temperature.
 
 ### Left out of step 2, to pick up in a later step
-- **Rotation rate** is not yet a planet setting. Step 3 needs it: it sets the width and number of the wind bands.
+- **Rotation rate:** done in step 3, as the planet's day length; it sets the width and number of the wind bands.
 - **Orbit eccentricity.**
 - **A flat map view.**
 - **Real ice sheets:** step 2 only brightens cold surfaces; step 6 replaces that.
@@ -169,7 +170,7 @@ Step 3 planned to prototype two wind models and choose. After the rules prototyp
 - Terrain speckle on a world wholly at sea level (predates step 2).
 - The build's 500 kB chunk warning (predates step 2).
 - Whether the changed-lines coverage tool should also measure `scripts/`.
-- Two small code notes from the step 2 review: a doc comment above the `MONTH_NAMES` re-export in `src/app/view.ts` that attaches to nothing; `cellLatitudes` in `src/core/insolation.ts` and a longitude in `src/core/observed.ts` repeating the `directionToLatLon` arithmetic with no test tying them together.
+- Two small code notes from the step 2 review: a doc comment above the `MONTH_NAMES` re-export in `src/app/layers/view.ts` that attaches to nothing; `cellLatitudes` in `src/core/planet/insolation.ts` and a longitude in `src/core/temperature/observed.ts` repeating the `directionToLatLon` arithmetic with no test tying them together.
 - Never tried by hand: Firefox, screen readers, touch and high-density screens, the production build since the solver speed-ups, and opening a world file saved before step 2 in the page.
 
 ## Prior art
