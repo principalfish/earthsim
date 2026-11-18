@@ -62,3 +62,18 @@
 | round | - | medium | defect | noticed | open | `src/core/climate.ts:311` | At the shipped capacity the half-step stops some passes from growing but does not bring the oscillation down; whether the loop settles there rests on the damping (see the notes, and piece 4's table) |
 | re-check | correctness | low | docs | verified | open | `src/core/climate.ts:113` | The `start` option doc and the `@throws` don't say that a start whose temperature has no valid record is refused with a RangeError (since `conditionsMatch`) |
 | re-check | correctness | low | test | verified | open | `src/core/climate.test.ts:117` | `changeC` is checked with `toBeLessThan(tolerance)` at lines 117 and 155, though settling is `<=` |
+
+## piece 4 · 2026-11-18 · The setting's value, and the baselines
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | medium | docs | verified | fixed | `src/core/config.ts:296` | The `windHeatCapacity` entry still called 1.2e6 a placeholder; now its physical source and its coast-contrast check |
+| round | docs | low | docs | verified | fixed | `src/core/config.ts:1799` | `coldLimitK` said 3 hPa/K gives 75 hPa, the Earth's record; now 17.5 at 0.7 and 75 at 3 |
+| round | docs | low | docs | verified | fixed | `docs/temperature.md:25` | A one-pass figures paragraph at thermal 3 contradicted the new section; dropped, with "to start with" |
+| round | correctness | low | docs | verified | fixed | `scripts/tune/tuning.ts:79` | The tuning and report scripts work from the temperature without winds; a note in the script's listing and header and in docs/winds.md says so, and that a search raising `thermalHpaPerK` needs the loop looked at again |
+| round | docs | low | docs | verified | fixed | `docs/winds.md:142` | Figures measured at 3 before the loop were unlabelled; labelled |
+| round | docs | - | docs | verified | fixed | `docs/winds.md:174` | The list of what is still to come named heat carried by the winds, now built |
+| round | coverage | low | test | verified | fixed | `src/core/climate.test.ts:150` | Nothing told the rms rule from the old max rule; the carry-on test now asserts the largest change is above the tolerance while the rms is within it |
+| round | docs | - | cleanup | verified | fixed | `src/core/wind/baseline/earthWinds.ts:11` | A reflowed header line was over-long |
+| round | coverage | low | test | verified | open | `src/core/wind/flowing.test.ts:411` | The guess tests show the same result from a warm guess but not that it takes fewer rounds; the round count is not exposed, so left (optional) |
+| round | coverage | - | - | dropped | - | `src/core/temperature/baseline/earthTemperature.test.ts` | A floor for North America's annual contrast — dropped: the 0.25 K regression check already fails if it shrinks |
