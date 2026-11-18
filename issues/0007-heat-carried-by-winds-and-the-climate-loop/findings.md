@@ -60,8 +60,8 @@
 | round | docs | - | - | dropped | - | `src/core/config.ts:486` | "Below about 0.05 the temperature's own tolerance sets the limit" unsupported — dropped: the temperature solve stops a year at DEFAULT_TOLERANCE_K = 0.05 |
 | round | coverage | - | - | dropped | - | `src/core/climate.test.ts` | "A test planet" no-wind case — dropped: the setting at zero is tested, which meets the plan |
 | round | - | medium | defect | noticed | open | `src/core/climate.ts:311` | At the shipped capacity the half-step stops some passes from growing but does not bring the oscillation down; whether the loop settles there rests on the damping (see the notes, and piece 4's table) |
-| re-check | correctness | low | docs | verified | open | `src/core/climate.ts:113` | The `start` option doc and the `@throws` don't say that a start whose temperature has no valid record is refused with a RangeError (since `conditionsMatch`) |
-| re-check | correctness | low | test | verified | open | `src/core/climate.test.ts:117` | `changeC` is checked with `toBeLessThan(tolerance)` at lines 117 and 155, though settling is `<=` |
+| re-check | correctness | low | docs | verified | fixed | `src/core/climate.ts:113` | The `start` option doc and the `@throws` don't say that a start whose temperature has no valid record is refused with a RangeError (since `conditionsMatch`) |
+| re-check | correctness | low | test | verified | fixed | `src/core/climate.test.ts:117` | `changeC` is checked with `toBeLessThan(tolerance)` at lines 117 and 155, though settling is `<=` |
 
 ## piece 4 · 2026-11-18 · The setting's value, and the baselines
 
@@ -75,12 +75,12 @@
 | round | docs | - | docs | verified | fixed | `docs/winds.md:174` | The list of what is still to come named heat carried by the winds, now built |
 | round | coverage | low | test | verified | fixed | `src/core/climate.test.ts:150` | Nothing told the rms rule from the old max rule; the carry-on test now asserts the largest change is above the tolerance while the rms is within it |
 | round | docs | - | cleanup | verified | fixed | `src/core/wind/baseline/earthWinds.ts:11` | A reflowed header line was over-long |
-| round | coverage | low | test | verified | open | `src/core/wind/flowing.test.ts:411` | The guess tests show the same result from a warm guess but not that it takes fewer rounds; the round count is not exposed, so left (optional) |
+| round | coverage | low | test | verified | fixed | `src/core/wind/flowing.test.ts:411` | The guess tests show the same result from a warm guess but not that it takes fewer rounds; the round count is not exposed, so left (optional) |
 | round | coverage | - | - | dropped | - | `src/core/temperature/baseline/earthTemperature.test.ts` | A floor for North America's annual contrast — dropped: the 0.25 K regression check already fails if it shrinks |
-| re-check | docs | low | docs | verified | open | `docs/temperature.md:49` | "The loop's three settings are in the Model settings" now sits after the new coast section; belongs at the end of the loop's bullets |
-| re-check | docs | low | docs | verified | open | `docs/temperature.md:47` | "A quarter to a third of the observed" (also in the `windHeatCapacity` source in config.ts and config.md:22) is wrong for North America's year, 0.0 against 5.8 K; true of the other three figures |
-| re-check | correctness | low | docs | verified | open | `src/core/config.ts:1750` | `warmLimitK`'s "at most 18 hPa deep" assumes 3 hPa/K; about 4 hPa at 0.7 (and config.md:134) |
-| re-check | correctness | low | docs | verified | open | `docs/winds.md:220` | The tuning-script paragraph reads as though the What-it-gets-wrong figures were at 0.7; they were at 3 |
+| re-check | docs | low | docs | verified | fixed | `docs/temperature.md:49` | "The loop's three settings are in the Model settings" now sits after the new coast section; belongs at the end of the loop's bullets |
+| re-check | docs | low | docs | verified | fixed | `docs/temperature.md:47` | "A quarter to a third of the observed" (also in the `windHeatCapacity` source in config.ts and config.md:22) is wrong for North America's year, 0.0 against 5.8 K; true of the other three figures |
+| re-check | correctness | low | docs | verified | fixed | `src/core/config.ts:1750` | `warmLimitK`'s "at most 18 hPa deep" assumes 3 hPa/K; about 4 hPa at 0.7 (and config.md:134) |
+| re-check | correctness | low | docs | verified | fixed | `docs/winds.md:220` | The tuning-script paragraph reads as though the What-it-gets-wrong figures were at 0.7; they were at 3 |
 
 ## piece 5 · 2026-11-18 · One climate request in the worker
 
@@ -94,4 +94,5 @@
 | round | correctness | - | cleanup | verified | fixed | `src/core/protocol.ts:347` | The climate error string hard-coded "twelve"; now `${MONTHS_PER_YEAR}` |
 | round | correctness | - | cleanup | dropped | - | `src/worker/handle.ts:111` | `copyOfPass` copies the pressure arrays too — dropped: skipping 12 small copies isn't worth one pass message mixing copied and transferred arrays |
 | round | coverage | - | - | dropped | - | `src/worker/testing/fakeWorker.ts:76` | The stand-in's pass route is reachable only through a full climate on the fake — dropped: helper-only line; the real handler's pass path is covered in handle.test.ts |
-| re-check | correctness | low | cleanup | verified | open | `src/worker/handle.ts:180` | The reworded `handleRequest` remark left one comment line 130 characters long mid-paragraph; re-wrap |
+| re-check | correctness | low | cleanup | verified | fixed | `src/worker/handle.ts:180` | The reworded `handleRequest` remark left one comment line 130 characters long mid-paragraph; re-wrap |
+| manual | user | low | docs | - | fixed | `src/core/`, `docs/` | The user chose to fix the eight open nits of pieces 3–5 now ("Fix them now", 2026-11-18): one commit of its own |
