@@ -152,3 +152,6 @@ Rejected (with the user's choices): putting the winds into the main symmetric so
 After every piece: `npm run check`, `npm run typecheck`, `npm test`, `npm run build`, `npm run docs:config` unchanged after regenerating. Both Earth baselines must pass untouched through pieces 1–3 (piece 2 with no winds gives today's answer) and are re-recorded in piece 4, with old and new figures in that review. Changed-lines coverage with `project.md`'s Coverage command. The region-by-region error script (`temperature-errors.ts` in the issue folder) is rerun after piece 4 and its figures given in the review.
 
 ## Notes
+
+### How the pieces run (2026-11-18)
+- Straight through, as the user chose: commit and push each piece after its review round (the verifier on every finding, then a light re-check), fix every verified finding, record each choice the plan leaves open under its piece as "Decided by the builder", and list them all at the end. Stop for piece 6's manual review; for piece 4 if the Earth's west–east coast contrast is far from believable (report, don't tune); and for anything that changes behaviour beyond the plan, departs from the settled ledger, touches shared state or cannot be undone, or a check that cannot be made to pass.
