@@ -10,7 +10,7 @@ No value changes: the Earth's temperature and wind figures come out exactly as b
 
 ## Plan
 
-_2026-11-18 · 5 of 5 pieces done · now: all done, in review_
+_2026-11-18 · 5 of 5 pieces done · now: all done, in review; self review done_
 
 - [x] **1/5 The temperature's settings in config.ts** · `279f599`
   The temperature's 18 settings, with their explanations, move into one config file the model reads from.
@@ -22,3 +22,5 @@ _2026-11-18 · 5 of 5 pieces done · now: all done, in review_
   A read-only screen, opened from Settings, shows every setting with its explanations.
 - [x] **5/5 The climate process diagram on the screen, and the PDF removed** · `1e201c3`
   The process diagram is redrawn on the screen, and the PDF and its script go.
+- [x] **Review fixes (round 1)** · `2fc625f`
+  Shared helpers, doc comments that point at the config instead of repeating it, and small test and wording tidy-ups.
