@@ -28,6 +28,7 @@ import {
 	SOURCES,
 	WIND_SOURCES,
 } from '../layers/view';
+import { answerWinds, climateOf } from '../testing/climateStore';
 import {
 	createDeferredLoader,
 	createEarthStage,
@@ -355,7 +356,7 @@ describe('createLayerPanel, the comparison', () => {
 		// Not sent again as the status changes.
 		const sent = stage.shown.length;
 		stage.store.markOutOfDate();
-		stage.store.markCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.shown).toHaveLength(sent);
 		// A new result: new differences.
 		stage.arrive(resultOnGrid());
@@ -377,7 +378,7 @@ describe('createLayerPanel, the comparison', () => {
 			source: 'observed',
 			current: true,
 		});
-		stage.store.markCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.lastLegend()?.status).toBeNull();
 		expect(stage.panel.shown()?.current).toBe(true);
 
@@ -404,7 +405,7 @@ describe('createLayerPanel, the comparison', () => {
 		expect(stage.lastLegend()?.scale?.figures).toBeNull();
 		expect(stage.lastLegend()?.status).toBeNull();
 		expect(stage.panel.shown()?.current).toBe(true);
-		stage.store.markCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.lastLegend()?.scale?.figures).toBeNull();
 		// The simulated and the difference keep theirs, marked as before.
 		stage.panel.setSource('difference');
@@ -416,7 +417,7 @@ describe('createLayerPanel, the comparison', () => {
 		expect(stage.lastLegend()?.scale?.figures).toBeNull();
 
 		const next = resultOnGrid();
-		stage.store.setResult(next, true);
+		stage.store.setClimateResult(climateOf(next), true);
 		const { months } = compareFields(next.months, observed, grid);
 		expect(stage.lastLegend()?.scale?.figures).toBe(
 			formatFigures(months[DEFAULT_MONTH] as FieldDifference, '°C'),
@@ -660,8 +661,7 @@ describe('createLayerPanel, one source for the layer and the winds', () => {
 		const result = resultOnGrid();
 		stage.arrive(result);
 		const solved = windsOnGrid();
-		stage.store.markWindsCalculating();
-		stage.store.setWindsResult(solved, true);
+		answerWinds(stage.store, solved, true);
 		return {
 			stage,
 			years,

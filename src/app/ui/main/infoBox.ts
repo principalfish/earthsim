@@ -7,13 +7,13 @@
  * the pointer is over the globe.
  *
  * The legend and the winds are each told what they show, with a line of
- * its own, and the calculation of the temperature and the winds,
- * which goes on whatever is on screen, has a line too;
+ * its own, and the calculation of the climate, the temperature and the
+ * winds together, which goes on whatever is on screen, has a line too;
  * {@link infoStatus} picks the one line the box shows of the three.
  */
 
+import type { TemperatureProgress } from '../../../core/index';
 import type { LayerStatus, TemperatureLayer } from '../../layers/layers';
-import { TEMPERATURE_UNAVAILABLE_TEXT } from '../../layers/scalar';
 import { createElement } from '../fields';
 import { createReadoutBlock, type ReadoutText } from './cursorReadout';
 import {
@@ -21,15 +21,23 @@ import {
 	LEGEND_EMPTY_TEXT,
 	LEGEND_OUT_OF_DATE_TEXT,
 	type LegendContent,
-	progressFraction,
 } from './legend';
-import { WINDS_UNAVAILABLE_TEXT, type WindKeyContent } from './windKey';
+import type { WindKeyContent } from './windKey';
 
-/** What is said while the temperature is being calculated. */
-export const CALCULATING_TEMPERATURE_TEXT = 'Calculating temperature';
+/** What is said while the first pass of the climate is being calculated. */
+export const CALCULATING_CLIMATE_TEXT = 'Calculating climate';
 
-/** What is said while the winds are being calculated. */
-export const CALCULATING_WINDS_TEXT = 'Calculating winds';
+/**
+ * What is said while a later pass of the climate is being calculated,
+ * refining the one on show.
+ *
+ * @param pass - The pass under way, from 2.
+ */
+export const refiningClimateText = (pass: number): string =>
+	`Refining climate (pass ${pass})`;
+
+/** What is said when the climate can no longer be calculated. */
+export const CLIMATE_UNAVAILABLE_TEXT = 'Climate unavailable';
 
 /**
  * What is said while the calculation is paused with a result that does
@@ -45,16 +53,16 @@ export const PAUSED_TEXT = 'Paused';
 export type InfoState = LayerStatus | 'paused';
 
 /**
- * Where the calculation of the temperature and then the winds stands, for
- * the box's status line, whatever is on screen.
+ * Where the calculation of the climate stands, for the box's status line,
+ * whatever is on screen.
  */
 export type CalculationContent = {
 	/** Where it stands. */
 	readonly state: InfoState;
-	/** What is said of it, or null while both results are current. */
+	/** What is said of it, or null while its results are current. */
 	readonly status: string | null;
 	/**
-	 * The progress bar, shown while either is being calculated: its fraction
+	 * The progress bar, shown while it is being calculated: its fraction
 	 * done, or null while that is not known. Null when no bar is shown.
 	 */
 	readonly bar: { readonly fraction: number | null } | null;
@@ -89,7 +97,7 @@ const severity = (state: InfoState): number =>
 /** A status line with nothing to say. */
 const NOTHING_TO_SAY: InfoStatus = { text: null, bar: null };
 
-/** The calculation with both results current: nothing to say. */
+/** The calculation with its results current: nothing to say. */
 const CALCULATED: CalculationContent = {
 	state: 'current',
 	status: null,
@@ -117,64 +125,89 @@ const waiting = (
 };
 
 /**
- * Where the calculation stands: the temperature's, until it is current,
- * and then the winds', which are worked out from it.
+ * How much of a pass's temperature solve is done.
+ *
+ * @param progress - How far the solve has come, or null before its first
+ * year is done.
+ * @returns The years done over the years done and expected to go, from 0
+ * to 1; or null when there is nothing to base it on, before the first year
+ * and while there is no estimate of the years left.
+ */
+export const progressFraction = (
+	progress: TemperatureProgress | null,
+): number | null => {
+	if (progress === null || progress.estimatedYearsLeft === null) {
+		return null;
+	}
+	return (
+		progress.yearsDone / (progress.yearsDone + progress.estimatedYearsLeft)
+	);
+};
+
+/**
+ * How much of the climate is done, for the bar under its line: the first
+ * pass's temperature solve, as {@link progressFraction} gives it, and then
+ * the whole bar for every later pass.
  *
  * @remarks
- * While the temperature is being calculated the line is
- * {@link CALCULATING_TEMPERATURE_TEXT}, with a bar of its progress, and
- * while the winds are, {@link CALCULATING_WINDS_TEXT}, with a bar that
- * does not know how far it has come, since their calculation tells
- * nothing of it. A result that is out of date, or none at all, is
- * {@link PAUSED_TEXT} while paused, and in the legend's words otherwise;
- * one that can no longer be calculated is in the words the temperature's
- * legend and the winds use for that. A calculation under way while paused
- * is said as calculating, since it goes on to its end.
+ * The first pass, from nothing or from the last settled climate, is most
+ * of the work, and the later passes refine what it shows, each carried on
+ * from the one before and so much shorter, with no telling how many there
+ * will be. So the bar fills with the first pass and stays full while the
+ * climate is refined: it never goes back, from one pass to the next.
  *
- * @param temperature - Where the temperature stands, and its progress.
- * @param winds - Where the winds stand.
+ * @param temperature - The temperature's progress and the pass under way.
+ */
+export const climateFraction = (
+	temperature: Pick<TemperatureLayer, 'progress' | 'pass'>,
+): number | null =>
+	temperature.pass !== null && temperature.pass > 1
+		? 1
+		: progressFraction(temperature.progress);
+
+/**
+ * Where the calculation of the climate stands, the temperature and the
+ * winds worked out together in passes, which the temperature layer tells.
+ *
+ * @remarks
+ * While the climate's first pass is being calculated the line is
+ * {@link CALCULATING_CLIMATE_TEXT}, and while a later one is,
+ * {@link refiningClimateText} with the pass, each with a bar of
+ * {@link climateFraction}, which never goes back between passes. A result
+ * that is out of date, or none at all, is {@link PAUSED_TEXT} while paused,
+ * and in the legend's words otherwise; one that can no longer be
+ * calculated is {@link CLIMATE_UNAVAILABLE_TEXT}. A calculation under way
+ * while paused is said as calculating, since it goes on to the end of its
+ * pass under way.
+ *
+ * @param temperature - Where the temperature stands, its progress and the
+ * pass under way; the winds stand with it, being worked out in the same
+ * passes.
  * @param paused - Whether the calculation is paused.
  */
 export const calculationContent = (
-	temperature: Pick<TemperatureLayer, 'status' | 'progress'>,
-	winds: LayerStatus,
+	temperature: Pick<TemperatureLayer, 'status' | 'progress' | 'pass'>,
 	paused: boolean,
 ): CalculationContent => {
 	switch (temperature.status) {
 		case 'unavailable':
 			return {
 				state: 'unavailable',
-				status: TEMPERATURE_UNAVAILABLE_TEXT,
+				status: CLIMATE_UNAVAILABLE_TEXT,
 				bar: null,
 			};
 		case 'calculating':
 			return {
 				state: 'calculating',
-				status: CALCULATING_TEMPERATURE_TEXT,
-				bar: { fraction: progressFraction(temperature.progress) },
+				status:
+					temperature.pass !== null && temperature.pass > 1
+						? refiningClimateText(temperature.pass)
+						: CALCULATING_CLIMATE_TEXT,
+				bar: { fraction: climateFraction(temperature) },
 			};
 		case 'outOfDate':
 		case 'empty':
 			return waiting(temperature.status, paused);
-		case 'current':
-			break;
-	}
-	switch (winds) {
-		case 'unavailable':
-			return {
-				state: 'unavailable',
-				status: WINDS_UNAVAILABLE_TEXT,
-				bar: null,
-			};
-		case 'calculating':
-			return {
-				state: 'calculating',
-				status: CALCULATING_WINDS_TEXT,
-				bar: { fraction: null },
-			};
-		case 'outOfDate':
-		case 'empty':
-			return waiting(winds, paused);
 		case 'current':
 			return CALCULATED;
 	}
@@ -189,11 +222,9 @@ export const calculationContent = (
  * from the worst: unavailable, calculating, paused, out of date, not
  * calculated yet. Between lines as bad, the legend's is said first, then
  * the calculation's, whose bar the winds' line never has, and then the
- * winds'; but a legend being calculated with a bar that does not know how
- * far it has come comes after the calculation's line, so Pressure on
- * screen is said as the temperature or the winds being calculated, and
- * only a temperature on screen that knows its years to go is said with
- * them. While all three are current there is nothing to say, but for a
+ * winds'; but a legend being calculated comes after the calculation's
+ * line, so whatever is on screen, the climate being calculated is said by
+ * its pass. While all three are current there is nothing to say, but for a
  * line said of the winds while they are current, such as that the
  * observed winds are loading or could not be loaded.
  *
@@ -210,10 +241,7 @@ export const infoStatus = (
 ): InfoStatus => {
 	const legendLines: readonly CalculationContent[] =
 		legend === null ? [] : [legend];
-	const legendFirst =
-		legend !== null &&
-		(legend.state !== 'calculating' ||
-			(legend.bar !== null && legend.bar.fraction !== null));
+	const legendFirst = legend !== null && legend.state !== 'calculating';
 	const lines: readonly CalculationContent[] = [
 		...(legendFirst ? legendLines : []),
 		calculation,

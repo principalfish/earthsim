@@ -14,7 +14,7 @@ The temperature is a seasonal energy balance: the year is stepped through month 
 - the greenhouse strength;
 - heat carried along by the winds, when a solve is given them (see below).
 
-There are no ocean currents yet, and the page does not yet use the climate loop below, so the aim is the right broad pattern, not a match to the real Earth.
+There are no ocean currents yet, so the aim is the right broad pattern, not a match to the real Earth.
 
 The model's settings are listed, with what each does and where its value comes from, in [Model settings](../src/core/config.md).
 
@@ -31,6 +31,7 @@ How strongly the wind carries heat is one setting, the heat capacity of the air 
 - It stops when the root-mean-square change a pass makes to the monthly temperature, over the globe and the year, is no more than 0.1 °C, or after 8 passes. The largest change in a single cell is left out of the rule: a few cells of spring snow and ice keep moving by more than a degree for many passes.
 - A pass whose change is larger than the one before's is an overshoot, and only half its change is applied.
 - A result that settled can be carried on from: a solve for the same world again settles in one pass.
+- The page works the temperature out this way, as the climate; see [When it is recalculated](#when-it-is-recalculated).
 - The day length now changes the settled temperature, through the winds, though not the first pass.
 - On the Earth at 64 the loop settles in 4 passes, about 8 s from nothing (1.4 s for the first pass, which is the temperature from nothing and the winds, then about 2 s for each later pass), and in one pass, about 2 s, carried on from the settled result; on a world of 128 about 9 s and 2 s, and on one of 256 about 27 s and 4 s. A later pass is the temperature carried on (0.3 s for a year), the flowing part of the winds (0.5–0.7 s, a tenth to a third less than from nothing because each month starts from the last pass's answer) and the winds (0.6 s). `npm run time:climate` measures it.
 - How fast the passes settle depends on how strongly the winds feed back. The thermal highs and lows are at their physical 0.7 hPa a kelvin for that reason: at the 3 they were tuned to before the winds carried heat, each pass shrank by about 0.7 and the Earth did not settle in 8. At 0.7 each pass shrinks by about 0.2 to 0.3.
@@ -72,12 +73,13 @@ The model is calibrated on the Earth, and far from it the results are rough. The
 
 ## When it is recalculated
 
-The temperature is worked out in its own worker, so a slow solve never holds up the rest of the page.
+The temperature is worked out with the winds, as the [climate loop](#the-climate-loop), in its own worker, so a slow solve never holds up the rest of the page.
 
+- **Pass by pass.** The first pass shows on the globe as soon as it is done, and each later pass refines it, the temperature and the winds always of the same pass, until the loop settles.
 - **Whatever is on screen,** Terrain included, so the result is ready when Temperature is chosen.
-- **After every change:** a stroke, undo, redo, a move of the Sea level or a Planet slider, or a new world. It starts a little under half a second after the change, and a change made during a solve stops it and starts a new one. A new world, and the world the page opens on, are asked for at once.
-- **Not while paused.** The [Pause button](user-guide.md#the-pause-button) stops it: a change only marks the result out of date, a new world stays uncalculated, and a solve under way finishes. Resume asks once for everything changed meanwhile.
-- **After a terrain edit it carries on from the last result,** which settles in fewer years.
+- **After every change:** a stroke, undo, redo, a move of the Sea level or a Planet slider, the day length's included, or a new world. It starts a little under half a second after the change, and a change made during the loop stops it and starts a new one. A new world, and the world the page opens on, are asked for at once.
+- **Not while paused.** The [Pause button](user-guide.md#the-pause-button) stops it: a change only marks the result out of date, a new world stays uncalculated, and a loop under way finishes the pass under way, shows it and stops. Resume carries on from that pass if nothing changed meanwhile, and otherwise asks once for everything changed.
+- **After a terrain edit it carries on from the last climate that settled,** which settles in fewer passes and years. One that ran out of passes is shown but not carried on from.
 - **After a change of sea level or planet it starts afresh,** as it does for a new world.
 
 ### Why it sometimes starts afresh
@@ -88,16 +90,17 @@ Terrain edits carry on, but only until the terrain has drifted past a limit sinc
 
 ### What the info box says meanwhile
 
-The status line of the info box, under the legend, says where the result stands, unless the winds have something worse to say; see the [user guide](user-guide.md#the-info-box). It says so on Terrain too.
+The status line of the info box, under the legend, says where the climate stands, whatever is on screen, Terrain included; see the [user guide](user-guide.md#the-info-box).
 
 | Status line | Meaning |
 |-|-|
-| "Calculating · year 3, about 2 to go", or "Calculating · year 5, finishing", with a bar | A new result is on its way, on Temperature once the years left can be told; the one before stays on the globe |
-| "Calculating temperature", with a bar | The same, said while Temperature is not on screen, and on it until the years left can be told |
+| "Calculating climate", with a bar | The climate's first pass is on its way, the bar following its years; the result before stays on the globe |
+| "Refining climate (pass 2)", and so on, with a full bar | The first pass is on the globe, and a later pass is refining it |
 | "Out of date" | The result on the globe no longer describes the world |
-| "Paused" | The result is out of date, or there is none, and the calculation is paused |
-| "Temperature could not be shown" | The globe could not take a current result |
-| "Temperature unavailable" | The worker could not be started |
+| "Paused" | The result is out of date, or there is none, and the calculation is paused; paused partway through the climate, the last pass finished stays on the globe |
+| "Temperature could not be shown" | The globe could not take a current result, while Temperature is on screen |
+| "Temperature unavailable" | The worker could not be started, while Temperature is on screen |
+| "Climate unavailable" | The same, while Terrain is on screen |
 
 Until the first result arrives, the globe keeps the height colours.
 

@@ -1,11 +1,12 @@
 /**
  * The layers the page computes from the world, as the page holds them:
- * for now the temperature through the year and the winds and pressure
- * worked out from it, each with whether it describes the world as it is.
+ * for now the climate's, the temperature through the year and the winds
+ * and pressure worked out with it, each with whether it describes the world
+ * as it is.
  *
- * Nothing here computes anything or touches the DOM. The schedulers that
- * ask for the temperature and the winds write here, and whatever shows
- * them reads here and listens for changes.
+ * Nothing here computes anything or touches the DOM. The scheduler that
+ * asks for the climate writes here, both layers together from one pass of
+ * its loop, and whatever shows them reads here and listens for changes.
  */
 
 import type {
@@ -49,23 +50,29 @@ export type TemperatureLayer = {
 	 */
 	readonly result: TemperatureResult | null;
 	/**
-	 * How far the calculation under way has come, as last told: null unless
-	 * the status is `calculating`, and until the first year of the
-	 * calculation is done.
+	 * How far the pass under way has come, as last told: null unless the
+	 * status is `calculating`, and until the first year of the pass is done.
 	 */
 	readonly progress: TemperatureProgress | null;
+	/**
+	 * The pass of the climate's loop under way, from 1: null unless the
+	 * status is `calculating`.
+	 */
+	readonly pass: number | null;
 };
 
 /**
- * A year of winds and pressure, with what it was worked out from: the
- * temperature result and the day length.
+ * A year of winds and pressure, with what it was worked out with: the
+ * temperature result of the same pass of the climate and the day length.
+ * It is also what one pass of the climate gives, both layers' results.
  */
 export type SolvedWinds = {
 	/** The winds and sea-level pressure of each month. */
 	readonly winds: WindResult;
 	/**
-	 * The temperature result whose months the winds were worked out from:
-	 * the very object, so that it can be told apart from any later result.
+	 * The temperature result the winds were worked out with, from the same
+	 * pass: the very object, so that it can be told apart from any later
+	 * result.
 	 */
 	readonly temperature: TemperatureResult;
 	/** The day length the winds were worked out for, in hours. */
@@ -73,13 +80,10 @@ export type SolvedWinds = {
 };
 
 /**
- * The winds layer as it stands at one moment. Its statuses mean what the
- * temperature's do, with the winds' result in place of the temperature's;
- * besides, winds are `current` only while the temperature they were worked
- * out from is the current one and the day length is the one they were
- * worked out for, and they are `unavailable` when there is no current
- * temperature and none can be calculated any more, since they are worked
- * out from it. Their calculation tells of no progress.
+ * The winds layer as it stands at one moment. The winds are worked out
+ * with the temperature, in the climate's passes, so their status is always
+ * the temperature's, with the winds' result in place of the temperature's.
+ * Their calculation tells of no progress of its own.
  */
 export type WindsLayer = {
 	/** Where the result stands against the world. */
@@ -93,30 +97,19 @@ export type WindsLayer = {
 };
 
 /**
- * Called after every change of either layer, with the temperature layer as
- * that change left it: after a change of the winds alone, the very
- * temperature layer it was handed before. A listener that wants the winds
- * reads them from the store.
+ * Called after every change of the layers, with the temperature layer as
+ * that change left it. A listener that wants the winds reads them from the
+ * store.
  */
 export type LayerListener = (layer: TemperatureLayer) => void;
 
 /** The computed layers of one page. */
 export type LayerStore = {
-	/**
-	 * The temperature layer as it stands now: a new object whenever this
-	 * layer changes, and the same one while only the winds do.
-	 */
+	/** The temperature layer as it stands now: a new object whenever it changes. */
 	readonly temperature: TemperatureLayer;
 	/**
-	 * The temperature result if it describes the world as it is, and
-	 * otherwise null: the result while the status is `current`, and while
-	 * it is `unavailable` if the result was current when it became so and
-	 * nothing has changed since. What the winds are worked out from.
-	 */
-	readonly currentTemperature: TemperatureResult | null;
-	/**
 	 * The winds layer as it stands now: a new object whenever this layer
-	 * changes, and the same one while only the temperature does.
+	 * changes, and the same one while only the temperature's progress does.
 	 */
 	readonly winds: WindsLayer;
 	/**
@@ -132,11 +125,6 @@ export type LayerStore = {
 	 */
 	clear(): void;
 	/**
-	 * Drops the winds alone, leaving the temperature as it is: their status
-	 * becomes `empty`, unless it is `unavailable`, which stays.
-	 */
-	clearWinds(): void;
-	/**
 	 * Says that the world has changed since the results were calculated: a
 	 * `current` result of either layer becomes `outOfDate`, since winds
 	 * worked out from a temperature that is out of date are too. Any other
@@ -146,58 +134,64 @@ export type LayerStore = {
 	 */
 	markOutOfDate(): void;
 	/**
-	 * Says that a result has been asked for: the status becomes
-	 * `calculating`, the result on hand stays, and there is no progress
-	 * yet. Once `unavailable`, this does nothing.
-	 */
-	markCalculating(): void;
-	/**
-	 * Says how far the calculation under way has come. Does nothing unless
-	 * the status is `calculating`.
-	 */
-	setProgress(progress: TemperatureProgress): void;
-	/**
-	 * Keeps a result that has been completed, in place of the one on hand.
-	 *
-	 * @param result - The result, whole.
-	 * @param current - Whether it describes the world as it is now, rather
-	 * than as it was before a change made while it was being calculated.
-	 * The status becomes `current` or `outOfDate`, unless it is
-	 * `unavailable`, which stays.
-	 */
-	setResult(result: TemperatureResult, current: boolean): void;
-	/**
-	 * Says that the request for a result failed: the result on hand stays,
-	 * and the status becomes `outOfDate`, or `empty` if there is no result.
-	 * Once `unavailable`, this does nothing.
-	 */
-	markFailed(): void;
-	/**
-	 * Says that no result can be calculated from now on: the status becomes
-	 * `unavailable` for good, and the result on hand stays until `clear`.
-	 * The winds become `unavailable` too as soon as there is no current
-	 * temperature to work them out from: at once if the result on hand is
-	 * not current, and otherwise at the next change of the world.
+	 * Says that no result can be calculated from now on: both layers become
+	 * `unavailable` for good, in one change, and the results on hand stay
+	 * until `clear`.
 	 */
 	markUnavailable(): void;
 	/**
-	 * Says that the day length has changed since the winds were calculated:
-	 * `current` winds become `outOfDate`, as for {@link markOutOfDate}, and
-	 * the temperature, which does not depend on the day length, is left as
-	 * it is.
+	 * Says that a climate, the temperature and the winds together, has been
+	 * asked for: both layers become `calculating` in one change, each
+	 * keeping its result, with no progress yet. Once `unavailable`, this
+	 * does nothing.
+	 *
+	 * @param pass - The pass under way, from 1: 1 when left out, and the
+	 * pass after the one reached for a climate carried on from it.
 	 */
-	markWindsOutOfDate(): void;
-	/** As {@link markCalculating}, for the winds. */
-	markWindsCalculating(): void;
-	/** As {@link setResult}, for the winds. */
-	setWindsResult(result: SolvedWinds, current: boolean): void;
-	/** As {@link markFailed}, for the winds. */
-	markWindsFailed(): void;
+	markClimateCalculating(pass?: number): void;
 	/**
-	 * As {@link markUnavailable}, for the winds alone: the temperature can
-	 * still be calculated.
+	 * Says how far the pass under way has come, and which pass it is. Does
+	 * nothing unless the temperature is `calculating`.
+	 *
+	 * @param progress - How far the pass's temperature solve has come.
+	 * @param pass - The pass it is in, from 1; left out, the pass on hand
+	 * stays.
 	 */
-	markWindsUnavailable(): void;
+	setProgress(progress: TemperatureProgress, pass?: number): void;
+	/**
+	 * Keeps a pass of the climate under way that has finished, before the
+	 * loop has: the pass's temperature and winds become both layers' results
+	 * in one change, to show at once, and both stay `calculating`. The next
+	 * pass is then under way, with no progress yet; or, if this pass is the
+	 * last, whose answer is to follow, it stays under way with its progress
+	 * as it last was. The pass is not `current`: only
+	 * {@link setClimateResult} settles it. Does nothing unless the
+	 * temperature is `calculating`.
+	 *
+	 * @param solved - The pass's temperature and winds, and the day length
+	 * they were worked out for.
+	 * @param pass - The pass, from 1.
+	 * @param last - Whether the loop ends with it; false when left out.
+	 */
+	setPass(solved: SolvedWinds, pass: number, last?: boolean): void;
+	/**
+	 * Keeps the climate's last pass as both layers' results, in one change.
+	 *
+	 * @param solved - The last pass's temperature and winds, and the day
+	 * length they were worked out for.
+	 * @param current - Whether it describes the world as it is now, rather
+	 * than as it was before a change made while it was being calculated.
+	 * Both statuses become `current` or `outOfDate`, unless they are
+	 * `unavailable`, which stays.
+	 */
+	setClimateResult(solved: SolvedWinds, current: boolean): void;
+	/**
+	 * Says that the climate under way ended before its result, because it
+	 * failed or was stopped: in one change, each layer keeps its result and
+	 * becomes `outOfDate`, or `empty` if it has none. Once `unavailable`,
+	 * this does nothing.
+	 */
+	markClimateStopped(): void;
 };
 
 /**
@@ -210,7 +204,7 @@ export const MAX_CHANGES_TOLD_IN_A_ROUND = 1000;
 
 /** A temperature layer with no result, empty or unavailable. */
 const emptyTemperature = (status: LayerStatus): TemperatureLayer =>
-	Object.freeze({ status, result: null, progress: null });
+	Object.freeze({ status, result: null, progress: null, pass: null });
 
 /** A winds layer with no result, empty or unavailable. */
 const emptyWinds = (status: LayerStatus): WindsLayer =>
@@ -258,9 +252,9 @@ const changed = <L extends object>(layer: L, next: Partial<L>): L => {
  * handed to `reportError` once, as it was thrown, in the order the
  * listeners were told. No method of the store ever throws for a listener.
  * The store reports these errors rather than throwing them because what
- * writes to it, the schedulers that ask for the temperature and the winds,
- * must go on scheduling whatever a listener does: an error thrown back
- * into one would stop it halfway through a change.
+ * writes to it, the scheduler that asks for the climate, must go on
+ * scheduling whatever a listener does: an error thrown back into it would
+ * stop it halfway through a change.
  *
  * A `reportError` that throws in turn is not let out either: what it
  * throws is dropped, and the remaining listeners are still told.
@@ -277,16 +271,8 @@ export const createLayerStore = (
 		readonly temperature: TemperatureLayer;
 		readonly winds: WindsLayer;
 	} = { temperature: emptyTemperature('empty'), winds: emptyWinds('empty') };
+	/** Whether no result can be calculated any more. */
 	let unavailable = false;
-	let windsUnavailable = false;
-	/**
-	 * Whether the temperature result describes the world as it is: whether
-	 * the status is `current`, or would be were it not `unavailable`.
-	 */
-	let temperatureCurrent = false;
-	/** Whether the winds can never be calculated again. */
-	const windsGone = (): boolean =>
-		windsUnavailable || (unavailable && !temperatureCurrent);
 	// Changes made while listeners are being told, each with the listeners
 	// there when it was made, waiting their turn to be told.
 	const untold: {
@@ -309,12 +295,7 @@ export const createLayerStore = (
 		readonly winds?: Partial<WindsLayer>;
 	}): void => {
 		const temperature = changed(layers.temperature, next.temperature ?? {});
-		const winds = changed(
-			layers.winds,
-			windsGone()
-				? { ...next.winds, status: 'unavailable' }
-				: (next.winds ?? {}),
-		);
+		const winds = changed(layers.winds, next.winds ?? {});
 		if (temperature === layers.temperature && winds === layers.winds) {
 			return;
 		}
@@ -362,8 +343,8 @@ export const createLayerStore = (
 		status === 'current' ? 'outOfDate' : status;
 
 	/** The status a completed result is kept with. */
-	const resultStatus = (gone: boolean, current: boolean): LayerStatus => {
-		if (gone) {
+	const resultStatus = (current: boolean): LayerStatus => {
+		if (unavailable) {
 			return 'unavailable';
 		}
 		return current ? 'current' : 'outOfDate';
@@ -373,9 +354,6 @@ export const createLayerStore = (
 		get temperature(): TemperatureLayer {
 			return layers.temperature;
 		},
-		get currentTemperature(): TemperatureResult | null {
-			return temperatureCurrent ? layers.temperature.result : null;
-		},
 		get winds(): WindsLayer {
 			return layers.winds;
 		},
@@ -383,86 +361,76 @@ export const createLayerStore = (
 			listeners.push(listener);
 		},
 		clear: () => {
-			temperatureCurrent = false;
-			set({
-				temperature: emptyTemperature(unavailable ? 'unavailable' : 'empty'),
-				winds: emptyWinds('empty'),
-			});
-		},
-		clearWinds: () => {
-			set({ winds: emptyWinds('empty') });
+			const status = unavailable ? 'unavailable' : 'empty';
+			set({ temperature: emptyTemperature(status), winds: emptyWinds(status) });
 		},
 		markOutOfDate: () => {
-			temperatureCurrent = false;
 			set({
 				temperature: { status: outOfDate(layers.temperature.status) },
 				winds: { status: outOfDate(layers.winds.status) },
 			});
 		},
-		markCalculating: () => {
-			if (!unavailable) {
-				temperatureCurrent = false;
-				set({ temperature: { status: 'calculating', progress: null } });
-			}
-		},
-		setProgress: (progress) => {
-			if (layers.temperature.status === 'calculating') {
-				set({ temperature: { progress } });
-			}
-		},
-		setResult: (result, current) => {
-			temperatureCurrent = current;
-			set({
-				temperature: {
-					status: resultStatus(unavailable, current),
-					result,
-					progress: null,
-				},
-			});
-		},
-		markFailed: () => {
-			if (!unavailable) {
-				temperatureCurrent = false;
-				set({
-					temperature: {
-						status: layers.temperature.result === null ? 'empty' : 'outOfDate',
-						progress: null,
-					},
-				});
-			}
-		},
 		markUnavailable: () => {
 			unavailable = true;
-			set({ temperature: { status: 'unavailable', progress: null } });
-		},
-		markWindsOutOfDate: () => {
-			set({ winds: { status: outOfDate(layers.winds.status) } });
-		},
-		markWindsCalculating: () => {
-			if (!windsGone()) {
-				set({ winds: { status: 'calculating' } });
-			}
-		},
-		setWindsResult: (result, current) => {
 			set({
-				winds: {
-					status: resultStatus(windsGone(), current),
-					result,
-				},
+				temperature: { status: 'unavailable', progress: null, pass: null },
+				winds: { status: 'unavailable' },
 			});
 		},
-		markWindsFailed: () => {
-			if (!windsGone()) {
+		markClimateCalculating: (pass = 1) => {
+			if (!unavailable) {
 				set({
-					winds: {
-						status: layers.winds.result === null ? 'empty' : 'outOfDate',
-					},
+					temperature: { status: 'calculating', progress: null, pass },
+					winds: { status: 'calculating' },
 				});
 			}
 		},
-		markWindsUnavailable: () => {
-			windsUnavailable = true;
-			set({ winds: { status: 'unavailable' } });
+		setProgress: (progress, pass) => {
+			if (layers.temperature.status === 'calculating') {
+				set({
+					temperature: pass === undefined ? { progress } : { progress, pass },
+				});
+			}
+		},
+		setPass: (solved, pass, last = false) => {
+			if (layers.temperature.status !== 'calculating') {
+				return;
+			}
+			set({
+				// The last pass's progress stays as it was, so what is shown of
+				// it does not go back while its answer is on the way.
+				temperature: last
+					? { result: solved.temperature, pass }
+					: { result: solved.temperature, progress: null, pass: pass + 1 },
+				winds: { result: solved },
+			});
+		},
+		setClimateResult: (solved, current) => {
+			const status = resultStatus(current);
+			set({
+				temperature: {
+					status,
+					result: solved.temperature,
+					progress: null,
+					pass: null,
+				},
+				winds: { status, result: solved },
+			});
+		},
+		markClimateStopped: () => {
+			if (unavailable) {
+				return;
+			}
+			const stopped = (result: unknown): LayerStatus =>
+				result === null ? 'empty' : 'outOfDate';
+			set({
+				temperature: {
+					status: stopped(layers.temperature.result),
+					progress: null,
+					pass: null,
+				},
+				winds: { status: stopped(layers.winds.result) },
+			});
 		},
 	};
 };

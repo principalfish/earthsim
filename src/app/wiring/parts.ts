@@ -11,11 +11,7 @@ import type { RotateButton, ViewInput } from '../globe/input';
 import type { Globe } from '../globe/renderer';
 import type { LayerStore } from '../layers/layers';
 import type { ObservedLoader } from '../layers/observedData';
-import type {
-	RefreshScheduler,
-	TemperatureScheduler,
-	WindsScheduler,
-} from '../layers/refresh';
+import type { ClimateScheduler, RefreshScheduler } from '../layers/refresh';
 import type { ScalarObservedLoader } from '../layers/scalar';
 import type { PageView, StoredView } from '../layers/view';
 import type { Autosave, AutosaveOptions } from '../saving/autosave';
@@ -81,10 +77,10 @@ export type PageStatsOptions = PageStatisticsOptions & {
 };
 
 /**
- * What the page's temperature, or its winds, are computed from, and where
- * they are kept.
+ * What the page's climate, the temperature and the winds, is computed
+ * from, and where it is kept.
  */
-export type PageTemperatureOptions = PageStatisticsOptions & {
+export type PageClimateOptions = PageStatisticsOptions & {
 	/**
 	 * Where the temperature and the winds are kept, for whatever shows them
 	 * to read.
@@ -107,8 +103,8 @@ export type PageLayerOptions = {
 	/** The unit chosen for each quantity it starts on. */
 	readonly units: ResolvedUnits;
 	/**
-	 * Where the temperature and the winds are kept: the store their
-	 * calculations write.
+	 * Where the temperature and the winds are kept: the store the climate's
+	 * calculation writes.
 	 */
 	readonly store: LayerStore;
 	/**
@@ -209,7 +205,8 @@ export type PageParts = {
 	) => Pick<Timeline, 'showView'>;
 	/**
 	 * Lays the Pause button in the corner over the globe, which pauses the
-	 * calculation of the temperature and the winds and resumes it.
+	 * calculation of the climate, the temperature and the winds, and resumes
+	 * it.
 	 */
 	readonly createPauseButton: (options: PauseButtonOptions) => void;
 	/** Adds the planet controls to the panel. */
@@ -225,20 +222,16 @@ export type PageParts = {
 		options: PageStatsOptions,
 	) => Pick<RefreshScheduler, 'refresh' | 'reset'> &
 		Pick<StatsPanel, 'setHeightUnit'>;
-	/** Starts whatever computes the temperature, running. */
-	readonly createTemperature: (
-		options: PageTemperatureOptions,
+	/**
+	 * Starts whatever computes the climate, the temperature and the winds
+	 * together, running.
+	 */
+	readonly createClimate: (
+		options: PageClimateOptions,
 	) => Pick<
-		TemperatureScheduler,
+		ClimateScheduler,
 		'refresh' | 'refreshNow' | 'reset' | 'setRunning'
 	>;
-	/**
-	 * Starts whatever computes the winds from the temperature, running, on
-	 * the store the temperature writes.
-	 */
-	readonly createWinds: (
-		options: PageTemperatureOptions,
-	) => Pick<WindsScheduler, 'refresh' | 'reset' | 'setRunning'>;
 	/**
 	 * Adds the layer controls to the panel, which hold the view settings:
 	 * what the globe is coloured by, as the dock chooses it, what of each

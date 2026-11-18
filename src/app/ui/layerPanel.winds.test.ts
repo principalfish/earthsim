@@ -4,6 +4,7 @@ import { temperatureOf } from '../../core/testing/temperatureFixtures';
 import type { LayerStore, SolvedWinds } from '../layers/layers';
 import { PLAYBACK_STEP_MS } from '../layers/playback';
 import { DEFAULT_MONTH, DEFAULT_PAGE_VIEW, WIND_SOURCES } from '../layers/view';
+import { answerWinds, keepingTemperature } from '../testing/climateStore';
 import {
 	createDeferredLoader,
 	createStage,
@@ -31,8 +32,7 @@ describe('createLayerPanel, the winds', () => {
 		stage: ReturnType<typeof createStage>,
 		solved: SolvedWinds,
 	) => {
-		stage.store.markWindsCalculating();
-		stage.store.setWindsResult(solved, true);
+		answerWinds(stage.store, solved, true);
 	};
 	/** The field of a month of a year of winds. */
 	const monthOf = (solved: SolvedWinds, month: number) => ({
@@ -95,11 +95,11 @@ describe('createLayerPanel, the winds', () => {
 		const stage = windy();
 		const first = solvedWinds();
 		arrive(stage, first);
-		stage.store.markWindsOutOfDate();
-		stage.store.markWindsCalculating();
+		stage.store.markOutOfDate();
+		stage.store.markClimateCalculating();
 		expect(stage.winds).toHaveLength(1);
 		const second = solvedWinds(5);
-		stage.store.setWindsResult(second, true);
+		stage.store.setClimateResult(keepingTemperature(stage.store, second), true);
 		expect(stage.winds).toEqual([
 			monthOf(first, DEFAULT_MONTH),
 			monthOf(second, DEFAULT_MONTH),
@@ -109,19 +109,19 @@ describe('createLayerPanel, the winds', () => {
 	it.each([
 		[
 			'out of date',
-			(store: LayerStore) => store.markWindsOutOfDate(),
+			(store: LayerStore) => store.markOutOfDate(),
 			'outOfDate',
 			LEGEND_OUT_OF_DATE_TEXT,
 		],
 		[
 			'being worked out',
-			(store: LayerStore) => store.markWindsCalculating(),
+			(store: LayerStore) => store.markClimateCalculating(),
 			'calculating',
 			WINDS_CALCULATING_TEXT,
 		],
 		[
 			'no longer calculable',
-			(store: LayerStore) => store.markWindsUnavailable(),
+			(store: LayerStore) => store.markUnavailable(),
 			'unavailable',
 			WINDS_UNAVAILABLE_TEXT,
 		],
@@ -192,7 +192,10 @@ describe('createLayerPanel, the winds', () => {
 		stage.panel.setWinds(false);
 		expect(stage.winds.at(-1)).toBeNull();
 		expect(stage.keys.at(-1)).toBeNull();
-		stage.store.setWindsResult(solvedWinds(3), true);
+		stage.store.setClimateResult(
+			keepingTemperature(stage.store, solvedWinds(3)),
+			true,
+		);
 		expect(stage.winds.at(-1)).toBeNull();
 		expect(stage.winds).toHaveLength(2);
 	});
@@ -260,12 +263,9 @@ describe('createLayerPanel, the winds', () => {
 	});
 
 	it.each([
-		['out of date', (store: LayerStore) => store.markWindsOutOfDate()],
-		['being worked out', (store: LayerStore) => store.markWindsCalculating()],
-		[
-			'no longer calculable',
-			(store: LayerStore) => store.markWindsUnavailable(),
-		],
+		['out of date', (store: LayerStore) => store.markOutOfDate()],
+		['being worked out', (store: LayerStore) => store.markClimateCalculating()],
+		['no longer calculable', (store: LayerStore) => store.markUnavailable()],
 	])(
 		'says the winds on the globe are not current while the store’s are %s',
 		(_name, change) => {
@@ -279,7 +279,7 @@ describe('createLayerPanel, the winds', () => {
 	it('says the winds on the globe are current again once new ones arrive', () => {
 		const stage = windy();
 		arrive(stage, solvedWinds());
-		stage.store.markWindsOutOfDate();
+		stage.store.markOutOfDate();
 		const next = solvedWinds(4);
 		arrive(stage, next);
 		expect(stage.panel.shownWinds()).toMatchObject({
@@ -294,7 +294,10 @@ describe('createLayerPanel, the winds', () => {
 		arrive(stage, solved);
 		const failure = new Error('refused');
 		stage.failWindsNext(failure);
-		stage.store.setWindsResult(solvedWinds(4), true);
+		stage.store.setClimateResult(
+			keepingTemperature(stage.store, solvedWinds(4)),
+			true,
+		);
 		expect(stage.errors).toEqual([failure]);
 		const shown = stage.panel.shownWinds();
 		expect(shown?.field.east).toBe(solved.winds.east[DEFAULT_MONTH]);
@@ -353,8 +356,7 @@ describe('createLayerPanel, the observed winds', () => {
 		stage: ReturnType<typeof createStage>,
 		solved: SolvedWinds,
 	): SolvedWinds => {
-		stage.store.markWindsCalculating();
-		stage.store.setWindsResult(solved, true);
+		answerWinds(stage.store, solved, true);
 		return solved;
 	};
 	/**
@@ -498,7 +500,7 @@ describe('createLayerPanel, the observed winds', () => {
 		expect(stage.lastKey()?.status).toBe(OBSERVED_WINDS_LOADING_TEXT);
 		stage.store.markOutOfDate();
 		expect(stage.lastKey()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
-		stage.store.markWindsCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.lastKey()?.status).toBe(WINDS_CALCULATING_TEXT);
 		// So they do once the load has failed, and the failure shows again
 		// when they are current.
@@ -617,14 +619,14 @@ describe('createLayerPanel, the observed winds', () => {
 	it('says nothing of the simulated winds being out of date under the observed, and says so under the simulated', async () => {
 		const { stage, observe } = createWindsStage();
 		await observe();
-		stage.store.markWindsOutOfDate();
+		stage.store.markOutOfDate();
 		// Under the observed winds, which are never out of date.
 		expect(stage.lastKey()?.status).toBeNull();
 		expect(stage.panel.shownWinds()?.current).toBe(true);
 		stage.panel.setSource('simulated');
 		expect(stage.lastKey()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		expect(stage.panel.shownWinds()?.current).toBe(false);
-		stage.store.markWindsCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.lastKey()?.status).toBe(WINDS_CALCULATING_TEXT);
 	});
 

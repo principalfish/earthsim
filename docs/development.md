@@ -83,7 +83,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `wind/observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `grid/vector.ts`'s directions east and north |
 | `wind/baseline/` | The Earth winds baseline (`earthWinds.ts`, the figures in `earthWinds.json`) and its check |
 | `index.ts` | What the core exports |
-| `protocol.ts` | The messages between the page and the worker, of four kinds: the terrain statistics, the temperature, the winds and the climate (the temperature and winds solved together, which tells of each pass as it finishes) |
+| `protocol.ts` | The messages between the page and the worker, of two kinds: the terrain statistics and the climate (the temperature and winds solved together, which tells of each pass as it finishes) |
 | `compare.ts` | One field less another, and area-weighted error figures |
 | `testing/` | Helpers only the tests use |
 
@@ -99,9 +99,9 @@ A pure library with no DOM, Three.js or worker globals.
 | `editing/undo.ts` | Undo and redo of strokes |
 | `saving/startup.ts` | Brings the saved world back, or opens the New world dialog |
 | `saving/storage.ts`, `saving/autosave.ts` | The saved world in IndexedDB, export and import, and when to save |
-| `layers/refresh.ts` | When to ask a worker again after the world changes, whatever is on screen; the winds after each new temperature result and each change of the day length; the temperature and the winds stopped while paused and caught up on resuming; with `oneAtATime` (statistics, winds) one request at a time, an overtaken answer ignored |
-| `layers/workerService.ts` | The statistics, temperature and winds services, each on its own worker |
-| `layers/layers.ts` | The computed layers the page holds, the temperature and the winds worked out from it, and whether each is current |
+| `layers/refresh.ts` | When to ask a worker again after the world changes, whatever is on screen; with `oneAtATime` (statistics) one request at a time, an overtaken answer ignored; the climate scheduler, which keeps each pass as it finishes, carries on only from a climate that settled, and on Pause lets the pass under way finish and stops, carrying on from it on resuming |
+| `layers/workerService.ts` | The statistics and climate services, each on its own worker, the climate's started afresh when a newer request overtakes it or Pause ends it |
+| `layers/layers.ts` | The computed layers the page holds, the temperature and the winds worked out with it, and whether each is current; the climate writes both together, each pass as it finishes and the pass under way |
 | `layers/view.ts` | What the globe shows: the layer, each computed layer's part of the year, the one source for the layer and the winds, the month, the sunlight, the winds and the grid; `StoredView`, the part the browser remembers (all but the month and the source) |
 | `layers/scalar/` | Each layer of one computed value per cell described as data, the temperature and the sea-level pressure the two offered (`temperature.ts`, `pressure.ts`, listed in `registry.ts`): its name, unit, how its values are written, its legend wording, its views of the year with their colours and scale fitting, its comparison with the observed Earth and where in the layer store its months come from; the layer panel, legend, cursor readout, top bar, date line and lighting take a description rather than naming the temperature. Also the description's types (`spec.ts`), a layer's values in the units chosen (`inUnit.ts`), the legend's caption (`caption.ts`), a year's fields and the scale a view of it is drawn on (`yearScale.ts`), and the fitting of a scale to the fields it shows and the writing of a value marked on it (`fit.ts`); importers take the rest through `index.ts` |
 | `layers/playback.ts` | Playing through the year |
@@ -118,7 +118,7 @@ A pure library with no DOM, Three.js or worker globals.
 
 ### `src/worker/`: the Web Worker
 
-It computes from a copy of the world, and its answers depend on the request alone: it keeps no results between requests, only tables it can build again, such as the grid's. The page runs three: one for the statistics, one for the temperature and one for the winds, which is sent the temperature's twelve months with the world. A fourth kind of request, the climate, solves the temperature and the winds together in one request: the worker tells of each pass of the loop as it finishes, with its temperature and winds, and its response holds only the passes taken and whether it settled, the last pass's arrays being the result. The earlier passes' arrays are copies, since the loop goes on to read them; the last pass's are transferred. The page switches to it when its scheduler replaces the other two.
+It computes from a copy of the world, and its answers depend on the request alone: it keeps no results between requests, only tables it can build again, such as the grid's. The page runs two: one for the statistics and one for the climate, which solves the temperature and the winds together in one request. The worker tells of each pass of the loop as it finishes, with its temperature and winds, and its response holds only the passes taken and whether it settled, the last pass's arrays being the result. The earlier passes' arrays are copies, since the loop goes on to read them; the last pass's are transferred. A pass cannot be interrupted, so a climate overtaken by a newer request, or stopped by Pause once its pass under way has finished, ends its worker and the page starts a fresh one.
 
 | File | What it holds |
 |-|-|

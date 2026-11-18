@@ -4,11 +4,7 @@
  * year it offers, and the lookup of a view among them.
  */
 
-import type {
-	MonthlyTemperature,
-	Resolution,
-	TemperatureProgress,
-} from '../../../core/index';
+import type { MonthlyTemperature, Resolution } from '../../../core/index';
 import type { SunlightStyle } from '../../globe/material';
 import type { ColourRamp } from '../../globe/ramp';
 import type { Quantity, UnitOf } from '../../settings/units';
@@ -141,12 +137,6 @@ export type ScalarLayerReading = {
 	 * metric unit of the layer's quantity: null exactly when the result is.
 	 */
 	readonly months: readonly Float32Array[] | null;
-	/**
-	 * How far the calculation under way has come, as last told: null for a
-	 * layer whose calculation tells nothing, and as the store has it for one
-	 * that tells its years.
-	 */
-	readonly progress: TemperatureProgress | null;
 };
 
 /** What a layer's result is read from: the page's layer store. */
@@ -191,13 +181,6 @@ export type ScalarLayerSpec = {
 	 * none of it, as when the globe refused its first field.
 	 */
 	readonly notShownText: string;
-	/**
-	 * Whether its calculation tells how far it has come, year by year, as the
-	 * temperature's does: the legend then says which year it is on and how
-	 * many are left, once it can tell that, and with its bar how far it has
-	 * come.
-	 */
-	readonly yearProgress: boolean;
 	/**
 	 * The views of its year it offers, in the order the Show control lists
 	 * them: the Month view among them, which a layer opens on.

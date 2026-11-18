@@ -30,6 +30,7 @@ import type { ComparisonContent } from '../ui/main/comparison';
 import type { CalculationContent } from '../ui/main/infoBox';
 import { formatFigures, type LegendContent } from '../ui/main/legend';
 import type { WindKeyContent } from '../ui/main/windKey';
+import { arriveClimate } from './climateStore';
 import { createFakeTimers } from './fakeTimers';
 import { settle } from './settle';
 
@@ -182,8 +183,7 @@ export const createStage = (
 	});
 	/** Has a result arrive, current, as the scheduler does. */
 	const arrive = (result: TemperatureResult): void => {
-		store.markCalculating();
-		store.setResult(result, true);
+		arriveClimate(store, result, true);
 	};
 	return {
 		store,

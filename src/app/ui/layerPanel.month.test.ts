@@ -584,7 +584,7 @@ describe('createLayerPanel, the summaries', () => {
 		const mean = stage.shown.at(-1)?.field;
 		const sent = stage.shown.length;
 		stage.store.markOutOfDate();
-		stage.store.markCalculating();
+		stage.store.markClimateCalculating();
 		stage.store.setProgress(progressOf(1));
 		expect(stage.shown).toHaveLength(sent);
 		stage.panel.setSummary('temperature', 'range');

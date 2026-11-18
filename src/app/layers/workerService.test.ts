@@ -1,20 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+	type ClimateSummary,
 	createBlankWorld,
 	type SimRequest,
 	simFailure,
-	solveTemperature,
-	solveWinds,
-	type TemperatureResult,
+	solveClimate,
 	type TerrainStats,
 	type World,
 } from '../../core/index';
-import { passMessageOf } from '../../core/testing/climateFixtures';
 import {
-	progressMessageOf,
-	temperatureOf,
-} from '../../core/testing/temperatureFixtures';
-import { windResultOf } from '../../core/testing/windFixtures';
+	climatePassOf,
+	passMessageOf,
+} from '../../core/testing/climateFixtures';
+import { progressMessageOf } from '../../core/testing/temperatureFixtures';
 import type { WorkerLike } from '../../worker/client';
 import {
 	createFakeWorker,
@@ -23,11 +21,10 @@ import {
 import { createFakeTimers } from '../testing/fakeTimers';
 import { settle } from '../testing/settle';
 import { createLayerStore } from './layers';
-import { STATS_DEBOUNCE_MS, TEMPERATURE_DEBOUNCE_MS } from './refresh';
+import { CLIMATE_DEBOUNCE_MS, STATS_DEBOUNCE_MS } from './refresh';
 import {
+	createClimateService,
 	createStatisticsService,
-	createTemperatureService,
-	createWindsService,
 	createWorkerService,
 	NO_WORKER_MESSAGE,
 	type StatisticsReadout,
@@ -102,11 +99,19 @@ const statsAnswer = (id: number, landFraction: number) => ({
 	result: statsOf(landFraction),
 });
 
-const temperatureAnswer = (id: number, yearsRun: number) => ({
+/** What a climate that took that many passes answers with. */
+const summaryOf = (passes: number, settled = true): ClimateSummary => ({
+	dayLengthHours: 24,
+	passes,
+	settled,
+	changeC: 0,
+});
+
+const climateAnswer = (id: number, passes: number, settled = true) => ({
 	id,
-	kind: 'temperature',
+	kind: 'climate',
 	ok: true,
-	result: temperatureOf(yearsRun),
+	result: summaryOf(passes, settled),
 });
 
 const blank = (): World => createBlankWorld(64);
@@ -284,7 +289,7 @@ describe('createWorkerService latest', () => {
 		const { service, workers } = createService();
 		const heard: number[] = [];
 		const call = service.latest(
-			'temperature',
+			'climate',
 			{ world: blank() },
 			{ onProgress: (progress) => heard.push(progress.yearsDone) },
 		);
@@ -309,9 +314,7 @@ describe('createWorkerService latest', () => {
 			},
 		);
 		workers.last().respond(passMessageOf(1, 1));
-		workers
-			.last()
-			.respond({ ...progressMessageOf(1, 1), kind: 'climate', pass: 1 });
+		workers.last().respond(progressMessageOf(1, 1, 1));
 		expect(first).toEqual([1]);
 		expect(firstProgress).toEqual([1]);
 		const newest = service.latest(
@@ -326,13 +329,9 @@ describe('createWorkerService latest', () => {
 		// The overtaken call's worker goes on computing it; what it tells
 		// meanwhile is not heard.
 		workers.last().respond(passMessageOf(1, 2));
-		workers
-			.last()
-			.respond({ ...progressMessageOf(1, 1), kind: 'climate', pass: 2 });
+		workers.last().respond(progressMessageOf(1, 1, 2));
 		workers.last().respond(passMessageOf(2, 1));
-		workers
-			.last()
-			.respond({ ...progressMessageOf(2, 1), kind: 'climate', pass: 1 });
+		workers.last().respond(progressMessageOf(2, 1, 1));
 		expect(first).toEqual([1]);
 		expect(firstProgress).toEqual([1]);
 		expect(second).toEqual([1]);
@@ -355,9 +354,9 @@ describe('createWorkerService restarting when overtaken', () => {
 
 	it('ends a worker still computing and asks a fresh one, once each', async () => {
 		const { service, workers } = restarting();
-		const first = service.latest('temperature', { world: blank() });
+		const first = service.latest('climate', { world: blank() });
 		const old = workers.last();
-		const second = service.latest('temperature', { world: blank() });
+		const second = service.latest('climate', { world: blank() });
 
 		expect(old.terminations).toBe(1);
 		expect(workers.started).toHaveLength(2);
@@ -369,20 +368,20 @@ describe('createWorkerService restarting when overtaken', () => {
 
 		// The old worker's late answer is never delivered: nobody listens.
 		expect(old.listenerCount('message')).toBe(0);
-		old.respond(temperatureAnswer(1, 7));
-		fresh.respond(temperatureAnswer(fresh.posted[0]?.id ?? -1, 2));
+		old.respond(climateAnswer(1, 7));
+		fresh.respond(climateAnswer(fresh.posted[0]?.id ?? -1, 2));
 		await expect(second).resolves.toEqual({
 			superseded: false,
-			result: temperatureOf(2),
+			result: summaryOf(2),
 		});
 	});
 
 	it('keeps a worker that answered everything it was asked', async () => {
 		const { service, workers } = restarting();
-		void service.latest('temperature', { world: blank() });
-		workers.last().respond(temperatureAnswer(1, 1));
+		void service.latest('climate', { world: blank() });
+		workers.last().respond(climateAnswer(1, 1));
 		await settle();
-		void service.latest('temperature', { world: blank() });
+		void service.latest('climate', { world: blank() });
 		expect(workers.started).toHaveLength(1);
 		expect(workers.last().terminations).toBe(0);
 		expect(workers.last().posted).toHaveLength(2);
@@ -390,18 +389,18 @@ describe('createWorkerService restarting when overtaken', () => {
 
 	it('keeps a worker whose last request failed', async () => {
 		const { service, workers } = restarting();
-		const first = service.latest('temperature', { world: blank() });
-		workers.last().respond(simFailure(1, 'temperature', 'no'));
+		const first = service.latest('climate', { world: blank() });
+		workers.last().respond(simFailure(1, 'climate', 'no'));
 		await expect(first).rejects.toThrow('no');
-		void service.latest('temperature', { world: blank() });
+		void service.latest('climate', { world: blank() });
 		expect(workers.started).toHaveLength(1);
 	});
 
 	it('becomes unavailable when the fresh worker cannot be started', async () => {
 		const { service, workers, unavailable } = restarting();
-		const first = service.latest('temperature', { world: blank() });
+		const first = service.latest('climate', { world: blank() });
 		workers.failNext.push('null');
-		const second = service.latest('temperature', { world: blank() });
+		const second = service.latest('climate', { world: blank() });
 
 		await expect(first).resolves.toEqual({ superseded: true });
 		await expect(second).rejects.toThrow(NO_WORKER_MESSAGE);
@@ -409,21 +408,94 @@ describe('createWorkerService restarting when overtaken', () => {
 		expect(workers.started).toHaveLength(1);
 		expect(workers.last().terminations).toBe(1);
 
-		await expect(
-			service.latest('temperature', { world: blank() }),
-		).rejects.toThrow(NO_WORKER_MESSAGE);
+		await expect(service.latest('climate', { world: blank() })).rejects.toThrow(
+			NO_WORKER_MESSAGE,
+		);
 		expect(workers.started).toHaveLength(1);
 	});
 
 	it('listens for errors on the fresh worker only', async () => {
 		const { service, workers, unavailable } = restarting();
-		void service.latest('temperature', { world: blank() });
+		void service.latest('climate', { world: blank() });
 		const old = workers.last();
-		const second = service.latest('temperature', { world: blank() });
+		const second = service.latest('climate', { world: blank() });
 		expect(old.listenerCount('error')).toBe(0);
 		workers.last().emit('error');
 		expect(unavailable()).toBe(1);
 		await expect(second).rejects.toThrow('reported an error');
+	});
+});
+
+describe('createWorkerService cancelled', () => {
+	it('supersedes the newest call at once and drops what its worker tells of it, keeping the worker', async () => {
+		const { service, workers } = createService();
+		const heard: number[] = [];
+		const call = service.latest(
+			'climate',
+			{ world: blank() },
+			{ onPass: (pass) => heard.push(pass.pass) },
+		);
+		workers.last().respond(passMessageOf(1, 1));
+		service.cancel();
+		await expect(call).resolves.toEqual({ superseded: true });
+		workers.last().respond(passMessageOf(1, 2));
+		workers.last().respond(climateAnswer(1, 2));
+		expect(heard).toEqual([1]);
+		expect(workers.started).toHaveLength(1);
+		expect(workers.last().terminations).toBe(0);
+
+		// The next call is asked of the same worker, and answered.
+		const next = service.latest('climate', { world: blank() });
+		workers.last().respond(climateAnswer(2, 1));
+		await expect(next).resolves.toEqual({
+			superseded: false,
+			result: summaryOf(1),
+		});
+	});
+
+	it('does nothing with no call to be answered', async () => {
+		const { service, workers } = createService({ restartWhenOvertaken: true });
+		service.cancel();
+		const answered = service.latest('climate', { world: blank() });
+		workers.last().respond(climateAnswer(1, 1));
+		await settle();
+		service.cancel();
+		await expect(answered).resolves.toEqual({
+			superseded: false,
+			result: summaryOf(1),
+		});
+		expect(workers.started).toHaveLength(1);
+		expect(workers.last().terminations).toBe(0);
+	});
+
+	it('ends the worker computing it and starts a fresh one, when restarting', async () => {
+		const { service, workers } = createService({ restartWhenOvertaken: true });
+		const call = service.latest('climate', { world: blank() });
+		const old = workers.last();
+		service.cancel();
+		await expect(call).resolves.toEqual({ superseded: true });
+		expect(old.terminations).toBe(1);
+		expect(old.listenerCount('message')).toBe(0);
+		expect(workers.started).toHaveLength(2);
+
+		// The next call goes to the fresh worker, overtaking nothing.
+		void service.latest('climate', { world: blank() });
+		expect(workers.started).toHaveLength(2);
+		expect(workers.last().posted).toHaveLength(1);
+	});
+
+	it('becomes unavailable when the fresh worker cannot be started', async () => {
+		const { service, workers, unavailable } = createService({
+			restartWhenOvertaken: true,
+		});
+		const call = service.latest('climate', { world: blank() });
+		workers.failNext.push('null');
+		service.cancel();
+		await expect(call).resolves.toEqual({ superseded: true });
+		expect(unavailable()).toBe(1);
+		await expect(service.latest('climate', { world: blank() })).rejects.toThrow(
+			NO_WORKER_MESSAGE,
+		);
 	});
 });
 
@@ -608,12 +680,12 @@ describe('createStatisticsService', () => {
 	});
 });
 
-const createTemperature = (workers = createWorkers()) => {
+const createClimate = (workers = createWorkers()) => {
 	const timers = createFakeTimers();
 	const logged: unknown[] = [];
 	const store = createLayerStore((error) => logged.push(error));
 	let world = blank();
-	const scheduler = createTemperatureService({
+	const scheduler = createClimateService({
 		createWorker: workers.create,
 		currentWorld: () => world,
 		isStrokeActive: () => false,
@@ -632,498 +704,246 @@ const createTemperature = (workers = createWorkers()) => {
 			world = next;
 		},
 		/** Moves past the wait, so that the request waiting is made. */
-		wait: () => timers.advance(TEMPERATURE_DEBOUNCE_MS),
+		wait: () => timers.advance(CLIMATE_DEBOUNCE_MS),
 	};
 };
 
-describe('createTemperatureService', () => {
-	it('asks for the temperature after the wait for a change, with nothing said to be on screen, and keeps the result', async () => {
-		const temperature = createTemperature();
-		expect(temperature.workers.started).toHaveLength(1);
-		temperature.scheduler.refresh();
-		expect(temperature.workers.posted()).toHaveLength(0);
+/** The request a worker was posted last, as a climate request. */
+const lastPosted = (worker: { readonly posted: SimRequest[] }) =>
+	worker.posted.at(-1) as SimRequest<'climate'>;
+
+describe('createClimateService', () => {
+	it('asks for the climate after the wait for a change, with nothing said to be on screen, and keeps each pass and the answer', async () => {
+		const climate = createClimate();
+		expect(climate.workers.started).toHaveLength(1);
+		climate.scheduler.refresh();
+		expect(climate.workers.posted()).toHaveLength(0);
 
 		// The world of the moment the request is made, once the wait is over,
 		// not of the change or of the start.
 		const world = blank();
 		world.elevation[0] = 1234;
-		temperature.setWorld(world);
-		temperature.wait();
-		expect(temperature.workers.posted()).toEqual([
-			{ id: 1, kind: 'temperature', world, start: undefined },
+		climate.setWorld(world);
+		climate.wait();
+		expect(climate.workers.posted()).toEqual([
+			{ id: 1, kind: 'climate', world, start: undefined },
 		]);
-		const [posted] =
-			temperature.workers.posted() as SimRequest<'temperature'>[];
-		expect(posted?.world.elevation[0]).toBe(1234);
-		expect(temperature.store.temperature.status).toBe('calculating');
+		expect(lastPosted(climate.workers.last()).world.elevation[0]).toBe(1234);
+		expect(climate.store.temperature.status).toBe('calculating');
+		expect(climate.store.winds.status).toBe('calculating');
 
-		temperature.workers.last().respond(progressMessageOf(1, 1));
-		expect(temperature.store.temperature.progress?.yearsDone).toBe(1);
-		await settle();
-		expect(temperature.store.temperature.status).toBe('calculating');
+		const worker = climate.workers.last();
+		worker.respond(progressMessageOf(1, 1, 1));
+		expect(climate.store.temperature).toMatchObject({
+			progress: { yearsDone: 1 },
+			pass: 1,
+		});
+		worker.respond(passMessageOf(1, 1));
+		expect(climate.store.temperature).toMatchObject({
+			status: 'calculating',
+			result: climatePassOf(1).temperature,
+			pass: 2,
+		});
+		expect(climate.store.winds.result?.winds).toEqual(climatePassOf(1).winds);
 
-		temperature.workers.last().respond(temperatureAnswer(1, 3));
+		worker.respond(passMessageOf(1, 2, { last: true, settled: true }));
+		worker.respond(climateAnswer(1, 2));
 		await settle();
-		expect(temperature.store.temperature).toEqual({
+		expect(climate.store.temperature).toEqual({
 			status: 'current',
-			result: temperatureOf(3),
+			result: climatePassOf(2).temperature,
 			progress: null,
+			pass: null,
+		});
+		expect(climate.store.winds).toEqual({
+			status: 'current',
+			result: {
+				temperature: climatePassOf(2).temperature,
+				winds: climatePassOf(2).winds,
+				dayLengthHours: 24,
+			},
 		});
 	});
 
-	it('restarts a worker still solving when a newer request overtakes it, and keeps the last result', async () => {
-		const temperature = createTemperature();
-		temperature.scheduler.refreshNow();
-		temperature.wait();
-		temperature.workers.last().respond(temperatureAnswer(1, 4));
+	it('restarts a worker still solving when a newer request overtakes it, starting from the settled climate', async () => {
+		const climate = createClimate();
+		climate.scheduler.refreshNow();
+		const first = climate.workers.last();
+		first.respond(passMessageOf(1, 4, { last: true, settled: true }));
+		first.respond(climateAnswer(1, 4));
 		await settle();
-		const kept = temperature.store.temperature.result;
+		const kept = climate.store.temperature.result;
 
-		temperature.scheduler.refresh();
-		temperature.wait();
-		const solving = temperature.workers.last();
-		temperature.scheduler.refresh();
-		temperature.wait();
+		climate.scheduler.refresh();
+		climate.wait();
+		const solving = climate.workers.last();
+		solving.respond(passMessageOf(2, 1));
+		climate.scheduler.refresh();
+		climate.wait();
 
 		expect(solving.terminations).toBe(1);
-		expect(temperature.workers.started).toHaveLength(2);
-		// The ended solve cost nothing of the last result, which is where
-		// the newest request starts from.
-		expect(temperature.store.temperature).toMatchObject({
-			status: 'calculating',
-			result: kept,
-		});
-		const newest = temperature.workers.last()
-			.posted[0] as SimRequest<'temperature'>;
-		expect(newest.start).toEqual({
-			state: kept?.state,
-			solvedFor: kept?.solvedFor,
-		});
+		expect(climate.workers.started).toHaveLength(2);
+		const newest = lastPosted(climate.workers.last());
+		expect(newest.start?.temperature.state).toEqual(kept?.state);
+		expect(newest.start?.temperature.months).toEqual(kept?.months);
+		expect(newest.start?.winds.east).toEqual(climatePassOf(4).winds.east);
+		expect(newest.start?.dayLengthHours).toBe(24);
 
 		// The ended worker's answer is never delivered.
-		solving.respond(temperatureAnswer(2, 99));
+		solving.respond(passMessageOf(2, 9, { last: true }));
+		solving.respond(climateAnswer(2, 9));
 		await settle();
-		expect(temperature.store.temperature.result).toBe(kept);
+		expect(climate.store.temperature).toMatchObject({
+			status: 'calculating',
+			result: climatePassOf(1).temperature,
+		});
+	});
+
+	it('on Pause, lets the pass under way finish, ends the worker for a fresh one, and on running again carries on from that pass', async () => {
+		const climate = createClimate();
+		climate.scheduler.refreshNow();
+		const worker = climate.workers.last();
+		worker.respond(passMessageOf(1, 1));
+		climate.scheduler.setRunning(false);
+		expect(worker.terminations).toBe(0);
+
+		worker.respond(passMessageOf(1, 2));
+		expect(worker.terminations).toBe(1);
+		expect(climate.workers.started).toHaveLength(2);
+		expect(climate.store.temperature).toMatchObject({
+			status: 'outOfDate',
+			result: climatePassOf(2).temperature,
+		});
+		expect(climate.store.winds.status).toBe('outOfDate');
+		await settle();
+		expect(climate.logged).toEqual([]);
+
+		climate.scheduler.setRunning(true);
+		const fresh = climate.workers.last();
+		const resumed = lastPosted(fresh);
+		expect(resumed.start?.temperature.months).toEqual(
+			climatePassOf(2).temperature.months,
+		);
+		expect(resumed.start?.winds.north).toEqual(climatePassOf(2).winds.north);
+		expect(climate.store.temperature.status).toBe('calculating');
+	});
+
+	it('keeps an answer for a day length changed while it was worked out as out of date', async () => {
+		const climate = createClimate();
+		climate.scheduler.refreshNow();
+		const world = blank();
+		world.planet = { ...world.planet, dayLengthHours: 30 };
+		climate.setWorld(world);
+		climate.scheduler.refresh();
+		const worker = climate.workers.last();
+		worker.respond(passMessageOf(1, 1, { last: true, settled: true }));
+		worker.respond(climateAnswer(1, 1));
+		await settle();
+		expect(climate.store.winds.status).toBe('outOfDate');
+		expect(climate.store.winds.result?.dayLengthHours).toBe(24);
+
+		climate.wait();
+		expect(lastPosted(climate.workers.last()).world.planet.dayLengthHours).toBe(
+			30,
+		);
 	});
 
 	it('is unavailable, keeping the store so, when the worker cannot be started', () => {
 		const workers = createWorkers();
 		workers.failNext.push('throw');
-		const temperature = createTemperature(workers);
-		expect(temperature.store.temperature.status).toBe('unavailable');
-		temperature.scheduler.refreshNow();
-		temperature.wait();
+		const climate = createClimate(workers);
+		expect(climate.store.temperature.status).toBe('unavailable');
+		expect(climate.store.winds.status).toBe('unavailable');
+		climate.scheduler.refreshNow();
+		climate.wait();
 		expect(workers.started).toHaveLength(0);
-		expect(temperature.logged).toHaveLength(1);
+		expect(climate.logged).toHaveLength(1);
 	});
 
 	it('is unavailable after a worker error, and asks nothing again', async () => {
-		const temperature = createTemperature();
-		temperature.scheduler.refreshNow();
-		temperature.wait();
-		temperature.workers.last().emit('error');
+		const climate = createClimate();
+		climate.scheduler.refreshNow();
+		climate.wait();
+		climate.workers.last().emit('error');
 		await settle();
-		expect(temperature.store.temperature.status).toBe('unavailable');
-		temperature.scheduler.refresh();
-		temperature.wait();
+		expect(climate.store.temperature.status).toBe('unavailable');
+		expect(climate.store.winds.status).toBe('unavailable');
+		climate.scheduler.refresh();
+		climate.wait();
 		await settle();
-		expect(temperature.workers.posted()).toHaveLength(1);
-		expect(temperature.workers.started).toHaveLength(1);
+		expect(climate.workers.posted()).toHaveLength(1);
+		expect(climate.workers.started).toHaveLength(1);
 	});
 
-	it('is unavailable when a fresh worker cannot be started', async () => {
-		const temperature = createTemperature();
-		temperature.scheduler.refreshNow();
-		temperature.wait();
-		temperature.workers.failNext.push('throw');
-		temperature.scheduler.refresh();
-		temperature.wait();
+	it('is unavailable when a fresh worker cannot be started for a newer request', async () => {
+		const climate = createClimate();
+		climate.scheduler.refreshNow();
+		climate.wait();
+		climate.workers.failNext.push('throw');
+		climate.scheduler.refresh();
+		climate.wait();
 		await settle();
-		expect(temperature.store.temperature.status).toBe('unavailable');
-		expect(temperature.workers.started).toHaveLength(1);
+		expect(climate.store.temperature.status).toBe('unavailable');
+		expect(climate.workers.started).toHaveLength(1);
 	});
 
-	// Two solves of a world that settles in its first year: well under a
-	// second, but several times that under coverage.
-	it('gives the store what the solver gives, through the real handler', {
-		timeout: 30_000,
+	it('is unavailable, keeping the pass reached, when no fresh worker can be started on Pause', async () => {
+		const climate = createClimate();
+		climate.scheduler.refreshNow();
+		climate.scheduler.setRunning(false);
+		climate.workers.failNext.push('null');
+		climate.workers.last().respond(passMessageOf(1, 1));
+		await settle();
+		expect(climate.store.temperature).toMatchObject({
+			status: 'unavailable',
+			result: climatePassOf(1).temperature,
+		});
+		expect(climate.store.winds.status).toBe('unavailable');
+		climate.scheduler.setRunning(true);
+		expect(climate.workers.posted()).toHaveLength(1);
+	});
+
+	// A climate of a world that settles at once: a few seconds, but several
+	// times that under coverage.
+	it('gives the store what the climate gives, through the real handler', {
+		timeout: 120_000,
 	}, async () => {
-		// An ocean with its axis upright settles in its first year.
+		// An ocean with its axis upright settles in its first year, and its
+		// winds carry little heat.
 		const world = blank();
 		world.planet = { ...world.planet, axialTiltDeg: 0 };
-		const temperature = createTemperature();
-		temperature.setWorld(world);
-		const years: number[] = [];
-		temperature.store.addListener((layer) => {
-			if (layer.progress !== null) {
-				years.push(layer.progress.yearsDone);
+		const climate = createClimate();
+		climate.setWorld(world);
+		const passes: (number | null)[] = [];
+		climate.store.addListener((layer) => {
+			if (layer.status === 'calculating' && layer.progress === null) {
+				passes.push(layer.pass);
 			}
 		});
-		temperature.scheduler.refreshNow();
-		temperature.wait();
-		temperature.workers.last().answer(1);
+		climate.scheduler.refreshNow();
+		climate.workers.last().answer(1);
 		await settle();
 
-		const direct = solveTemperature(world);
-		expect(temperature.store.temperature).toEqual({
+		const direct = solveClimate(world);
+		expect(climate.store.temperature).toEqual({
 			status: 'current',
-			result: direct,
+			result: direct.temperature,
 			progress: null,
+			pass: null,
 		});
-		expect(years).toEqual(
-			Array.from({ length: direct.yearsRun }, (_, year) => year + 1),
+		expect(climate.store.winds).toEqual({
+			status: 'current',
+			result: {
+				temperature: direct.temperature,
+				winds: direct.winds,
+				dayLengthHours: direct.dayLengthHours,
+			},
+		});
+		// Each pass was under way, with no year yet done, in turn: the first
+		// as the climate was asked for and each later one as the one before
+		// it was shown. The last keeps its progress until the answer.
+		expect(passes).toEqual(
+			Array.from({ length: direct.passes }, (_, index) => index + 1),
 		);
-	});
-});
-
-const createWinds = (workers = createWorkers()) => {
-	const timers = createFakeTimers();
-	const logged: unknown[] = [];
-	const store = createLayerStore((error) => logged.push(error));
-	let world = blank();
-	const scheduler = createWindsService({
-		createWorker: workers.create,
-		currentWorld: () => world,
-		isStrokeActive: () => false,
-		store,
-		setTimer: timers.setTimer,
-		clearTimer: timers.clearTimer,
-		logError: (error) => logged.push(error),
-	});
-	return {
-		scheduler,
-		workers,
-		timers,
-		store,
-		logged,
-		setWorld: (next: World) => {
-			world = next;
-		},
-		/**
-		 * Has the store take a current temperature result, as the
-		 * temperature's scheduler would after an edit, and lets what follows
-		 * run.
-		 */
-		arrive: async (temperature: TemperatureResult) => {
-			store.markOutOfDate();
-			store.markCalculating();
-			store.setResult(temperature, true);
-			await settle();
-		},
-	};
-};
-
-const windsAnswer = (id: number, value: number) => ({
-	id,
-	kind: 'winds',
-	ok: true,
-	result: windResultOf(value),
-});
-
-describe('createWindsService', () => {
-	it('asks for the winds of a new temperature from its months and the world of the moment, and keeps them', async () => {
-		const winds = createWinds();
-		const world = blank();
-		world.elevation[0] = 1234;
-		winds.setWorld(world);
-		const temperature = temperatureOf(1);
-		await winds.arrive(temperature);
-
-		expect(winds.workers.posted()).toEqual([
-			{ id: 1, kind: 'winds', world, temperatures: temperature.months },
-		]);
-		// A copy is sent: the store keeps the temperature's months whole.
-		expect(temperature.months[0]?.byteLength).toBe(2 * 4);
-		expect(winds.store.winds.status).toBe('calculating');
-
-		winds.workers.last().respond(windsAnswer(1, 3));
-		await settle();
-		expect(winds.store.winds).toEqual({
-			status: 'current',
-			result: { winds: windResultOf(3), temperature, dayLengthHours: 24 },
-		});
-	});
-
-	it('leaves an overtaken solve to finish on its worker, ignoring its answer, and asks the same worker next', async () => {
-		const winds = createWinds();
-		await winds.arrive(temperatureOf(1));
-		const newer = temperatureOf(2);
-		await winds.arrive(newer);
-
-		expect(winds.workers.started).toHaveLength(1);
-		expect(winds.workers.last().terminations).toBe(0);
-		expect(winds.workers.posted().map((posted) => posted.id)).toEqual([1]);
-
-		winds.workers.last().respond(windsAnswer(1, 1));
-		await settle();
-		expect(winds.store.winds).toEqual({ status: 'calculating', result: null });
-		expect(winds.workers.posted().map((posted) => posted.id)).toEqual([1, 2]);
-		expect(winds.workers.posted()[1]).toMatchObject({
-			temperatures: newer.months,
-		});
-
-		winds.workers.last().respond(windsAnswer(2, 2));
-		await settle();
-		expect(winds.store.winds).toEqual({
-			status: 'current',
-			result: {
-				winds: windResultOf(2),
-				temperature: newer,
-				dayLengthHours: 24,
-			},
-		});
-	});
-
-	it('records a request that fails and keeps no winds', async () => {
-		const winds = createWinds();
-		await winds.arrive(temperatureOf(1));
-		winds.workers.last().respond(simFailure(1, 'winds', 'too calm'));
-		await settle();
-		expect(winds.logged).toEqual([new Error('too calm')]);
-		expect(winds.store.winds).toEqual({ status: 'empty', result: null });
-	});
-
-	it('is unavailable, keeping the store so, when the worker cannot be started, and the temperature carries on', async () => {
-		const workers = createWorkers();
-		workers.failNext.push('null');
-		const winds = createWinds(workers);
-		expect(winds.store.winds.status).toBe('unavailable');
-		const temperature = temperatureOf(1);
-		await winds.arrive(temperature);
-		winds.timers.advance(TEMPERATURE_DEBOUNCE_MS);
-		await settle();
-		expect(workers.started).toHaveLength(0);
-		expect(winds.store.winds.status).toBe('unavailable');
-		expect(winds.store.temperature).toMatchObject({
-			status: 'current',
-			result: temperature,
-		});
-	});
-
-	it('is unavailable after a worker error, and asks nothing again', async () => {
-		const winds = createWinds();
-		await winds.arrive(temperatureOf(1));
-		winds.workers.last().emit('error');
-		await settle();
-		expect(winds.store.winds.status).toBe('unavailable');
-		await winds.arrive(temperatureOf(2));
-		expect(winds.workers.posted()).toHaveLength(1);
-		expect(winds.workers.started).toHaveLength(1);
-	});
-
-	// Two wind solves: about a second each, but several times that under
-	// coverage.
-	it('gives the store what the solver gives, through the real handler', {
-		timeout: 60_000,
-	}, async () => {
-		const winds = createWinds();
-		const world = blank();
-		winds.setWorld(world);
-		const temperature = temperatureOf(1, world.elevation.length);
-		for (const [index, month] of temperature.months.entries()) {
-			month.fill(index);
-		}
-		await winds.arrive(temperature);
-		winds.workers.last().answer(1);
-		await settle();
-
-		expect(winds.store.winds).toEqual({
-			status: 'current',
-			result: {
-				winds: solveWinds(world, temperature.months),
-				temperature,
-				dayLengthHours: 24,
-			},
-		});
-	});
-});
-
-describe('createWindsService with changes while a solve runs', () => {
-	/**
-	 * A winds service on a world whose day length the test changes in
-	 * place, as the planet controls do, with its first
-	 * solve, for 24 hours, under way.
-	 */
-	const createRunning = async () => {
-		const winds = createWinds();
-		const world = blank();
-		winds.setWorld(world);
-		await winds.arrive(temperatureOf(1));
-		const setDayLength = (hours: number): void => {
-			world.planet = { ...world.planet, dayLengthHours: hours };
-			winds.scheduler.refresh();
-		};
-		/** Answers the newest request, with a value telling it apart. */
-		const answerNewest = async (): Promise<void> => {
-			const request = winds.workers.posted().at(-1);
-			if (request === undefined) {
-				throw new Error('nothing was posted');
-			}
-			winds.workers
-				.last()
-				.respond(windsAnswer(request.id, request.world.planet.dayLengthHours));
-			await settle();
-		};
-		const wait = async (): Promise<void> => {
-			winds.timers.advance(TEMPERATURE_DEBOUNCE_MS);
-			await settle();
-		};
-		/** The day length each request posted was solved for, in order. */
-		const postedDays = () =>
-			winds.workers
-				.posted()
-				.map((request) => request.world.planet.dayLengthHours);
-		return { ...winds, world, setDayLength, answerNewest, wait, postedDays };
-	};
-
-	/**
-	 * Whether the winds kept are current only if solved for the day length
-	 * set now: the fixture's answers hold the day length they were posted
-	 * with in every value.
-	 */
-	const expectHonest = (winds: Awaited<ReturnType<typeof createRunning>>) => {
-		const { status, result } = winds.store.winds;
-		if (result !== null) {
-			expect(result.winds.east[0]?.[0]).toBe(result.dayLengthHours);
-		}
-		if (status === 'current') {
-			expect(result?.dayLengthHours).toBe(winds.world.planet.dayLengthHours);
-		}
-	};
-
-	it('never keeps winds solved for one day length as current for another', async () => {
-		const winds = await createRunning();
-		winds.setDayLength(30);
-		await winds.wait();
-		winds.setDayLength(40);
-		await winds.answerNewest();
-		expectHonest(winds);
-		await winds.wait();
-		expect(winds.postedDays()).toEqual([24, 40]);
-		winds.setDayLength(30);
-		await winds.answerNewest();
-		expectHonest(winds);
-		expect(winds.store.winds.status).toBe('outOfDate');
-
-		await winds.wait();
-		expect(winds.postedDays()).toEqual([24, 40, 30]);
-		await winds.answerNewest();
-		expect(winds.store.winds).toMatchObject({
-			status: 'current',
-			result: { dayLengthHours: 30 },
-		});
-		expectHonest(winds);
-		await winds.wait();
-		expect(winds.postedDays()).toHaveLength(3);
-	});
-
-	it('does not either when paused and resumed while the solve runs', async () => {
-		const winds = await createRunning();
-		winds.setDayLength(30);
-		await winds.wait();
-		winds.setDayLength(40);
-		await winds.answerNewest();
-		await winds.wait();
-		winds.setDayLength(30);
-		winds.scheduler.setRunning(false);
-		await winds.answerNewest();
-		expectHonest(winds);
-		winds.scheduler.setRunning(true);
-		expectHonest(winds);
-		expect(winds.store.winds.status).not.toBe('current');
-
-		await winds.wait();
-		expect(winds.postedDays()).toEqual([24, 40, 30]);
-		await winds.answerNewest();
-		expect(winds.store.winds).toMatchObject({
-			status: 'current',
-			result: { dayLengthHours: 30 },
-		});
-		expectHonest(winds);
-	});
-
-	it('posts a request held back for a solve once it is answered, with the world as it is then', async () => {
-		const winds = await createRunning();
-		winds.setDayLength(30);
-		await winds.wait();
-		expect(winds.postedDays()).toEqual([24]);
-		winds.world.planet = { ...winds.world.planet, dayLengthHours: 30 };
-		await winds.answerNewest();
-		expect(winds.postedDays()).toEqual([24, 30]);
-		// The answer it overtook is dropped.
-		expect(winds.store.winds).toEqual({ status: 'calculating', result: null });
-		await winds.answerNewest();
-		expect(winds.store.winds).toMatchObject({
-			status: 'current',
-			result: { dayLengthHours: 30 },
-		});
-	});
-
-	it('posts nothing held back whose turn comes during a stroke, and asks once after it', async () => {
-		let stroke = false;
-		const workers = createWorkers();
-		const timers = createFakeTimers();
-		const store = createLayerStore(() => {});
-		const world = blank();
-		const scheduler = createWindsService({
-			createWorker: workers.create,
-			currentWorld: () => world,
-			isStrokeActive: () => stroke,
-			store,
-			setTimer: timers.setTimer,
-			clearTimer: timers.clearTimer,
-			logError: () => {},
-		});
-		store.markCalculating();
-		store.setResult(temperatureOf(1), true);
-		await settle();
-		world.planet = { ...world.planet, dayLengthHours: 30 };
-		scheduler.refresh();
-		timers.advance(TEMPERATURE_DEBOUNCE_MS);
-		await settle();
-
-		stroke = true;
-		workers.last().respond(windsAnswer(1, 1));
-		await settle();
-		timers.advance(TEMPERATURE_DEBOUNCE_MS * 3);
-		await settle();
-		expect(workers.posted()).toHaveLength(1);
-
-		// The stroke's end changes the world, which the temperature's
-		// result then leads to winds for.
-		stroke = false;
-		store.markOutOfDate();
-		timers.advance(TEMPERATURE_DEBOUNCE_MS);
-		await settle();
-		expect(workers.posted()).toHaveLength(1);
-		expect(store.winds.status).toBe('empty');
-		store.markCalculating();
-		store.setResult(temperatureOf(2), true);
-		await settle();
-		timers.advance(TEMPERATURE_DEBOUNCE_MS * 3);
-		await settle();
-		expect(workers.posted()).toHaveLength(2);
-		expect(store.winds.status).toBe('calculating');
-	});
-
-	it('posts nothing held back once paused, or the world replaced', async () => {
-		const paused = await createRunning();
-		paused.setDayLength(30);
-		await paused.wait();
-		paused.scheduler.setRunning(false);
-		await paused.answerNewest();
-		await paused.wait();
-		expect(paused.postedDays()).toEqual([24]);
-		expect(paused.store.winds.status).toBe('outOfDate');
-
-		const replaced = await createRunning();
-		replaced.setDayLength(30);
-		await replaced.wait();
-		replaced.store.clear();
-		replaced.scheduler.reset();
-		await replaced.answerNewest();
-		await replaced.wait();
-		expect(replaced.postedDays()).toEqual([24]);
-		expect(replaced.store.winds).toEqual({ status: 'empty', result: null });
 	});
 });

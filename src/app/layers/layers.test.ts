@@ -29,12 +29,32 @@ const createWatched = (): {
 	return { store, heard, statuses: () => heard.map((layer) => layer.status) };
 };
 
+/** Winds worked out with a temperature result, told apart by their value. */
+const windsFrom = (
+	temperature: TemperatureResult,
+	value = 1,
+	dayLengthHours = 24,
+): SolvedWinds => ({
+	winds: windResultOf(value),
+	temperature,
+	dayLengthHours,
+});
+
+/** A climate whose temperature is that result, with winds of its own. */
+const climateWith = (result: TemperatureResult): SolvedWinds =>
+	windsFrom(result);
+
 describe('createLayerStore', () => {
 	it('starts empty, with no result and no progress', () => {
 		expect(createLayerStore(ignore).temperature).toEqual({
 			status: 'empty',
 			result: null,
 			progress: null,
+			pass: null,
+		});
+		expect(createLayerStore(ignore).winds).toEqual({
+			status: 'empty',
+			result: null,
 		});
 	});
 
@@ -43,7 +63,7 @@ describe('createLayerStore', () => {
 		const calls: string[] = [];
 		store.addListener((layer) => calls.push(`one ${layer.status}`));
 		store.addListener((layer) => calls.push(`two ${layer.status}`));
-		store.markCalculating();
+		store.markClimateCalculating();
 		expect(calls).toEqual(['one calculating', 'two calculating']);
 	});
 
@@ -51,22 +71,25 @@ describe('createLayerStore', () => {
 		const { store, heard } = createWatched();
 		store.clear();
 		store.markOutOfDate();
-		store.markFailed();
+		store.markClimateStopped();
 		store.setProgress(progressOf(1));
 		expect(heard).toEqual([]);
 
-		store.markCalculating();
-		store.markCalculating();
+		store.markClimateCalculating();
+		store.markClimateCalculating();
 		expect(heard).toHaveLength(1);
 	});
 
 	it('gives a new, unchangeable layer at each change', () => {
 		const { store } = createWatched();
 		const before = store.temperature;
-		store.markCalculating();
+		const winds = store.winds;
+		store.markClimateCalculating();
 		expect(store.temperature).not.toBe(before);
+		expect(store.winds).not.toBe(winds);
 		expect(before.status).toBe('empty');
 		expect(Object.isFrozen(store.temperature)).toBe(true);
+		expect(Object.isFrozen(store.winds)).toBe(true);
 	});
 
 	it('makes the change, tells every listener and reports the error of one that throws, throwing nothing', () => {
@@ -80,7 +103,7 @@ describe('createLayerStore', () => {
 			throw failure;
 		});
 		store.addListener((layer) => heard.push(layer.status));
-		expect(() => store.markCalculating()).not.toThrow();
+		expect(() => store.markClimateCalculating()).not.toThrow();
 		expect(heard).toEqual(['calculating']);
 		expect(store.temperature.status).toBe('calculating');
 		// Reported once, with the layer already changed.
@@ -101,7 +124,7 @@ describe('createLayerStore', () => {
 			throw second;
 		});
 		store.addListener((layer) => heard.push(layer.status));
-		expect(() => store.markCalculating()).not.toThrow();
+		expect(() => store.markClimateCalculating()).not.toThrow();
 		expect(heard).toEqual(['calculating', 'calculating']);
 		expect(store.temperature.status).toBe('calculating');
 		expect(reported).toEqual([first, second]);
@@ -121,7 +144,7 @@ describe('createLayerStore', () => {
 		store.addListener(() => {
 			throw new Error('could not draw either');
 		});
-		expect(() => store.markCalculating()).not.toThrow();
+		expect(() => store.markClimateCalculating()).not.toThrow();
 		expect(heard).toEqual(['calculating']);
 		expect(reports).toBe(2);
 		expect(store.temperature.status).toBe('calculating');
@@ -129,10 +152,10 @@ describe('createLayerStore', () => {
 });
 
 describe('a listener that writes to the store', () => {
-	/** A store calculating its first result, with nothing yet told. */
+	/** A store calculating its first climate, with nothing yet told. */
 	const calculating = (reportError: (error: unknown) => void): LayerStore => {
 		const store = createLayerStore(reportError);
-		store.markCalculating();
+		store.markClimateCalculating();
 		return store;
 	};
 
@@ -150,7 +173,7 @@ describe('a listener that writes to the store', () => {
 		store.addListener((layer) => {
 			calls.push(`B ${layer.status}`);
 		});
-		store.setResult(temperatureOf(1), true);
+		store.setClimateResult(climateWith(temperatureOf(1)), true);
 		expect(calls).toEqual([
 			'A current',
 			'A then sees outOfDate',
@@ -176,7 +199,9 @@ describe('a listener that writes to the store', () => {
 		store.addListener((layer) => {
 			calls.push(`B ${layer.status}`);
 		});
-		expect(() => store.setResult(temperatureOf(1), true)).not.toThrow();
+		expect(() =>
+			store.setClimateResult(climateWith(temperatureOf(1)), true),
+		).not.toThrow();
 		expect(calls).toEqual([
 			'A current',
 			'B current',
@@ -196,17 +221,16 @@ describe('a listener that writes to the store', () => {
 				store.addListener((told) => late.push(told.status));
 			}
 		});
-		store.setResult(temperatureOf(1), true);
+		store.setClimateResult(climateWith(temperatureOf(1)), true);
 		expect(late).toEqual([]);
-		store.markFailed();
-		store.markCalculating();
+		store.markClimateCalculating();
 		expect(late).toEqual(['calculating']);
 	});
 
 	it('is stopped, with one error reported, when listeners go on undoing each other', () => {
 		const reported: unknown[] = [];
 		const store = calculating((error) => reported.push(error));
-		const result = temperatureOf(1);
+		const climate = climateWith(temperatureOf(1));
 		let told = 0;
 		store.addListener((layer) => {
 			told++;
@@ -216,10 +240,10 @@ describe('a listener that writes to the store', () => {
 		});
 		store.addListener((layer) => {
 			if (layer.status === 'outOfDate') {
-				store.setResult(result, true);
+				store.setClimateResult(climate, true);
 			}
 		});
-		store.setResult(result, true);
+		store.setClimateResult(climate, true);
 		expect(told).toBe(MAX_CHANGES_TOLD_IN_A_ROUND);
 		expect(reported).toHaveLength(1);
 		expect(reported[0]).toBeInstanceOf(Error);
@@ -239,93 +263,104 @@ describe('a listener that writes to the store', () => {
 describe('a calculation', () => {
 	it('keeps the latest progress while calculating, and drops it with the result', () => {
 		const { store } = createWatched();
-		store.markCalculating();
+		store.markClimateCalculating();
 		store.setProgress(progressOf(1));
 		store.setProgress(progressOf(2));
 		expect(store.temperature.progress).toEqual(progressOf(2));
 
 		const result = temperatureOf(2);
-		store.setResult(result, true);
+		store.setClimateResult(climateWith(result), true);
 		expect(store.temperature).toEqual({
 			status: 'current',
 			result,
 			progress: null,
+			pass: null,
 		});
 		expect(store.temperature.result).toBe(result);
 	});
 
-	it('keeps the previous result on hand while the next is calculated', () => {
+	it('keeps the previous results on hand while the next are calculated', () => {
 		const { store } = createWatched();
-		const first = temperatureOf(1);
-		store.setResult(first, true);
-		store.markCalculating();
+		const first = climateWith(temperatureOf(1));
+		store.setClimateResult(first, true);
+		store.markClimateCalculating();
 		expect(store.temperature.status).toBe('calculating');
-		expect(store.temperature.result).toBe(first);
+		expect(store.temperature.result).toBe(first.temperature);
+		expect(store.winds).toEqual({ status: 'calculating', result: first });
 
 		// Told apart from calculating with nothing to show.
 		const fresh = createLayerStore(ignore);
-		fresh.markCalculating();
+		fresh.markClimateCalculating();
 		expect(fresh.temperature).toMatchObject({
 			status: 'calculating',
 			result: null,
 		});
+		expect(fresh.winds).toEqual({ status: 'calculating', result: null });
 	});
 
 	it('starts each calculation with no progress', () => {
 		const { store } = createWatched();
-		store.markCalculating();
+		store.markClimateCalculating();
 		store.setProgress(progressOf(3));
-		store.markCalculating();
+		store.markClimateCalculating();
 		expect(store.temperature.progress).toBeNull();
 	});
 
 	it('keeps a result that was overtaken by a change as out of date', () => {
 		const { store } = createWatched();
-		store.markCalculating();
-		const result = temperatureOf(4);
-		store.setResult(result, false);
+		store.markClimateCalculating();
+		const climate = climateWith(temperatureOf(4));
+		store.setClimateResult(climate, false);
 		expect(store.temperature).toEqual({
 			status: 'outOfDate',
-			result,
+			result: climate.temperature,
 			progress: null,
+			pass: null,
 		});
+		expect(store.winds).toEqual({ status: 'outOfDate', result: climate });
 	});
 
 	it('ignores progress unless calculating', () => {
 		const { store } = createWatched();
-		store.setResult(temperatureOf(1), true);
-		store.setProgress(progressOf(1));
+		store.setClimateResult(climateWith(temperatureOf(1)), true);
+		store.setProgress(progressOf(1), 2);
 		expect(store.temperature.progress).toBeNull();
+		expect(store.temperature.pass).toBeNull();
 	});
 });
 
 describe('a change of the world', () => {
-	it('marks a current result out of date and keeps it', () => {
+	it('marks both current results out of date, in one change, and keeps them', () => {
 		const { store, statuses } = createWatched();
-		const result = temperatureOf(1);
-		store.setResult(result, true);
+		const climate = climateWith(temperatureOf(1));
+		store.setClimateResult(climate, true);
 		store.markOutOfDate();
-		expect(store.temperature).toMatchObject({ status: 'outOfDate', result });
+		expect(store.temperature).toMatchObject({
+			status: 'outOfDate',
+			result: climate.temperature,
+		});
+		expect(store.winds).toEqual({ status: 'outOfDate', result: climate });
 		expect(statuses()).toEqual(['current', 'outOfDate']);
 	});
 
 	it('leaves a calculation under way as it is', () => {
 		const { store } = createWatched();
-		store.markCalculating();
+		store.markClimateCalculating();
 		store.setProgress(progressOf(1));
 		store.markOutOfDate();
 		expect(store.temperature).toMatchObject({
 			status: 'calculating',
 			progress: progressOf(1),
 		});
+		expect(store.winds.status).toBe('calculating');
 	});
 });
 
 describe('a replacement of the world', () => {
-	it('drops the result and leaves the layer empty, then calculating once asked', () => {
+	it('drops both results and leaves the layers empty, then calculating once asked', () => {
 		const { store, statuses } = createWatched();
-		store.setResult(temperatureOf(1), true);
-		store.markCalculating();
+		store.setClimateResult(climateWith(temperatureOf(1)), true);
+		store.markClimateCalculating();
 		store.setProgress(progressOf(1));
 
 		store.clear();
@@ -333,12 +368,15 @@ describe('a replacement of the world', () => {
 			status: 'empty',
 			result: null,
 			progress: null,
+			pass: null,
 		});
-		store.markCalculating();
+		expect(store.winds).toEqual({ status: 'empty', result: null });
+		store.markClimateCalculating();
 		expect(store.temperature).toEqual({
 			status: 'calculating',
 			result: null,
 			progress: null,
+			pass: 1,
 		});
 		expect(statuses()).toEqual([
 			'current',
@@ -351,281 +389,266 @@ describe('a replacement of the world', () => {
 });
 
 describe('a failed request', () => {
-	it('marks the result out of date and keeps every field of it', () => {
+	it('marks the results out of date and keeps every field of them', () => {
 		const { store } = createWatched();
 		const result = temperatureOf(5);
 		const months = result.months.slice();
-		store.setResult(result, true);
-		store.markCalculating();
+		const climate = climateWith(result);
+		store.setClimateResult(climate, true);
+		store.markClimateCalculating();
 		store.setProgress(progressOf(2));
 
-		store.markFailed();
+		store.markClimateStopped();
 		expect(store.temperature).toEqual({
 			status: 'outOfDate',
 			result,
 			progress: null,
+			pass: null,
 		});
 		expect(store.temperature.result).toBe(result);
 		expect(store.temperature.result?.months).toEqual(months);
 		expect(store.temperature.result?.state).toBe(result.state);
+		expect(store.winds).toEqual({ status: 'outOfDate', result: climate });
 	});
 
-	it('leaves the layer empty when there was no result', () => {
+	it('leaves the layers empty when there was no result', () => {
 		const { store } = createWatched();
-		store.markCalculating();
-		store.markFailed();
+		store.markClimateCalculating();
+		store.markClimateStopped();
 		expect(store.temperature).toEqual({
 			status: 'empty',
 			result: null,
 			progress: null,
+			pass: null,
 		});
+		expect(store.winds).toEqual({ status: 'empty', result: null });
 	});
 });
 
 describe('unavailability', () => {
-	it('is for good, keeping the result until it is cleared', () => {
-		const { store } = createWatched();
-		const result = temperatureOf(1);
-		store.setResult(result, true);
-		store.markCalculating();
+	it('is for good, for both layers at once, keeping the results until they are cleared', () => {
+		const { store, heard } = createWatched();
+		const climate = climateWith(temperatureOf(1));
+		store.setClimateResult(climate, true);
+		store.markClimateCalculating();
 		store.setProgress(progressOf(1));
+		heard.length = 0;
 
 		store.markUnavailable();
+		expect(heard).toHaveLength(1);
 		expect(store.temperature).toEqual({
 			status: 'unavailable',
-			result,
+			result: climate.temperature,
 			progress: null,
+			pass: null,
 		});
+		expect(store.winds).toEqual({ status: 'unavailable', result: climate });
 
-		store.markCalculating();
-		store.markFailed();
+		store.markClimateCalculating();
+		store.markClimateStopped();
 		store.markOutOfDate();
+		store.setPass(climateWith(temperatureOf(3)), 1);
 		expect(store.temperature.status).toBe('unavailable');
-		const late = temperatureOf(2);
-		store.setResult(late, true);
+		expect(store.temperature.result).toBe(climate.temperature);
+		const late = climateWith(temperatureOf(2));
+		store.setClimateResult(late, true);
 		expect(store.temperature).toMatchObject({
 			status: 'unavailable',
-			result: late,
+			result: late.temperature,
 		});
+		expect(store.winds).toEqual({ status: 'unavailable', result: late });
 
 		store.clear();
 		expect(store.temperature).toEqual({
 			status: 'unavailable',
 			result: null,
 			progress: null,
+			pass: null,
 		});
-	});
-});
-
-/** Winds worked out from a temperature result, told apart by their value. */
-const windsFrom = (
-	temperature: TemperatureResult,
-	value = 1,
-	dayLengthHours = 24,
-): SolvedWinds => ({
-	winds: windResultOf(value),
-	temperature,
-	dayLengthHours,
-});
-
-describe('the winds', () => {
-	it('start empty, with no result, beside an empty temperature', () => {
-		expect(createLayerStore(ignore).winds).toEqual({
-			status: 'empty',
-			result: null,
-		});
-	});
-
-	it('follow the temperature through calculating, current and out of date', () => {
-		const { store, statuses } = createWatched();
-		const temperature = temperatureOf(1);
-		store.setResult(temperature, true);
-		const first = windsFrom(temperature, 1);
-
-		store.markWindsCalculating();
-		expect(store.winds).toEqual({ status: 'calculating', result: null });
-		store.setWindsResult(first, true);
-		expect(store.winds).toEqual({ status: 'current', result: first });
-
-		// A change of the world puts both out of date, in one change.
-		store.markOutOfDate();
-		expect(store.temperature.status).toBe('outOfDate');
-		expect(store.winds).toEqual({ status: 'outOfDate', result: first });
-
-		// The winds on hand stay while the next are calculated.
-		store.markWindsCalculating();
-		expect(store.winds).toEqual({ status: 'calculating', result: first });
-		const second = windsFrom(temperature, 2);
-		store.setWindsResult(second, false);
-		expect(store.winds).toEqual({ status: 'outOfDate', result: second });
-
-		expect(statuses()).toEqual([
-			'current',
-			'current',
-			'current',
-			'outOfDate',
-			'outOfDate',
-			'outOfDate',
-		]);
-	});
-
-	it('tell every listener of each change of theirs, with the temperature layer as it stands', () => {
-		const { store, heard } = createWatched();
-		const before = store.winds;
-		store.markWindsCalculating();
-		store.markWindsCalculating();
-		expect(heard).toEqual([store.temperature]);
-		expect(heard[0]).toBe(store.temperature);
-		expect(store.winds).not.toBe(before);
-		expect(Object.isFrozen(store.winds)).toBe(true);
-	});
-
-	it('alone go out of date for a change of the day length', () => {
-		const { store } = createWatched();
-		const temperature = temperatureOf(1);
-		store.setResult(temperature, true);
-		const winds = windsFrom(temperature);
-		store.setWindsResult(winds, true);
-
-		store.markWindsOutOfDate();
-		expect(store.winds).toEqual({ status: 'outOfDate', result: winds });
-		expect(store.temperature.status).toBe('current');
-	});
-
-	it('leave a calculation under way as it is when the world changes', () => {
-		const { store } = createWatched();
-		store.markWindsCalculating();
-		store.markOutOfDate();
-		store.markWindsOutOfDate();
-		expect(store.winds.status).toBe('calculating');
-	});
-
-	it('are dropped with the temperature when the world is replaced', () => {
-		const { store } = createWatched();
-		const temperature = temperatureOf(1);
-		store.setResult(temperature, true);
-		store.setWindsResult(windsFrom(temperature), true);
-
-		store.clear();
-		expect(store.winds).toEqual({ status: 'empty', result: null });
-		expect(store.temperature.status).toBe('empty');
-	});
-
-	it('keep their result, out of date, when a request fails, and are empty with none', () => {
-		const { store } = createWatched();
-		store.markWindsCalculating();
-		store.markWindsFailed();
-		expect(store.winds).toEqual({ status: 'empty', result: null });
-
-		const winds = windsFrom(temperatureOf(1));
-		store.setWindsResult(winds, true);
-		store.markWindsCalculating();
-		store.markWindsFailed();
-		expect(store.winds).toEqual({ status: 'outOfDate', result: winds });
-	});
-
-	it('are unavailable for good on their own, keeping their result until cleared, and leave the temperature be', () => {
-		const { store } = createWatched();
-		const winds = windsFrom(temperatureOf(1));
-		store.setWindsResult(winds, true);
-
-		store.markWindsUnavailable();
-		expect(store.winds).toEqual({ status: 'unavailable', result: winds });
-		store.markWindsCalculating();
-		store.markWindsFailed();
-		store.markOutOfDate();
-		store.markWindsOutOfDate();
-		expect(store.winds.status).toBe('unavailable');
-		const late = windsFrom(temperatureOf(2), 2);
-		store.setWindsResult(late, true);
-		expect(store.winds).toEqual({ status: 'unavailable', result: late });
-		store.clear();
-		expect(store.winds).toEqual({ status: 'unavailable', result: null });
-
-		store.markCalculating();
-		expect(store.temperature.status).toBe('calculating');
-	});
-
-	it('are still worked out while the unavailable temperature is current', () => {
-		const { store } = createWatched();
-		const temperature = temperatureOf(1);
-		store.setResult(temperature, true);
-		const winds = windsFrom(temperature);
-		store.setWindsResult(winds, true);
-
-		store.markUnavailable();
-		expect(store.winds).toEqual({ status: 'current', result: winds });
-		expect(store.currentTemperature).toBe(temperature);
-		store.markWindsOutOfDate();
-		store.markWindsCalculating();
-		expect(store.winds.status).toBe('calculating');
-		const next = windsFrom(temperature, 2, 30);
-		store.setWindsResult(next, true);
-		expect(store.winds).toEqual({ status: 'current', result: next });
-	});
-
-	it('become unavailable once the temperature is unavailable with no current result', () => {
-		const { store } = createWatched();
-		const temperature = temperatureOf(1);
-		store.setResult(temperature, true);
-		const winds = windsFrom(temperature);
-		store.setWindsResult(winds, true);
-		store.markUnavailable();
-
-		// A change of the world leaves no temperature to work them out from.
-		store.markOutOfDate();
-		expect(store.currentTemperature).toBeNull();
-		expect(store.winds).toEqual({ status: 'unavailable', result: winds });
-		store.markWindsCalculating();
-		store.markWindsFailed();
-		store.setWindsResult(windsFrom(temperature, 2), true);
-		expect(store.winds.status).toBe('unavailable');
-		store.clear();
 		expect(store.winds).toEqual({ status: 'unavailable', result: null });
 	});
 
-	it('become unavailable at once when the temperature does with a result out of date, or none', () => {
-		const outOfDate = createWatched().store;
-		outOfDate.setResult(temperatureOf(1), false);
-		outOfDate.markUnavailable();
-		expect(outOfDate.winds.status).toBe('unavailable');
+	it('is so at once with a current result, as with none', () => {
+		const current = createWatched().store;
+		current.setClimateResult(climateWith(temperatureOf(1)), true);
+		current.markUnavailable();
+		expect(current.winds.status).toBe('unavailable');
 
 		const none = createWatched().store;
 		none.markUnavailable();
 		expect(none.winds).toEqual({ status: 'unavailable', result: null });
 	});
+});
 
-	it('give the temperature result as current only while it describes the world', () => {
-		const { store } = createWatched();
-		const temperature = temperatureOf(1);
-		expect(store.currentTemperature).toBeNull();
-		store.setResult(temperature, false);
-		expect(store.currentTemperature).toBeNull();
-		store.setResult(temperature, true);
-		expect(store.currentTemperature).toBe(temperature);
-		store.markCalculating();
-		expect(store.currentTemperature).toBeNull();
-		store.setResult(temperature, true);
-		store.markFailed();
-		expect(store.currentTemperature).toBeNull();
-		store.setResult(temperature, true);
-		store.clear();
-		expect(store.currentTemperature).toBeNull();
+/** A pass of the climate, its winds worked out with its temperature. */
+const passOf = (value: number): SolvedWinds =>
+	windsFrom(temperatureOf(value), value);
+
+describe('a climate', () => {
+	it('makes both layers calculating in one change, each keeping its result, the first pass under way', () => {
+		const { store, heard } = createWatched();
+		const settled = passOf(1);
+		store.setClimateResult(settled, true);
+		heard.length = 0;
+
+		store.markClimateCalculating();
+		expect(heard).toHaveLength(1);
+		expect(store.temperature).toEqual({
+			status: 'calculating',
+			result: settled.temperature,
+			progress: null,
+			pass: 1,
+		});
+		expect(store.winds).toEqual({ status: 'calculating', result: settled });
 	});
 
-	it('alone are dropped by clearWinds, the temperature left as it is', () => {
-		const { store } = createWatched();
-		const temperature = temperatureOf(1);
-		store.setResult(temperature, true);
-		store.setWindsResult(windsFrom(temperature), true);
-		store.clearWinds();
-		expect(store.winds).toEqual({ status: 'empty', result: null });
-		expect(store.temperature).toMatchObject({
-			status: 'current',
-			result: temperature,
+	it('shows each pass at once in both layers, still calculating, with the next pass under way', () => {
+		const { store, heard } = createWatched();
+		store.markClimateCalculating();
+		store.setProgress(progressOf(3), 1);
+		expect(store.temperature.pass).toBe(1);
+		heard.length = 0;
+
+		const first = passOf(1);
+		store.setPass(first, 1);
+		expect(heard).toHaveLength(1);
+		expect(store.temperature).toEqual({
+			status: 'calculating',
+			result: first.temperature,
+			progress: null,
+			pass: 2,
 		});
-		store.markWindsUnavailable();
-		store.clearWinds();
-		expect(store.winds).toEqual({ status: 'unavailable', result: null });
+		expect(store.winds).toEqual({ status: 'calculating', result: first });
+
+		// The temperature and the winds on show are always of the same pass.
+		store.setProgress(progressOf(1), 2);
+		const second = passOf(2);
+		store.setPass(second, 2);
+		expect(store.temperature.result).toBe(second.temperature);
+		expect(store.winds.result?.temperature).toBe(store.temperature.result);
+		expect(store.temperature.pass).toBe(3);
+
+		// The last pass leaves itself under way until the answer, with its
+		// progress as it was, so that what is shown of it does not go back.
+		store.setProgress({ ...progressOf(4), estimatedYearsLeft: 0 }, 3);
+		store.setPass(passOf(3), 3, true);
+		expect(store.temperature).toMatchObject({
+			pass: 3,
+			progress: { ...progressOf(4), estimatedYearsLeft: 0 },
+		});
+	});
+
+	it('starts a climate carried on from a pass reached at the pass after it', () => {
+		const { store } = createWatched();
+		store.markClimateCalculating(4);
+		expect(store.temperature).toMatchObject({
+			status: 'calculating',
+			pass: 4,
+		});
+		store.setPass(passOf(1), 4);
+		expect(store.temperature.pass).toBe(5);
+	});
+
+	it('keeps the pass under way that progress tells, and the one on hand when it tells none', () => {
+		const { store } = createWatched();
+		store.markClimateCalculating();
+		store.setProgress(progressOf(1), 4);
+		expect(store.temperature.pass).toBe(4);
+		store.setProgress(progressOf(2));
+		expect(store.temperature).toMatchObject({
+			pass: 4,
+			progress: progressOf(2),
+		});
+	});
+
+	it('keeps no pass unless calculating', () => {
+		const { store, heard } = createWatched();
+		store.setPass(passOf(1), 1);
+		expect(heard).toEqual([]);
+		expect(store.temperature.result).toBeNull();
+		expect(store.winds.result).toBeNull();
+	});
+
+	it('settles both layers in one change, as current or out of date', () => {
+		const { store, heard } = createWatched();
+		store.markClimateCalculating();
+		store.setPass(passOf(1), 1);
+		heard.length = 0;
+
+		const last = passOf(2);
+		store.setClimateResult(last, true);
+		expect(heard).toHaveLength(1);
+		expect(store.temperature).toEqual({
+			status: 'current',
+			result: last.temperature,
+			progress: null,
+			pass: null,
+		});
+		expect(store.winds).toEqual({ status: 'current', result: last });
+
+		store.markClimateCalculating();
+		store.setClimateResult(passOf(3), false);
+		expect(store.temperature.status).toBe('outOfDate');
+		expect(store.winds.status).toBe('outOfDate');
+	});
+
+	it('when stopped or failed, keeps both results out of date, or leaves both empty with none', () => {
+		const none = createWatched();
+		none.store.markClimateCalculating();
+		none.store.markClimateStopped();
+		expect(none.heard).toHaveLength(2);
+		expect(none.store.temperature).toEqual({
+			status: 'empty',
+			result: null,
+			progress: null,
+			pass: null,
+		});
+		expect(none.store.winds).toEqual({ status: 'empty', result: null });
+
+		const { store } = createWatched();
+		store.markClimateCalculating();
+		const reached = passOf(1);
+		store.setPass(reached, 1);
+		store.markClimateStopped();
+		expect(store.temperature).toEqual({
+			status: 'outOfDate',
+			result: reached.temperature,
+			progress: null,
+			pass: null,
+		});
+		expect(store.winds).toEqual({ status: 'outOfDate', result: reached });
+	});
+
+	it('is unavailable together once the worker is gone, keeping what it had', () => {
+		const { store } = createWatched();
+		store.markClimateCalculating();
+		const reached = passOf(1);
+		store.setPass(reached, 1);
+		store.markUnavailable();
+		expect(store.temperature).toMatchObject({
+			status: 'unavailable',
+			result: reached.temperature,
+		});
+		expect(store.winds).toEqual({ status: 'unavailable', result: reached });
+
+		store.markClimateCalculating();
+		store.markClimateStopped();
+		store.setClimateResult(passOf(2), true);
+		expect(store.temperature.status).toBe('unavailable');
+		expect(store.winds.status).toBe('unavailable');
+	});
+
+	it('is dropped, both layers, when the world is replaced', () => {
+		const { store } = createWatched();
+		store.markClimateCalculating();
+		store.setPass(passOf(1), 1);
+		store.clear();
+		expect(store.temperature).toEqual({
+			status: 'empty',
+			result: null,
+			progress: null,
+			pass: null,
+		});
+		expect(store.winds).toEqual({ status: 'empty', result: null });
 	});
 });

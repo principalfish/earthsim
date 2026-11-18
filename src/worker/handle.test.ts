@@ -3,20 +3,14 @@ import {
 	computeTerrainStats,
 	createBlankWorld,
 	DEFAULT_MAX_YEARS,
-	DEFAULT_PLANET,
 	generateWorld,
-	PLANET_LIMITS,
 	type SimPass,
 	type SimProgress,
 	type SimRequest,
 	type SimResponse,
 	solveClimate,
-	solveTemperature,
-	solveWinds,
 	TEMPERATURE_MODEL,
-	type TemperatureResult,
 	temperatureConditions,
-	type WindResult,
 	type World,
 } from '../core/index';
 import { handleRequest } from './handle';
@@ -177,338 +171,6 @@ describe('handleRequest', () => {
 	});
 });
 
-/**
- * Time allowed for each test here that solves a world's year: well under a
- * second each, but coverage makes them several times slower.
- */
-const SOLVE_TIMEOUT_MS = 30_000;
-
-/** A value worked out on first use and then shared. */
-const shared = <T>(make: () => T): (() => T) => {
-	let value: T | undefined;
-	return () => {
-		value ??= make();
-		return value;
-	};
-};
-
-/**
- * A blank ocean whose axis is tilted beyond the limit, as a message may
- * carry it. Brought to the limit, 90 degrees, it takes several years to
- * settle from nothing, so a cap of one year would show.
- */
-const TILTED: World = {
-	...createBlankWorld(64),
-	planet: { ...DEFAULT_PLANET, axialTiltDeg: 200 },
-};
-
-/** The solver's own answer for the tilted world, called directly. */
-const direct = shared(() =>
-	solveTemperature({
-		...TILTED,
-		planet: { ...TILTED.planet, axialTiltDeg: PLANET_LIMITS.axialTiltDeg.max },
-	}),
-);
-
-/**
- * The handler's answer for the tilted world, from a message that also
- * tries to set the solver's cap, tolerance and constants, as it arrives
- * in a worker, with every message about progress.
- */
-const handled = shared(() => {
-	const reports: SimProgress[] = [];
-	const { response, transfer } = handleRequest(
-		structuredClone({
-			id: 21,
-			kind: 'temperature',
-			world: TILTED,
-			maxYears: 1,
-			tolerance: 1000,
-			model: { ...TEMPERATURE_MODEL, stepsPerMonth: 1 },
-		}),
-		(progress) => reports.push(progress),
-	);
-	return { response, transfer, reports };
-});
-
-/** The result a response carries; fails the test if it has none. */
-const resultOf = (response: SimResponse): TemperatureResult => {
-	if (!response.ok || response.kind !== 'temperature') {
-		throw new Error(
-			`expected a temperature result: ${JSON.stringify(response)}`,
-		);
-	}
-	return response.result as TemperatureResult;
-};
-
-const temperatureRequest = (
-	extras: Record<string, unknown> = {},
-): Record<string, unknown> => ({
-	id: 30,
-	kind: 'temperature',
-	world: TILTED,
-	...extras,
-});
-
-describe('handleRequest for temperature', { timeout: SOLVE_TIMEOUT_MS }, () => {
-	it('returns the fields the solver gives directly, the planet brought to its limits as the solver does', () => {
-		expect(handled().response).toEqual({
-			id: 21,
-			kind: 'temperature',
-			ok: true,
-			result: direct(),
-		});
-	});
-
-	it('takes no cap, tolerance or constants from the message', () => {
-		// Either a cap of one year or that tolerance would stop the solve
-		// after its first year, and one step a month would change every
-		// value.
-		const result = resultOf(handled().response);
-		expect(direct().yearsRun).toBeGreaterThan(1);
-		expect(result.yearsRun).toBe(direct().yearsRun);
-		expect(result.months).toEqual(direct().months);
-	});
-
-	it('transfers the buffers of the twelve months and the three state arrays, each once', () => {
-		const { response, transfer } = handled();
-		const result = resultOf(response);
-		const expected = [
-			...result.months.map((month) => month.buffer),
-			result.state.temperatureK.buffer,
-			result.state.previousK.buffer,
-			result.state.referenceCoolingK.buffer,
-		];
-		expect(transfer).toHaveLength(15);
-		expect(new Set(transfer).size).toBe(15);
-		for (const buffer of expected) {
-			expect(transfer).toContain(buffer);
-		}
-	});
-
-	it('gives a transfer list a post accepts, which hands the arrays over', () => {
-		const { response, transfer } = handleRequest(
-			temperatureRequest({ start: direct() }),
-		);
-		const values = resultOf(response).months[0]?.slice();
-		const posted = structuredClone(response, { transfer });
-		expect(resultOf(posted).months[0]).toEqual(values);
-		expect(resultOf(response).months[0]?.byteLength).toBe(0);
-		expect(resultOf(response).state.previousK.byteLength).toBe(0);
-		expect(resultOf(response).state.referenceCoolingK.byteLength).toBe(0);
-	});
-
-	it('carries a start’s record and reference through a copy of the request and back in the result', () => {
-		// The tilted world is all sea, with no cooling of its own, so a
-		// reference of a tenth of the limit everywhere has drifted only that
-		// far: the state is carried on and passes the reference back.
-		const start = direct();
-		const reference = new Float64Array(
-			start.state.referenceCoolingK.length,
-		).fill(TEMPERATURE_MODEL.terrainDriftLimitK / 10);
-		const { response, transfer } = handleRequest(
-			structuredClone(
-				temperatureRequest({
-					id: 32,
-					start: {
-						...start,
-						state: { ...start.state, referenceCoolingK: reference },
-					},
-				}),
-			),
-		);
-		const result = resultOf(response);
-		expect(result.yearsRun).toBe(1);
-		expect(result.state.referenceCoolingK).toEqual(reference);
-		expect(result.solvedFor).toEqual(start.solvedFor);
-		expect(transfer).toContain(result.state.referenceCoolingK.buffer);
-		const posted = resultOf(structuredClone(response, { transfer }));
-		expect(posted.state.referenceCoolingK).toEqual(reference);
-		expect(posted.solvedFor).toEqual(start.solvedFor);
-	});
-
-	it('answers a start without a record, or a malformed one, with a failure rather than throwing', () => {
-		const { months, state, solvedFor } = direct();
-		for (const start of [
-			{ months, state },
-			{ state, solvedFor: { ...solvedFor, seaLevel: Number.NaN } },
-			{
-				state,
-				solvedFor: {
-					...solvedFor,
-					planet: { ...solvedFor.planet, starMass: undefined },
-				},
-			},
-			{
-				state: { ...state, referenceCoolingK: new Float32Array(3) },
-				solvedFor,
-			},
-		]) {
-			const { response, transfer } = handleRequest(
-				temperatureRequest({ start }),
-			);
-			expect(response).toMatchObject({
-				id: 30,
-				kind: 'temperature',
-				ok: false,
-				error: expect.stringContaining("A temperature request's start must"),
-			});
-			expect(transfer).toEqual([]);
-		}
-		expect(
-			respond(
-				temperatureRequest({
-					start: {
-						state: { ...state, referenceCoolingK: new Float64Array(5) },
-						solvedFor,
-					},
-				}),
-			),
-		).toEqual({
-			id: 30,
-			kind: 'temperature',
-			ok: false,
-			error:
-				"A starting state's referenceCoolingK must be a Float64Array of 24576 values",
-		});
-	});
-
-	it('tells of each year as it finishes, with the id and kind, before answering', () => {
-		const { reports } = handled();
-		const { yearsRun } = direct();
-		expect(reports.map((report) => report.progress.yearsDone)).toEqual(
-			Array.from({ length: yearsRun }, (_, year) => year + 1),
-		);
-		for (const report of reports) {
-			expect(report).toMatchObject({ id: 21, kind: 'temperature' });
-			expect(report.progress.maxYears).toBe(DEFAULT_MAX_YEARS);
-		}
-		expect(reports.at(-1)?.progress.estimatedYearsLeft).toBe(0);
-		expect(reports.at(-1)?.progress.changeK).toBe(direct().finalChangeK);
-	});
-
-	it('carries on from the start it is given, as the solver does, leaving it as it was', () => {
-		const start = direct();
-		const before = start.state.temperatureK.slice();
-		const { response } = handleRequest(
-			structuredClone(temperatureRequest({ id: 31, start })),
-		);
-		expect(response).toEqual({
-			id: 31,
-			kind: 'temperature',
-			ok: true,
-			result: solveTemperature(TILTED, { start }),
-		});
-		expect(start.state.temperatureK).toEqual(before);
-	});
-
-	it('answers a start of months alone with a failure, rather than throwing', () => {
-		for (const start of [
-			{ months: direct().months, solvedFor: direct().solvedFor },
-			{ solvedFor: direct().solvedFor },
-		]) {
-			expect(respond(temperatureRequest({ start }))).toMatchObject({
-				id: 30,
-				kind: 'temperature',
-				ok: false,
-				error: expect.stringContaining("A temperature request's start must"),
-			});
-		}
-	});
-
-	it('answers a start the solver refuses with its reason, rather than throwing', () => {
-		const short = {
-			...direct().state,
-			temperatureK: new Float64Array(5),
-		};
-		expect(
-			respond(
-				temperatureRequest({
-					start: { state: short, solvedFor: direct().solvedFor },
-				}),
-			),
-		).toMatchObject({
-			id: 30,
-			kind: 'temperature',
-			ok: false,
-			error: expect.stringContaining('temperatureK'),
-		});
-	});
-
-	it('answers a start on another grid than the world is solved on with a failure, rather than throwing', () => {
-		// A world of 128 cells per face edge is solved on the 64 grid, so a
-		// state on its own grid is on the wrong one.
-		const world = createBlankWorld(128);
-		const cells = 6 * 128 * 128;
-		const fine = {
-			temperatureK: new Float64Array(cells).fill(280),
-			previousK: new Float64Array(cells).fill(280),
-			referenceCoolingK: new Float64Array(cells),
-			stepSeconds: direct().state.stepSeconds,
-		};
-		const { response, transfer } = handleRequest(
-			structuredClone({
-				id: 33,
-				kind: 'temperature',
-				world,
-				start: { state: fine, solvedFor: temperatureConditions(world) },
-			}),
-		);
-		expect(response).toEqual({
-			id: 33,
-			kind: 'temperature',
-			ok: false,
-			error:
-				'A starting state must be on the grid of 64 cells per face edge, which this world is solved on, 24576 values an array; its temperatureK holds 98304',
-		});
-		expect(transfer).toEqual([]);
-	});
-
-	it('cannot be made to solve on the world’s own grid by a message', () => {
-		const world = createBlankWorld(128);
-		const { response } = handleRequest(
-			structuredClone({
-				id: 34,
-				kind: 'temperature',
-				world,
-				fullResolution: true,
-				options: { fullResolution: true },
-			}),
-		);
-		const result = resultOf(response);
-		expect(result.months[0]).toHaveLength(6 * 128 * 128);
-		expect(result.state.temperatureK).toHaveLength(6 * 64 * 64);
-	});
-
-	it('answers a start of the wrong form with a failure, and transfers nothing', () => {
-		const handledBadly = handleRequest(
-			temperatureRequest({
-				start: { state: 'last time', solvedFor: direct().solvedFor },
-			}),
-		);
-		expect(handledBadly.response).toMatchObject({
-			id: 30,
-			kind: 'temperature',
-			ok: false,
-			error: expect.stringContaining("A temperature request's start must be"),
-		});
-		expect(handledBadly.transfer).toEqual([]);
-	});
-
-	it('answers with a failure when the progress cannot be told', () => {
-		const { response, transfer } = handleRequest(temperatureRequest(), () => {
-			throw new Error('nobody to tell');
-		});
-		expect(response).toEqual({
-			id: 30,
-			kind: 'temperature',
-			ok: false,
-			error: 'nobody to tell',
-		});
-		expect(transfer).toEqual([]);
-	});
-});
-
 describe('handleRequest for statistics', () => {
 	it('transfers nothing and tells of no progress', () => {
 		const reports: SimProgress[] = [];
@@ -522,110 +184,14 @@ describe('handleRequest for statistics', () => {
 	});
 });
 
-/**
- * Time allowed for each test here that solves a world's winds: about a
- * second each, but coverage makes them several times slower.
- */
-const WIND_SOLVE_TIMEOUT_MS = 60_000;
-
-/** A world with land and sea, for the winds. */
-const WINDY = generated(1984, 0.35);
-
-/** Twelve months of temperature for that world, warmer each month. */
-const windTemperatures = (): Float32Array[] =>
-	Array.from({ length: 12 }, (_, month) =>
-		new Float32Array(WINDY.elevation.length).fill(month),
-	);
-
-/** The solver's own winds for that world and those months. */
-const directWinds = shared(() => solveWinds(WINDY, windTemperatures()));
-
-/**
- * The handler's answer for that world and those months, as they arrive in
- * a worker, with every message about progress.
- */
-const handledWinds = shared(() => {
-	const reports: SimProgress[] = [];
-	const { response, transfer } = handleRequest(
-		structuredClone({
-			id: 40,
-			kind: 'winds',
-			world: WINDY,
-			temperatures: windTemperatures(),
-		}),
-		(progress) => reports.push(progress),
-	);
-	return { response, transfer, reports };
-});
-
-/** The winds a response carries; fails the test if it has none. */
-const windsOf = (response: SimResponse): WindResult => {
-	if (!response.ok || response.kind !== 'winds') {
-		throw new Error(`expected winds: ${JSON.stringify(response)}`);
-	}
-	return response.result as WindResult;
+/** A value worked out on first use and then shared. */
+const shared = <T>(make: () => T): (() => T) => {
+	let value: T | undefined;
+	return () => {
+		value ??= make();
+		return value;
+	};
 };
-
-describe('handleRequest for winds', { timeout: WIND_SOLVE_TIMEOUT_MS }, () => {
-	it('returns the winds and pressure the solver gives directly, telling of no progress', () => {
-		const { response, reports } = handledWinds();
-		expect(response).toEqual({
-			id: 40,
-			kind: 'winds',
-			ok: true,
-			result: directWinds(),
-		});
-		expect(reports).toEqual([]);
-	});
-
-	it('transfers the buffers of the twelve months of each field, each once, in a list a post accepts', () => {
-		const { response, transfer } = handledWinds();
-		const winds = windsOf(response);
-		const fields = [...winds.east, ...winds.north, ...winds.pressure];
-		expect(transfer).toHaveLength(36);
-		expect(new Set(transfer).size).toBe(36);
-		for (const field of fields) {
-			expect(transfer).toContain(field.buffer);
-		}
-
-		// Last, since posting empties the shared answer's arrays.
-		const values = winds.pressure[0]?.slice();
-		const posted = structuredClone(response, { transfer });
-		expect(windsOf(posted).pressure[0]).toEqual(values);
-		expect(winds.pressure[0]?.byteLength).toBe(0);
-		expect(winds.east[11]?.byteLength).toBe(0);
-	});
-
-	it('answers a malformed request with a failure, keeping the id and kind and transferring nothing', () => {
-		const temperatures = windTemperatures();
-		const short = new Float32Array(WINDY.elevation.length - 1);
-		for (const [message, reason] of [
-			[{ temperatures: temperatures.slice(1) }, 'array of 12 Float32Arrays'],
-			[{ temperatures: [...temperatures.slice(1), [0]] }, 'Float32Arrays'],
-			[{ temperatures: undefined }, 'Float32Arrays'],
-			[{ temperatures: [...temperatures.slice(1), short] }, 'month 11 holds'],
-			[
-				{ temperatures, world: { ...WINDY, elevation: new Float32Array(5) } },
-				'elevation',
-			],
-			[{ temperatures, world: { ...WINDY, resolution: 63 } }, '63'],
-		] as const) {
-			const reports: SimProgress[] = [];
-			const handledBadly = handleRequest(
-				{ id: 41, kind: 'winds', world: WINDY, ...message },
-				(progress) => reports.push(progress),
-			);
-			expect(handledBadly.response, reason).toMatchObject({
-				id: 41,
-				kind: 'winds',
-				ok: false,
-				error: expect.stringContaining(reason),
-			});
-			expect(handledBadly.transfer).toEqual([]);
-			expect(reports).toEqual([]);
-		}
-	});
-});
 
 /** Time allowed for the tests that solve a climate: ten seconds or so a run. */
 const CLIMATE_SOLVE_TIMEOUT_MS = 300_000;
@@ -735,20 +301,33 @@ describe('handleRequest for climate', {
 		expect([...passNumbers].sort((a, b) => a - b)).toEqual(passNumbers);
 		expect(new Set(passNumbers).size).toBe(directClimate().passes);
 		expect(reports[0]?.progress.yearsDone).toBe(1);
+		expect(reports[0]?.progress.maxYears).toBe(DEFAULT_MAX_YEARS);
+		expect(reports.at(-1)?.progress.estimatedYearsLeft).toBe(0);
 	});
 
-	it('takes no settings of the model or of the winds from the message', () => {
-		// A message that asked for one pass would stop the loop after one.
+	it('takes no cap, tolerance or settings of the model or of the winds from the message', () => {
+		// A message that asked for one pass would stop the loop after one, and
+		// a cap of one year, that tolerance or one step a month would change
+		// the first pass's temperature.
+		const passes: SimPass[] = [];
 		const { response } = handleRequest(
 			climateRequest({
-				model: { climateMaxPasses: 1 },
+				model: { ...TEMPERATURE_MODEL, climateMaxPasses: 1, stepsPerMonth: 1 },
 				windSettings: { thermalHpaPerK: 50 },
 				maxPasses: 1,
+				maxYears: 1,
+				tolerance: 1000,
 			}),
+			() => {},
+			(pass) => passes.push(pass),
 		);
 		expect(response.ok && response.result).toMatchObject({
 			passes: directClimate().passes,
 		});
+		expect(passes[0]?.climatePass.temperature.yearsRun).toBeGreaterThan(1);
+		expect(passes.at(-1)?.climatePass.temperature.months).toEqual(
+			directClimate().temperature.months,
+		);
 	});
 
 	it('carries on from the start it is given, a result as the page keeps it, and settles in one pass', () => {
@@ -775,23 +354,135 @@ describe('handleRequest for climate', {
 			settled: true,
 		});
 		expect(passes).toHaveLength(1);
+		// The start's record is carried through the copy and back.
+		expect(passes[0]?.climatePass.temperature.solvedFor).toEqual(
+			last.temperature.solvedFor,
+		);
+	});
+
+	/** Twelve months of a field on a world's cells. */
+	const monthsOf = (cells: number): Float32Array[] =>
+		Array.from({ length: 12 }, () => new Float32Array(cells));
+
+	/**
+	 * A start of the right form for a world, solved for it, whose state has
+	 * the arrays given, on a grid of its own choosing.
+	 */
+	const startFor = (
+		world: World,
+		state: Record<string, unknown>,
+	): Record<string, unknown> => ({
+		temperature: {
+			months: monthsOf(world.elevation.length),
+			state,
+			solvedFor: temperatureConditions(world),
+		},
+		winds: {
+			east: monthsOf(world.elevation.length),
+			north: monthsOf(world.elevation.length),
+		},
+		dayLengthHours: world.planet.dayLengthHours,
+	});
+
+	/** A state of the right form, with values everywhere, on that many cells. */
+	const stateOn = (cells: number) => ({
+		temperatureK: new Float64Array(cells).fill(280),
+		previousK: new Float64Array(cells).fill(280),
+		referenceCoolingK: new Float64Array(cells),
+		stepSeconds: 86_400,
 	});
 
 	it('answers a start of the wrong form with a failure, and tells of no pass', () => {
-		const passes: SimPass[] = [];
-		const { response, transfer } = handleRequest(
-			climateRequest({ start: { dayLengthHours: 24 } }),
-			() => {},
-			(pass) => passes.push(pass),
-		);
-		expect(response).toMatchObject({
+		const good = startFor(CLIMATE_WORLD, stateOn(6 * 64 * 64));
+		const temperature = good.temperature as Record<string, unknown>;
+		const solvedFor = temperature.solvedFor as Record<string, unknown>;
+		for (const start of [
+			{ dayLengthHours: 24 },
+			{ ...good, temperature: { ...temperature, state: 'last time' } },
+			{
+				...good,
+				temperature: {
+					...temperature,
+					solvedFor: { ...solvedFor, seaLevel: Number.NaN },
+				},
+			},
+			{
+				...good,
+				temperature: {
+					...temperature,
+					state: {
+						...stateOn(6 * 64 * 64),
+						referenceCoolingK: new Float32Array(3),
+					},
+				},
+			},
+		]) {
+			const passes: SimPass[] = [];
+			const { response, transfer } = handleRequest(
+				climateRequest({ start }),
+				() => {},
+				(pass) => passes.push(pass),
+			);
+			expect(response).toMatchObject({
+				id: 50,
+				kind: 'climate',
+				ok: false,
+				error: expect.stringContaining("A climate request's start"),
+			});
+			expect(transfer).toEqual([]);
+			expect(passes).toEqual([]);
+		}
+	});
+
+	it('answers a start the solver refuses with its reason, rather than throwing', () => {
+		const state = {
+			...stateOn(6 * 64 * 64),
+			referenceCoolingK: new Float64Array(5),
+		};
+		expect(
+			respond(climateRequest({ start: startFor(CLIMATE_WORLD, state) })),
+		).toEqual({
 			id: 50,
 			kind: 'climate',
 			ok: false,
-			error: expect.stringContaining("A climate request's start"),
+			error:
+				"A starting state's referenceCoolingK must be a Float64Array of 24576 values",
+		});
+	});
+
+	it('answers a start on another grid than the world is solved on with a failure, rather than throwing', () => {
+		// A world of 128 cells per face edge is solved on the 64 grid, so a
+		// state on its own grid is on the wrong one.
+		const world = createBlankWorld(128);
+		const { response, transfer } = handleRequest(
+			structuredClone({
+				id: 33,
+				kind: 'climate',
+				world,
+				start: startFor(world, stateOn(6 * 128 * 128)),
+			}),
+		);
+		expect(response).toEqual({
+			id: 33,
+			kind: 'climate',
+			ok: false,
+			error:
+				'A starting state must be on the grid of 64 cells per face edge, which this world is solved on, 24576 values an array; its temperatureK holds 98304',
 		});
 		expect(transfer).toEqual([]);
-		expect(passes).toEqual([]);
+	});
+
+	it('answers with a failure when the progress cannot be told', () => {
+		const { response, transfer } = handleRequest(climateRequest(), () => {
+			throw new Error('nobody to tell');
+		});
+		expect(response).toEqual({
+			id: 50,
+			kind: 'climate',
+			ok: false,
+			error: 'nobody to tell',
+		});
+		expect(transfer).toEqual([]);
 	});
 
 	it('answers a world the core refuses with its reason, and tells of no pass', () => {

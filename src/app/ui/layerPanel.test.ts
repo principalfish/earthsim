@@ -28,6 +28,7 @@ import {
 	type StoredView,
 	WIND_SOURCES,
 } from '../layers/view';
+import { answerWinds, arriveClimate, climateOf } from '../testing/climateStore';
 import {
 	byClass,
 	createFakeDocument,
@@ -56,19 +57,18 @@ import {
 import { createLayerPanel } from './layerPanel';
 import type { ComparisonContent } from './main/comparison';
 import {
-	CALCULATING_TEMPERATURE_TEXT,
-	CALCULATING_WINDS_TEXT,
+	CALCULATING_CLIMATE_TEXT,
 	type CalculationContent,
 	createInfoBox,
 	type InfoBox,
 	PAUSED_TEXT,
+	refiningClimateText,
 } from './main/infoBox';
 import {
 	LEGEND_CALCULATING_TEXT,
 	LEGEND_EMPTY_TEXT,
 	LEGEND_OUT_OF_DATE_TEXT,
 	type LegendContent,
-	legendContent,
 } from './main/legend';
 import { WINDS_CALCULATING_TEXT } from './main/windKey';
 
@@ -183,14 +183,12 @@ describe('createLayerPanel', () => {
 		stage.store.markOutOfDate();
 		expect(stage.lastLegend()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		expect(stage.lastLegend()?.scale).not.toBeNull();
-		stage.store.markCalculating();
+		stage.store.markClimateCalculating();
 		stage.store.setProgress({ ...progressOf(2), estimatedYearsLeft: 2 });
-		expect(stage.lastLegend()?.status).toBe(
-			'Calculating · year 2, about 2 to go',
-		);
-		expect(stage.lastLegend()?.bar).toEqual({ fraction: 0.5 });
+		expect(stage.lastLegend()?.status).toBe(LEGEND_CALCULATING_TEXT);
+		expect(stage.lastLegend()?.bar).toEqual({ fraction: null });
 		expect(stage.lastLegend()?.scale).not.toBeNull();
-		stage.store.markFailed();
+		stage.store.markClimateStopped();
 		expect(stage.shown).toHaveLength(1);
 		expect(stage.shown[0]?.field).toBe(result.months[DEFAULT_MONTH]);
 	});
@@ -270,7 +268,7 @@ describe('createLayerPanel', () => {
 		// Straight to the next result, with no change between to send the
 		// first again.
 		const next = resultWith(5);
-		stage.store.setResult(next, true);
+		stage.store.setClimateResult(climateOf(next), true);
 		expect(stage.shown.map((shown) => shown.field)).toEqual([
 			next.months[DEFAULT_MONTH],
 		]);
@@ -302,8 +300,7 @@ describe('createLayerPanel', () => {
 		const failure = new RangeError('Refused once');
 		stage.failNext(failure);
 		const second = resultSpanning(0, 40);
-		stage.store.markCalculating();
-		stage.store.setResult(second, false);
+		arriveClimate(stage.store, second, false);
 		expect(stage.errors).toEqual([failure]);
 		// The globe still shows the first result, and the legend its scale,
 		// while its line says where the store's result stands.
@@ -314,7 +311,7 @@ describe('createLayerPanel', () => {
 		expect(stage.lastLegend()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		// The next change sends the refused field again; taken, the legend
 		// moves to its scale.
-		stage.store.markCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.shown.at(-1)?.field).toBe(second.months[DEFAULT_MONTH]);
 		expect(stage.shown.at(-1)?.range).toEqual({ min: 0, max: 40 });
 		expect(tickLabels(stage.lastLegend())).toEqual([
@@ -336,8 +333,7 @@ describe('createLayerPanel', () => {
 		const failure = new RangeError('Refused once');
 		stage.failNext(failure);
 		const second = resultSpanning(0, 40);
-		stage.store.markCalculating();
-		stage.store.setResult(second, true);
+		arriveClimate(stage.store, second, true);
 		expect(stage.store.temperature.status).toBe('current');
 		expect(stage.errors).toEqual([failure]);
 		// The globe still shows the first result, on its scale, and the
@@ -372,8 +368,7 @@ describe('createLayerPanel', () => {
 		const stage = createStage();
 		stage.panel.setLayer('temperature');
 		stage.failNext(new RangeError('Refused once'));
-		stage.store.markCalculating();
-		stage.store.setResult(resultSpanning(-10, 10), false);
+		arriveClimate(stage.store, resultSpanning(-10, 10), false);
 		expect(stage.shown).toEqual([]);
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
@@ -399,7 +394,7 @@ describe('createLayerPanel', () => {
 		// The next result, straight after with no change between, is taken,
 		// and its scale replaces the line.
 		const next = resultSpanning(0, 40);
-		stage.store.setResult(next, true);
+		stage.store.setClimateResult(climateOf(next), true);
 		expect(stage.shown.map((shown) => shown.field)).toEqual([
 			next.months[DEFAULT_MONTH],
 		]);
@@ -444,7 +439,7 @@ describe('createLayerPanel', () => {
 		stage.arrive(result);
 		const scale = stage.shown.at(-1)?.range;
 		stage.store.markOutOfDate();
-		stage.store.markCalculating();
+		stage.store.markClimateCalculating();
 		stage.store.setProgress(progressOf(1));
 		stage.panel.setMonth(0);
 		for (const view of ['annualMean', 'warmest', 'coldest'] as const) {
@@ -505,15 +500,13 @@ describe('createLayerPanel, starting on a stored view', () => {
 		const result = resultWith();
 		const started = createStage({ start: stored() });
 		started.arrive(result);
-		started.store.markWindsCalculating();
-		started.store.setWindsResult(solvedWinds(), true);
+		answerWinds(started.store, solvedWinds(), true);
 		const chosen = createStage();
 		chosen.panel.setLayer('temperature');
 		chosen.panel.setSummary('temperature', 'annualMean');
 		chosen.panel.setWinds(true);
 		chosen.arrive(result);
-		chosen.store.markWindsCalculating();
-		chosen.store.setWindsResult(solvedWinds(), true);
+		answerWinds(chosen.store, solvedWinds(), true);
 		expect(started.shown).toHaveLength(1);
 		expect(started.shown).toEqual(chosen.shown);
 		expect(started.winds.at(-1)).not.toBeNull();
@@ -595,7 +588,7 @@ describe('createLayerPanel, what the globe shows', () => {
 		stage.panel.setLayer('temperature');
 		stage.store.clear();
 		expect(stage.panel.shown()).toBeNull();
-		stage.store.markCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.panel.shown()).toBeNull();
 	});
 
@@ -640,10 +633,10 @@ describe('createLayerPanel, what the globe shows', () => {
 		expect(stage.lastLegend()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		expect(stage.panel.shown()).toMatchObject({ field, current: false });
 
-		stage.store.markCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.panel.shown()).toMatchObject({ field, current: false });
 
-		stage.store.setResult(result, true);
+		stage.store.setClimateResult(climateOf(result), true);
 		expect(stage.panel.shown()).toMatchObject({ field, current: true });
 
 		stage.store.markUnavailable();
@@ -659,8 +652,7 @@ describe('createLayerPanel, what the globe shows', () => {
 
 		stage.failNext(new RangeError('Refused once'));
 		const second = resultWith(5);
-		stage.store.markCalculating();
-		stage.store.setResult(second, true);
+		arriveClimate(stage.store, second, true);
 		expect(stage.store.temperature.status).toBe('current');
 		expect(stage.lastLegend()?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		expect(stage.panel.shown()).toEqual({
@@ -759,12 +751,13 @@ describe('the info box over the globe', () => {
 		expect(byClass(root, 'comparison')).toEqual([]);
 	});
 
-	/** Has the temperature and then its winds arrive, both current. */
+	/** Has the climate arrive, its temperature and winds both current. */
 	const solveAll = (store: LayerStore): void => {
-		store.markCalculating();
-		store.setResult(resultWith(), true);
-		store.markWindsCalculating();
-		store.setWindsResult(solvedWinds(), true);
+		store.markClimateCalculating();
+		store.setClimateResult(
+			{ ...solvedWinds(), temperature: resultWith() },
+			true,
+		);
 	};
 
 	it('shows on Terrain while nothing is calculated yet, and hides there once all is current', () => {
@@ -788,34 +781,52 @@ describe('the info box over the globe', () => {
 		solveAll(store);
 		expect(status()).toBe('');
 		expect(root.hidden).toBe(true);
-		store.markWindsOutOfDate();
+		store.markOutOfDate();
 		expect(status()).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		panel.setWinds(false);
 		// Out of date whatever is shown: the calculation's line says so.
 		expect(status()).toBe(LEGEND_OUT_OF_DATE_TEXT);
-		store.markWindsCalculating();
-		store.setWindsResult(solvedWinds(), true);
+		solveAll(store);
 		expect(root.hidden).toBe(true);
 	});
 
-	it('names the temperature and then the winds while each is calculated on Terrain, the temperature with its progress', () => {
+	it('names the climate’s first pass with its progress and then each pass refining it on Terrain, with a bar that never goes back', () => {
 		const { store, root, status, bar } = make();
-		store.markCalculating();
-		store.setProgress({ ...progressOf(2), estimatedYearsLeft: 2 });
+		store.markClimateCalculating();
+		store.setProgress({ ...progressOf(2), estimatedYearsLeft: 2 }, 1);
 		expect(root.hidden).toBe(false);
-		expect(status()).toBe(CALCULATING_TEMPERATURE_TEXT);
+		expect(status()).toBe(CALCULATING_CLIMATE_TEXT);
 		expect(bar.hidden).toBe(false);
 		expect(bar.getAttribute('value')).toBe('0.5');
 
-		store.setResult(resultWith(), true);
-		store.markWindsCalculating();
-		expect(status()).toBe(CALCULATING_WINDS_TEXT);
-		expect(bar.hidden).toBe(false);
+		const solved = { ...solvedWinds(), temperature: resultWith() };
+		store.setPass(solved, 1);
+		expect(status()).toBe('Refining climate (pass 2)');
+		expect(bar.getAttribute('value')).toBe('1');
+		store.setProgress({ ...progressOf(1), estimatedYearsLeft: 2 }, 2);
+		expect(bar.getAttribute('value')).toBe('1');
+		store.setPass(solved, 2, true);
+		expect(status()).toBe(refiningClimateText(2));
 
-		store.setWindsResult(solvedWinds(), true);
+		store.setClimateResult(solved, true);
 		expect(status()).toBe('');
 		expect(bar.hidden).toBe(true);
 		expect(root.hidden).toBe(true);
+	});
+
+	it('shows each pass of the climate at once, the temperature and the winds from the same pass', () => {
+		const stage = createStage();
+		stage.panel.setLayer('temperature');
+		stage.panel.setWinds(true);
+		stage.store.markClimateCalculating();
+		for (const pass of [1, 2]) {
+			const solved = { ...solvedWinds(pass), temperature: resultWith(pass) };
+			stage.store.setPass(solved, pass);
+			expect(stage.shown.at(-1)?.field).toBe(
+				solved.temperature.months[DEFAULT_MONTH],
+			);
+			expect(stage.winds.at(-1)?.east).toBe(solved.winds.east[DEFAULT_MONTH]);
+		}
 	});
 
 	it('says Paused only while paused with a result that is not current, on any layer', () => {
@@ -839,7 +850,7 @@ describe('the info box over the globe', () => {
 		store.clear();
 		expect(status()).toBe(PAUSED_TEXT);
 		// A calculation left to finish is said as one under way.
-		store.markCalculating();
+		store.markClimateCalculating();
 		expect(status()).not.toBe(PAUSED_TEXT);
 	});
 
@@ -853,24 +864,20 @@ describe('the info box over the globe', () => {
 		expect(status()).toBe(PAUSED_TEXT);
 	});
 
-	it('follows the calculation', () => {
+	it('follows the calculation, saying the climate’s line over the temperature’s years', () => {
 		const { store, pickLayer, legend, status, bar } = make();
 		pickLayer('temperature');
-		store.markCalculating();
-		store.setProgress(progressOf(1));
-		expect(status()).toBe(CALCULATING_TEMPERATURE_TEXT);
+		store.markClimateCalculating();
+		store.setProgress(progressOf(1), 1);
+		expect(status()).toBe(CALCULATING_CLIMATE_TEXT);
 		expect(bar.hidden).toBe(false);
-		store.setProgress({ ...progressOf(2), estimatedYearsLeft: 3 });
-		expect(status()).toBe(
-			legendContent(TEMPERATURE_LAYER, store.temperature, null, false).status,
-		);
-		expect(bar.hidden).toBe(false);
+		store.setProgress({ ...progressOf(2), estimatedYearsLeft: 3 }, 1);
+		expect(status()).toBe(CALCULATING_CLIMATE_TEXT);
+		expect(bar.getAttribute('value')).toBe('0.4');
 		expect(legend.hidden).toBe(true);
 
 		const result = resultWith();
-		store.setResult(result, true);
-		store.markWindsCalculating();
-		store.setWindsResult(solvedWinds(), true);
+		store.setClimateResult({ ...solvedWinds(), temperature: result }, true);
 		expect(status()).toBe('');
 		expect(bar.hidden).toBe(true);
 		expect(legend.hidden).toBe(false);
@@ -881,32 +888,26 @@ describe('the info box over the globe', () => {
 });
 
 describe('createLayerPanel, the key’s wording', () => {
-	it('says Calculating while the temperature the winds wait for is worked out, and Not calculated yet only when nothing is under way', () => {
+	it('says Calculating while the climate the winds are part of is worked out, and Not calculated yet only when nothing is under way', () => {
 		const stage = createStage();
 		stage.panel.setWinds(true);
 		expect(stage.lastKey()).toEqual({
 			state: 'empty',
 			status: LEGEND_EMPTY_TEXT,
 		});
-		stage.store.markCalculating();
-		expect(stage.store.winds.status).toBe('empty');
+		stage.store.markClimateCalculating();
 		expect(stage.lastKey()).toEqual({
 			state: 'calculating',
 			status: WINDS_CALCULATING_TEXT,
 		});
-		stage.store.markFailed();
+		stage.store.markClimateStopped();
 		expect(stage.lastKey()).toEqual({
 			state: 'empty',
 			status: LEGEND_EMPTY_TEXT,
 		});
-		stage.store.markCalculating();
-		stage.store.setResult(temperatureOf(1), true);
-		// A temperature and no winds asked for yet: nothing is under way.
-		expect(stage.lastKey()).toEqual({
-			state: 'empty',
-			status: LEGEND_EMPTY_TEXT,
-		});
-		stage.store.markWindsCalculating();
+		arriveClimate(stage.store, temperatureOf(1), true);
+		expect(stage.lastKey()?.state).toBe('current');
+		stage.store.markClimateCalculating();
 		expect(stage.lastKey()).toEqual({
 			state: 'calculating',
 			status: WINDS_CALCULATING_TEXT,
@@ -917,7 +918,7 @@ describe('createLayerPanel, the key’s wording', () => {
 		const stage = createStage();
 		stage.panel.setWinds(true);
 		stage.panel.setLayer('pressure');
-		stage.store.markCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.lastKey()?.status).toBe(WINDS_CALCULATING_TEXT);
 		expect(stage.lastLegend()?.status).toBe(LEGEND_CALCULATING_TEXT);
 	});
@@ -976,8 +977,7 @@ describe('createLayerPanel, another layer described', () => {
 		});
 		/** Has a year of winds and pressure arrive, current. */
 		const arrive = (solved: SolvedWinds = pressureWinds()): SolvedWinds => {
-			store.markWindsCalculating();
-			store.setWindsResult(solved, true);
+			answerWinds(store, solved, true);
 			return solved;
 		};
 		return {
@@ -1005,10 +1005,10 @@ describe('createLayerPanel, another layer described', () => {
 
 	it('says where the calculation stands the same way whichever layer is chosen, and with the Winds tile on or off', () => {
 		const stage = createTwoLayerStage();
-		stage.store.markCalculating();
+		stage.store.markClimateCalculating();
 		const calculating = {
 			state: 'calculating',
-			status: CALCULATING_TEMPERATURE_TEXT,
+			status: CALCULATING_CLIMATE_TEXT,
 			bar: { fraction: null },
 		};
 		for (const step of [
@@ -1059,25 +1059,23 @@ describe('createLayerPanel, another layer described', () => {
 			source: 'simulated',
 			current: true,
 		});
-		// The temperature's store is not where its months are.
-		stage.store.markCalculating();
-		stage.store.setResult(temperatureOf(1), true);
-		expect(stage.panel.shown()?.field).toBe(
-			solved.winds.pressure[DEFAULT_MONTH],
+		// Its months are the winds' pressure, not the temperature's.
+		expect(stage.panel.shown()?.field).not.toBe(
+			stage.store.temperature.result?.months[DEFAULT_MONTH],
 		);
 	});
 
 	it('says its own words while its calculation is under way or unavailable', () => {
 		const stage = createTwoLayerStage();
 		stage.panel.setLayer(MADE_UP_ID);
-		stage.store.markWindsCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.legends.at(-1)).toEqual({
 			scale: null,
 			state: 'calculating',
 			status: LEGEND_CALCULATING_TEXT,
 			bar: { fraction: null },
 		});
-		stage.store.markWindsUnavailable();
+		stage.store.markUnavailable();
 		expect(stage.legends.at(-1)?.status).toBe(MADE_UP_LAYER.unavailableText);
 	});
 
@@ -1112,8 +1110,7 @@ describe('createLayerPanel, another layer described', () => {
 			]),
 		);
 		stage.arrive();
-		stage.store.markCalculating();
-		stage.store.setResult(temperatureOf(1), true);
+		arriveClimate(stage.store, temperatureOf(1), true);
 		stage.panel.setLayer('temperature');
 		expect(stage.told.at(-1)?.summaries.temperature).toBe('warmest');
 		stage.panel.setLayer(MADE_UP_ID);
@@ -1165,8 +1162,7 @@ describe('createLayerPanel, another layer described', () => {
 	it('keeps the scale of the layer the globe still shows, as that layer writes it, when it refuses the first field of another', () => {
 		const stage = createTwoLayerStage();
 		stage.panel.setLayer('temperature');
-		stage.store.markCalculating();
-		stage.store.setResult(temperatureOf(1), true);
+		arriveClimate(stage.store, temperatureOf(1), true);
 		const temperatureScale = stage.legends.at(-1)?.scale;
 		expect(temperatureScale?.caption).toMatch(/, °C$/);
 		const solved = stage.arrive();
@@ -1186,7 +1182,7 @@ describe('createLayerPanel, another layer described', () => {
 		expect(legend?.status).toBe(LEGEND_OUT_OF_DATE_TEXT);
 		// The line goes on in the chosen layer's words: its calculation tells
 		// no years, where the temperature's would.
-		stage.store.markWindsCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.panel.shown()?.layer).toBe(TEMPERATURE_LAYER);
 		expect(stage.legends.at(-1)).toEqual({
 			scale: temperatureScale,

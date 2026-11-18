@@ -6,7 +6,7 @@ How the surface winds and sea-level pressure are worked out, which planet settin
 
 The winds are worked out from the temperature, a month at a time: first a map of sea-level pressure built by rules, then the wind that follows from it. It is a sketch of the real circulation, meant to be right in kind, not a simulation of the air.
 
-They are worked out again, in a worker of their own, as soon as each new temperature arrives and a moment after a change of the day length, whatever is on screen, and not while the [Pause button](user-guide.md#the-pause-button) is pressed.
+They come out of each pass of the [climate loop](temperature.md#the-climate-loop) with the temperature, worked out in a worker of its own a moment after every change of the world, the day length's included, whatever is on screen, and not while the [Pause button](user-guide.md#the-pause-button) is pressed.
 
 ### Bands of pressure
 
@@ -191,7 +191,7 @@ These are recorded, not tuned. The model is not fitted any closer to the observe
 - **The air above the surface.** There is one level, the surface, and no upper winds or jet streams.
 - **Weather.** The winds are monthly means of a steady balance: no storms, fronts or day-to-day change.
 - **The air's own motion.** The wind does not carry itself along, so nothing is steered by the flow upstream, and there is no difference between the hemispheres other than what their land and temperature give.
-- **The ocean.** There are no ocean currents. On their own the winds do not change the temperature; the climate loop feeds them back, though the page does not use it yet.
+- **The ocean.** There are no ocean currents. On their own the winds do not change the temperature; the climate loop, which the page works the climate out with, feeds them back.
 
 ## The pressure of finer worlds is worked out on the 64 grid
 

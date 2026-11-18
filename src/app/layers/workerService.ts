@@ -1,9 +1,9 @@
 /**
- * The services the page runs on simulation workers, the statistics, the
- * temperature and the winds, each on a worker of its own: starting a
- * worker and its client, keeping only the newest answer, starting the
- * worker afresh when a slow computation is overtaken in the services that
- * restart it, and what follows when a worker cannot be had.
+ * The services the page runs on simulation workers, the statistics and the
+ * climate, each on a worker of its own: starting a worker and its client,
+ * keeping only the newest answer, starting the worker afresh when a slow
+ * computation is overtaken or cancelled in the service that restarts it,
+ * and what follows when a worker cannot be had.
  *
  * Nothing here starts a real worker or a real timer: each is handed in, so
  * that all of it can be run with stand-ins.
@@ -24,15 +24,13 @@ import {
 } from '../../worker/client';
 import type { LayerStore } from './layers';
 import {
+	CLIMATE_DEBOUNCE_MS,
+	type ClimateScheduler,
+	createClimateScheduler,
 	createRefreshScheduler,
-	createTemperatureScheduler,
-	createWindsScheduler,
 	type LatestOutcome,
 	type RefreshScheduler,
 	STATS_DEBOUNCE_MS,
-	TEMPERATURE_DEBOUNCE_MS,
-	type TemperatureScheduler,
-	type WindsScheduler,
 } from './refresh';
 
 /** The error a request to a service that has no worker rejects with. */
@@ -51,9 +49,9 @@ export type WorkerServiceOptions = {
 	 */
 	readonly createClient?: (worker: WorkerLike) => SimClient;
 	/**
-	 * Whether a request that overtakes one still under way ends the worker
-	 * computing that one and starts a fresh worker for itself, rather than
-	 * waiting behind it. False when left out.
+	 * Whether a request that overtakes one still under way, or a `cancel`
+	 * of one, ends the worker computing it and starts a fresh worker, rather
+	 * than leaving it to compute what nobody wants. False when left out.
 	 */
 	readonly restartWhenOvertaken?: boolean;
 	/** Records why a worker could not be started. */
@@ -88,6 +86,16 @@ export type WorkerService = {
 		options?: RequestOptions,
 	): Promise<LatestOutcome<SimResults[K]>>;
 	/**
+	 * Ends the newest call, if it is still to be answered, as a newer call
+	 * would: it resolves at once to an outcome marked as superseded, and
+	 * whatever its worker later tells of it is dropped. With
+	 * `restartWhenOvertaken` the worker computing it is ended and a fresh
+	 * one started, so that the computation stops; if none can be started
+	 * the service becomes unavailable. With no call to be answered it does
+	 * nothing.
+	 */
+	cancel(): void;
+	/**
 	 * Has a listener called once, when the service becomes unavailable, or
 	 * at once if it already is.
 	 */
@@ -118,12 +126,12 @@ type Started = {
  * to the end on the worker, which answers the newer one after it. Every
  * call is posted, and so copied for the worker, when it is made; a caller
  * that wants no requests queued behind a computation makes one call at a
- * time, as the statistics and the winds do through their schedulers
+ * time, as the statistics do through their scheduler
  * (`oneAtATime` of {@link createRefreshScheduler}). With
  * `restartWhenOvertaken`, a request that overtakes one still under way
  * first ends the worker, which drops the older request's answer for good,
  * and then starts a fresh one: the newest request never waits behind a
- * stale one. A worker that
+ * stale one; `cancel` ends the worker in the same way. A worker that
  * answered everything it was asked is kept. If the fresh worker cannot be
  * started, the service becomes unavailable, and the request rejects.
  *
@@ -184,18 +192,26 @@ export const createWorkerService = (
 
 	let current: Started | null = start();
 
+	/**
+	 * Supersedes the newest call, if it is still to be answered, and ends
+	 * its worker for a fresh one in the services that restart it.
+	 */
+	const overtake = (): void => {
+		const overtaken = running;
+		running = null;
+		overtaken?.supersede();
+		if (overtaken !== null && restartWhenOvertaken && current !== null) {
+			stop(current);
+			current = start();
+			if (current === null) {
+				becomeUnavailable();
+			}
+		}
+	};
+
 	return {
 		latest: (kind, payload, requestOptions) => {
-			const overtaken = running;
-			running = null;
-			overtaken?.supersede();
-			if (overtaken !== null && restartWhenOvertaken && current !== null) {
-				stop(current);
-				current = start();
-				if (current === null) {
-					becomeUnavailable();
-				}
-			}
+			overtake();
 			if (current === null) {
 				return Promise.reject(new Error(NO_WORKER_MESSAGE));
 			}
@@ -237,6 +253,7 @@ export const createWorkerService = (
 					);
 			});
 		},
+		cancel: overtake,
 		onUnavailable: (listener) => {
 			if (current === null) {
 				listener();
@@ -325,96 +342,55 @@ export const createStatisticsService = <H>(
 	return scheduler;
 };
 
-/** What the page's temperature, or its winds, are made from. */
-export type TemperatureServiceOptions<H> = Omit<
+/** What the page's climate is made from. */
+export type ClimateServiceOptions<H> = Omit<
 	StatisticsServiceOptions<H>,
 	'readout'
 > & {
-	/** Where the result, its status and the progress are kept. */
+	/**
+	 * Where the temperature and the winds, their statuses, the progress and
+	 * the pass under way are kept.
+	 */
 	readonly store: LayerStore;
 };
 
 /**
- * Starts a simulation worker for the temperature and keeps the store up to
- * date with the world while the scheduler is running, as it is unless
- * paused.
+ * Starts a simulation worker for the climate, the temperature and the
+ * winds solved together, and keeps the store up to date with the world
+ * while the scheduler is running, as it is unless paused.
  *
  * @remarks
- * A solve takes seconds, so one that a newer request overtakes is not
+ * A climate takes seconds, so one that a newer request overtakes is not
  * waited for: its worker is ended and a fresh one started (see
- * {@link createWorkerService}). Whatever goes wrong with the worker costs
- * only the temperature: the store says it is unavailable, keeping what it
- * had, and nothing more is asked. A request that fails is recorded, and
- * the store keeps the last result, marked out of date.
+ * {@link createWorkerService}), and so is one that pausing ends once its
+ * pass under way has finished. Whatever goes wrong with the worker costs
+ * only the climate: the store says both layers are unavailable, keeping
+ * what it had, and nothing more is asked. A request that fails is
+ * recorded, and the store keeps the last results, marked out of date.
+ *
+ * The climate is asked for after a change with the wait
+ * {@link CLIMATE_DEBOUNCE_MS}; see {@link createClimateScheduler} for the
+ * rest.
  *
  * @param options - The worker, the world, the store and the timers.
  * @returns The scheduler, running.
  */
-export const createTemperatureService = <H>(
-	options: TemperatureServiceOptions<H>,
-): TemperatureScheduler => {
+export const createClimateService = <H>(
+	options: ClimateServiceOptions<H>,
+): ClimateScheduler => {
 	const service = createWorkerService({
 		createWorker: options.createWorker,
 		createClient: options.createClient,
 		restartWhenOvertaken: true,
 		logError: options.logError,
 	});
-	const scheduler = createTemperatureScheduler<H>({
-		request: (start, onProgress) =>
-			service.latest(
-				'temperature',
-				{ world: options.currentWorld(), start },
-				{ onProgress },
-			),
-		store: options.store,
-		debounceMs: TEMPERATURE_DEBOUNCE_MS,
-		setTimer: options.setTimer,
-		clearTimer: options.clearTimer,
-		isBusy: options.isStrokeActive,
-		onError: options.logError,
-	});
-	service.onUnavailable(scheduler.markUnavailable);
-	return scheduler;
-};
-
-/**
- * Starts a simulation worker for the winds and keeps the store's winds up
- * to date with its temperature and the world while the scheduler is
- * running, as it is unless paused.
- *
- * @remarks
- * Unlike the temperature's, a wind solve is never cut short: the worker is
- * kept, with the grid tables it has built, which a fresh worker would have
- * to build again and so make the next solve slower. The scheduler asks for
- * one solve at a time, and asks again once it is answered if things have
- * moved on meanwhile, the answer so overtaken kept by nobody (see
- * {@link createWindsScheduler}). Whatever goes wrong with the worker costs
- * only the winds: the store says they are unavailable, keeping what it
- * had, and nothing more is asked. A request that fails is recorded, and
- * the store keeps the last winds, marked out of date, or stays empty if
- * there were none.
- *
- * The winds are asked for after a change of the day length with the
- * temperature's wait, {@link TEMPERATURE_DEBOUNCE_MS}; see
- * {@link createWindsScheduler} for the rest.
- *
- * @param options - The worker, the world, the store and the timers.
- * @returns The scheduler, running.
- */
-export const createWindsService = <H>(
-	options: TemperatureServiceOptions<H>,
-): WindsScheduler => {
-	const service = createWorkerService({
-		createWorker: options.createWorker,
-		createClient: options.createClient,
-		logError: options.logError,
-	});
-	const scheduler = createWindsScheduler<H>({
-		request: (world, temperature) =>
-			service.latest('winds', { world, temperatures: temperature.months }),
+	const scheduler = createClimateScheduler<H>({
+		request: (world, start, callbacks) =>
+			service.latest('climate', { world, start }, callbacks),
+		cancel: service.cancel,
 		currentWorld: options.currentWorld,
 		store: options.store,
-		debounceMs: TEMPERATURE_DEBOUNCE_MS,
+		debounceMs: CLIMATE_DEBOUNCE_MS,
 		setTimer: options.setTimer,
 		clearTimer: options.clearTimer,
 		isBusy: options.isStrokeActive,

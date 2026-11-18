@@ -5,11 +5,9 @@
  * request: it keeps no results between requests, only tables it can build
  * again, such as the grid's. Every request carries the whole world it is
  * about, and its answer is computed from what the request carries alone.
- * For a temperature request that is the world and, when the page has one,
- * an earlier result to start from; for a winds request, the world and the
- * twelve months of its temperature; for a climate request, the world and,
- * when the page has one, an earlier climate to start from. The page's
- * world stays the one that is edited.
+ * For a climate request that is the world and, when the page has one, an
+ * earlier climate to start from. The page's world stays the one that is
+ * edited.
  *
  * A request and its response share an id, so that answers can be told apart
  * whatever order they arrive in, and a kind, which says what is computed.
@@ -31,10 +29,8 @@ import {
 import type {
 	TemperatureConditions,
 	TemperatureProgress,
-	TemperatureResult,
 	TemperatureStart,
 } from './temperature/temperature';
-import type { WindResult } from './wind/model';
 import type { TerrainStats } from './world/stats';
 import type { World } from './world/world';
 
@@ -50,10 +46,6 @@ import type { World } from './world/world';
 export type SimResults = {
 	/** Summary statistics of the terrain at the world's sea level. */
 	readonly terrainStats: TerrainStats;
-	/** The world's near-surface air temperature through its year. */
-	readonly temperature: TemperatureResult;
-	/** The world's surface winds and sea-level pressure through its year. */
-	readonly winds: WindResult;
 	/**
 	 * The world's climate, its temperature and winds solved together: its
 	 * day length, the passes taken and whether it settled. The arrays are
@@ -83,23 +75,6 @@ export type SimPayloads = {
 /** What a request of each kind carries besides the world. */
 type SimExtras = {
 	readonly terrainStats: Record<never, never>;
-	readonly temperature: {
-		/**
-		 * Where the solve starts from: usually the previous result for the
-		 * world, its state and the sea level and planet it was solved for,
-		 * from before an edit. Left out, the solve starts from nothing.
-		 */
-		readonly start?: TemperatureStart;
-	};
-	readonly winds: {
-		/**
-		 * The twelve months, January to December, of the world's near-surface
-		 * air temperature in degrees Celsius, one value per cell, as a
-		 * temperature result's `months` hold them. Posting the request copies
-		 * them, as it does the world.
-		 */
-		readonly temperatures: readonly Float32Array[];
-	};
 	readonly climate: {
 		/**
 		 * Where the climate starts from: usually the previous settled result
@@ -196,8 +171,6 @@ export type SimPass = {
 
 const KINDS: { readonly [K in SimKind]: true } = {
 	terrainStats: true,
-	temperature: true,
-	winds: true,
 	climate: true,
 };
 
@@ -240,9 +213,9 @@ const isConditionsShaped = (value: unknown): value is TemperatureConditions =>
 	);
 
 /**
- * Whether a value has the form of a start for a temperature solve: an
- * object with a record of the sea level and planet it was solved for and a
- * state of the form of a result's state.
+ * Whether a value has the form of where a temperature solve starts from:
+ * an object with a record of the sea level and planet it was solved for and
+ * a state of the form of a result's state.
  *
  * @remarks
  * As for a world, the state is checked for its form only. How many values
@@ -255,11 +228,11 @@ const isTemperatureStartShaped = (value: unknown): value is TemperatureStart =>
 	isStateShaped(value.state);
 
 /**
- * Whether a value has the form of a year of temperatures: an array of
- * twelve `Float32Array`s.
+ * Whether a value has the form of a year of a field: an array of twelve
+ * `Float32Array`s.
  *
  * @remarks
- * As for a start, how many values each holds and what they are is for the
+ * As for a state, how many values each holds and what they are is for the
  * solver to refuse.
  */
 const isMonthsShaped = (value: unknown): value is Float32Array[] =>
@@ -274,8 +247,9 @@ const isMonthsShaped = (value: unknown): value is Float32Array[] =>
  * length that is a finite number.
  *
  * @remarks
- * As for a temperature start, how many values each array holds and what
- * they are is for the solver to refuse.
+ * As for a world, how many values each array holds and what they are is
+ * for the solver to refuse. The temperature's record is small and is
+ * checked in full.
  */
 const isClimateStartShaped = (value: unknown): value is ClimateStart =>
 	isRecord(value) &&
@@ -310,32 +284,6 @@ const PAYLOADS: {
 	) => SimPayloads[K] | string;
 } = {
 	terrainStats: (_message, world) => ({ world }),
-	temperature: (message, world) => {
-		const { start } = message;
-		if (start === undefined) {
-			return { world };
-		}
-		if (!isTemperatureStartShaped(start)) {
-			return "A temperature request's start must be an object whose solvedFor has a finite seaLevel and a planet whose settings, the day length aside, are finite, and whose state has temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number";
-		}
-		// Only what a solve starts from is taken, whatever else came with it.
-		return {
-			world,
-			start: {
-				state: start.state,
-				solvedFor: copyConditions(start.solvedFor),
-			},
-		};
-	},
-	winds: (message, world) => {
-		const { temperatures } = message;
-		if (!isMonthsShaped(temperatures)) {
-			return `A winds request's temperatures must be an array of ${MONTHS_PER_YEAR} Float32Arrays, one a month`;
-		}
-		// A new array of the very months, so nothing else the array holds is
-		// taken.
-		return { world, temperatures: [...temperatures] };
-	},
 	climate: (message, world) => {
 		const { start } = message;
 		if (start === undefined) {
@@ -412,24 +360,20 @@ export const simFailure = (
  *
  * @remarks
  * The request is built afresh from the fields its kind carries, so that
- * nothing else in the message reaches whatever computes it: a temperature
- * request is not given the solver's cap, tolerance or constants, nor asked
- * to solve on the world's own grid, whatever the message says, and of its
- * start only the state and the record are taken, so the months of a whole
- * result sent as a start are left behind. Of a winds request's temperatures
- * only the twelve months are taken, into a new array. A climate request is
- * likewise given no say over the model's settings, and of its start only
- * the temperature's months, state and record, the winds' two components and
- * the day length are taken.
+ * nothing else in the message reaches whatever computes it: a climate
+ * request is not given the solver's cap, tolerance or constants, the wind
+ * model's settings, nor asked to solve on the world's own grid, whatever
+ * the message says, and of its start only the temperature's months, state
+ * and record, the winds' eastward and northward parts and the day length
+ * are taken, so the pressure of a whole result sent as a start is left
+ * behind, and of the record's planet only the settings the temperature
+ * reads.
  *
  * @param message - What arrived, of any type at all.
  * @returns The request, or the failure to answer it with: for a message
  * that is not an object, an id that is not a finite number, a kind that is
  * missing or not known, a world that is not {@link isWorldShaped}, or, for
- * a temperature request, a start that is there but not of the form of one,
- * or, for a winds request, temperatures that are not twelve
- * `Float32Array`s, or, for a climate request, a start that is there but not
- * of the form of one.
+ * a climate request, a start that is there but not of the form of one.
  * The failure carries the message's id and kind where it has usable ones.
  * An unknown kind is repeated in the failure's error, cut short if long.
  */

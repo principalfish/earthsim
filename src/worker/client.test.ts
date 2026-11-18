@@ -6,7 +6,6 @@ import {
 	type SimRequest,
 	type SimResponse,
 	simFailure,
-	type TemperatureProgress,
 	type TerrainStats,
 	type World,
 } from '../core/index';
@@ -221,80 +220,6 @@ describe('request', () => {
 	});
 });
 
-describe('request for temperature', () => {
-	it('sends a copy of the start with the world, leaving the caller both', async () => {
-		const worker = createFakeWorker();
-		const client = createSimClient(worker);
-		const world = blank();
-		const start = temperatureOf(3, 4);
-
-		void client.request('temperature', { world, start });
-
-		expect(worker.postCalls).toEqual([
-			[{ id: 1, kind: 'temperature', world, start }],
-		]);
-		const posted = worker.posted[0] as SimRequest<'temperature'>;
-		expect(posted.start?.state?.temperatureK).not.toBe(
-			start.state.temperatureK,
-		);
-		expect(start.state.temperatureK.byteLength).toBe(4 * 8);
-		expect(start.months[0]?.byteLength).toBe(4 * 4);
-	});
-
-	it('tells of progress for its own id, in order, and settles only on the response', async () => {
-		const worker = createFakeWorker();
-		const client = createSimClient(worker);
-		const heard: TemperatureProgress[] = [];
-		const other: TemperatureProgress[] = [];
-
-		const result = client.request(
-			'temperature',
-			{ world: blank() },
-			{ onProgress: (progress) => heard.push(progress) },
-		);
-		void client.request(
-			'temperature',
-			{ world: blank() },
-			{ onProgress: (progress) => other.push(progress) },
-		);
-		worker.respond(progressMessageOf(1, 1));
-		worker.respond(progressMessageOf(1, 2));
-		expect(await stateOf(result)).toBe('pending');
-		expect(heard.map((progress) => progress.yearsDone)).toEqual([1, 2]);
-		expect(other).toEqual([]);
-
-		worker.respond({
-			id: 1,
-			kind: 'temperature',
-			ok: true,
-			result: temperatureOf(2),
-		});
-		await expect(result).resolves.toEqual(temperatureOf(2));
-
-		// Answered: whatever comes for it later is ignored.
-		worker.respond(progressMessageOf(1, 3));
-		expect(heard).toHaveLength(2);
-	});
-
-	it('ignores progress for an id nobody waits on, or with nobody to tell', async () => {
-		const worker = createFakeWorker();
-		const client = createSimClient(worker);
-
-		const quiet = client.request('temperature', { world: blank() });
-		expect(() => worker.respond(progressMessageOf(1, 1))).not.toThrow();
-		expect(() => worker.respond(progressMessageOf(99, 1))).not.toThrow();
-		expect(await stateOf(quiet)).toBe('pending');
-
-		worker.respond({
-			id: 1,
-			kind: 'temperature',
-			ok: true,
-			result: temperatureOf(1),
-		});
-		await expect(quiet).resolves.toEqual(temperatureOf(1));
-	});
-});
-
 describe('request for climate', () => {
 	const summary = {
 		dayLengthHours: 24,
@@ -308,15 +233,24 @@ describe('request for climate', () => {
 		const client = createSimClient(worker);
 		const world = blank();
 		const start = {
-			temperature: temperatureOf(3),
-			winds: windResultOf(3),
+			temperature: temperatureOf(3, 4),
+			winds: windResultOf(3, 4),
 			dayLengthHours: 24,
 		};
 		const request = client.request('climate', { world, start });
-		expect(worker.posted[0]).toMatchObject({ id: 1, kind: 'climate' });
-		// Posted without a transfer list: the caller's arrays are whole.
-		expect(worker.postCalls[0]).toHaveLength(1);
-		expect(start.temperature.months[0]?.length).toBe(2);
+		expect(worker.postCalls).toEqual([
+			[{ id: 1, kind: 'climate', world, start }],
+		]);
+		// Posted without a transfer list: the caller's arrays are whole, and
+		// the worker's are copies.
+		const posted = worker.posted[0] as SimRequest<'climate'>;
+		expect(posted.start?.temperature.state.temperatureK).not.toBe(
+			start.temperature.state.temperatureK,
+		);
+		expect(posted.start?.winds.east[0]).not.toBe(start.winds.east[0]);
+		expect(start.temperature.state.temperatureK.byteLength).toBe(4 * 8);
+		expect(start.temperature.months[0]?.byteLength).toBe(4 * 4);
+		expect(start.winds.east[0]?.byteLength).toBe(4 * 4);
 		worker.respond({ id: 1, kind: 'climate', ok: true, result: summary });
 		await expect(request).resolves.toEqual(summary);
 	});
@@ -341,9 +275,10 @@ describe('request for climate', () => {
 			{ world: blank() },
 			{ onPass: (pass) => other.push(pass.pass) },
 		);
-		worker.respond({ ...progressMessageOf(1, 1), kind: 'climate', pass: 1 });
+		worker.respond(progressMessageOf(1, 1, 1));
 		worker.respond(passMessageOf(1, 1));
-		worker.respond({ ...progressMessageOf(1, 1), kind: 'climate', pass: 2 });
+		worker.respond(progressMessageOf(1, 1, 2));
+		worker.respond(progressMessageOf(2, 1, 1));
 		worker.respond(passMessageOf(1, 2, { last: true, settled: true }));
 		expect(await stateOf(result)).toBe('pending');
 		expect(passes).toEqual([1, 2]);
@@ -361,13 +296,15 @@ describe('request for climate', () => {
 		expect(passes).toEqual([1, 2]);
 	});
 
-	it('ignores a pass for an id nobody waits on, or with nobody to tell', async () => {
+	it('ignores a pass or progress for an id nobody waits on, or with nobody to tell', async () => {
 		const worker = createFakeWorker();
 		const client = createSimClient(worker);
 
 		const quiet = client.request('climate', { world: blank() });
 		expect(() => worker.respond(passMessageOf(1, 1))).not.toThrow();
 		expect(() => worker.respond(passMessageOf(99, 1))).not.toThrow();
+		expect(() => worker.respond(progressMessageOf(1, 1))).not.toThrow();
+		expect(() => worker.respond(progressMessageOf(99, 1))).not.toThrow();
 		expect(await stateOf(quiet)).toBe('pending');
 
 		worker.respond({ id: 1, kind: 'climate', ok: true, result: summary });
@@ -380,28 +317,6 @@ describe('request for climate', () => {
 		const result = client.request('climate', { world: blank() });
 		worker.respond(simFailure(1, 'climate', 'a pass failed'));
 		await expect(result).rejects.toThrow('a pass failed');
-	});
-});
-
-describe('request for winds', () => {
-	it('sends a copy of the temperatures with the world, leaving the caller both, and resolves with the winds', async () => {
-		const worker = createFakeWorker();
-		const client = createSimClient(worker);
-		const world = blank();
-		const temperatures = temperatureOf(1, 4).months;
-
-		const pending = client.request('winds', { world, temperatures });
-
-		expect(worker.postCalls).toEqual([
-			[{ id: 1, kind: 'winds', world, temperatures }],
-		]);
-		const posted = worker.posted[0] as SimRequest<'winds'>;
-		expect(posted.temperatures[0]).not.toBe(temperatures[0]);
-		expect(temperatures[0]?.byteLength).toBe(4 * 4);
-
-		const winds = windResultOf(1, 4);
-		worker.respond({ id: 1, kind: 'winds', ok: true, result: winds });
-		await expect(pending).resolves.toBe(winds);
 	});
 });
 

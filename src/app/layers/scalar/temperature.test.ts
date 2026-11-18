@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import {
-	progressOf,
-	temperatureOf,
-} from '../../../core/testing/temperatureFixtures';
+import { temperatureOf } from '../../../core/testing/temperatureFixtures';
 import {
 	DIFFERENCE_RAMP,
 	SEASONAL_RANGE_RAMP,
 	TEMPERATURE_RAMP,
 } from '../../globe/ramp';
+import { climateOf, keepingTemperature } from '../../testing/climateStore';
 import { pressureWinds } from '../../testing/scalarLayerFixtures';
 import { createLayerStore } from '../layers';
 import { loadObservedTemperature } from '../observedData';
@@ -29,7 +27,6 @@ describe('the temperature layer', () => {
 		expect(TEMPERATURE_LAYER.notShownText).toBe(
 			'Temperature could not be shown',
 		);
-		expect(TEMPERATURE_LAYER.yearProgress).toBe(true);
 		expect(TEMPERATURE_LAYER.summaryControlId).toBe('temperature-view');
 		expect(TEMPERATURE_LAYER.sunlightStyle).toBe('line');
 		expect(TEMPERATURE_LAYER.minSpan['°C']).toBe(2);
@@ -73,25 +70,23 @@ describe('the temperature layer', () => {
 		expect([DIFFERENCE_HALF_SPAN_C, DIFFERENCE_TICK_STEP]).toEqual([20, 10]);
 	});
 
-	it('reads the store’s temperature, its months and its progress', () => {
+	it('reads the store’s temperature and its months', () => {
 		const store = createLayerStore(() => {});
 		expect(TEMPERATURE_LAYER.read(store)).toEqual({
 			status: 'empty',
 			result: null,
 			months: null,
-			progress: null,
 		});
 		const result = temperatureOf(1);
-		store.markCalculating();
-		store.setProgress(progressOf(2));
-		expect(TEMPERATURE_LAYER.read(store).progress).toEqual(progressOf(2));
-		store.setResult(result, true);
+		store.markClimateCalculating();
+		expect(TEMPERATURE_LAYER.read(store).status).toBe('calculating');
+		store.setClimateResult(climateOf(result), true);
 		const reading = TEMPERATURE_LAYER.read(store);
 		expect(reading.status).toBe('current');
 		expect(reading.result).toBe(result);
 		expect(reading.months).toBe(result.months);
 		// The winds are not the temperature's.
-		store.setWindsResult(pressureWinds(), true);
+		store.setClimateResult(keepingTemperature(store, pressureWinds()), true);
 		expect(TEMPERATURE_LAYER.read(store).result).toBe(result);
 	});
 

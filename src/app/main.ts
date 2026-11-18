@@ -9,9 +9,8 @@ import { loadEarthData } from './layers/earthData';
 import { loadObservedWinds } from './layers/observedData';
 import { loadLayerObserved } from './layers/scalar';
 import {
+	createClimateService,
 	createStatisticsService,
-	createTemperatureService,
-	createWindsService,
 } from './layers/workerService';
 import { AUTOSAVE_DELAY_MS, createAutosave } from './saving/autosave';
 import {
@@ -94,9 +93,9 @@ const createGlobeOrExplain = (): Globe | null => {
 };
 
 /**
- * Starts an instance of the simulation worker. Each service has one of its
- * own, so that a slow temperature or wind solve never holds up the
- * statistics or the other.
+ * Starts an instance of the simulation worker. Each service, the
+ * statistics and the climate, has one of its own, so that a slow climate
+ * never holds up the statistics.
  */
 const createWorker = (): Worker =>
 	new Worker(new URL('../worker/sim.worker.ts', import.meta.url), {
@@ -187,16 +186,8 @@ if (globe !== null) {
 				setHeightUnit: readout.setHeightUnit,
 			};
 		},
-		createTemperature: (options) =>
-			createTemperatureService({
-				...options,
-				createWorker,
-				setTimer,
-				clearTimer,
-				logError,
-			}),
-		createWinds: (options) =>
-			createWindsService({
+		createClimate: (options) =>
+			createClimateService({
 				...options,
 				createWorker,
 				setTimer,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { temperatureOf } from '../../../core/testing/temperatureFixtures';
 import { windResultOf } from '../../../core/testing/windFixtures';
 import { createLayerStore, type WindsLayer } from '../../layers/layers';
+import { keepingTemperature } from '../../testing/climateStore';
 import { LEGEND_EMPTY_TEXT, LEGEND_OUT_OF_DATE_TEXT } from './legend';
 import {
 	OBSERVED_WINDS_FAILED_TEXT,
@@ -37,20 +38,20 @@ describe('windKeyContent', () => {
 		const store = createLayerStore(() => {});
 		const said = (): string | null => windKeyContent(store.winds).status;
 		expect(said()).toBe('Not calculated yet');
-		store.markWindsCalculating();
+		store.markClimateCalculating();
 		expect(said()).toBe('Calculating');
-		store.setWindsResult(
-			{
+		store.setClimateResult(
+			keepingTemperature(store, {
 				winds: windResultOf(1),
 				temperature: temperatureOf(1),
 				dayLengthHours: 24,
-			},
+			}),
 			true,
 		);
 		expect(said()).toBeNull();
-		store.markWindsOutOfDate();
+		store.markOutOfDate();
 		expect(said()).toBe('Out of date');
-		store.markWindsUnavailable();
+		store.markUnavailable();
 		expect(said()).toBe('Winds unavailable');
 	});
 });

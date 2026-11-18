@@ -2,23 +2,21 @@
  * Deciding when to ask the simulation worker for something again: a short
  * while after the last change, however many changes came together.
  *
- * The refresh scheduler does that for any result. The temperature
- * scheduler is built on it: it asks after every change of the world while
- * it is running, as it is unless paused, starts each request from the last
- * completed result, and keeps the result, where it stands against the
- * world and the progress of the calculation under way in the page's layer
- * store. The winds scheduler is built on it too: while it is running it
- * asks as soon as each new temperature result arrives and after a change
- * of the day length, and keeps the winds beside the temperature in the
- * store. Neither asks with anything on screen in mind: the temperature and
- * the winds are worked out whatever the page shows.
+ * The refresh scheduler does that for any result. The climate scheduler is
+ * built on it: it asks after every change of the world while it is
+ * running, as it is unless paused, for the temperature and the winds solved
+ * together in a loop of passes, starts each request from the last climate
+ * that settled, and keeps each pass as it finishes, the answer, where they
+ * stand against the world and the progress of the pass under way in the
+ * page's layer store. It asks with nothing on screen in mind: the climate
+ * is worked out whatever the page shows.
  */
 
 import type {
+	ClimateProgress,
+	ClimateStart,
+	ClimateSummary,
 	TemperatureProgress,
-	TemperatureResult,
-	TemperatureStart,
-	WindResult,
 	World,
 } from '../../core/index';
 import type { LayerStore, SolvedWinds } from './layers';
@@ -31,19 +29,19 @@ import type { LayerStore, SolvedWinds } from './layers';
 export const STATS_DEBOUNCE_MS = 150;
 
 /**
- * How long the temperature waits after the last change before it is asked
+ * How long the climate waits after the last change before it is asked
  * for, in milliseconds.
  *
  * @remarks
  * Longer than the statistics' wait, because asking again costs more: a
- * solve takes from a fraction of a second to several seconds, and a
+ * pass takes from a fraction of a second to several seconds, and a
  * request that overtakes one still running ends that worker and starts
  * another, which builds its grid afresh. A slider being dragged sends a
  * change every frame and pauses for a moment now and then; this is long
  * enough that most such pauses send nothing, and short against the solve
  * that follows, so the wait adds little to the time a result takes.
  */
-export const TEMPERATURE_DEBOUNCE_MS = 400;
+export const CLIMATE_DEBOUNCE_MS = 400;
 
 /**
  * How a latest-wins request ended, short of failing: with its result, or
@@ -326,22 +324,50 @@ export const createRefreshScheduler = <T, H>(
 	};
 };
 
-/** What a temperature scheduler asks for, when, and where it keeps it. */
-export type TemperatureSchedulerOptions<H> = {
+/** Whom a climate request tells of its progress and of each pass. */
+export type ClimateCallbacks = {
 	/**
-	 * Asks for the temperature of the world as it is at the moment it is
-	 * called, as a worker service's latest-wins request does.
+	 * Told how far the year's solve under way has come, with the pass of the
+	 * loop it is in.
+	 */
+	readonly onProgress: (progress: TemperatureProgress, pass?: number) => void;
+	/** Told of each pass of the loop as it finishes, in order. */
+	readonly onPass: (pass: ClimateProgress) => void;
+};
+
+/** What a climate scheduler asks for, when, and where it keeps it. */
+export type ClimateSchedulerOptions<H> = {
+	/**
+	 * Asks for the climate of a world, as a worker service's latest-wins
+	 * request does: an answer overtaken by a newer request, or ended by
+	 * `cancel`, comes back marked as superseded. It must copy what it sends
+	 * before it returns, as posting to a worker does, so that the world
+	 * solved is the world as it was when asked.
 	 *
-	 * @param start - Where the solve starts from: the state of the last
-	 * result to be completed and the sea level and planet it was solved for,
-	 * without its months, or nothing if there is none.
-	 * @param onProgress - To be told how far the solve has come.
+	 * @param world - The world as it is at the moment of asking.
+	 * @param start - Where the loop starts from (see
+	 * {@link createClimateScheduler}), or nothing to start from nothing.
+	 * @param callbacks - Whom to tell of the progress and of each pass.
+	 * @returns What the climate came to, without its arrays, which are its
+	 * last pass's.
 	 */
 	readonly request: (
-		start: TemperatureStart | undefined,
-		onProgress: (progress: TemperatureProgress) => void,
-	) => Promise<LatestOutcome<TemperatureResult>>;
-	/** Where the result, its status and the progress are kept. */
+		world: World,
+		start: ClimateStart | undefined,
+		callbacks: ClimateCallbacks,
+	) => Promise<LatestOutcome<ClimateSummary>>;
+	/**
+	 * Ends the computation of the request under way, if there is one, so
+	 * that it is answered as superseded, as a worker service's `cancel`
+	 * does.
+	 */
+	readonly cancel: () => void;
+	/** The world being edited, at the time it is asked. */
+	readonly currentWorld: () => World;
+	/**
+	 * Where the temperature and the winds, their statuses, the progress and
+	 * the pass under way are kept.
+	 */
 	readonly store: LayerStore;
 	/** How long to wait after the last change, in milliseconds. */
 	readonly debounceMs: number;
@@ -355,14 +381,17 @@ export type TemperatureSchedulerOptions<H> = {
 	readonly onError: (error: unknown) => void;
 };
 
-/** Keeps the temperature up to date with the world while it is running. */
-export type TemperatureScheduler = {
+/**
+ * Keeps the climate, the temperature and the winds together, up to date
+ * with the world while it is running.
+ */
+export type ClimateScheduler = {
 	/**
-	 * Says that the world has changed. The result on hand is out of date
-	 * from now on. While the scheduler is running, the temperature is asked
-	 * for again once no further change has come for the debounce time, and
-	 * later if a stroke is under way then; while it is not, nothing is
-	 * asked for.
+	 * Says that the world has changed, its day length included. The results
+	 * on hand are out of date from now on. While the scheduler is running,
+	 * the climate is asked for again once no further change has come for the
+	 * debounce time, and later if a stroke is under way then; while it is
+	 * not, nothing is asked for.
 	 */
 	refresh(): void;
 	/**
@@ -375,21 +404,31 @@ export type TemperatureScheduler = {
 	 */
 	refreshNow(): void;
 	/**
-	 * Says that the world has been replaced by another. The result on hand
-	 * describes a world that is gone and is dropped, as is the answer to any
-	 * request already made; the store is left `empty` until the next
-	 * request is made. The next request starts from nothing.
+	 * Says that the world has been replaced by another. The results on hand
+	 * describe a world that is gone and are dropped, as are the passes and
+	 * the answer of any request already made; the store is left `empty`
+	 * until the next request is made, which starts from nothing. While the
+	 * scheduler is not running, a request under way is ended at once.
 	 */
 	reset(): void;
 	/**
 	 * Says whether the scheduler is running, as it is from the start.
+	 *
 	 * Stopped, a request waiting to be made is cancelled, and none is made
-	 * until it runs again; a solve already under way is left to finish. Run
-	 * again, the temperature is asked for if the world has changed since
-	 * the last request was made or there has been none: once, whatever the
-	 * changes meanwhile, and at once, with no debounce time, unless a stroke
-	 * is under way, which it waits for as a change does. Saying what is
-	 * already so does nothing.
+	 * until it runs again. A climate under way is left to finish the pass
+	 * under way, which is kept and shown as the others are, and is then
+	 * ended, its results kept out of date; if that pass is its last, the
+	 * climate's answer is kept as usual. Run again, the climate is asked for
+	 * if the world has changed since the last request was made, if that
+	 * request was ended or failed, or if there has been none: once, whatever
+	 * the changes meanwhile, and at once, with no debounce time, unless a
+	 * stroke is under way, which it waits for as a change does. A climate
+	 * ended by pausing, with nothing changed since, is carried on from the
+	 * pass it reached, its passes numbered on from that one, with as many
+	 * passes again as a request may take. Run again before the pass under
+	 * way has finished, the climate carries on, and is asked for again only
+	 * if the world has changed meanwhile. Saying what is already so does
+	 * nothing.
 	 */
 	setRunning(running: boolean): void;
 	/**
@@ -400,109 +439,239 @@ export type TemperatureScheduler = {
 	markUnavailable(): void;
 };
 
+/** Where a climate is carried on from: the pass it reached. */
+const startFrom = (solved: SolvedWinds): ClimateStart => ({
+	temperature: {
+		months: solved.temperature.months,
+		state: solved.temperature.state,
+		solvedFor: solved.temperature.solvedFor,
+	},
+	winds: { east: solved.winds.east, north: solved.winds.north },
+	dayLengthHours: solved.dayLengthHours,
+});
+
+/** A climate's answer: its last pass, and whether it settled. */
+type ClimateAnswer = {
+	readonly solved: SolvedWinds;
+	readonly settled: boolean;
+};
+
 /**
- * Asks for the temperature again after every change while running, and
- * keeps what comes back in the store.
+ * Asks for the climate again after every change while running, and keeps
+ * each pass and the answer in the store.
  *
  * @remarks
  * The waiting, the putting off during a stroke, the dropping of answers
  * that a newer request has overtaken, and the dropping of answers to
  * requests made before `reset` are those of
- * {@link createRefreshScheduler}, which this is built on.
+ * {@link createRefreshScheduler}, which this is built on. A request that
+ * overtakes one under way does not wait for it: the worker service ends
+ * that one, so an edit or a new world mid-loop starts the loop again.
  *
- * It runs from the start, so a change asks whatever is on screen. A
- * change made while it is not running asks for nothing: the result on
- * hand is marked out of date instead, or the store left empty after
- * `reset`, and the temperature is asked for once when it runs again, with
- * no wait: running again is one change, not a run of them, taking in
- * every change made meanwhile. Stopping it while a solve is under way
- * leaves that solve to finish, since its work is already paid for: its
- * result is kept, as current if nothing has changed since it was asked
- * for and as out of date if something has, and running again then asks
- * nothing unless something has.
+ * It runs from the start, so a change asks whatever is on screen. A change
+ * made while it is not running asks for nothing: the results on hand are
+ * marked out of date instead, or the store left empty after `reset`, and
+ * the climate is asked for once when it runs again, with no wait: running
+ * again is one change, not a run of them, taking in every change made
+ * meanwhile. A change of the day length is a change like any other, since
+ * the winds and so the temperature depend on it.
  *
- * Each request starts from the last result to be completed, so that a
- * solve after a small edit settles in fewer years: its state and its
- * record of the sea level and planet it was solved for are handed on, and
- * its months are not, since a start has no use for them and they are the
- * bulk of a result (about 19 MB on a world of 256 cells per face edge),
- * which a request would copy to the worker. The solver itself sets the
- * start aside after a change of sea level or planet, or once the terrain
- * has drifted far enough. That result stays on hand, in the store, until a
- * newer one is completed: a request that is overtaken or fails costs
- * nothing of it. After `reset` there is none, so the first solve of a new
- * world starts from nothing.
+ * In the store, both layers become `calculating` when a request is made.
+ * Each pass of the newest request is kept there as it finishes, the
+ * temperature and the winds together ({@link LayerStore.setPass}), so the
+ * first pass shows the world at once and the later ones refine it, and
+ * the progress follows the solve of the pass under way. Neither is
+ * `current` until the answer arrives, which keeps the last pass as both
+ * results, current if nothing has changed since the request was made and
+ * out of date if something has. Passes and progress from a request that a
+ * newer one has overtaken, or made before `reset`, are not kept.
  *
- * In the store, the status becomes `calculating` when a request is made
- * and the progress follows the solve of the newest request. Progress from
- * a request that a newer one has overtaken is not kept, and nor is any
- * that comes while the status is not `calculating`, as after `reset`
- * until the next request is made.
+ * Each request starts from the last climate whose loop settled, its last
+ * pass's temperature (months, state and record) and winds (eastward and
+ * northward) and the day length, kept here rather than read from the
+ * store, which also holds passes not settled. A loop that ended on its most
+ * passes, unsettled, is shown but not carried on from, so a later request
+ * starts from the settled climate before it, if any. The one other start is
+ * the pass a climate stopped by pausing had reached: running again carries
+ * on from there, since it is as good a start as a settled one, unless the
+ * world has changed since that request was made. The climate carried on
+ * goes on counting its passes from there, so its first is shown as the one
+ * after the pass reached; the most passes a loop may take are counted by
+ * the worker for each request, so a climate carried on after a pause may
+ * take that many more. After `reset` there is neither start, so the first
+ * climate of a new world starts from nothing. The solver itself sets a
+ * start aside that does not suit the world.
  *
- * @param options - The request, the store, the wait and the timers.
+ * The worker cannot be interrupted partway through a pass, so pausing
+ * waits for the pass under way, keeps it as the others are kept, and then
+ * ends the request (`cancel`), marking both layers out of date, unless that
+ * pass was the last, whose answer is kept as usual.
+ *
+ * A request that fails leaves both layers' results out of date, or empty
+ * if there were none, and the next change or running again asks again.
+ *
+ * @param options - The request, the world, the store, the wait and the
+ * timers.
  * @returns The scheduler, running.
  */
-export const createTemperatureScheduler = <H>(
-	options: TemperatureSchedulerOptions<H>,
-): TemperatureScheduler => {
+export const createClimateScheduler = <H>(
+	options: ClimateSchedulerOptions<H>,
+): ClimateScheduler => {
 	const { store } = options;
 	let running = true;
 	/**
-	 * Whether the world has changed since the last request was made, or
-	 * there has been none, so that the result on hand, or the one on its
-	 * way, does not take the change in.
+	 * Whether a climate is needed: the world has changed since the last
+	 * request was made, that request was ended or failed, or there has been
+	 * none, so that the results on hand, or those on their way, do not take
+	 * the world in.
 	 */
 	let stale = true;
-	/** Counts requests: only the newest request's progress is kept. */
-	let asked = 0;
+	/**
+	 * The newest request, whose passes and progress are kept; null once a
+	 * reset or a stop has set it aside.
+	 */
+	let wanted: object | null = null;
+	/** The request whose answer is still to come, if any. */
+	let underWay: object | null = null;
+	/** Whether the request under way is to be ended after its pass under way. */
+	let stopping = false;
+	/** Where the last climate that settled ended, since the world was made. */
+	let settled: ClimateStart | undefined;
+	/**
+	 * Where a climate ended by pausing had reached, for running again, and
+	 * the number of the pass it reached, counted as shown.
+	 */
+	let reached: { readonly start: ClimateStart; readonly pass: number } | null =
+		null;
 
-	const scheduler = createRefreshScheduler<TemperatureResult, H>({
-		request: () => {
+	/**
+	 * Ends the request under way once a pass has finished, keeping that pass
+	 * out of date and where it reached, if nothing has changed since it was
+	 * asked for.
+	 *
+	 * @param solved - The pass that finished, with the temperature and winds
+	 * it gave.
+	 * @param pass - The pass that finished, counted as shown.
+	 */
+	const stop = (solved: SolvedWinds, pass: number): void => {
+		stopping = false;
+		wanted = null;
+		reached = stale ? null : { start: startFrom(solved), pass };
+		stale = true;
+		options.cancel();
+		store.markClimateStopped();
+	};
+
+	const scheduler = createRefreshScheduler<ClimateAnswer, H>({
+		request: async () => {
 			stale = false;
-			const mine = ++asked;
-			store.markCalculating();
-			const previous = store.temperature.result;
-			const start: TemperatureStart | undefined =
-				previous === null
-					? undefined
-					: { state: previous.state, solvedFor: previous.solvedFor };
-			return options.request(start, (progress) => {
-				if (mine === asked) {
-					store.setProgress(progress);
+			stopping = false;
+			const mine = {};
+			wanted = mine;
+			underWay = mine;
+			try {
+				const world = options.currentWorld();
+				const { dayLengthHours } = world.planet;
+				const start = reached?.start ?? settled;
+				// A climate carried on goes on counting its passes from the
+				// one it reached; the worker counts each request's from 1.
+				const before = reached?.pass ?? 0;
+				reached = null;
+				store.markClimateCalculating(before + 1);
+				// In an object, since the passes come in callbacks.
+				const kept: { last: SolvedWinds | null } = { last: null };
+				const outcome = await options.request(world, start, {
+					onProgress: (progress, pass) => {
+						if (wanted === mine) {
+							store.setProgress(
+								progress,
+								pass === undefined ? undefined : before + pass,
+							);
+						}
+					},
+					onPass: (pass) => {
+						const solved: SolvedWinds = {
+							temperature: pass.temperature,
+							winds: pass.winds,
+							dayLengthHours,
+						};
+						kept.last = solved;
+						if (wanted !== mine) {
+							return;
+						}
+						store.setPass(solved, before + pass.pass, pass.last);
+						if (stopping && !pass.last) {
+							stop(solved, before + pass.pass);
+						}
+					},
+				});
+				if (outcome.superseded) {
+					return outcome;
 				}
-			});
+				if (kept.last === null) {
+					throw new Error('The climate was answered without a single pass');
+				}
+				return {
+					superseded: false,
+					result: { solved: kept.last, settled: outcome.result.settled },
+				};
+			} finally {
+				if (underWay === mine) {
+					underWay = null;
+					stopping = false;
+				}
+			}
 		},
 		debounceMs: options.debounceMs,
 		setTimer: options.setTimer,
 		clearTimer: options.clearTimer,
 		isBusy: options.isBusy,
-		onResult: (result) => store.setResult(result, !stale),
+		onResult: ({ solved, settled: hasSettled }) => {
+			store.setClimateResult(solved, !stale);
+			if (hasSettled) {
+				settled = startFrom(solved);
+			}
+		},
 		onError: (error) => {
 			// Asked for again at the next change, or when it runs again.
 			stale = true;
-			store.markFailed();
+			store.markClimateStopped();
 			options.onError(error);
 		},
 		onUnavailable: store.markUnavailable,
 	});
 
+	/** Says the world has changed: what was reached is no start for it. */
+	const changed = (): void => {
+		stale = true;
+		reached = null;
+		store.markOutOfDate();
+	};
+
 	return {
 		refresh: () => {
-			stale = true;
-			store.markOutOfDate();
+			changed();
 			if (running) {
 				scheduler.refresh();
 			}
 		},
 		refreshNow: () => {
-			stale = true;
-			store.markOutOfDate();
+			changed();
 			if (running) {
 				scheduler.refreshNow();
 			}
 		},
 		reset: () => {
 			stale = true;
+			reached = null;
+			settled = undefined;
+			wanted = null;
+			stopping = false;
+			if (!running && underWay !== null) {
+				// Nothing of it is wanted, and nothing will overtake it until
+				// the scheduler runs again.
+				options.cancel();
+			}
 			store.clear();
 			scheduler.reset();
 		},
@@ -513,294 +682,15 @@ export const createTemperatureScheduler = <H>(
 			running = next;
 			if (!running) {
 				scheduler.cancel();
-			} else if (stale) {
+				stopping = underWay !== null && underWay === wanted;
+				return;
+			}
+			// Run again before the pass under way finished: the climate under
+			// way carries on, unless something has changed since it was asked.
+			stopping = false;
+			if (stale) {
 				scheduler.refreshNow();
 			}
-		},
-		markUnavailable: scheduler.markUnavailable,
-	};
-};
-
-/** What a winds scheduler asks for, when, and where it keeps it. */
-export type WindsSchedulerOptions<H> = {
-	/**
-	 * Asks for the winds of a world from a temperature result's months, as
-	 * a worker service's latest-wins request does. It must copy what it
-	 * sends before it returns, as posting to a worker does, so that the
-	 * world solved is the world as it was when asked.
-	 *
-	 * @param world - The world as it is at the moment of asking.
-	 * @param temperature - The current temperature result, whose months the
-	 * winds are worked out from.
-	 */
-	readonly request: (
-		world: World,
-		temperature: TemperatureResult,
-	) => Promise<LatestOutcome<WindResult>>;
-	/** The world being edited, at the time it is asked. */
-	readonly currentWorld: () => World;
-	/**
-	 * Where the temperature is read from and the winds, their status
-	 * included, are kept.
-	 */
-	readonly store: LayerStore;
-	/**
-	 * How long to wait after a change of the day length, in milliseconds.
-	 * A new temperature result is not waited after.
-	 */
-	readonly debounceMs: number;
-	/** Starts a timer, as `setTimeout` does, and returns its handle. */
-	readonly setTimer: (callback: () => void, delayMs: number) => H;
-	/** Cancels a timer by its handle, as `clearTimeout` does. */
-	readonly clearTimer: (handle: H) => void;
-	/** Whether a brush stroke is under way; see {@link RefreshOptions}. */
-	readonly isBusy?: () => boolean;
-	/** Called with what went wrong when a request fails. */
-	readonly onError: (error: unknown) => void;
-};
-
-/**
- * Keeps the winds up to date with the temperature and the day length while
- * it is running.
- */
-export type WindsScheduler = {
-	/**
-	 * Says that the day length has changed. The winds on hand are out of
-	 * date from now on. While the scheduler is running, they are asked for
-	 * again once no further change has come for the debounce time, if the
-	 * temperature is current then; while it is not, nothing is asked for.
-	 */
-	refresh(): void;
-	/**
-	 * Says that the world has been replaced by another. The store's winds
-	 * describe a world that is gone and are dropped, as is the answer to any
-	 * winds request already made; the temperature is left to its own
-	 * scheduler.
-	 */
-	reset(): void;
-	/**
-	 * Says whether the scheduler is running, as it is from the start. Run
-	 * again, the winds are asked for if there are none for the current
-	 * temperature and day length, on hand or on their way: at once if the
-	 * temperature is current, and otherwise when the temperature they need
-	 * arrives. Winds on hand that are marked out of date but were worked
-	 * out from the current temperature and day length, as after a change
-	 * since undone, are marked current instead. Stopped, a request waiting
-	 * to be made is cancelled, and none is made until it runs again; a
-	 * solve already under way is left to finish. Saying what is already so
-	 * does nothing.
-	 *
-	 * @remarks
-	 * The winds are worked out from the temperature, which this does not
-	 * ask for: whoever runs the winds again runs the temperature again too.
-	 */
-	setRunning(running: boolean): void;
-	/**
-	 * Says that no request can be answered from now on, as when the worker
-	 * is gone: the store marks the winds unavailable, and nothing is asked
-	 * for again.
-	 */
-	markUnavailable(): void;
-};
-
-/** Nothing was asked: an outcome that is reported to nobody. */
-const NOTHING_ASKED = { superseded: true } as const;
-
-/**
- * Asks for the winds whenever what they are worked out from changes, while
- * running, and keeps what comes back in the store.
- *
- * @remarks
- * The winds are worked out from the current temperature result and the
- * world as it is when asked, its day length among the rest. They are
- * asked for as soon as a new temperature result arrives in the store as
- * current, with no wait: the temperature has already waited for the
- * changes to stop. A change of the day length, which the temperature does
- * not depend on, asks after the debounce time instead, as a change does
- * for the temperature. Running again with a current temperature asks at
- * once too: it is one change, not a run of them. It runs from the start,
- * so the winds follow every current temperature whatever is on screen,
- * the winds and the pressure shown or not. Nothing is asked
- * for while the temperature on hand is not current, as after an edit until
- * its next result: that result asks when it comes.
- *
- * Each result is kept with the temperature result and the day length it
- * was worked out from ({@link SolvedWinds}). It is kept as current only if,
- * when it arrives, that temperature result is still the store's and still
- * current and the world's day length is still that one; otherwise it is
- * kept as out of date. So an answer for an older temperature or an older
- * day length is never shown as current. When the temperature goes out of
- * date, so do the winds, which the store sees to.
- *
- * One request is under way at a time (`oneAtATime` of
- * {@link createRefreshScheduler}), since a wind solve is left to finish
- * once asked. A new temperature or a change of the day length that comes
- * while one is under way is asked for once its answer has arrived, and
- * that answer, overtaken, is reported to nobody. Then the world, the
- * temperature and the day length are read together, at the moment the
- * request is sent, and the answer is kept with what was read then.
- * Nothing is asked then during a stroke, without a current temperature or
- * once the scheduler is stopped. Nor is anything asked when the winds on
- * hand are current again, as after a change of the day length undone
- * within the wait: they are marked current instead. A new temperature or
- * a change made while it is not running asks for nothing, and stopping it
- * leaves a request already made to finish, its result kept and judged as
- * any other.
- *
- * @param options - The request, the world, the store, the wait and the
- * timers.
- * @returns The scheduler, running.
- */
-export const createWindsScheduler = <H>(
-	options: WindsSchedulerOptions<H>,
-): WindsScheduler => {
-	const { store } = options;
-	let running = true;
-	/**
-	 * What the newest request made was for, or null if there has been none
-	 * since the last failure or replacement of the world.
-	 */
-	let askedFor: Omit<SolvedWinds, 'winds'> | null = null;
-	/** The newest temperature result seen in the store as current. */
-	let seen: TemperatureResult | null = null;
-	/**
-	 * Whether the answer to the last request sent is still to come, whether
-	 * or not it will then be dropped.
-	 */
-	let awaiting = false;
-
-	/** The store's temperature result, if it is current; otherwise null. */
-	const currentTemperature = (): TemperatureResult | null =>
-		store.currentTemperature;
-
-	/** The world's day length, as it is now. */
-	const dayLength = (): number => options.currentWorld().planet.dayLengthHours;
-
-	/** Whether winds of that temperature and day length would be current. */
-	const isCurrent = (made: Omit<SolvedWinds, 'winds'>): boolean =>
-		made.temperature === currentTemperature() &&
-		made.dayLengthHours === dayLength();
-
-	const scheduler = createRefreshScheduler<SolvedWinds, H>({
-		// The world, the temperature and the day length are read here, at the
-		// moment the request is sent and the world copied for the worker, so
-		// the answer is kept with what it was worked out from.
-		request: () => {
-			const temperature = currentTemperature();
-			if (temperature === null) {
-				// The winds need a current temperature, and its next result
-				// asks for them when it arrives. Winds left calculating by a
-				// request whose answer was dropped for this one are not.
-				if (store.winds.status === 'calculating') {
-					store.markWindsFailed();
-				}
-				return Promise.resolve(NOTHING_ASKED);
-			}
-			const held = store.winds.result;
-			if (held !== null && isCurrent(held)) {
-				// Marked out of date by a change since undone: current again,
-				// with no solve needed.
-				store.setWindsResult(held, true);
-				return Promise.resolve(NOTHING_ASKED);
-			}
-			const world = options.currentWorld();
-			const made = { temperature, dayLengthHours: world.planet.dayLengthHours };
-			askedFor = made;
-			store.markWindsCalculating();
-			awaiting = true;
-			return options
-				.request(world, temperature)
-				.then((outcome) =>
-					outcome.superseded
-						? outcome
-						: { superseded: false, result: { ...made, winds: outcome.result } },
-				)
-				.finally(() => {
-					awaiting = false;
-				});
-		},
-		debounceMs: options.debounceMs,
-		setTimer: options.setTimer,
-		clearTimer: options.clearTimer,
-		isBusy: options.isBusy,
-		oneAtATime: true,
-		onResult: (result) => store.setWindsResult(result, isCurrent(result)),
-		onError: (error) => {
-			// Asked for again at the next change, or when it runs again.
-			askedFor = null;
-			store.markWindsFailed();
-			options.onError(error);
-		},
-		onUnavailable: store.markWindsUnavailable,
-	});
-
-	/**
-	 * Asks for the winds on running again. With a current temperature it
-	 * asks at once: running again is one change, with no run of changes to
-	 * wait out, and a wait would leave the winds reading as not calculated
-	 * until it ended. Without one it waits as a change does, and the request
-	 * made then asks for nothing unless the temperature has come meanwhile,
-	 * whose arrival asks in any case.
-	 */
-	const askOnRunning = (): void => {
-		if (currentTemperature() === null) {
-			scheduler.refresh();
-		} else {
-			scheduler.refreshNow();
-		}
-	};
-
-	store.addListener(() => {
-		const temperature = currentTemperature();
-		if (temperature === null || temperature === seen) {
-			return;
-		}
-		seen = temperature;
-		if (running) {
-			scheduler.refreshNow();
-		}
-	});
-
-	return {
-		refresh: () => {
-			store.markWindsOutOfDate();
-			if (running) {
-				scheduler.refresh();
-			}
-		},
-		reset: () => {
-			askedFor = null;
-			// Whatever temperature is on hand is the old world's until its own
-			// scheduler drops it, and is not a new result to ask winds for.
-			seen = currentTemperature();
-			store.clearWinds();
-			scheduler.reset();
-		},
-		setRunning: (next) => {
-			if (next === running) {
-				return;
-			}
-			running = next;
-			if (!running) {
-				scheduler.cancel();
-				return;
-			}
-			const { status, result } = store.winds;
-			if (status === 'calculating' && awaiting) {
-				if (askedFor === null || !isCurrent(askedFor)) {
-					askOnRunning();
-				}
-				// Otherwise the answer on its way is for things as they are.
-				return;
-			}
-			if (result !== null && isCurrent(result)) {
-				// The winds on hand were marked out of date by a change since
-				// undone, such as a day length changed and changed back: they
-				// are current again, and need no solve.
-				store.setWindsResult(result, true);
-				return;
-			}
-			askOnRunning();
 		},
 		markUnavailable: scheduler.markUnavailable,
 	};

@@ -15,7 +15,6 @@ import {
 	sunColour,
 	sunDirection,
 	sunDrawnSize,
-	TEMPERATURE_SETTINGS,
 	type World,
 } from '../core/index';
 import type { AppState } from './editing/appState';
@@ -48,11 +47,11 @@ import type { PageParts } from './wiring/parts';
 
 export type {
 	PageAutosaveOptions,
+	PageClimateOptions,
 	PageLayerOptions,
 	PageParts,
 	PageReadoutOptions,
 	PageStatisticsOptions,
-	PageTemperatureOptions,
 } from './wiring/parts';
 
 /**
@@ -70,23 +69,23 @@ export type {
  * dock's Grid tile goes straight to the globe, and tells the layer panel,
  * which holds it with the rest of the view settings. The dock and the
  * layer panel are given no list of layers, so both offer every layer in
- * `SCALAR_LAYERS`. The temperature and then the winds, which have nothing
- * of their own in the panel, are made just before the layers.
+ * `SCALAR_LAYERS`. The climate, the temperature and the winds solved
+ * together, which has nothing of its own in the panel, is made just before
+ * the layers.
  *
- * The temperature and the winds are worked out whatever is on screen:
- * the temperature after every change of the world, and the winds from
- * each current temperature, so the page opens on whatever layer it was
- * left on with both being worked out. The dock's Winds tile tells the
- * layer panel, which shows the winds on the globe, and offers the month in
- * Terrain view, while it is on; a new world keeps it.
+ * The climate is worked out whatever is on screen, after every change of
+ * the world, so the page opens on whatever layer it was left on with both
+ * being worked out. The dock's Winds tile tells the layer panel, which
+ * shows the winds on the globe, and offers the month in Terrain view,
+ * while it is on; a new world keeps it.
  *
- * The Pause button, made after the layers, stops both: pressed, the
- * temperature and then the winds are told to stop running, so a request
- * waiting to be made is cancelled and a solve under way is left to
- * finish, and the layer panel is told, for the info box to say so;
- * released, the temperature and then the winds run again, each catching up
- * at once with the changes made meanwhile, and the layer panel is told.
- * The page always opens with it released.
+ * The Pause button, made after the layers, stops it: pressed, the climate
+ * is told to stop running, so a request waiting to be made is cancelled
+ * and a climate under way finishes the pass under way and stops there, and
+ * the layer panel is told, for the info box to say so; released, the
+ * climate runs again, carrying on at once from where it stopped, or
+ * catching up with the changes made meanwhile, and the layer panel is
+ * told. The page always opens with it released.
  *
  * The date line under the world's description is written as soon as the
  * world controls are made, and follows the world's age and every change of
@@ -152,33 +151,29 @@ export type {
  * and then has the history forget that world; the globe; the sea-level
  * control; the planet controls, which show the world's settings without
  * passing them on; the world's description; the statistics, reset and
- * then asked for again; the temperature and then the winds, each reset;
- * the layer panel, which stops the year playing, puts July back on screen
- * and is told whether the world is the measured Earth; the date line; the
- * panel's message, which is taken back; the autosave; and last the
- * temperature again, asked for at once unless paused, with no wait, once
- * every part before it is on the new world. The winds are asked for again
- * by the temperature's next result. An edit of the world, which is no new
- * world, keeps the month on screen.
+ * then asked for again; the climate, reset; the layer panel, which stops
+ * the year playing, puts July back on screen and is told whether the world
+ * is the measured Earth; the date line; the panel's message, which is
+ * taken back; the autosave; and last the climate again, asked for at once
+ * unless paused, with no wait, once every part before it is on the new
+ * world. An edit of the world, which is no new world, keeps the month on
+ * screen.
  *
  * A committed stroke, an undo, a redo and the sea-level control each ask
- * for the statistics and the temperature again, tell the layer panel
- * whether the world is still, or is again, the measured Earth, and mark
- * the world changed for the autosave; the winds follow from the
- * temperature's next result. A change of the planet settings, which
+ * for the statistics and the climate again, tell the layer panel whether
+ * the world is still, or is again, the measured Earth, and mark the world
+ * changed for the autosave. A change of the planet settings, which
  * {@link AppState.setPlanet} tells the planet listeners of, asks for the
- * temperature again, tells the layer panel the same and marks the world
- * changed; the statistics do not depend on it. A change of the day length
- * alone, which the temperature does not depend on, asks for the winds
- * again instead and never for the temperature; a change of several
- * settings that includes any other goes to the temperature. Whether the
+ * climate again, the day length's included, since the winds and through
+ * them the temperature depend on it, tells the layer panel the same and
+ * marks the world changed; the statistics do not depend on it. Whether the
  * world is the measured Earth is worked out once for each of these, and
- * once for each new world, never during a stroke. The planet
- * controls make such a change through {@link AppState.setPlanet} at each
- * movement of a slider. A drag needs no wait of its own: the temperature
- * waits for the changes to stop, and stops a calculation a later change
- * overtakes. The planet settings are not part of the history: an undo puts
- * back the last stroke, whatever the planet controls did since.
+ * once for each new world, never during a stroke. The planet controls make
+ * such a change through {@link AppState.setPlanet} at each movement of a
+ * slider. A drag needs no wait of its own: the climate waits for the
+ * changes to stop, and stops a calculation a later change overtakes. The
+ * planet settings are not part of the history: an undo puts back the last
+ * stroke, whatever the planet controls did since.
  *
  * The view settings but the month and the source are preferences of the
  * browser too: read once, as the page starts and before any part that
@@ -193,7 +188,7 @@ export type {
  * it and the history shortcuts are out of reach and nothing is saved. A
  * change made to the blank world meanwhile would otherwise be saved over
  * the saved world, or be lost when that world arrives. Nor is the
- * temperature asked for until then: the world brought back is asked for
+ * climate asked for until then: the world brought back is asked for
  * as any new world is, and the blank world, when the page stays on it,
  * once the storage has answered.
  *
@@ -352,7 +347,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		isStrokeActive: sculpt.isStrokeActive,
 		onTerrainChange: () => {
 			statistics.refresh();
-			temperature.refresh();
+			climate.refresh();
 			checkEarth();
 			autosave.markChanged();
 			readout.invalidate();
@@ -383,7 +378,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 			world.seaLevel = normaliseSeaLevel(metres);
 			globe.setSeaLevel(world.seaLevel);
 			statistics.refresh();
-			temperature.refresh();
+			climate.refresh();
 			checkEarth();
 			autosave.markChanged();
 			readout.invalidate();
@@ -430,15 +425,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		planet: state.world.planet,
 		onChange: state.setPlanet,
 	});
-	// A part that shows the temperature and fails on a change is recorded
-	// here, and the edit that made the change carries on regardless.
+	// A part that shows the climate and fails on a change is recorded here,
+	// and the edit that made the change carries on regardless.
 	const layers = createLayerStore(logError);
-	const temperature = parts.createTemperature({
-		currentWorld: () => state.world,
-		isStrokeActive: sculpt.isStrokeActive,
-		store: layers,
-	});
-	const winds = parts.createWinds({
+	const climate = parts.createClimate({
 		currentWorld: () => state.world,
 		isStrokeActive: sculpt.isStrokeActive,
 		store: layers,
@@ -468,8 +458,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	});
 	parts.createPauseButton({
 		onPause: (paused) => {
-			temperature.setRunning(!paused);
-			winds.setRunning(!paused);
+			climate.setRunning(!paused);
 			layerPanel.setPaused(paused);
 		},
 	});
@@ -520,12 +509,10 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// their way: neither is to be shown as the new world's.
 	state.addListener(statistics.reset);
 	state.addListener(statistics.refresh);
-	// The temperature on hand is the old world's, and is not where the new
-	// world's solve starts from. It is asked for again below, last.
-	state.addListener(temperature.reset);
-	// So are the winds on hand and any on their way; the new world's
-	// temperature asks for its winds when it comes.
-	state.addListener(winds.reset);
+	// The climate on hand, and any on its way, is the old world's, and is
+	// not where the new world's starts from. It is asked for again below,
+	// last.
+	state.addListener(climate.reset);
 	// The month on screen is the view's, but a new world starts again from
 	// July and from the simulated temperature, after the store has dropped
 	// the old world's result so that the old result is not shown for July
@@ -546,34 +533,17 @@ export const startPage = (parts: PageParts): Promise<void> => {
 	// The autosave takes no note of this until it is started, which is
 	// after the world brought back when the page opens is in place.
 	state.addListener(autosave.markChanged);
-	// The new world's temperature is asked for last, once every part above
-	// is on the new world, and at once: a new world is whole when it
-	// arrives, with no run of changes to wait out, and a wait would leave
-	// the layers reading as not calculated until it ended.
-	state.addListener(temperature.refreshNow);
-	/**
-	 * The planet settings as the planet listener last saw them, to tell a
-	 * change of the day length alone from one the temperature depends on.
-	 */
-	let planetSeen = { ...state.world.planet };
-	state.addListener((world) => {
-		planetSeen = { ...world.planet };
-	});
-	// The planet settings are saved with the world, and the temperature
-	// depends on all of them but the day length, which the winds alone read.
-	// A change the temperature depends on reaches the winds through the
-	// temperature's next result.
-	state.addPlanetListener((world) => {
+	// The new world's climate is asked for last, once every part above is
+	// on the new world, and at once: a new world is whole when it arrives,
+	// with no run of changes to wait out, and a wait would leave the layers
+	// reading as not calculated until it ended.
+	state.addListener(climate.refreshNow);
+	// The planet settings are saved with the world, and the climate depends
+	// on all of them: the temperature on all but the day length, and the
+	// winds, which carry its heat, on the day length too.
+	state.addPlanetListener(() => {
 		placeSun();
-		const forTemperature = TEMPERATURE_SETTINGS.some(
-			(name) => world.planet[name] !== planetSeen[name],
-		);
-		planetSeen = { ...world.planet };
-		if (forTemperature) {
-			temperature.refresh();
-		} else {
-			winds.refresh();
-		}
+		climate.refresh();
 		checkEarth();
 		autosave.markChanged();
 	});
@@ -620,7 +590,7 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		// blank one the page stays on otherwise is asked for here, as any
 		// other world is.
 		if (state.world === blank) {
-			temperature.refreshNow();
+			climate.refreshNow();
 		}
 	};
 	return restoreOrStart();

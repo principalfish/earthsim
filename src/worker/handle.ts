@@ -15,8 +15,6 @@ import {
 	type SimResults,
 	simFailure,
 	solveClimate,
-	solveTemperature,
-	solveWinds,
 	type TemperatureProgress,
 	type TemperatureResult,
 	type WindResult,
@@ -51,13 +49,11 @@ type Reports = {
  * its progress, if it has any to tell, as it goes.
  *
  * @remarks
- * Only what the request carries is passed on. A temperature request in
+ * Only what the request carries is passed on. A climate request in
  * particular has no say over the solver's cap, tolerance or constants,
- * which are always the solver's own, nor over the grid it is solved on, so
- * that no message can make a solve run longer than the solver allows by
- * default. Nor has a winds request: its winds are always solved on the
- * solver's own grid. Nor has a climate request: it is solved with the
- * model's own settings and the wind model's own, and of its start only the
+ * which are always the model's own, nor over the wind model's settings or
+ * the grids they are solved on, so that no message can make a solve run
+ * longer than the solver allows by default; of its start only the
  * temperature's months, state and record, the winds' two components and the
  * day length are used.
  */
@@ -68,12 +64,6 @@ const COMPUTE: {
 	) => SimResults[K];
 } = {
 	terrainStats: (request) => computeTerrainStats(request.world),
-	temperature: (request, report) =>
-		solveTemperature(request.world, {
-			start: request.start,
-			onYear: (progress) => report.progress(progress),
-		}),
-	winds: (request) => solveWinds(request.world, request.temperatures),
 	climate: (request, report) => {
 		const { dayLengthHours, passes, settled, changeC } = solveClimate(
 			request.world,
@@ -139,8 +129,7 @@ const BUFFERS: {
 	readonly [K in SimKind]: (result: SimResults[K]) => ArrayBufferLike[];
 } = {
 	terrainStats: () => [],
-	temperature: temperatureBuffers,
-	winds: windBuffers,
+	// The climate's arrays are its last pass's, transferred with that pass.
 	climate: () => [],
 };
 
@@ -171,19 +160,15 @@ const reasonOf = (error: unknown): string =>
  * response saying why, with the request's id when it has one. So does an
  * error thrown by `onProgress` or `onPass`, which ends the computation.
  *
- * A temperature request is solved with the start it carries, if any, and
- * the solver's own cap, tolerance, constants and grid. A start on another
- * grid than the one the world is solved on, which the solver refuses, comes
- * back as a failure like any other. Its planet settings are brought within
- * their limits by the solver, as for any other caller. While it runs,
- * `onProgress` hears of each year as it finishes, and of a climate's each
- * year of each pass with that pass; nothing else reports progress. A winds
- * request is solved from the world and the twelve months of temperature it
- * carries; temperatures the solver refuses, such as
- * months of the wrong length, come back as a failure. A climate request is
- * solved from the world and the start it carries, if any, and `onPass`
- * hears of each pass of its loop as it finishes, in order, with the buffers
- * to transfer with it; the last pass's own arrays are sent, since nothing
+ * A climate request is solved from the world and the start it carries, if
+ * any, with the model's own cap, tolerance, constants and grids. A start on
+ * another grid than the one the world is solved on, which the solver
+ * refuses, comes back as a failure like any other. Its planet settings are
+ * brought within their limits by the solver, as for any other caller.
+ * While it runs, `onProgress` hears of each year of each pass as it
+ * finishes, with that pass; nothing else reports progress. `onPass` hears
+ * of each pass of its loop as it finishes, in order, with the buffers to
+ * transfer with it; the last pass's own arrays are sent, since nothing
  * reads them after, and an earlier pass's are copies, since the loop goes
  * on to read them. The climate's response holds only the day length, the
  * passes taken, whether it settled and the last change: its arrays are the
@@ -198,11 +183,9 @@ const reasonOf = (error: unknown): string =>
  * runs, with the request's id and kind. Left out, nobody is told.
  * @param onPass - Told of each pass of a climate request as it finishes,
  * with its transfer list. Left out, nobody is told.
- * @returns The response to post back, and its transfer list: for a
- * temperature result, the buffers of its twelve months and of the three
- * arrays of its state; for a winds result, those of its twelve months each
- * of eastward wind, northward wind and pressure; for anything else,
- * nothing.
+ * @returns The response to post back, and its transfer list, which is
+ * empty: the statistics hold no arrays, and the climate's are sent with its
+ * passes.
  */
 export const handleRequest = (
 	request: unknown,

@@ -489,11 +489,11 @@ describe('createProcessDiagram', () => {
 		).toEqual([
 			[
 				'Built today:',
-				' temperature, then pressure, then winds, each worked out once in that order, with no feedback.',
+				' temperature, pressure and winds in a loop, with heat carried by winds.',
 			],
 			[
 				'Planned, not built:',
-				' the loop and heat carried by winds, rain, ocean currents, ice, storm zones, biomes.',
+				' rain, ocean currents, ice, storm zones, biomes.',
 			],
 		]);
 		expect(DIAGRAM_STATUS).toHaveLength(2);
