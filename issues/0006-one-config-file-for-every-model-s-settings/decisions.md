@@ -35,6 +35,8 @@ The user's brief (2026-11-18): "Plan 3d", roadmap step 3d in `investigations/202
 
 - Piece 5 approved after the user compared the diagram with the PDF in a browser, with the builder's choice to leave out the PDF's title, subtitle and drawing date standing (no objection raised). The user: "Tried it, approve" (2026-11-18)
 
+- Review 01's ten fixes approved, with the four upheld re-check findings fixed first (A: rewrap `processDiagram.test.ts:18-22`; B: rewrap the `estimateYearsLeft` remark at `temperature.ts:1358`; C: say `SLOWEST_SHRINK_TRUSTED`'s rule as a ratio of the year before's change; D: use `entriesOf` in `modelSettings.test.ts` and `write-config-doc.test.ts`); the unchecked cast inside `entriesOf` is left as it is. The user: "Approve, fix A–D" (2026-11-18)
+
 ## Open
 - None.
 
