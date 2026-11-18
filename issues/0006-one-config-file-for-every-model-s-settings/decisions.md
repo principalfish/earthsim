@@ -20,11 +20,12 @@ The user's brief (2026-11-18): "Plan 3d", roadmap step 3d in `investigations/202
 - Scope widened: the page gains a config screen that shows every setting and lets the user edit them, while `config.ts` stays editable by hand (and by Claude) as the source; the screen carries all the explanations the climate-process PDF has (what each setting controls, what raising or lowering it does, where its value comes from), and the PDF and its script (`scripts/docs/climate-process.py`) are removed. This reverses "the PDF is out of scope" and "the page and its workers never override". The user: "as part of this can we make a new config screen which displays all these settings and allows me to edit them. this should n ot stop you from editing t hem too! / this screen should have all the explanations that are in the pdf too / we can then ditch the p[df and associated script" (2026-11-18)
 - Each entry therefore also carries the PDF's per-setting text, `raising` and `lowering`, as data, since the screen shows them; the long reasoning with references stays as a doc comment.
 
+- The config screen is a full-page overlay, opened by a "Model settings" button in Settings, with a tab per model and its groups inside; the globe stays visible at the edges, and Close returns. The user: "Full-page overlay (Recommended)" (2026-11-18)
+- The climate process diagram is redrawn as an SVG at the top of the config screen; the Python script and the PDF go entirely. The user: "On the config screen (Recommended)" (2026-11-18)
+- `config.md` stays, generated from the config with its drift test, so the settings can be read on GitHub without running the page. The user: "Keep it, generated (Recommended)" (2026-11-18)
+
 ## Open
-- What an edit on the screen does: for this visit only, remembered in the browser, saved with the world, or exported for `config.ts`.
-- Where the screen lives on the page.
-- Where the PDF's first page, the climate process diagram, goes once the PDF is removed.
-- Whether `config.md` is still wanted beside the screen.
+- What an edit on the screen does. The user: "maybe we can have a settings.json which we can update through that page?" (2026-11-18): how the page, which is static files with no server, writes that file.
 
 ## Assumed
 - The value objects keep today's key order whatever the grouping, since the tuning script and tests rely on it; if a group order would change it, the order is kept explicitly.
