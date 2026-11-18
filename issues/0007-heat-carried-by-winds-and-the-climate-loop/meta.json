@@ -6,9 +6,9 @@
   "state": "investigating",
   "branch": "heat-carried-by-winds-and-the-climate-loop",
   "base": "main",
-  "gh_issue": null,
+  "gh_issue": 13,
   "build_model": null,
   "created": "2026-11-18 11:49",
-  "updated": "2026-11-18 11:49",
+  "updated": "2026-11-18 12:55",
   "done": null
 }
