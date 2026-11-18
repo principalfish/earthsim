@@ -111,7 +111,7 @@ Rejected:
 ## Checkpoints
 - [x] 1. The temperature's settings in `config.ts`
 - [x] 2. The winds' settings in `config.ts`, and the tuning list
-- [ ] 3. `config.md`, written from the config
+- [x] 3. `config.md`, written from the config
 - [ ] 4. The "Model settings" screen
 - [ ] 5. The climate process diagram on the screen, and the PDF removed
 
@@ -150,3 +150,12 @@ Decided by the builder:
 - Units: degrees are '°', and dimensionless ones are named by kind ('share', 'power', 'ratio', 'factor', 'slope', 'cells').
 - Their doc comments in `rules.ts` stay, with a line saying the value is read from `WIND_CONFIG`, so the config entry and the code comment cannot be mistaken for one another.
 - Review: correctness, security and coverage ran; security and coverage were clean; correctness checked all 36 values, orders, texts, bounds and search orders by script and raised two low findings (a doc sentence in `docs/winds.md` that could be misread; the four constants' comments not saying where the value is read from), both fixed. I did not run the verifier or a re-check on the two doc-only fixes, as every finding was fixed anyway and nothing was left to rule on. Changed-lines coverage 100%.
+
+### Piece 3: `config.md`, written from the config (committed 34ab717, 2026-11-18)
+
+Decided by the builder:
+- The writer is `scripts/write-config-doc.ts` (export `configDocText`, `CONFIG_DOC_SECTIONS`, `main`), run as `npm run docs:config` through `run-with-vite.mjs`, with the drift test in `scripts/write-config-doc.test.ts`. The page is `src/core/config.md`; the winds baseline pattern (the test compares the committed file with what the command would write) is followed.
+- Layout: a title and how to read it, then a section per model (`## Temperature`, `## Winds`) with an intro line, a count sentence (settings, physical against solver, how many tuned, how many fixed choices), a table per group (Setting, Value, What it controls, Raising it, Lowering it, Where it comes from, Tuned), the numerical groups after the physical ones (the config orders them so), and the section's fixed choices last as their own group. `Tuned` is the entry's phrase or "No".
+- Values print with their unit as the config holds it (`0.0065 K/m`, `20°`), numbers of 1e6 and over or under 1e-3 in `2.5e8` form; dimensionless ones print with their kind word (`0.27 fraction`, `4 ratio`).
+- Pointers: `docs/temperature.md` and `docs/winds.md` link to the page; `docs/development.md` lists the command, the script and the page; the README docs table gained a "Model settings" row, which is a link to a file outside `docs/` and so a small departure from "one line per docs file".
+- Review: security, docs clean; correctness raised five low findings (singular/plural in the count sentence, a clumsy join, no hint in the drift test's failure, a sentence with two colons, README row), coverage three (a line break in a text, number-form boundaries, `main`'s write path), all fixed except `main`'s write path and the missing-file branch, accepted as a thin wrapper over `writeFileSync` that the drift test and `npm run docs:config` exercise. The re-check raised one more singular/plural wording, fixed. Scripts are outside the coverage tool, so coverage is judged from the tests.
