@@ -110,7 +110,7 @@ Rejected:
 
 ## Checkpoints
 - [x] 1. The temperature's settings in `config.ts`
-- [ ] 2. The winds' settings in `config.ts`, and the tuning list
+- [x] 2. The winds' settings in `config.ts`, and the tuning list
 - [ ] 3. `config.md`, written from the config
 - [ ] 4. The "Model settings" screen
 - [ ] 5. The climate process diagram on the screen, and the PDF removed
@@ -139,3 +139,14 @@ Decided by the builder:
 - `TEMPERATURE_CONFIG` is typed const-generic, so a reader of one group's literal type cannot read `numerical` without annotating it as `ConfigSection` (the test and the later screen do that).
 - The long `@remarks` bullets moved to doc comments above their entries; `TEMPERATURE_MODEL`'s doc now points to `TEMPERATURE_CONFIG`. `docs/development.md` line 53 (the PDF's settings pages, "a future `src/core/config.md`") is left for pieces 3 and 5.
 - Review: correctness, security, coverage and the verifier raised four verified findings, all fixed; the re-check raised one wording leftover, fixed. Changed-lines coverage 100% on the tracked files; `config.ts` is tested directly.
+
+### Piece 2: the winds' settings in `config.ts`, and the tuning list (committed 181cb39, 2026-11-18)
+
+Decided by the builder:
+- The wind entries were generated, not retyped: `what`, `raising`, `lowering` and `source` come verbatim from the PDF script's `WIND` rows (so the screen and `config.md` carry the PDF's text), the 8 groups are the PDF's, and each old doc comment sits unchanged above its entry (apart from `{@link X}` turned into backticks, since config.ts imports nothing). The PDF's trailing "Not tuned." sentences were dropped from `source`.
+- `tuned` is non-null for the PDF's eleven tuned settings only, with a phrase of what each was tuned against, from its doc comment. The five set by hand for other reasons (`earthContrastK`, `poleTaperDeg`, `sideContrastK`, `wideSummerFromShare`, `wideSummerToShare`) stay `null`, as the PDF has them; their `source` says what was done.
+- `tunable` became two optional entry fields, `bounds` ({above, atMost}, on all 36) and `searchOrder` (1 to 14, on the fourteen the tuning script searches). The order is kept explicit because `TUNED_SETTINGS` lists them in an order that differs from the config's, and the acceptance asks for the same names in the same order. `SETTING_BOUNDS` is the entries' bounds, identical to the old name rule for all 36 (a test pins it); `TUNED_SETTINGS` is the entries with a `searchOrder`, sorted.
+- Chosen constants that moved, as the `constants` group of `WIND_CONFIG`: `REFERENCE_PRESSURE_HPA` (1011), `AIR_DENSITY_KG_M3` (1.2, a rounded-down choice rather than the physical 1.225), `EARTH_CELL_WIDTH_DEG` (30) and `FULL_BANDS_EASE_CELLS` (0.25). They keep their names and exports in `rules.ts`, read from `constantsOf(WIND_CONFIG)`. Stayed: `PROFILE_BANDS`, `TABLE_STEP_DEG`, `LOCAL_BAND_SECTORS`, `ZONAL_BANDS` (grid sizes), `DIRECTION_MIN_SPEED_M_PER_S` and `DIRECTION_TOLERANCE_DEG` (how the error figures are scored, not the model), `RADIUS_M`, `PASCALS_PER_HPA`, `RADIANS_PER_DEGREE` (physical or unit). Their `what`, `raising`, `lowering` are written from how `rules.ts` uses them, and a reviewer confirmed them.
+- Units: degrees are '°', and dimensionless ones are named by kind ('share', 'power', 'ratio', 'factor', 'slope', 'cells').
+- Their doc comments in `rules.ts` stay, with a line saying the value is read from `WIND_CONFIG`, so the config entry and the code comment cannot be mistaken for one another.
+- Review: correctness, security and coverage ran; security and coverage were clean; correctness checked all 36 values, orders, texts, bounds and search orders by script and raised two low findings (a doc sentence in `docs/winds.md` that could be misread; the four constants' comments not saying where the value is read from), both fixed. I did not run the verifier or a re-check on the two doc-only fixes, as every finding was fixed anyway and nothing was left to rule on. Changed-lines coverage 100%.

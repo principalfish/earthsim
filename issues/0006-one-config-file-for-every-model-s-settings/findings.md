@@ -10,3 +10,12 @@
 | round | coverage | low | test | verified | fixed | `src/core/config.test.ts:98` | The non-finite check was tested only on a group entry, not on the constants |
 | round | security | - | - | - | - | - | Clean |
 | re-check | correctness | low | docs | verified | fixed | `src/core/config.ts:9` | Two comments still said `config.md` is generated, before it exists |
+
+## piece 2 · 2026-11-18 · The winds' settings in config.ts, and the tuning list
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | docs | - | fixed | `docs/winds.md:210` | "the entries marked for the tuning search are the ones `tuned` takes" could be read as the `tuned` field |
+| round | correctness | low | cleanup | - | fixed | `src/core/wind/rules.ts:81` | The four moved constants keep full doc comments with no note that the value now comes from the config |
+| round | security | - | - | - | - | - | Clean |
+| round | coverage | - | - | - | - | - | Clean |
