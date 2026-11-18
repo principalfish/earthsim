@@ -10,9 +10,9 @@ No value changes: the Earth's temperature and wind figures come out exactly as b
 
 ## Plan
 
-_2026-11-18 · 0 of 5 pieces done · now: waiting on a decision (piece 1)_
+_2026-11-18 · 0 of 5 pieces done · now: piece 1 in progress_
 
-- [ ] **1/5 The temperature's settings in config.ts** · not started
+- [ ] **1/5 The temperature's settings in config.ts** · in progress
   The temperature's 18 settings, with their explanations, move into one config file the model reads from.
 - [ ] **2/5 The winds' settings in config.ts, and the tuning list** · not started
   The winds' 36 settings and the chosen constants beside them join it, and the tuning script takes its list from there.
