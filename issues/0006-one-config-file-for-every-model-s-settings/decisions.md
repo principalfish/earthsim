@@ -24,8 +24,10 @@ The user's brief (2026-11-18): "Plan 3d", roadmap step 3d in `investigations/202
 - The climate process diagram is redrawn as an SVG at the top of the config screen; the Python script and the PDF go entirely. The user: "On the config screen (Recommended)" (2026-11-18)
 - `config.md` stays, generated from the config with its drift test, so the settings can be read on GitHub without running the page. The user: "Keep it, generated (Recommended)" (2026-11-18)
 
+- The config screen is read-only for now: it shows every setting with its explanations, and settings are changed by editing `config.ts` in a chat. No `settings.json`, no saving from the page, and the page and its workers still never override the models' settings. This narrows the earlier "allows me to edit them". The user: "ok for now lets not make it editable to make this simpler - keep as ts if you wish. we edit through chats here. just having the screen to reference is enough" (2026-11-18)
+
 ## Open
-- What an edit on the screen does. The user: "maybe we can have a settings.json which we can update through that page?" (2026-11-18): how the page, which is static files with no server, writes that file.
+- None.
 
 ## Assumed
 - The value objects keep today's key order whatever the grouping, since the tuning script and tests rely on it; if a group order would change it, the order is kept explicitly.
@@ -34,3 +36,5 @@ The user's brief (2026-11-18): "Plan 3d", roadmap step 3d in `investigations/202
 - `config.md` is written by a new npm command (`npm run docs:config`) and checked by a Vitest test that compares the committed page with what the command would write, as the winds baseline test already does; `docs/temperature.md` and `docs/winds.md` point to it.
 - The core's `index.ts` also exports `TEMPERATURE_CONFIG` and `WIND_CONFIG`.
 - Verification: the values come out identical (a test pins each value object against today's literal values), the Earth temperature baseline is unchanged, the Earth's wind figures are the same bit for bit, and the tuning script lists the same 14 names.
+- The config screen reads the same `TEMPERATURE_CONFIG` and `WIND_CONFIG` that the models and `config.md` use, so the three can never disagree.
+- Removing the PDF also removes its rows in `README.md` and `docs/development.md` (the climate-process section and its run command), and the Python venv instructions that only it needed.
