@@ -77,16 +77,24 @@
 
 | Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
 |-|-|-|-|-|-|-|-|
-| round | docs | low | docs | verified | open | `src/app/ui/panel/processDiagram.test.ts:18` | Test comments and constant names point at the deleted PDF |
-| round | common-mistakes | low | docs | verified | open | `src/core/wind/rules.ts:81` | Use-site doc comments repeat the config entries' reasoning, value and status (also `temperature.ts:1336`) |
-| round | correctness | low | cleanup | verified | open | `scripts/tune/command.ts:17` | Groups-to-entries flattening repeated in four places, with casts |
-| round | common-mistakes | low | cleanup | verified | open | `src/core/config.ts:47` | `ConfigBounds` duplicates `SettingBounds` |
-| round | correctness | nit | cleanup | verified | open | `src/app/ui/panel/processDiagram.ts:153` | `DIAGRAM_LOOP.title`/`.note` never read; text copied in the labels |
-| round | common-mistakes | nit | docs | verified | open | `scripts/tune/command.ts:23` | `TUNED_SETTINGS` doc hand-lists the 14 names |
-| round | common-mistakes | nit | docs | verified | open | `src/core/config.ts:72` | Garbled `ConfigSection.name` doc |
-| round | docs | nit | docs | verified | open | `README.md:42` | Model settings row too long |
-| round | common-mistakes | nit | cleanup | verified | open | `src/app/wiring.ts:400` | `endStroke` + `readout.clear` pair copied |
-| round | common-mistakes | nit | test | verified | open | `src/core/config.test.ts:385` | `formatConfigValue` edge cases tested twice |
+| round | docs | low | docs | verified | fixed | `src/app/ui/panel/processDiagram.test.ts:18` | Test comments and constant names point at the deleted PDF |
+| round | common-mistakes | low | docs | verified | fixed | `src/core/wind/rules.ts:81` | Use-site doc comments repeat the config entries' reasoning, value and status (also `temperature.ts:1336`) |
+| round | correctness | low | cleanup | verified | fixed | `scripts/tune/command.ts:17` | Groups-to-entries flattening repeated in four places, with casts |
+| round | common-mistakes | low | cleanup | verified | fixed | `src/core/config.ts:47` | `ConfigBounds` duplicates `SettingBounds` |
+| round | correctness | nit | cleanup | verified | fixed | `src/app/ui/panel/processDiagram.ts:153` | `DIAGRAM_LOOP.title`/`.note` never read; text copied in the labels |
+| round | common-mistakes | nit | docs | verified | fixed | `scripts/tune/command.ts:23` | `TUNED_SETTINGS` doc hand-lists the 14 names |
+| round | common-mistakes | nit | docs | verified | fixed | `src/core/config.ts:72` | Garbled `ConfigSection.name` doc |
+| round | docs | nit | docs | verified | fixed | `README.md:42` | Model settings row too long |
+| round | common-mistakes | nit | cleanup | verified | fixed | `src/app/wiring.ts:400` | `endStroke` + `readout.clear` pair copied |
+| round | common-mistakes | nit | test | verified | fixed | `src/core/config.test.ts:385` | `formatConfigValue` edge cases tested twice |
 | round | docs | - | - | dropped | - | `src/core/config.md` | Missing backticks on names in prose — dropped: only the Setting column is backticked |
 | round | security | - | - | - | - | - | Clean |
 | round | coverage | - | - | - | - | - | Clean: 99% of 249 changed lines; 2 glue lines accepted |
+| re-check | correctness | low | docs | verified | open | `src/app/ui/panel/processDiagram.test.ts:21` | The rewritten header comment has a 131-character line |
+| re-check | correctness | low | docs | verified | open | `src/core/temperature/temperature.ts:1358` | The edited `estimateYearsLeft` remark has a 101-character line |
+| re-check | docs | low | docs | verified | open | `src/core/temperature/temperature.ts:1338` | `SLOWEST_SHRINK_TRUSTED`'s doc says "shrank by less" without saying than what |
+| re-check | common-mistakes | low | cleanup | verified | open | `src/app/ui/panel/modelSettings.test.ts:57` | Groups-plus-constants flattening left in two tests (also `scripts/write-config-doc.test.ts:59`) where `entriesOf` is not used |
+| re-check | correctness | - | cleanup | noticed | open | `src/core/config.ts:114` | `entriesOf<K>` casts to the caller's K unchecked, so the casts moved rather than went |
+| re-check | common-mistakes | - | cleanup | dropped | - | `scripts/write-config-doc.ts:94` | `settingsIn` as a wrapper — dropped: two callers, a clear name |
+| re-check | common-mistakes | - | docs | dropped | - | `src/core/temperature/temperature.ts:622` | Over-long line — dropped: outside the change, a template literal in code |
+| re-check | common-mistakes | - | docs | dropped | - | `src/app/ui/panel/processDiagram.test.ts:263` | Over-long line — dropped: not changed here, 77 characters |
