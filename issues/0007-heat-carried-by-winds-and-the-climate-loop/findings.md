@@ -96,3 +96,21 @@
 | round | coverage | - | - | dropped | - | `src/worker/testing/fakeWorker.ts:76` | The stand-in's pass route is reachable only through a full climate on the fake — dropped: helper-only line; the real handler's pass path is covered in handle.test.ts |
 | re-check | correctness | low | cleanup | verified | fixed | `src/worker/handle.ts:180` | The reworded `handleRequest` remark left one comment line 130 characters long mid-paragraph; re-wrap |
 | manual | user | low | docs | - | fixed | `src/core/`, `docs/` | The user chose to fix the eight open nits of pieces 3–5 now ("Fix them now", 2026-11-18): one commit of its own |
+
+## piece 6 · 2026-11-18 · The page: one scheduler, passes shown as they land
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | medium | defect | verified | fixed | `src/app/layers/refresh.ts:560` | After Pause stopped the loop at pass n, Resume asked at pass 1: the status went back to "Calculating climate" and the bar dropped; now the pass reached is kept and the resumed request reads "Refining climate (pass n+1)" with a full bar (the 8-pass limit counts afresh per request) |
+| round | coverage | low | defect | verified | fixed | `src/app/layers/layers.ts:527` | `setPass(..., last)` with pass 1 the last left null progress and the bar went indeterminate; now keeps the last progress, with a test that fails on a null after a number |
+| round | docs | low | docs | verified | fixed | `docs/winds.md:9` | Said the winds are worked out in a worker of their own; now with the temperature, in each climate pass |
+| round | docs | low | docs | verified | fixed | `docs/temperature.md:93` | The info box table had no "Climate unavailable" row; reworded |
+| round | correctness | low | cleanup | verified | fixed | `src/app/layers/layers.ts:148` | The old per-layer store methods had no production caller; deleted, ~190 test references moved to the climate methods (helpers in `testing/climateStore.ts`), two untrue comments fixed |
+| round | correctness | low | cleanup | verified | fixed | `src/app/ui/main/legend.ts:290` | `progressLine` and `yearProgress` unreachable now the box always says the climate line first; dropped with their tests |
+| round | correctness | low | cleanup | verified | fixed | `src/app/layers/scalar/pressure.ts:152` | The `windsStatus` special case was redundant; removed |
+| round | correctness | - | cleanup | verified | fixed | `src/app/wiring.ts:174` | Over-long comment lines re-wrapped (wiring.ts, layerPanel.ts) |
+| round | correctness | - | - | dropped | - | `src/app/layers/refresh.ts:559` | The raw `world.planet` day length — dropped: appState normalises the planet, and `suits` would only set a start aside |
+| round | coverage | - | - | dropped | - | `src/app/main.ts:189` | The entry file that starts a real Worker is not run by any test — dropped: accepted |
+| re-check | coverage | medium | test | verified | open | `src/app/layers/refresh.test.ts:1337` | The bar test skips a null bar after a number (`if (content.bar === null) continue`), so it cannot fail on a bar that goes unknown; only the last entry is asserted full |
+| re-check | correctness | low | test | verified | open | `src/app/layers/refresh.test.ts:1354` | The pass numbering's reset after a world change or reset while paused is not asserted (three tests check only where the request starts; add `store.temperature.pass` is 1) |
+| re-check | docs | low | docs | verified | open | `src/app/layers/refresh.ts:548` | The doc comment of `stop` has `@param pass` but no `@param solved` |
