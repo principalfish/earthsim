@@ -31,6 +31,8 @@ The user's brief (2026-11-18): "Plan 3d", roadmap step 3d in `investigations/202
 
 - The builder starts, and with it piece 1 (the temperature's settings in `config.ts`), with no decisions open. The user: "Start it" (2026-11-18)
 
+- Piece 4 approved after the user tried the screen in a browser (the builder could not). The user: "Tried it, approve" (2026-11-18)
+
 ## Open
 - None.
 
