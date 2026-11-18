@@ -26,6 +26,8 @@ The user's brief (2026-11-18): "Plan 3b", roadmap step 3b in `investigations/202
 
 - The builder starts, and with it piece 1 (the wind's flowing part), with no decisions open. The user: "Start it" (2026-11-18)
 
+- Piece 1's two departures accepted: the flowing part comes back as edge flows only (a wind rebuilt at cell centres would keep about a third of its divergence); a purely converging wind comes back as about an eighth of itself rather than zero, because the exchange solver's two-point couplings are not a consistent gradient on skewed cube cells, while the net flow out of every cell is zero to 1e-7 of the input's rms, so no heat is made. The more exact skew-corrected fix is out of scope. The cost (about 60 ms a month at 64, about 0.7 s a year of winds) and the proposal to work out the flowing part on the 64 grid for finer worlds are noted for piece 3. The open wording nit at `flowing.ts:168` stays open. The user: "Accept, carry on" (2026-11-18)
+
 ## Open
 - None.
 
