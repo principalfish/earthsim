@@ -3,12 +3,12 @@
   "slug": "one-config-file-for-every-model-s-settings",
   "title": "One config file for every model's settings, with a screen to read them",
   "mode": "refactor",
-  "state": "investigating",
+  "state": "planned",
   "branch": "one-config-file-for-every-model-s-settings",
   "base": "main",
   "gh_issue": 11,
   "build_model": null,
   "created": "2026-11-18 09:04",
-  "updated": "2026-11-18 09:32",
+  "updated": "2026-11-18 09:33",
   "done": null
 }
