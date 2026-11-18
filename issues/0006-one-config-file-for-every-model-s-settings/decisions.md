@@ -17,8 +17,14 @@ The user's brief (2026-11-18): "Plan 3d", roadmap step 3d in `investigations/202
 - The sections are `TEMPERATURE_CONFIG` and `WIND_CONFIG`; the models' value objects keep their names (`TEMPERATURE_MODEL`, `DEFAULT_WIND_SETTINGS`), so no caller changes. The user: "TEMPERATURE_CONFIG, WIND_CONFIG (Recommended)" (2026-11-18)
 - Grouped as the climate-process PDF groups them: temperature in its 3 groups, winds in its 8, the solver's numerical settings apart from the physical ones. The user: "As the process PDF does (Recommended)" (2026-11-18)
 
+- Scope widened: the page gains a config screen that shows every setting and lets the user edit them, while `config.ts` stays editable by hand (and by Claude) as the source; the screen carries all the explanations the climate-process PDF has (what each setting controls, what raising or lowering it does, where its value comes from), and the PDF and its script (`scripts/docs/climate-process.py`) are removed. This reverses "the PDF is out of scope" and "the page and its workers never override". The user: "as part of this can we make a new config screen which displays all these settings and allows me to edit them. this should n ot stop you from editing t hem too! / this screen should have all the explanations that are in the pdf too / we can then ditch the p[df and associated script" (2026-11-18)
+- Each entry therefore also carries the PDF's per-setting text, `raising` and `lowering`, as data, since the screen shows them; the long reasoning with references stays as a doc comment.
+
 ## Open
-- None.
+- What an edit on the screen does: for this visit only, remembered in the browser, saved with the world, or exported for `config.ts`.
+- Where the screen lives on the page.
+- Where the PDF's first page, the climate process diagram, goes once the PDF is removed.
+- Whether `config.md` is still wanted beside the screen.
 
 ## Assumed
 - The value objects keep today's key order whatever the grouping, since the tuning script and tests rely on it; if a group order would change it, the order is kept explicitly.
