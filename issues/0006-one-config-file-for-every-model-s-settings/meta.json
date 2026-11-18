@@ -3,13 +3,13 @@
   "slug": "one-config-file-for-every-model-s-settings",
   "title": "One config file for every model's settings, with a screen to read them",
   "mode": "refactor",
-  "state": "planned",
-  "branch": "one-config-file-for-every-model-s-settings",
+  "state": "building",
+  "branch": "claude/one-config-file-for-every-model-s-settings-3f9895",
   "base": "main",
   "gh_issue": 11,
   "build_model": null,
   "created": "2026-11-18 09:04",
-  "updated": "2026-11-18 09:41",
+  "updated": "2026-11-18 09:53",
   "done": null,
   "local": [
     {
@@ -17,6 +17,16 @@
       "name": "local_ccf806aa-c54e-457b-a302-15f87ba9df11",
       "added": "2026-11-18 09:41",
       "note": "builder: one-config-file-for-every-model-s-settings"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/philiph/workspace/earth_sim/.claude/worktrees/one-config-file-for-every-model-s-settings-3f9895",
+      "added": "2026-11-18 09:53"
+    },
+    {
+      "kind": "branch",
+      "name": "claude/one-config-file-for-every-model-s-settings-3f9895",
+      "added": "2026-11-18 09:53"
     }
   ]
 }
