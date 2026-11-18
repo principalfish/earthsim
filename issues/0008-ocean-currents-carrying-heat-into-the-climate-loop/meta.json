@@ -3,13 +3,13 @@
   "slug": "ocean-currents-carrying-heat-into-the-climate-loop",
   "title": "Ocean currents carrying heat into the climate loop",
   "mode": "build",
-  "state": "planned",
-  "branch": "ocean-currents-carrying-heat-into-the-climate-loop",
+  "state": "building",
+  "branch": "claude/ocean-currents-carrying-heat-into-the-climate-loop-c5911d",
   "base": "main",
   "gh_issue": 15,
   "build_model": null,
   "created": "2026-11-18 19:50",
-  "updated": "2026-11-18 20:26",
+  "updated": "2026-11-18 20:27",
   "done": null,
   "local": [
     {
@@ -17,6 +17,16 @@
       "name": "local_eb13cb33-7cf1-48ce-a63f-84119c45555c",
       "added": "2026-11-18 20:26",
       "note": "builder: ocean-currents-carrying-heat-into-the-climate-loop"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/philiph/workspace/earth_sim/.claude/worktrees/ocean-currents-carrying-heat-into-the-climate-loop-c5911d",
+      "added": "2026-11-18 20:27"
+    },
+    {
+      "kind": "branch",
+      "name": "claude/ocean-currents-carrying-heat-into-the-climate-loop-c5911d",
+      "added": "2026-11-18 20:27"
     }
   ]
 }
