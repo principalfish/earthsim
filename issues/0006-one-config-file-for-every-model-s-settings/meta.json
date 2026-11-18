@@ -16,7 +16,8 @@
       "kind": "session",
       "name": "local_ccf806aa-c54e-457b-a302-15f87ba9df11",
       "added": "2026-11-18 09:41",
-      "note": "builder: one-config-file-for-every-model-s-settings"
+      "note": "builder: one-config-file-for-every-model-s-settings",
+      "removed": "2026-11-18 11:33"
     },
     {
       "kind": "worktree",
