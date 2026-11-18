@@ -114,3 +114,4 @@
 - 2026-11-18 09:32 · one-config-file-for-every-model-s-settings (0006) · title = One config file for every model's settings, with a screen to read them
 - 2026-11-18 09:32 · one-config-file-for-every-model-s-settings (0006) · GitHub issue #11
 - 2026-11-18 09:33 · one-config-file-for-every-model-s-settings (0006) · investigating → planned
+- 2026-11-18 09:41 · one-config-file-for-every-model-s-settings (0006) · tracking session local_ccf806aa-c54e-457b-a302-15f87ba9df11
