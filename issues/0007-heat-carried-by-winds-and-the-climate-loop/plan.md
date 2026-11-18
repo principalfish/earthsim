@@ -141,7 +141,7 @@ Rejected (with the user's choices): putting the winds into the main symmetric so
 
 ## Checkpoints
 - [x] 1. The wind's flowing part
-- [ ] 2. Heat carried by the wind, in the temperature solve
+- [x] 2. Heat carried by the wind, in the temperature solve
 - [ ] 3. The climate loop in the core
 - [ ] 4. The setting's value, and the baselines
 - [ ] 5. One climate request in the worker
@@ -164,3 +164,13 @@ Decided by the builder:
 - Solver constants (mass 1e-2 per unit area, each round solved to 0.1 of the largest net flow it starts from, 1e-7 target, at most 12 rounds), chosen by a measured sweep: about 60 ms per month at 64 (about 0.7 s a year of winds), 3–4 rounds. At 128 and 256 one month took 0.77 s and 3.2 s on random winds (first call included), so for finer worlds piece 3 should take the flowing part on the 64 grid and carry it to the solve grid rather than solve it there.
 - Uncovered changed lines (flowing.ts, the two defensive throws: 12 rounds without reaching the tolerance; the exchange solve not converging): defensive, real winds take 3–4 rounds; accepted by the coverage check. Not reachable with finite, antisymmetric input unless flows are near the float range's ends.
 - docs/winds.md says heat "is to be carried by" the flowing part; piece 2 or 3 makes it "is carried" and updates "What it leaves out" (the winds do not change the temperature) when they wire it in.
+
+### Piece 2: heat carried by the wind, in the temperature solve (2026-11-18)
+Decided by the builder:
+- **The setting is `windHeatCapacity`, in J/m²/K** (the heat capacity per square metre of the air that moves the heat), not a depth in metres: it needs no air-properties constant, and sits beside the land and sea heat capacities. Placeholder 1.2e6 (about a kilometre of air at 1.2 kg/m³ and 1004 J/kg/K); piece 4 sets it from physics. 0 skips advection and gives today's solve bit for bit.
+- **`winds` flows are given on the grid the world is solved on** (`solveResolution` of the world's: 64 for worlds of 64 and 128), not on the world's own grid with the solve coarsening them (the plan's wording). Coarsening by summing the flows across merged cells' edges would also be exact and keep the zero net flow, but the flows at 128 cost about 0.8 s a month to find, so the loop will find them on 64 anyway; how piece 3 gets them there is settled in piece 3 (with the timings, as the planner chat asked).
+- **The step**: after each time step's exchange solve (and the clamp at 2.7 K), an implicit upwind step with the step's flows, interpolated linearly between month-mid values at the time the step ends, as the sunlight is; Gauss–Seidel, forward then back over cell index, stopping when no cell changed by the solver's tolerance in a sweep (cap 200; running out marks the solve not converged), then the heat A·C·T made exact by a uniform shift weighted by area times heat capacity. Measured against a 1e-13 reference on the Earth's flows: the error left is at most 1.05 times the tolerance. A topological ordering of the flow was not needed.
+- **The first guess and the year-end correction ignore the winds**: the year loop absorbs the difference. The Earth at 64 with the default setting still converges in 4 years; the solve takes 1.6–2 times as long (0.8–0.9 s to 1.4–1.6 s). At ten times the setting (the full column, 1e7) it takes 14 years and 5.6 s, and Siberia's January comes out 20 K warmer, so the setting wants care in piece 4.
+- Effect on the Earth at 64 with the model's own winds, default setting, January: western Europe +2.4 K, western North America +4.1 K, eastern North America −4.6 K, East Asia −12.8 K (from 7.6 to −8.5 °C against an observed about 1 °C: it overshoots; piece 4 judges).
+- Uncovered changed line (temperature.ts, `solved = false` when a step's advection sweeps hit the cap): a defensive guard; real winds converge in a handful of sweeps, and the advector's cap path is tested directly.
+- `config.test.ts`'s literal copy of the temperature values gains the new setting; docs/development.md says the temperature model has 19 settings.

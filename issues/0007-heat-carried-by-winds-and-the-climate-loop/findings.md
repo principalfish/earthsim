@@ -19,3 +19,25 @@
 | round | coverage | - | - | dropped | - | `src/core/wind/flowing.test.ts:219` | Assert the zonal-mean eastward wind changes little — dropped: optional, correlation and rms ratio already check the pattern |
 | round | - | - | docs | noticed | fixed | `src/core/wind/flowing.ts:131` | The leftover is nearer an eighth (0.13) than a tenth |
 | re-check | correctness | low | docs | verified | open | `src/core/wind/flowing.ts:168` | "to ten millionths of the input's rms flow" can be misread as 10 × 1e-6; should read "a ten-millionth" (1e-7) |
+
+## piece 2 · 2026-11-18 · Heat carried by the wind, in the temperature solve
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | docs | low | docs | verified | fixed | `docs/development.md:72` | No row for `temperature/advection.ts`; the `temperature.ts` row didn't mention winds |
+| round | docs | low | docs | verified | fixed | `docs/temperature.md:25` | "Several degrees milder/colder" didn't match the measured January changes (+2.4, +4.1, −4.6, −12.8 K) |
+| round | docs | low | docs | verified | fixed | `docs/temperature.md:25` | "About half as long again" had no measurement; measured 1.6–2 times |
+| round | correctness | low | docs | verified | fixed | `src/core/temperature/advection.ts:17` | Header promised "no new extreme" but the closing heat-fixing shift can pass the start's range by up to the tolerance |
+| round | correctness | low | docs | verified | fixed | `src/core/config.ts:307` | Setting text called a heat capacity a depth |
+| round | coverage | low | test | verified | fixed | `src/core/temperature/advection.test.ts:175` | Sweep-cap path untested; added (converged false, 200 sweeps, heat exact) |
+| round | coverage | low | test | verified | fixed | `src/core/temperature/temperature.ts:1281` | The clamp before advection had no test reaching it; added a coldest-world solve with winds |
+| round | docs | low | docs | verified | fixed | `src/core/temperature/temperature.ts:1` | Module header omitted the advection step |
+| round | correctness | medium | - | dropped | - | `src/core/temperature/advection.ts:209` | Stop test is the last sweep's change, may stop short in slow loops — dropped: measured on real Earth flows at 64 (Jan and Jul, 1.2e6 and 6e6, tolerance 5e-3 and 0.05) against a 1e-13 reference, the error left is at most 1.05 times the tolerance |
+| round | correctness | - | - | dropped | - | `src/core/temperature/advection.ts:138` | `setFlows` re-checks finiteness each step — dropped: exported API whose doc promises the RangeError; a few reads a step |
+| round | correctness | - | - | dropped | - | `src/core/temperature/temperature.ts` | Flows on the solve grid differ from the plan (the solve coarsening them) — dropped: recorded builder decision; piece 3 settles the helper |
+| round | docs | - | - | dropped | - | `docs/winds.md:72` | "Is to be carried" reads as future work — dropped: accurate, the page doesn't yet feed winds to the temperature |
+| re-check | correctness | low | docs | verified | open | `docs/temperature.md:23` | "Flows are interpolated between the months' as the sunlight is" is wrong: sunlight is evaluated at each step's end, only the flows are interpolated |
+| re-check | correctness | low | docs | verified | open | `src/core/temperature/advection.ts:19` | The closing shift is "within the sweeps' tolerance" only when they converge; at the 200-sweep cap nothing bounds it |
+| re-check | coverage | low | test | verified | open | `src/core/temperature/temperatureWinds.test.ts:186` | The coldest-world assertion `> -273.15` can't fail (this world's coldest month is about 35 K); the air floor is 1.35 K, not 2.7 K, so the comment is wrong too |
+| re-check | correctness | low | docs | verified | open | `docs/temperature.md:23` | "Makes no new extreme" has no caveat (to within the solver's tolerance) |
+| re-check | docs | low | docs | verified | open | `docs/winds.md:190` | "The winds do not change the temperature" should add that the page does not yet give the temperature the winds |
