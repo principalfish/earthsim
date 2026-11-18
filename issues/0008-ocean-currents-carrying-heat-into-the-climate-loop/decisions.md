@@ -15,6 +15,7 @@
 - **The Temperature layer stays the air's** everywhere, compared with the observed air temperature as now; the sea's own is on the new Sea temperature layer. The user: "The air's, as today (Recommended)" (2026-11-18)
 - **Nine pieces** (plan.md), with the page split over two; manual reviews at pieces 8 (the Sea temperature layer) and 9 (the Currents overlay and the finished model). The user: "Pieces 8 and 9 (Recommended)" (2026-11-18)
 - **The builder runs straight through, as in 3b:** commit and push after each piece's review round and light re-check (with the verifier), fix verified findings, record "Decided by the builder" choices and list them at the end; it stops for the manual reviews of pieces 8 and 9, the overturning rule choice (piece 7), a region getting clearly worse, the loop not settling within the cap, a data source that can't be reached or shipped, and anything beyond the plan. Re-check findings the verifier upholds come to the user unfixed. The user: "Straight through, as 3b (Recommended)" (2026-11-18)
+- **OISST licence accepted as enough to ship:** no explicit public-domain or CC0 text; NOAA PSL asks for acknowledgement, and NOAA's ERDDAP record for the same product says "may be used and redistributed for free"; both quoted in docs/data.md. Piece 1's four re-check findings (the renormalisation test, the development.md rows, the downloadRetry cancel, a comment wrap) are fixed in piece 2's commit. The user: "Accept, fix all four" (2026-11-18)
 
 ## Open
 
