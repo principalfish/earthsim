@@ -19,6 +19,6 @@ The temperature and wind models are built on about 60 tuned numbers. They used t
   - the diagram's tests no longer refer to the deleted PDF.
 - The verifier was skipped in three of the per-piece rounds, where every finding was fixed anyway; the self review covered the whole branch.
 
-**Worth checking by hand:** the screen and the diagram were only ever seen in your browser, since the builder had none. Their unit tests use a stand-in document.
+**Worth checking by hand:** the screen and the diagram were seen in a real browser only at the two manual reviews; their unit tests use a stand-in document.
 
 Closes #11
