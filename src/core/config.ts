@@ -293,6 +293,41 @@ export const TEMPERATURE_CONFIG = defineSection(
 					source: "Taken equal to land's.",
 					tuned: null,
 				},
+				/**
+				 * The heat capacity of about a kilometre of air, the depth the surface
+				 * wind blows in, at the sea-level density of 1.2 kg m⁻³ and
+				 * 1004 J kg⁻¹ K⁻¹. Set from that estimate, not tuned. Its check is the
+				 * Earth's west-east coast contrast at 40-60°N, kept in the temperature
+				 * baseline: with it the winds give western Europe 2.9 K milder than East
+				 * Asia over the year and 7.8 K in January, against 0.7 and 2.4 K
+				 * without them and 11.5 and 22.9 K observed; for North America 0.0 and
+				 * 3.5 K, against about -0.8 and -0.6 K and 5.8 and 15.1 K observed.
+				 */
+				windHeatCapacity: {
+					value: 1.2e6,
+					unit: 'J/m²/K',
+					what:
+						'How strongly the wind carries heat: the heat the moving air' +
+						' holds for each kelvin, per square metre, which is set by the' +
+						' depth of the air the wind moves heat in. It only matters once' +
+						' the winds are fed back into the temperature.',
+					raising:
+						'The wind carries more heat: milder west coasts and colder' +
+						' east coasts at mid-latitudes, the sea reaching further' +
+						' inland downwind, and a smaller difference between the tropics' +
+						' and the poles.',
+					lowering:
+						'The wind carries less heat, down to none at 0, where the' +
+						' temperature is what it is without the winds.',
+					source:
+						'Physics: about a kilometre of air, the depth the surface wind' +
+						' blows in, at the sea-level density of 1.2 kg/m³ and 1004' +
+						" J/kg/K. Checked against the Earth's west-east coast contrast:" +
+						' about a quarter to a third of the observed in three of the' +
+						" four figures, in the right places, and none for North America's" +
+						' year.',
+					tuned: null,
+				},
 				/** The standard atmosphere's 6.5 K km⁻¹ (ICAO, 1993). */
 				lapseRate: {
 					value: 6.5e-3,
@@ -437,6 +472,64 @@ export const TEMPERATURE_CONFIG = defineSection(
 						' below iceStartC; the model refuses it otherwise.',
 					lowering: 'A wider, gentler ramp: less ice at a given temperature.',
 					source: 'A smooth ramp rather than a single freezing point.',
+					tuned: null,
+				},
+			},
+		},
+		{
+			title: 'The climate loop',
+			numerical: true,
+			settings: {
+				/** Below the 0.1 °C that a map of the temperature can show. */
+				climateToleranceC: {
+					value: 0.1,
+					unit: '°C',
+					what:
+						'How small the root-mean-square change a pass of the climate' +
+						' loop makes to the monthly temperature, over the whole globe and' +
+						' the year, must be for the climate to count as settled.',
+					raising: 'The loop stops sooner, on a climate a little less settled.',
+					lowering:
+						'More passes, to a climate settled more finely; below about 0.05' +
+						" the temperature's own tolerance sets the limit.",
+					source:
+						'Chosen: below what a map of the temperature shows. The' +
+						' root-mean-square rather than the largest change, which a few' +
+						' cells of spring snow and ice keep above 0.1 for many passes.',
+					tuned: null,
+				},
+				climateMaxPasses: {
+					value: 8,
+					unit: 'passes',
+					what:
+						'The most passes of the loop, each a temperature solve with the' +
+						" last pass's winds and then the winds from the new temperature.",
+					raising:
+						'A world whose climate settles slowly gets further; the climate' +
+						' takes longer to appear.',
+					lowering:
+						'The loop gives up sooner, leaving the climate less settled on' +
+						' such a world. At 1, no climate settles, and none is carried on' +
+						' from.',
+					source:
+						'Chosen: the Earth settles in about four passes, and a generated' +
+						' world in four or five.',
+					tuned: null,
+				},
+				climateOvershootShare: {
+					value: 0.5,
+					unit: 'fraction',
+					what:
+						"How much of a pass's change is applied when the pass changes" +
+						' the temperature by more than the pass before did (an' +
+						' overshoot, where the winds and the temperature chase each other).' +
+						' It only stops a pass from growing on the one before; it does' +
+						' not bring down an oscillation at a stronger feedback than the' +
+						" model's, which the loop then leaves unsettled at its limit.",
+					raising:
+						'Overshoots are damped less; at 1 they are not damped at all.',
+					lowering: 'Overshoots are damped harder; the loop moves more slowly.',
+					source: 'Chosen: half.',
 					tuned: null,
 				},
 			},
@@ -1550,10 +1643,12 @@ export const WIND_CONFIG = defineSection(
 				 * continents are, that is about 0.7 hPa a kelvin at 1,000 hPa and 270 K,
 				 * which is where it started. Tuned by hand to 3 against the observed
 				 * Earth's Siberian high and its summer low over South Asia, which the
-				 * simulated temperature makes too weak at the start's value.
+				 * simulated temperature makes too weak at the start's value, and put
+				 * back to 0.7 when the winds began to carry heat: at 3 the winds' own
+				 * feedback on the temperature did not settle.
 				 */
 				thermalHpaPerK: {
-					value: 3,
+					value: 0.7,
 					unit: 'hPa/K',
 					what:
 						'Pressure added for each kelvin a place is colder than its' +
@@ -1563,14 +1658,16 @@ export const WIND_CONFIG = defineSection(
 					raising:
 						'Stronger winter highs, such as the Siberian high, deeper' +
 						' summer lows, and stronger monsoon winds out of and into the' +
-						' continents.',
+						' continents. Once the winds carry heat it also strengthens the' +
+						" loop's feedback: at 3 the climate loop's passes shrank by" +
+						' about 0.7 each and the Earth did not settle in eight.',
 					lowering:
 						'Weaker highs and lows over land; the bands dominate. At 0.7,' +
-						" the physical starting figure, the Earth's Siberian high and" +
-						' South Asian summer low came out too weak.',
-					source: 'Physics suggests 0.7 hPa/K for a shallow cold layer.',
+						" the physical figure, the Earth's Siberian high and South Asian" +
+						' summer low come out weaker than observed.',
+					source: 'Physics: 0.7 hPa/K for a cold layer 1.5 km deep.',
 					tuned:
-						"Tuned by hand against the observed Earth's Siberian high and its summer low over South Asia.",
+						"Tuned by hand to 3 against the observed Earth's Siberian high and its summer low over South Asia, then put back to the physical 0.7 when the winds began to carry heat, so that the climate loop settles; retuning waits for the winds' own tuning step.",
 					bounds: { above: 0 },
 					searchOrder: 3,
 				},
@@ -1655,8 +1752,8 @@ export const WIND_CONFIG = defineSection(
 					what:
 						"Caps how deep a hot place's low gets: warmth above the" +
 						" latitude's average counts less and less beyond about this" +
-						' many kelvin, so a low is at most 18 hPa deep before' +
-						' smoothing.',
+						' many kelvin, so a low is at most about 4 hPa deep before' +
+						' smoothing at 0.7 hPa/K (18 hPa at 3 hPa/K).',
 					raising:
 						"Hot places' lows deepen further. With no cap, the Earth's" +
 						' hot continental interiors give a deep summer low over' +
@@ -1711,19 +1808,20 @@ export const WIND_CONFIG = defineSection(
 				 * high counts, however cold the place: a cold `c` beyond `coldKneeK` `K`
 				 * counts as `K + (L − K) tanh((c − K) / (L − K))` for this `L`, which
 				 * follows the cold in full at the knee and levels off smoothly. At
-				 * `thermalHpaPerK`'s 3 hPa a kelvin it gives a high on low land at most
-				 * 75 hPa above its latitude before smoothing, which with the reference
-				 * pressure of 1,011 hPa is about the Earth's record of 1,084 hPa. A
-				 * guess, not tuned.
+				 * `thermalHpaPerK`'s 0.7 hPa a kelvin it gives a high on low land at
+				 * most 17.5 hPa above its latitude before smoothing; at the 3 hPa a
+				 * kelvin it was tuned at, 75 hPa, which with the reference pressure of
+				 * 1,011 hPa is about the Earth's record of 1,084 hPa. A guess, not
+				 * tuned.
 				 */
 				coldLimitK: {
 					value: 25,
 					unit: 'K',
 					what:
-						'The most cold a high counts, however cold the place. At 3' +
-						' hPa/K it keeps a high on low land within 75 hPa of its' +
-						" latitude before smoothing: about the Earth's record of" +
-						' 1,084 hPa.',
+						'The most cold a high counts, however cold the place. At 0.7' +
+						' hPa/K it keeps a high on low land within 17.5 hPa of its' +
+						' latitude before smoothing; at 3 hPa/K, 75 hPa, about the' +
+						" Earth's record of 1,084 hPa.",
 					raising:
 						'No effect on the Earth. Very cold places on extreme worlds' +
 						' get higher highs.',

@@ -27,6 +27,7 @@ import {
 import { cellWeights, fitRangeCentred } from '../layers/scalar/fit';
 import { DEFAULT_MONTH, SOURCES } from '../layers/view';
 import { SYSTEM_UNITS } from '../settings/units';
+import { answerWinds } from '../testing/climateStore';
 import {
 	createDeferredLoader,
 	createEarthStage,
@@ -38,7 +39,7 @@ import {
 } from '../testing/layerPanelStage';
 import { pressureWinds, weightedMean } from '../testing/scalarLayerFixtures';
 import { settle } from '../testing/settle';
-import { CALCULATING_WINDS_TEXT } from './main/infoBox';
+import { CALCULATING_CLIMATE_TEXT, refiningClimateText } from './main/infoBox';
 import {
 	formatFigures,
 	LEGEND_CALCULATING_TEXT,
@@ -51,8 +52,7 @@ describe('createLayerPanel, the pressure', () => {
 		stage: ReturnType<typeof createStage>,
 		solved: SolvedWinds = pressureWinds(),
 	): SolvedWinds => {
-		stage.store.markWindsCalculating();
-		stage.store.setWindsResult(solved, true);
+		answerWinds(stage.store, solved, true);
 		return solved;
 	};
 	/** The scale the pressure of a year is drawn on: centred on its mean. */
@@ -78,14 +78,14 @@ describe('createLayerPanel, the pressure', () => {
 		expect(stage.told.at(-1)?.summaries.pressure).toBe('annualMean');
 	});
 
-	it('says the winds are being calculated on it, on the Temperature and on Terrain alike, with the Winds tile off', () => {
+	it('says the climate is being refined on it, on the Temperature and on Terrain alike, with the Winds tile off', () => {
 		const stage = createStage();
-		stage.arrive(resultWith());
-		stage.store.markWindsCalculating();
+		stage.store.markClimateCalculating();
+		stage.store.setPass({ ...solvedWinds(), temperature: resultWith() }, 1);
 		const calculating = {
 			state: 'calculating',
-			status: CALCULATING_WINDS_TEXT,
-			bar: { fraction: null },
+			status: refiningClimateText(2),
+			bar: { fraction: 1 },
 		};
 		for (const layer of ['pressure', 'temperature', 'terrain'] as const) {
 			stage.panel.setLayer(layer);
@@ -96,13 +96,15 @@ describe('createLayerPanel, the pressure', () => {
 	it('says the same with the Winds tile on, whichever layer it is left for', () => {
 		const stage = createStage();
 		stage.panel.setWinds(true);
-		stage.arrive(resultWith());
-		stage.store.markWindsCalculating();
+		stage.store.markClimateCalculating();
 		for (const layer of ['pressure', 'temperature', 'terrain'] as const) {
 			stage.panel.setLayer(layer);
-			expect(stage.lastCalculation()?.status).toBe(CALCULATING_WINDS_TEXT);
+			expect(stage.lastCalculation()?.status).toBe(CALCULATING_CLIMATE_TEXT);
 		}
-		stage.store.setWindsResult(solvedWinds(), true);
+		stage.store.setClimateResult(
+			{ ...solvedWinds(), temperature: resultWith() },
+			true,
+		);
 		expect(stage.lastCalculation()).toEqual({
 			state: 'current',
 			status: null,
@@ -119,9 +121,6 @@ describe('createLayerPanel, the pressure', () => {
 			status: LEGEND_EMPTY_TEXT,
 			bar: null,
 		});
-		// The temperature's result is not where its months are.
-		stage.arrive(resultWith());
-		expect(stage.shown).toEqual([]);
 		const solved = arriveWinds(stage);
 		const last = stage.shown.at(-1);
 		expect(last?.field).toBe(solved.winds.pressure[DEFAULT_MONTH]);
@@ -161,7 +160,7 @@ describe('createLayerPanel, the pressure', () => {
 			'Annual average sea-level pressure, hPa',
 		);
 		const sent = stage.shown.length;
-		stage.store.markWindsOutOfDate();
+		stage.store.markOutOfDate();
 		stage.panel.setSummary('pressure', 'month');
 		stage.panel.setSummary('pressure', 'annualMean');
 		expect(stage.shown).toHaveLength(sent + 2);
@@ -171,7 +170,7 @@ describe('createLayerPanel, the pressure', () => {
 	it('says Calculating with no year count, and its own words when it cannot be calculated or shown', () => {
 		const stage = createStage();
 		stage.panel.setLayer('pressure');
-		stage.store.markWindsCalculating();
+		stage.store.markClimateCalculating();
 		expect(stage.lastLegend()).toEqual({
 			scale: null,
 			state: 'calculating',
@@ -179,7 +178,7 @@ describe('createLayerPanel, the pressure', () => {
 			bar: { fraction: null },
 		});
 		expect(LEGEND_CALCULATING_TEXT).toBe('Calculating');
-		stage.store.markWindsUnavailable();
+		stage.store.markUnavailable();
 		expect(stage.lastLegend()?.status).toBe('Pressure unavailable');
 
 		const refused = createStage();
@@ -577,8 +576,7 @@ describe('createLayerPanel, the pressure in inHg', () => {
 	it('fits the pressure about its mean in inHg, to ends and ticks of two decimals', () => {
 		const stage = createStage({ units: SYSTEM_UNITS.imperial });
 		stage.panel.setLayer('pressure');
-		stage.store.markWindsCalculating();
-		stage.store.setWindsResult(pressureWinds(), true);
+		answerWinds(stage.store, pressureWinds(), true);
 		// The months run from 1000 to 1031 hPa about a mean of 1015.5:
 		// 29.53 to 30.44 inHg about 29.99.
 		const legend = stage.lastLegend();
@@ -605,8 +603,8 @@ describe('createLayerPanel, the pressure in inHg', () => {
 		const months = solved.winds.pressure.map((month) =>
 			new Float32Array(cells).fill(month[0] as number),
 		);
-		stage.store.markWindsCalculating();
-		stage.store.setWindsResult(
+		answerWinds(
+			stage.store,
 			{ ...solved, winds: { ...solved.winds, pressure: months } },
 			true,
 		);

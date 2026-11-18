@@ -40,7 +40,6 @@ export {
 	PRESSURE_NOT_SHOWN_TEXT,
 	PRESSURE_OBSERVED,
 	PRESSURE_UNAVAILABLE_TEXT,
-	windsStatus,
 } from './pressure';
 export {
 	loadLayerObserved,

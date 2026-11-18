@@ -4,9 +4,9 @@ import {
 	readObservedPressureFile,
 	readObservedWindFile,
 } from '../../../../scripts/earth/dataFile.mjs';
+import { solveClimate } from '../../climate';
 import { decodeEarth, earthWorld, isMeasuredEarth } from '../../earth/earth';
 import { getGrid } from '../../grid/grid';
-import { solveTemperature } from '../../temperature/temperature';
 import {
 	type WindErrorFigures,
 	type WindResult,
@@ -18,7 +18,7 @@ import {
 	observedPressure,
 	observedWind,
 } from '../observedWind';
-import { solveWinds, type WindSettings } from '../solve';
+import type { WindSettings } from '../solve';
 import {
 	type EarthWindFigures,
 	earthWindFigures,
@@ -31,11 +31,11 @@ import {
 import committed from './earthWinds.json';
 
 /**
- * Time allowed for each test that solves the Earth's year of temperature
- * and winds: a few seconds, and several times that under coverage
- * instrumentation.
+ * Time allowed for each test that solves the Earth's climate: ten seconds or
+ * so, more for a setting that keeps the loop from settling, and several times
+ * that under coverage instrumentation.
  */
-const SOLVE_TIMEOUT_MS = 60_000;
+const SOLVE_TIMEOUT_MS = 300_000;
 
 /** The Earth's year of winds as solved now, against the observed. */
 const solvedEarth = (settings?: Partial<WindSettings>): EarthWindFigures => {
@@ -55,7 +55,7 @@ const solvedEarth = (settings?: Partial<WindSettings>): EarthWindFigures => {
 		),
 	};
 	return earthWindFigures(
-		solveWinds(earth, solveTemperature(earth).months, { settings }),
+		solveClimate(earth, { windSettings: settings }).winds,
 		observed,
 		getGrid(WIND_BASELINE_RESOLUTION),
 	);
@@ -115,12 +115,12 @@ describe('the Earth winds baseline', () => {
 	);
 
 	it(
-		'is worsened by the thermal highs and lows made twice as strong',
+		'is worsened by the thermal highs and lows made much stronger',
 		() => {
-			// The thermal response doubled, from 3 to 6 hPa a kelvin, worsens
-			// every one of the nine figures: the whole year's wind RMS to
-			// 4.52 m/s, its direction share to 59.58% and its pressure RMS to
-			// 8.34 hPa.
+			// The thermal response put up from 0.7 to 6 hPa a kelvin, the winds
+			// and the temperature solved together as the baseline is, worsens
+			// eight of the nine figures: every one but January's direction share,
+			// which the stronger highs help.
 			const worse = windBaselineRegressions(
 				solvedEarth({ thermalHpaPerK: 6 }),
 				committed,
@@ -130,7 +130,6 @@ describe('the Earth winds baseline', () => {
 				'whole year direction share',
 				'whole year pressure RMS',
 				'January wind RMS',
-				'January direction share',
 				'January pressure RMS',
 				'July wind RMS',
 				'July direction share',

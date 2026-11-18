@@ -14,6 +14,7 @@ import {
 	createVectorField,
 	curl,
 	divergence,
+	edgeFlows,
 	fromEastNorth,
 	gradient,
 	laplacian,
@@ -1098,6 +1099,88 @@ describe('smoothField', () => {
 		expect(into.every((value) => value === 7)).toBe(true);
 		for (const km of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
 			expect(() => smoothField(grid, noisy, km), `${km}`).toThrow(RangeError);
+		}
+	});
+});
+
+describe('edgeFlows', () => {
+	const random = createRandom(23);
+	const noise = (grid: Grid): VectorField =>
+		vectorsOf(grid, (x, y, z) =>
+			tangent(
+				[20 * random() - 10, 20 * random() - 10, 20 * random() - 10],
+				x,
+				y,
+				z,
+			),
+		);
+
+	it.each([64, 128])(
+		'at %d: each edge’s flow is exactly the negative of the same edge seen from the other cell, and the flows out of a cell sum to its divergence times its area, in every cell including those at the cube’s edges and corners',
+		(resolution) => {
+			const grid = getGrid(resolution);
+			const vectors = noise(grid);
+			const flows = edgeFlows(grid, vectors);
+			const spread = divergence(grid, vectors);
+			let asymmetry = 0;
+			let imbalance = 0;
+			for (let cell = 0; cell < grid.cellCount; cell++) {
+				let out = 0;
+				for (let side = 0; side < 4; side++) {
+					const flow = flows[4 * cell + side] as number;
+					const other = grid.neighbours[4 * cell + side] as number;
+					let back = 0;
+					while (grid.neighbours[4 * other + back] !== cell) {
+						back++;
+					}
+					asymmetry = Math.max(
+						asymmetry,
+						Math.abs(flow + (flows[4 * other + back] as number)),
+					);
+					out += flow;
+				}
+				imbalance = Math.max(
+					imbalance,
+					Math.abs(
+						out - (spread[cell] as number) * (grid.areas[cell] as number),
+					),
+				);
+			}
+			expect(asymmetry).toBe(0);
+			expect(imbalance).toBeLessThan(1e-12);
+		},
+	);
+
+	it('is in proportion to the radius, and writes into the array given', () => {
+		const grid = getGrid(64);
+		const vectors = noise(grid);
+		const unit = edgeFlows(grid, vectors);
+		const big = edgeFlows(grid, vectors, 1000);
+		for (let entry = 0; entry < unit.length; entry++) {
+			expect(big[entry]).toBeCloseTo(1000 * (unit[entry] as number), 6);
+		}
+		const into = new Float64Array(4 * grid.cellCount);
+		expect(edgeFlows(grid, vectors, 1, into)).toBe(into);
+		expect(into).toEqual(unit);
+	});
+
+	it('refuses vectors or an output of the wrong length, and a radius that is not positive and finite', () => {
+		const grid = getGrid(64);
+		const vectors = noise(grid);
+		expect(() => edgeFlows(grid, vectors, 1, new Float64Array(5))).toThrow(
+			RangeError,
+		);
+		expect(() =>
+			edgeFlows(grid, {
+				x: new Float64Array(5),
+				y: new Float64Array(5),
+				z: new Float64Array(5),
+			}),
+		).toThrow(RangeError);
+		for (const radius of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+			expect(() => edgeFlows(grid, vectors, radius), `${radius}`).toThrow(
+				RangeError,
+			);
 		}
 	});
 });

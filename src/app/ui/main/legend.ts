@@ -1,12 +1,12 @@
 /**
  * The legend of a data layer: its colour ramp with the values marked at
  * round numbers, and a line saying whether what is on the globe describes
- * the world as it is, with the progress of a calculation under way. The
- * legend's block in the info box draws the ramp; the box's one status line
- * says the line, unless the winds have worse to say.
+ * the world as it is, or that a calculation is under way. The legend's
+ * block in the info box draws the ramp; the box's one status line says the
+ * line, unless the calculation or the winds have worse to say.
  */
 
-import type { FieldDifference, TemperatureProgress } from '../../../core/index';
+import type { FieldDifference } from '../../../core/index';
 import {
 	type ColourRamp,
 	rampGradient,
@@ -74,11 +74,7 @@ export const LEGEND_EMPTY_TEXT = 'Not calculated yet';
  */
 export const LEGEND_OUT_OF_DATE_TEXT = 'Out of date';
 
-/**
- * What the legend says of a calculation under way that tells nothing of how
- * far it has come, or that tells its years but cannot yet tell how many
- * are left.
- */
+/** What the legend says of a calculation under way. */
 export const LEGEND_CALCULATING_TEXT = 'Calculating';
 
 /**
@@ -287,51 +283,6 @@ export const formatFigures = (
 export const tickPosition = (value: number, range: ValueRange): number =>
 	((value - range.min) / (range.max - range.min)) * 100;
 
-/**
- * The line the legend shows while a result of a layer that tells its years,
- * such as the temperature, is being calculated, such as `Calculating ·
- * year 3, about 2 to go`.
- *
- * @param progress - How far the calculation has come, or null before its
- * first year is done.
- * @returns The years done and after them how many more are expected, or
- * that this year is the last, once there is an estimate of the years left;
- * until then, before the first year is done and while there is no
- * estimate, {@link LEGEND_CALCULATING_TEXT}, as {@link progressFraction}
- * then does not know how far it has come either.
- */
-export const progressLine = (progress: TemperatureProgress | null): string => {
-	if (progress === null || progress.estimatedYearsLeft === null) {
-		return LEGEND_CALCULATING_TEXT;
-	}
-	const done = `Calculating · year ${progress.yearsDone}`;
-	const left = progress.estimatedYearsLeft;
-	if (left === 0) {
-		return `${done}, finishing`;
-	}
-	return `${done}, about ${left} to go`;
-};
-
-/**
- * How much of a calculation is done, for the bar under the progress line.
- *
- * @param progress - How far the calculation has come, or null before its
- * first year is done.
- * @returns The years done over the years done and expected to go, from 0
- * to 1; or null when there is nothing to base it on, before the first year
- * and while there is no estimate of the years left.
- */
-export const progressFraction = (
-	progress: TemperatureProgress | null,
-): number | null => {
-	if (progress === null || progress.estimatedYearsLeft === null) {
-		return null;
-	}
-	return (
-		progress.yearsDone / (progress.yearsDone + progress.estimatedYearsLeft)
-	);
-};
-
 /** One value marked along the scale. */
 export type LegendTick = {
 	/** The value as the legend writes it. */
@@ -414,10 +365,8 @@ export type LegendContent = {
  * What the legend shows for a layer as it stands.
  *
  * @param layer - The description of the layer chosen: its words for a
- * result that cannot be calculated or shown, and whether its calculation
- * tells its years.
- * @param reading - Where the layer's result stands and how far its
- * calculation has come, from the store.
+ * result that cannot be calculated or shown.
+ * @param reading - Where the layer's result stands, from the store.
  * @param source - The range, ramp and caption the globe is showing, or
  * null when it shows no scale.
  * @param showsResult - Whether what the globe shows is the layer's own
@@ -432,21 +381,20 @@ export type LegendContent = {
  * it. While the globe does not, the line is {@link LEGEND_OUT_OF_DATE_TEXT}
  * over the earlier result's scale, which is what the globe then shows, and
  * the layer's words for a result not shown when there is no scale at all.
- * While calculating, a layer that tells its years has the line of
- * {@link progressLine} and a bar of {@link progressFraction}, which until
- * the years left can be told are {@link LEGEND_CALCULATING_TEXT} and a bar
- * that does not know how far it has come, as any other layer has
- * throughout. The scale's ticks are at its own step when it has one, written
- * in the source's unit as the source's layer writes them, and it gives the
- * source's error figures in that unit, to one decimal more than the unit's,
- * when it has them. Values beyond the ends, which the globe draws in the
+ * While calculating, the line is {@link LEGEND_CALCULATING_TEXT}, with a
+ * bar that does not know how far it has come: the info box's status line
+ * says the climate's progress instead (see `infoStatus`). The scale's
+ * ticks are at its own step when it has one, written in the source's unit
+ * as the source's layer writes them, and it gives the source's error
+ * figures in that unit, to one decimal more than the unit's, when it has
+ * them. Values beyond the ends, which the globe draws in the
  * end colours, are not marked.
  * @throws RangeError if the source's unit is not one of its layer's
  * quantity.
  */
 export const legendContent = (
 	layer: ScalarLayerSpec,
-	reading: Pick<ScalarLayerReading, 'status' | 'progress'>,
+	reading: Pick<ScalarLayerReading, 'status'>,
 	source: LegendSource | null,
 	showsResult: boolean,
 	sourceLayer: Pick<ScalarLayerSpec, 'formatTick' | 'quantity'> = layer,
@@ -504,19 +452,12 @@ export const legendContent = (
 				bar: null,
 			};
 		case 'calculating':
-			return layer.yearProgress
-				? {
-						scale,
-						state: 'calculating',
-						status: progressLine(reading.progress),
-						bar: { fraction: progressFraction(reading.progress) },
-					}
-				: {
-						scale,
-						state: 'calculating',
-						status: LEGEND_CALCULATING_TEXT,
-						bar: { fraction: null },
-					};
+			return {
+				scale,
+				state: 'calculating',
+				status: LEGEND_CALCULATING_TEXT,
+				bar: { fraction: null },
+			};
 		case 'unavailable':
 			return {
 				scale,

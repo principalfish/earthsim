@@ -54,18 +54,21 @@ export const progressOf = (yearsDone: number): TemperatureProgress => ({
 });
 
 /**
- * A worker's message about the progress of the temperature request with
- * that id.
+ * A worker's message about the progress of the climate request with that
+ * id, within one pass of its loop.
  *
  * @param id - The id of the request.
  * @param yearsDone - The years done, as for {@link progressOf}.
+ * @param pass - The pass the progress is within, from 1; 1 when left out.
  * @returns The message, its progress that of {@link progressOf}.
  */
 export const progressMessageOf = (
 	id: number,
 	yearsDone: number,
+	pass = 1,
 ): SimProgress => ({
 	id,
-	kind: 'temperature',
+	kind: 'climate',
 	progress: progressOf(yearsDone),
+	pass,
 });

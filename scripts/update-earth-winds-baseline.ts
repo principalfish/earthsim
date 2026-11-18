@@ -21,8 +21,7 @@ import {
 	getGrid,
 	observedPressure,
 	observedWind,
-	solveTemperature,
-	solveWinds,
+	solveClimate,
 } from '../src/core/index';
 import {
 	type EarthWindFigures,
@@ -51,9 +50,9 @@ export const WIND_BASELINE_FILE = join(
 
 /**
  * The Earth preset's wind and pressure figures as the models solve them
- * now: its temperature solved, its winds worked out from that with the
- * wind model's default settings, both at
- * {@link WIND_BASELINE_RESOLUTION}, against the observed winds and
+ * now: its climate solved by the loop of the temperature and the winds, with
+ * the wind model's default settings, at {@link WIND_BASELINE_RESOLUTION},
+ * against the observed winds and
  * pressure on the same cells.
  *
  * @returns New figures, unrounded.
@@ -74,7 +73,7 @@ export const earthWindFiguresNow = (): EarthWindFigures => {
 		),
 	};
 	return earthWindFigures(
-		solveWinds(world, solveTemperature(world).months),
+		solveClimate(world).winds,
 		observed,
 		getGrid(WIND_BASELINE_RESOLUTION),
 	);

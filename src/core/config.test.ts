@@ -32,14 +32,16 @@ const entry = (value: number) => ({
 	tuned: null,
 });
 
-// A literal copy of the temperature model's values as they were before they
-// moved into the config, in the order the model listed them.
+// A literal copy of the temperature model's values, in the order the model
+// lists them: the first eighteen as they were before they moved into the
+// config, then those added since.
 const TEMPERATURE_LITERAL = {
 	diffusivity: 0.55,
 	landDiffusivity: 0.35,
 	oceanHeatCapacity: 2.5e8,
 	landHeatCapacity: 1e7,
 	seaIceHeatCapacity: 1e7,
+	windHeatCapacity: 1.2e6,
 	lapseRate: 6.5e-3,
 	greenhouseFactor: 0.633,
 	albedo: 0.27,
@@ -48,6 +50,9 @@ const TEMPERATURE_LITERAL = {
 	iceAlbedo: 0.62,
 	iceStartC: 0,
 	iceFullC: -10,
+	climateToleranceC: 0.1,
+	climateMaxPasses: 8,
+	climateOvershootShare: 0.5,
 	stepsPerMonth: 2,
 	solverToleranceK: 5e-3,
 	solverMaxIterations: 200,
@@ -186,12 +191,13 @@ describe('TEMPERATURE_CONFIG', () => {
 		}
 	});
 
-	it('lists each setting once, with the solver group numerical and last', () => {
+	it('lists each setting once, with the loop group and the solver group numerical, the solver last', () => {
 		const names = entries.map(([name]) => name);
 		expect(new Set(names).size).toBe(names.length);
 		expect(section.groups.map((group) => group.numerical === true)).toEqual([
 			false,
 			false,
+			true,
 			true,
 		]);
 		expect(section.groups.map((group) => Object.keys(group.settings))).toEqual([
@@ -201,6 +207,7 @@ describe('TEMPERATURE_CONFIG', () => {
 				'oceanHeatCapacity',
 				'landHeatCapacity',
 				'seaIceHeatCapacity',
+				'windHeatCapacity',
 				'lapseRate',
 				'greenhouseFactor',
 			],
@@ -212,6 +219,7 @@ describe('TEMPERATURE_CONFIG', () => {
 				'iceStartC',
 				'iceFullC',
 			],
+			['climateToleranceC', 'climateMaxPasses', 'climateOvershootShare'],
 			[
 				'stepsPerMonth',
 				'solverToleranceK',
@@ -264,7 +272,7 @@ const WIND_LITERAL = {
 	localBandsFullToDeg: 40,
 	localBandsGlobalFromDeg: 70,
 	bandAmplitudeHpa: 9,
-	thermalHpaPerK: 3,
+	thermalHpaPerK: 0.7,
 	thermalSmoothingKm: 900,
 	seaThermalShare: 0.3,
 	warmLimitK: 6,

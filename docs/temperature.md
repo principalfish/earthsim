@@ -11,11 +11,43 @@ The temperature is a seasonal energy balance: the year is stepped through month 
 - heat spreading between neighbouring cells;
 - cooling with height;
 - snow and ice brightening cold surfaces;
-- the greenhouse strength.
+- the greenhouse strength;
+- heat carried along by the winds, when a solve is given them (see below).
 
-There are no ocean currents yet, and the winds do not yet carry heat back into the temperature, so the aim is the right broad pattern, not a match to the real Earth.
+There are no ocean currents yet, so the aim is the right broad pattern, not a match to the real Earth.
 
 The model's settings are listed, with what each does and where its value comes from, in [Model settings](../src/core/config.md).
+
+### Heat carried by the winds
+
+A solve may be given a year of winds, as the flows they carry across every cell edge (the flowing part of the winds: see [Winds](winds.md#the-flowing-part)). After each time step's heat exchange, a second step moves heat downwind: each cell takes the temperature of the air flowing in from its upwind neighbours, weighted by how much flows in against the cell's own heat capacity. The step is stable however long it is, makes no new extreme (to within the solver's tolerance), keeps the heat exactly, and leaves a uniform temperature as it is. The flows are those of the time each step ends, as the sunlight is, interpolated between the months'; only the flows are interpolated, the sunlight is worked out for that time.
+
+How strongly the wind carries heat is one setting, the heat capacity of the air that moves it (about a kilometre of air); at 0 the solve is the one with no winds, exactly. A world of 128 or 256 is solved on a coarser grid, so its flows must be on that grid; `flowingPartForSolve` finds them there from the world's own winds (see [Winds](winds.md#the-flowing-part)).
+
+### The climate loop
+
+`solveClimate` works the temperature and the winds out together, in passes. The first pass is the temperature without winds and the winds from it, exactly as before. Each later pass solves the temperature again, carried on from the last pass's and with heat carried along the last pass's winds, then works out the winds from the new temperature.
+
+- It stops when the root-mean-square change a pass makes to the monthly temperature, over the globe and the year, is no more than 0.1 °C, or after 8 passes. The largest change in a single cell is left out of the rule: a few cells of spring snow and ice keep moving by more than a degree for many passes.
+- A pass whose change is larger than the one before's is an overshoot, and only half its change is applied.
+- A result that settled can be carried on from: a solve for the same world again settles at the second pass at the earliest, since the first carries heat along the start's winds, which may be those of a world since edited, and a local edit moves the global change by less than the tolerance.
+- The page works the temperature out this way, as the climate; see [When it is recalculated](#when-it-is-recalculated).
+- The day length now changes the settled temperature, through the winds, though not the first pass.
+- On the Earth at 64 the loop settles in 4 passes, about 8 s from nothing, and carried on from the settled result in 2 passes, about 3 s. `npm run time:climate` measures every resolution and the parts of a pass.
+- How fast the passes settle depends on how strongly the winds feed back. The thermal highs and lows are at their physical 0.7 hPa a kelvin for that reason: at the 3 they were tuned to before the winds carried heat, each pass shrank by about 0.7 and the Earth did not settle in 8. At 0.7 each pass shrinks by about 0.2 to 0.3.
+
+The loop's three settings are in the [Model settings](../src/core/config.md).
+
+### Heat carried along the winds, on the Earth
+
+How strongly the wind carries heat is the heat capacity of the air that moves it, 1.2e6 J/m²/K: about a kilometre of air at the sea-level density, the depth the surface wind blows in. It is set from that physical estimate and not tuned. Its check is the Earth's west–east coast contrast at 40–60°N, kept in the [baseline](development.md#the-earth-temperature-baseline):
+
+| | Simulated, annual | Observed, annual | Simulated, January | Observed, January |
+|-|-|-|-|-|
+| Western Europe less East Asia | 2.9 K | 11.5 K | 7.8 K | 22.9 K |
+| West less east North America | 0.0 K | 5.8 K | 3.5 K | 15.1 K |
+
+Without the winds the model gave 0.7 and 2.4 K for Europe against Asia and about −0.8 and −0.6 K for North America. So the winds make a contrast, in the right places: a quarter to a third of the observed size in three of the four figures, and none for North America's year; the rest is not theirs to make: the sea's own heat transport, ocean currents, is a later step. East Asia's January comes out 0.8 °C against an observed −4.0. The Earth's error against the observed falls from 3.93 to 3.66 K root-mean-square for the year.
 
 ### Finer worlds are solved on a coarser grid
 
@@ -41,12 +73,13 @@ The model is calibrated on the Earth, and far from it the results are rough. The
 
 ## When it is recalculated
 
-The temperature is worked out in its own worker, so a slow solve never holds up the rest of the page.
+The temperature is worked out with the winds, as the [climate loop](#the-climate-loop), in its own worker, so a slow solve never holds up the rest of the page.
 
+- **Pass by pass.** The first pass shows on the globe as soon as it is done, and each later pass refines it, the temperature and the winds always of the same pass, until the loop settles.
 - **Whatever is on screen,** Terrain included, so the result is ready when Temperature is chosen.
-- **After every change:** a stroke, undo, redo, a move of the Sea level or a Planet slider, or a new world. It starts a little under half a second after the change, and a change made during a solve stops it and starts a new one. A new world, and the world the page opens on, are asked for at once.
-- **Not while paused.** The [Pause button](user-guide.md#the-pause-button) stops it: a change only marks the result out of date, a new world stays uncalculated, and a solve under way finishes. Resume asks once for everything changed meanwhile.
-- **After a terrain edit it carries on from the last result,** which settles in fewer years.
+- **After every change:** a stroke, undo, redo, a move of the Sea level or a Planet slider, the day length's included, or a new world. It starts a little under half a second after the change, and a change made during the loop stops it and starts a new one. A new world, and the world the page opens on, are asked for at once.
+- **Not while paused.** The [Pause button](user-guide.md#the-pause-button) stops it: a change only marks the result out of date, a new world stays uncalculated, and a loop under way finishes the pass under way, shows it and stops. Resume carries on from that pass if nothing changed meanwhile (the first pass after a Resume cannot settle the climate, so a paused loop can take one pass more than one never paused), and otherwise asks once for everything changed.
+- **After a terrain edit it carries on from the last climate that settled,** which settles in fewer passes and years. One that ran out of passes is shown but not carried on from.
 - **After a change of sea level or planet it starts afresh,** as it does for a new world.
 
 ### Why it sometimes starts afresh
@@ -57,16 +90,17 @@ Terrain edits carry on, but only until the terrain has drifted past a limit sinc
 
 ### What the info box says meanwhile
 
-The status line of the info box, under the legend, says where the result stands, unless the winds have something worse to say; see the [user guide](user-guide.md#the-info-box). It says so on Terrain too.
+The status line of the info box, under the legend, says where the climate stands, whatever is on screen, Terrain included; see the [user guide](user-guide.md#the-info-box).
 
 | Status line | Meaning |
 |-|-|
-| "Calculating · year 3, about 2 to go", or "Calculating · year 5, finishing", with a bar | A new result is on its way, on Temperature once the years left can be told; the one before stays on the globe |
-| "Calculating temperature", with a bar | The same, said while Temperature is not on screen, and on it until the years left can be told |
+| "Calculating climate", with a bar | The climate's first pass is on its way, the bar following its years; the result before stays on the globe |
+| "Refining climate (pass 2)", and so on, with a full bar | The first pass is on the globe, and a later pass is refining it |
 | "Out of date" | The result on the globe no longer describes the world |
-| "Paused" | The result is out of date, or there is none, and the calculation is paused |
-| "Temperature could not be shown" | The globe could not take a current result |
-| "Temperature unavailable" | The worker could not be started |
+| "Paused" | The result is out of date, or there is none, and the calculation is paused; paused partway through the climate, the last pass finished stays on the globe |
+| "Temperature could not be shown" | The globe could not take a current result, while Temperature is on screen |
+| "Temperature unavailable" | The worker could not be started, while Temperature is on screen |
+| "Climate unavailable" | The same, while Terrain is on screen |
 
 Until the first result arrives, the globe keeps the height colours.
 
@@ -94,4 +128,4 @@ On the **measured Earth**, the comparison control in the top bar over the globe 
 - **Error figures** show under the legend, for the month or summary on screen: the mean difference and the root-mean-square difference, such as `Mean −0.1 °C · RMS 3.9 °C`.
 - The observed temperature is fetched the first time it is needed: when Observed or Difference is chosen in Temperature view, or Temperature is chosen while either is on. If that fails while Temperature is on screen, the view goes back to Simulated and the next choice tries again; if Temperature has been left meanwhile, the choice is kept and the fetch is tried again on coming back to it.
 
-The model's constants were tuned against the observed Earth when it was built, and were not tuned again for this comparison. The Earth's error figures are kept as a baseline for later steps, such as winds and ocean currents, to improve on; see [Development](development.md#the-earth-temperature-baseline).
+The model's constants were tuned against the observed Earth when it was built, and were not tuned again for this comparison. The Earth's error figures, and its west–east coast contrasts, are kept as a baseline for later steps, such as ocean currents, to improve on; see [Development](development.md#the-earth-temperature-baseline).

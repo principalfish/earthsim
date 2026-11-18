@@ -141,8 +141,8 @@ export const TEMPERATURE_OBSERVED: ObservedComparison = {
  * whole numbers in every unit, but for a tick of a narrow scale. On the
  * measured Earth it is compared with the observed temperature, as
  * {@link TEMPERATURE_OBSERVED} says. It is read from the store's
- * temperature, whose calculation tells its years, and is calculated by the
- * temperature. Over it, sunlight is shown as the line between day and
+ * temperature, and is calculated with the winds in the climate's passes.
+ * Over it, sunlight is shown as the line between day and
  * night.
  */
 export const TEMPERATURE_LAYER: ScalarLayerSpec = {
@@ -153,7 +153,6 @@ export const TEMPERATURE_LAYER: ScalarLayerSpec = {
 	formatTick: (value) => formatTick(value),
 	unavailableText: TEMPERATURE_UNAVAILABLE_TEXT,
 	notShownText: TEMPERATURE_NOT_SHOWN_TEXT,
-	yearProgress: true,
 	summaries: [
 		{
 			id: 'month',
@@ -186,7 +185,6 @@ export const TEMPERATURE_LAYER: ScalarLayerSpec = {
 		status: temperature.status,
 		result: temperature.result,
 		months: temperature.result?.months ?? null,
-		progress: temperature.progress,
 	}),
 	sunlightStyle: 'line',
 	summaryControlId: 'temperature-view',

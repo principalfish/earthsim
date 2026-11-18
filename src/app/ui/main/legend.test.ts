@@ -46,16 +46,8 @@ import {
 	legendTicks,
 	MAX_LEGEND_TICKS,
 	MAX_STEPPED_TICKS,
-	progressFraction,
-	progressLine,
 	tickPosition,
 } from './legend';
-
-/** Progress with an estimate of the years left. */
-const progressWith = (
-	yearsDone: number,
-	estimatedYearsLeft: number | null,
-): TemperatureProgress => ({ ...progressOf(yearsDone), estimatedYearsLeft });
 
 describe('legendTicks', () => {
 	it('marks a narrow range at fine round steps', () => {
@@ -215,35 +207,6 @@ describe('tickPosition', () => {
 	});
 });
 
-describe('progressLine and progressFraction', () => {
-	it('say only that it is calculating before any progress, with no fraction', () => {
-		expect(progressLine(null)).toBe(LEGEND_CALCULATING_TEXT);
-		expect(progressFraction(null)).toBeNull();
-	});
-
-	it('say only that it is calculating, not the years done, while there is no estimate', () => {
-		const progress = progressWith(3, null);
-		expect(progressLine(progress)).toBe(LEGEND_CALCULATING_TEXT);
-		expect(progressFraction(progress)).toBeNull();
-	});
-
-	it('give the years expected to go with an estimate', () => {
-		const progress = progressWith(3, 2);
-		expect(progressLine(progress)).toBe('Calculating · year 3, about 2 to go');
-		expect(progressFraction(progress)).toBe(0.6);
-		expect(progressLine(progressWith(4, 1))).toBe(
-			'Calculating · year 4, about 1 to go',
-		);
-		expect(progressFraction(progressWith(4, 1))).toBe(0.8);
-	});
-
-	it('say so on the last year, with the bar full', () => {
-		const progress = progressWith(5, 0);
-		expect(progressLine(progress)).toBe('Calculating · year 5, finishing');
-		expect(progressFraction(progress)).toBe(1);
-	});
-});
-
 describe('legendContent', () => {
 	const source = {
 		range: { min: -10, max: 30 },
@@ -254,11 +217,11 @@ describe('legendContent', () => {
 	const layerOf = (
 		status: TemperatureLayer['status'],
 		withResult = true,
-		progress: TemperatureProgress | null = null,
 	): TemperatureLayer => ({
 		status,
 		result: withResult ? result : null,
-		progress,
+		progress: null,
+		pass: null,
 	});
 
 	it('draws the ramp and its ticks for a current result, with nothing said', () => {
@@ -389,19 +352,18 @@ describe('legendContent', () => {
 		expect(content.bar).toBeNull();
 	});
 
-	it('marks a calculation under way with its progress, over the result on hand', () => {
-		const content = legendContent(
-			TEMPERATURE_LAYER,
-			layerOf('calculating', true, progressWith(3, 2)),
-			source,
-			true,
-		);
+	it('marks a calculation under way over the result on hand, whatever its progress, which the info box says', () => {
+		const calculating: TemperatureLayer = {
+			...layerOf('calculating'),
+			progress: { ...progressOf(3), estimatedYearsLeft: 2 },
+		};
+		const content = legendContent(TEMPERATURE_LAYER, calculating, source, true);
 		expect(content.scale).not.toBeNull();
-		expect(content.status).toBe('Calculating · year 3, about 2 to go');
-		expect(content.bar).toEqual({ fraction: 0.6 });
+		expect(content.status).toBe(LEGEND_CALCULATING_TEXT);
+		expect(content.bar).toEqual({ fraction: null });
 	});
 
-	it('shows the progress alone while the first result is calculated', () => {
+	it('says only that it is calculating while the first result is calculated', () => {
 		const content = legendContent(
 			TEMPERATURE_LAYER,
 			layerOf('calculating', false),
@@ -800,7 +762,7 @@ describe('marking a scale in a unit', () => {
 	it('draws the scale in the source’s unit, its ticks written as the layer writes them there', () => {
 		const content = legendContent(
 			PRESSURE_LAYER,
-			{ status: 'current', progress: null },
+			{ status: 'current' },
 			{
 				range: { min: -0.6, max: 0.6 },
 				ramp: PRESSURE_RAMP,
@@ -821,7 +783,7 @@ describe('marking a scale in a unit', () => {
 		expect(content.scale?.figures).toBe('Mean +0.031 inHg · RMS 0.118 inHg');
 		const kelvin = legendContent(
 			TEMPERATURE_LAYER,
-			{ status: 'current', progress: null },
+			{ status: 'current' },
 			{
 				range: { min: 239, max: 305 },
 				ramp: TEMPERATURE_RAMP,
@@ -844,7 +806,7 @@ describe('marking a scale in a unit', () => {
 		expect(() =>
 			legendContent(
 				PRESSURE_LAYER,
-				{ status: 'current', progress: null },
+				{ status: 'current' },
 				{
 					range: { min: 0, max: 10 },
 					ramp: PRESSURE_RAMP,

@@ -40,8 +40,7 @@ export type WindKeyContent = {
 /**
  * What is shown of the winds layer as it stands.
  *
- * @param layer - Where the winds stand, as the store has them or as
- * `windsStatus` words them for showing.
+ * @param layer - Where the winds stand, as the store has them.
  * @returns No line for current winds; {@link LEGEND_OUT_OF_DATE_TEXT},
  * {@link WINDS_CALCULATING_TEXT}, {@link LEGEND_EMPTY_TEXT} or
  * {@link WINDS_UNAVAILABLE_TEXT} for the others, the arrows on hand, if

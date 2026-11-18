@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TemperatureProgress } from '../../../core/index';
-import { progressOf } from '../../../core/testing/temperatureFixtures';
+import {
+	progressOf,
+	temperatureOf,
+} from '../../../core/testing/temperatureFixtures';
 import { TEMPERATURE_RAMP } from '../../globe/ramp';
-import type { LayerStatus } from '../../layers/layers';
+import {
+	createLayerStore,
+	type LayerStatus,
+	type LayerStore,
+} from '../../layers/layers';
 import {
 	PRESSURE_LAYER,
 	PRESSURE_UNAVAILABLE_TEXT,
@@ -10,6 +17,7 @@ import {
 	TEMPERATURE_NOT_SHOWN_TEXT,
 	TEMPERATURE_UNAVAILABLE_TEXT,
 } from '../../layers/scalar';
+import { climateOf } from '../../testing/climateStore';
 import {
 	byClass,
 	createFakeDocument,
@@ -19,13 +27,16 @@ import {
 } from '../../testing/fakeDocument';
 import { READOUT_OUT_OF_DATE_TEXT, type ReadoutText } from './cursorReadout';
 import {
-	CALCULATING_TEMPERATURE_TEXT,
-	CALCULATING_WINDS_TEXT,
+	CALCULATING_CLIMATE_TEXT,
 	type CalculationContent,
+	CLIMATE_UNAVAILABLE_TEXT,
 	calculationContent,
+	climateFraction,
 	createInfoBox,
 	infoStatus,
 	PAUSED_TEXT,
+	progressFraction,
+	refiningClimateText,
 } from './infoBox';
 import {
 	LEGEND_CALCULATING_TEXT,
@@ -67,14 +78,13 @@ const CALCULATED: CalculationContent = {
 };
 
 /**
- * What the legend is shown for the temperature in a status, with its scale
- * on show; a calculation with the progress given.
+ * What the legend is shown for a layer, the temperature when none is given,
+ * in a status, with its scale on show.
  */
 const legendOf = (
 	status: LayerStatus,
-	progress: TemperatureProgress | null = null,
 	layer = TEMPERATURE_LAYER,
-): LegendContent => legendContent(layer, { status, progress }, SOURCE, true);
+): LegendContent => legendContent(layer, { status }, SOURCE, true);
 
 /** What the key is shown for the winds in a status. */
 const keyOf = (status: LayerStatus): WindKeyContent =>
@@ -206,32 +216,8 @@ describe('infoStatus', () => {
 		).toBe(LEGEND_EMPTY_TEXT);
 	});
 
-	it('carries the progress of a temperature being calculated, whatever the key says of the winds waiting for it', () => {
-		const progress = { ...progressOf(3), estimatedYearsLeft: 2 };
-		expect(
-			infoStatus(
-				legendOf('calculating', progress),
-				keyOf('calculating'),
-				CALCULATED,
-			),
-		).toEqual({
-			text: 'Calculating · year 3, about 2 to go',
-			bar: { fraction: 0.6 },
-		});
-		expect(
-			infoStatus(
-				legendOf('calculating', progress),
-				keyOf('outOfDate'),
-				CALCULATED,
-			),
-		).toEqual({
-			text: 'Calculating · year 3, about 2 to go',
-			bar: { fraction: 0.6 },
-		});
-	});
-
 	it('carries no progress for a layer that does not tell its years, nor for the winds', () => {
-		const pressure = legendOf('calculating', null, PRESSURE_LAYER);
+		const pressure = legendOf('calculating', PRESSURE_LAYER);
 		expect(infoStatus(pressure, keyOf('calculating'), CALCULATED)).toEqual({
 			text: LEGEND_CALCULATING_TEXT,
 			bar: { fraction: null },
@@ -243,11 +229,8 @@ describe('infoStatus', () => {
 			bar: null,
 		});
 		expect(
-			infoStatus(
-				legendOf('unavailable', null, PRESSURE_LAYER),
-				null,
-				CALCULATED,
-			).text,
+			infoStatus(legendOf('unavailable', PRESSURE_LAYER), null, CALCULATED)
+				.text,
 		).toBe(PRESSURE_UNAVAILABLE_TEXT);
 	});
 
@@ -275,7 +258,7 @@ describe('infoStatus', () => {
 	it('takes a layer that could not be shown as unavailable, and a kept earlier result as out of date', () => {
 		const notShown = legendContent(
 			TEMPERATURE_LAYER,
-			{ status: 'current', progress: null },
+			{ status: 'current' },
 			null,
 			false,
 		);
@@ -284,7 +267,7 @@ describe('infoStatus', () => {
 		);
 		const kept = legendContent(
 			TEMPERATURE_LAYER,
-			{ status: 'current', progress: null },
+			{ status: 'current' },
 			SOURCE,
 			false,
 		);
@@ -312,55 +295,150 @@ describe('infoStatus', () => {
 	);
 });
 
-/** Where the calculation stands, with the temperature and the winds given. */
+/**
+ * Where the calculation stands, with the temperature given, its progress
+ * and the climate's pass under way.
+ */
 const calculationOf = (
 	temperature: LayerStatus,
-	winds: LayerStatus = 'empty',
 	paused = false,
 	progress: TemperatureProgress | null = null,
+	pass: number | null = temperature === 'calculating' ? 1 : null,
 ): CalculationContent =>
-	calculationContent({ status: temperature, progress }, winds, paused);
+	calculationContent({ status: temperature, progress, pass }, paused);
 
 describe('calculationContent', () => {
-	it('names the temperature while it is calculated, with a bar of its progress', () => {
+	it('names the climate while its first pass is calculated, with a bar of the temperature’s progress', () => {
 		expect(calculationOf('calculating')).toEqual({
 			state: 'calculating',
-			status: CALCULATING_TEMPERATURE_TEXT,
+			status: CALCULATING_CLIMATE_TEXT,
 			bar: { fraction: null },
 		});
 		expect(
-			calculationOf('calculating', 'outOfDate', false, {
+			calculationOf('calculating', false, {
 				...progressOf(3),
 				estimatedYearsLeft: 1,
 			}),
 		).toEqual({
 			state: 'calculating',
-			status: CALCULATING_TEMPERATURE_TEXT,
+			status: CALCULATING_CLIMATE_TEXT,
 			bar: { fraction: 0.75 },
 		});
+		// Calculated with no pass told, as by no climate, it is the first.
+		expect(calculationOf('calculating', false, null, null).status).toBe(
+			CALCULATING_CLIMATE_TEXT,
+		);
 	});
 
-	it('names the winds once the temperature is current, with a bar that does not know how far they have come', () => {
-		expect(calculationOf('current', 'calculating')).toEqual({
+	it('names the pass under way while the climate is refined, with a full bar', () => {
+		expect(calculationOf('calculating', false, null, 2)).toEqual({
 			state: 'calculating',
-			status: CALCULATING_WINDS_TEXT,
-			bar: { fraction: null },
+			status: 'Refining climate (pass 2)',
+			bar: { fraction: 1 },
+		});
+		expect(
+			calculationOf(
+				'calculating',
+				false,
+				{ ...progressOf(1), estimatedYearsLeft: 3 },
+				5,
+			),
+		).toEqual({
+			state: 'calculating',
+			status: refiningClimateText(5),
+			bar: { fraction: 1 },
 		});
 	});
 
-	it('says nothing while both are current, paused or not', () => {
-		const calculated = { state: 'current', status: null, bar: null };
-		expect(calculationOf('current', 'current')).toEqual(calculated);
-		expect(calculationOf('current', 'current', true)).toEqual(calculated);
+	/** Progress with an estimate of the years left. */
+	const yearsOf = (
+		yearsDone: number,
+		estimatedYearsLeft: number,
+	): TemperatureProgress => ({ ...progressOf(yearsDone), estimatedYearsLeft });
+
+	/**
+	 * The bar's fractions as a climate goes through a store, from the
+	 * moment it is asked for until its answer: each time its line is
+	 * worked out from the temperature layer.
+	 */
+	const barThrough = (
+		steps: readonly ((store: LayerStore) => void)[],
+	): (number | null)[] => {
+		const store = createLayerStore(() => {});
+		store.markClimateCalculating();
+		const fractions: (number | null)[] = [];
+		const look = (): void => {
+			const { bar } = calculationContent(store.temperature, false);
+			if (bar !== null) {
+				fractions.push(bar.fraction);
+			}
+		};
+		look();
+		for (const step of steps) {
+			step(store);
+			look();
+		}
+		return fractions;
+	};
+
+	/**
+	 * Fails unless the fractions never fall back: none smaller than one
+	 * before it, and none that does not know how far it has come once one
+	 * did.
+	 */
+	const expectNeverBack = (fractions: readonly (number | null)[]): void => {
+		let before: number | null = null;
+		for (const fraction of fractions) {
+			if (before !== null) {
+				expect(fraction).not.toBeNull();
+				expect(fraction ?? 0).toBeGreaterThanOrEqual(before);
+			}
+			before = fraction ?? before;
+		}
+	};
+
+	it('moves its bar on and never back, through the years of the first pass and every pass after', () => {
+		const pass = climateOf(temperatureOf(1));
+		const fractions = barThrough([
+			(store) => store.setProgress(progressOf(1), 1),
+			(store) => store.setProgress(yearsOf(2, 6), 1),
+			(store) => store.setProgress(yearsOf(6, 2), 1),
+			(store) => store.setProgress(yearsOf(8, 0), 1),
+			// The first pass finished: the second under way, no year done yet.
+			(store) => store.setPass(pass, 1),
+			(store) => store.setProgress(yearsOf(1, 2), 2),
+			(store) => store.setPass(pass, 2),
+			(store) => store.setProgress(yearsOf(1, 1), 3),
+			(store) => store.setPass(pass, 3, true),
+		]);
+		expect(fractions.filter((fraction) => fraction !== null).length).toBe(
+			fractions.length - 2,
+		);
+		expectNeverBack(fractions);
+		expect(fractions.at(-1)).toBe(1);
 	});
 
-	it.each<[string, LayerStatus, LayerStatus]>([
-		['the temperature out of date', 'outOfDate', 'outOfDate'],
-		['no temperature', 'empty', 'empty'],
-		['the winds out of date', 'current', 'outOfDate'],
-		['no winds', 'current', 'empty'],
-	])('says Paused for %s while paused', (_name, temperature, winds) => {
-		expect(calculationOf(temperature, winds, true)).toEqual({
+	it('keeps its bar where it was when the first pass is the last, as at a cap of one pass', () => {
+		const fractions = barThrough([
+			(store) => store.setProgress(yearsOf(1, 1), 1),
+			(store) => store.setProgress(yearsOf(2, 0), 1),
+			(store) => store.setPass(climateOf(temperatureOf(1)), 1, true),
+		]);
+		expect(fractions).toEqual([null, 0.5, 1, 1]);
+		expectNeverBack(fractions);
+	});
+
+	it('says nothing while the results are current, paused or not', () => {
+		const calculated = { state: 'current', status: null, bar: null };
+		expect(calculationOf('current')).toEqual(calculated);
+		expect(calculationOf('current', true)).toEqual(calculated);
+	});
+
+	it.each<[string, LayerStatus]>([
+		['the climate out of date', 'outOfDate'],
+		['no climate', 'empty'],
+	])('says Paused for %s while paused', (_name, temperature) => {
+		expect(calculationOf(temperature, true)).toEqual({
 			state: 'paused',
 			status: PAUSED_TEXT,
 			bar: null,
@@ -368,7 +446,7 @@ describe('calculationContent', () => {
 	});
 
 	it('says in the legend’s words what is not current while not paused', () => {
-		expect(calculationOf('outOfDate', 'outOfDate')).toEqual({
+		expect(calculationOf('outOfDate')).toEqual({
 			state: 'outOfDate',
 			status: LEGEND_OUT_OF_DATE_TEXT,
 			bar: null,
@@ -378,49 +456,71 @@ describe('calculationContent', () => {
 			status: LEGEND_EMPTY_TEXT,
 			bar: null,
 		});
-		expect(calculationOf('current', 'outOfDate').status).toBe(
-			LEGEND_OUT_OF_DATE_TEXT,
-		);
-		expect(calculationOf('current', 'empty').status).toBe(LEGEND_EMPTY_TEXT);
 	});
 
-	it('says a calculation left to finish while paused is under way', () => {
-		expect(calculationOf('calculating', 'outOfDate', true).status).toBe(
-			CALCULATING_TEMPERATURE_TEXT,
+	it('says a pass left to finish while paused is under way', () => {
+		expect(calculationOf('calculating', true).status).toBe(
+			CALCULATING_CLIMATE_TEXT,
 		);
-		expect(calculationOf('current', 'calculating', true).status).toBe(
-			CALCULATING_WINDS_TEXT,
+		expect(calculationOf('calculating', true, null, 3).status).toBe(
+			refiningClimateText(3),
 		);
 	});
 
 	it('says what can no longer be calculated, paused or not', () => {
 		for (const paused of [false, true]) {
-			expect(calculationOf('unavailable', 'empty', paused)).toEqual({
+			expect(calculationOf('unavailable', paused)).toEqual({
 				state: 'unavailable',
-				status: TEMPERATURE_UNAVAILABLE_TEXT,
-				bar: null,
-			});
-			expect(calculationOf('current', 'unavailable', paused)).toEqual({
-				state: 'unavailable',
-				status: WINDS_UNAVAILABLE_TEXT,
+				status: CLIMATE_UNAVAILABLE_TEXT,
 				bar: null,
 			});
 		}
 	});
 });
 
+describe('progressFraction', () => {
+	/** Progress with an estimate of the years left. */
+	const progressWith = (
+		yearsDone: number,
+		estimatedYearsLeft: number | null,
+	): TemperatureProgress => ({ ...progressOf(yearsDone), estimatedYearsLeft });
+
+	it('knows nothing before any progress, nor while there is no estimate', () => {
+		expect(progressFraction(null)).toBeNull();
+		expect(progressFraction(progressWith(3, null))).toBeNull();
+	});
+
+	it('gives the years done over those done and expected to go, full on the last', () => {
+		expect(progressFraction(progressWith(3, 2))).toBe(0.6);
+		expect(progressFraction(progressWith(4, 1))).toBe(0.8);
+		expect(progressFraction(progressWith(5, 0))).toBe(1);
+	});
+});
+
+describe('climateFraction', () => {
+	it('is the first pass’s progress, and then full', () => {
+		const progress = { ...progressOf(1), estimatedYearsLeft: 3 };
+		expect(climateFraction({ progress: null, pass: 1 })).toBeNull();
+		expect(climateFraction({ progress, pass: 1 })).toBe(0.25);
+		expect(climateFraction({ progress, pass: null })).toBe(0.25);
+		expect(climateFraction({ progress, pass: 2 })).toBe(1);
+		expect(climateFraction({ progress: null, pass: 8 })).toBe(1);
+	});
+});
+
 describe('infoStatus with the calculation', () => {
 	it('says the calculation’s line with its bar while nothing else is shown, as on Terrain', () => {
 		expect(infoStatus(null, null, calculationOf('calculating'))).toEqual({
-			text: CALCULATING_TEMPERATURE_TEXT,
+			text: CALCULATING_CLIMATE_TEXT,
 			bar: { fraction: null },
 		});
 		expect(
-			infoStatus(null, null, calculationOf('current', 'calculating')),
-		).toEqual({ text: CALCULATING_WINDS_TEXT, bar: { fraction: null } });
-		expect(infoStatus(null, null, calculationOf('current', 'current'))).toEqual(
-			{ text: null, bar: null },
-		);
+			infoStatus(null, null, calculationOf('calculating', false, null, 2)),
+		).toEqual({ text: refiningClimateText(2), bar: { fraction: 1 } });
+		expect(infoStatus(null, null, calculationOf('current'))).toEqual({
+			text: null,
+			bar: null,
+		});
 	});
 
 	it('says the calculation’s line over a current legend and key', () => {
@@ -428,13 +528,13 @@ describe('infoStatus with the calculation', () => {
 			infoStatus(
 				legendOf('current'),
 				keyOf('current'),
-				calculationOf('current', 'calculating'),
+				calculationOf('calculating', false, null, 3),
 			).text,
-		).toBe(CALCULATING_WINDS_TEXT);
+		).toBe(refiningClimateText(3));
 	});
 
 	it('puts Paused after calculating and unavailable, and before out of date and not calculated yet', () => {
-		const paused = calculationOf('outOfDate', 'outOfDate', true);
+		const paused = calculationOf('outOfDate', true);
 		for (const status of ['outOfDate', 'empty'] as const) {
 			expect(infoStatus(legendOf(status), keyOf(status), paused).text).toBe(
 				PAUSED_TEXT,
@@ -449,65 +549,69 @@ describe('infoStatus with the calculation', () => {
 	});
 
 	it('says the legend’s line among lines as bad, then the calculation’s, then the key’s', () => {
-		const progress = { ...progressOf(2), estimatedYearsLeft: 2 };
-		const calculating = calculationOf('calculating', 'empty', false, progress);
-		const legend = legendOf('calculating', progress);
-		expect(infoStatus(legend, keyOf('calculating'), calculating)).toEqual({
+		const outOfDate = calculationOf('outOfDate');
+		const legend = legendOf('outOfDate');
+		expect(infoStatus(legend, keyOf('outOfDate'), outOfDate)).toEqual({
 			text: legend.status,
 			bar: legend.bar,
 		});
+		const progress = { ...progressOf(2), estimatedYearsLeft: 2 };
+		const calculating = calculationOf('calculating', false, progress);
 		expect(infoStatus(null, keyOf('calculating'), calculating)).toEqual({
-			text: CALCULATING_TEMPERATURE_TEXT,
+			text: CALCULATING_CLIMATE_TEXT,
 			bar: { fraction: 0.5 },
 		});
-		const pressure = legendOf('unavailable', null, PRESSURE_LAYER);
-		expect(
-			infoStatus(pressure, null, calculationOf('current', 'unavailable')).text,
-		).toBe(PRESSURE_UNAVAILABLE_TEXT);
+		const pressure = legendOf('unavailable', PRESSURE_LAYER);
+		expect(infoStatus(pressure, null, calculationOf('unavailable')).text).toBe(
+			PRESSURE_UNAVAILABLE_TEXT,
+		);
 	});
 
-	it('says the calculation’s line over a legend being calculated whose bar does not know how far it has come', () => {
-		const pressure = legendOf('calculating', null, PRESSURE_LAYER);
+	it('says the climate’s line, by its pass, over any legend being calculated, the temperature’s with its years included', () => {
 		const progress = { ...progressOf(3), estimatedYearsLeft: 1 };
+		const pressure = legendOf('calculating', PRESSURE_LAYER);
 		expect(
 			infoStatus(
 				pressure,
 				keyOf('calculating'),
-				calculationOf('calculating', 'empty', false, progress),
+				calculationOf('calculating', false, progress),
 			),
-		).toEqual({ text: CALCULATING_TEMPERATURE_TEXT, bar: { fraction: 0.75 } });
+		).toEqual({ text: CALCULATING_CLIMATE_TEXT, bar: { fraction: 0.75 } });
 		expect(
 			infoStatus(
-				pressure,
+				legendOf('calculating'),
 				keyOf('calculating'),
-				calculationOf('current', 'calculating'),
+				calculationOf('calculating', false, progress),
 			),
-		).toEqual({ text: CALCULATING_WINDS_TEXT, bar: { fraction: null } });
+		).toEqual({ text: CALCULATING_CLIMATE_TEXT, bar: { fraction: 0.75 } });
 		expect(
 			infoStatus(
 				legendOf('calculating'),
 				null,
-				calculationOf('calculating', 'empty'),
+				calculationOf('calculating', false, null, 4),
 			),
-		).toEqual({ text: CALCULATING_TEMPERATURE_TEXT, bar: { fraction: null } });
+		).toEqual({ text: refiningClimateText(4), bar: { fraction: 1 } });
 	});
 
-	it('ranks the legend against the calculation by the state and bar it is given, whatever its words', () => {
+	it('ranks the legend against the calculation by the state it is given, whatever its words', () => {
 		const known: LegendContent = {
 			scale: null,
 			state: 'calculating',
 			status: 'Some words',
 			bar: { fraction: 0.25 },
 		};
-		const unknown: LegendContent = { ...known, bar: { fraction: null } };
-		const calculating = calculationOf('current', 'calculating');
-		expect(infoStatus(known, null, calculating)).toEqual({
+		const calculating = calculationOf('calculating');
+		expect(infoStatus(known, null, calculating).text).toBe(
+			CALCULATING_CLIMATE_TEXT,
+		);
+		expect(infoStatus(known, null, calculationOf('current'))).toEqual({
 			text: 'Some words',
 			bar: { fraction: 0.25 },
 		});
-		expect(infoStatus(unknown, null, calculating).text).toBe(
-			CALCULATING_WINDS_TEXT,
-		);
+		expect(
+			infoStatus({ ...known, state: 'outOfDate' }, null, calculationOf('empty'))
+				.text,
+		).toBe('Some words');
 	});
 });
 
@@ -623,12 +727,7 @@ describe('createInfoBox', () => {
 	it('shows the box for a status line alone, while the layer has no scale yet, and hides it again for nothing', () => {
 		const parts = make();
 		parts.box.showLegend(
-			legendContent(
-				TEMPERATURE_LAYER,
-				{ status: 'empty', progress: null },
-				null,
-				false,
-			),
+			legendContent(TEMPERATURE_LAYER, { status: 'empty' }, null, false),
 		);
 		expect(parts.legend.hidden).toBe(true);
 		expect(parts.root.hidden).toBe(false);
@@ -736,22 +835,26 @@ describe('createInfoBox', () => {
 	it('shows the box for the calculation’s line alone, with its bar, and hides it once all is current', () => {
 		const parts = make();
 		parts.box.showCalculation(
-			calculationOf('calculating', 'empty', false, {
+			calculationOf('calculating', false, {
 				...progressOf(1),
 				estimatedYearsLeft: 3,
 			}),
 		);
 		expect(parts.root.hidden).toBe(false);
 		expect(parts.legend.hidden).toBe(true);
-		expect(parts.status.textContent).toBe(CALCULATING_TEMPERATURE_TEXT);
+		expect(parts.status.textContent).toBe(CALCULATING_CLIMATE_TEXT);
 		expect(parts.bar.hidden).toBe(false);
 		expect(parts.bar.getAttribute('value')).toBe('0.25');
 
-		parts.box.showCalculation(calculationOf('current', 'empty', true));
+		parts.box.showCalculation(calculationOf('calculating', false, null, 2));
+		expect(parts.status.textContent).toBe('Refining climate (pass 2)');
+		expect(parts.bar.getAttribute('value')).toBe('1');
+
+		parts.box.showCalculation(calculationOf('empty', true));
 		expect(parts.status.textContent).toBe(PAUSED_TEXT);
 		expect(parts.bar.hidden).toBe(true);
 
-		parts.box.showCalculation(calculationOf('current', 'current'));
+		parts.box.showCalculation(calculationOf('current'));
 		expect(parts.status.textContent).toBe('');
 		expect(parts.root.hidden).toBe(true);
 	});
@@ -786,7 +889,7 @@ describe('createInfoBox', () => {
 		parts.box.showLegend(
 			legendContent(
 				TEMPERATURE_LAYER,
-				{ status: 'current', progress: null },
+				{ status: 'current' },
 				{
 					...SOURCE,
 					figures: { meanDifference: 1.25, rmsDifference: 2.04 },

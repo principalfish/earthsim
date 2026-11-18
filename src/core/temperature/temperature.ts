@@ -28,6 +28,12 @@
  * {@link createExchangeSolver}); reflectivity and heat capacity are read at
  * that expected end. The year is repeated until it stops changing.
  *
+ * A solve may be given a year of winds, as the flows they carry across the
+ * cells' edges. Each step is then followed by an implicit upwind step that
+ * carries heat along the flows (see {@link createHeatAdvector}), with the
+ * flows of the time the step ends at, interpolated between the months'; it
+ * is skipped when {@link TemperatureModel.windHeatCapacity} is 0.
+ *
  * A world of more than 64 cells per face edge is worked out on the grid a
  * step coarser (see {@link solveResolution}) and its sea-level temperatures
  * carried back to the world's own grid, where each cell's air is cooled by
@@ -67,6 +73,11 @@ import {
 	yearLengthDays,
 } from '../planet/planet';
 import { MAX_ELEVATION_M, MIN_ELEVATION_M, type World } from '../world/world';
+import {
+	createHeatAdvector,
+	type HeatAdvector,
+	interpolateFlows,
+} from './advection';
 import { createExchangeSolver, type ExchangeSolver } from './exchange';
 import type { MonthlyTemperature } from './observed';
 
@@ -99,6 +110,13 @@ export type TemperatureModel = {
 	 * below, so the surface warms and cools like land.
 	 */
 	readonly seaIceHeatCapacity: number;
+	/**
+	 * The heat capacity per square metre of the air that carries heat along
+	 * the wind, in joules per square metre per kelvin: how strongly the wind
+	 * carries it. Not negative; at 0 the winds carry none and the winds
+	 * given to a solve are not used.
+	 */
+	readonly windHeatCapacity: number;
 	/** Cooling of the air with height above sea level, in kelvin per metre. */
 	readonly lapseRate: number;
 	/**
@@ -154,6 +172,24 @@ export type TemperatureModel = {
 	 * 0 every pass is solved.
 	 */
 	readonly correctionRefineK: number;
+	/**
+	 * How small the root-mean-square change a pass of the climate loop makes
+	 * to the monthly temperature, weighted by area and over the twelve
+	 * months, must be, in degrees Celsius, for the climate to count as
+	 * settled. Above 0.
+	 */
+	readonly climateToleranceC: number;
+	/**
+	 * The most passes of the climate loop, a whole number from 1 to
+	 * {@link MAX_CLIMATE_PASSES}. At 1, no climate settles, and none is
+	 * carried on from.
+	 */
+	readonly climateMaxPasses: number;
+	/**
+	 * The share of a pass's change that is applied when the pass changes
+	 * the temperature by more than the pass before: above 0 and at most 1.
+	 */
+	readonly climateOvershootShare: number;
 };
 
 /**
@@ -178,7 +214,8 @@ export type TemperatureConditions = {
 	/**
 	 * The planet's settings that the temperature reads, as
 	 * {@link normalisePlanet} gives them. The day length is not one of
-	 * them: the temperature does not depend on it.
+	 * them: a solve of the temperature alone does not depend on it. A
+	 * climate's record names it separately.
 	 */
 	readonly planet: TemperaturePlanet;
 };
@@ -229,9 +266,9 @@ export type TemperatureState = {
  * @remarks
  * A {@link TemperatureResult} is one. The state is used only for the sea
  * level and planet in `solvedFor`; for any other the start is set aside.
- * The planet's day length is not part of this: the temperature does not
- * depend on it. It is also set aside once its terrain has drifted to
- * {@link TemperatureModel.terrainDriftLimitK} or past it. A start set aside
+ * The planet's day length is not part of this: a solve of the temperature
+ * alone does not depend on it. It is also set aside once its terrain has
+ * drifted to {@link TemperatureModel.terrainDriftLimitK} or past it. A start set aside
  * leaves the solve starting from nothing: see {@link solveTemperature} for
  * the rules and their order.
  */
@@ -240,6 +277,23 @@ export type TemperatureStart = {
 	readonly state: TemperatureState;
 	/** The sea level and planet the previous result was solved for. */
 	readonly solvedFor: TemperatureConditions;
+};
+
+/**
+ * What the winds carry, for heat to be carried along with them: a year of
+ * monthly flows across the edges of the grid the world is solved on.
+ */
+export type TemperatureWinds = {
+	/**
+	 * Twelve fields, January to December, of what the wind carries across
+	 * every edge, in square metres a second, laid out as {@link edgeFlows}
+	 * gives them: `4 * cellCount` values each, on the grid the world is
+	 * solved on, which is {@link solveResolution} of the world's own unless
+	 * `fullResolution` is set. Each should have no net flow in or out of
+	 * any cell, as {@link flowingPart} gives them, so that heat is moved
+	 * and never made. They must not be changed while the solve runs.
+	 */
+	readonly flows: readonly ArrayLike<number>[];
 };
 
 /** What {@link solveTemperature} may be given besides the world. */
@@ -263,6 +317,15 @@ export type SolveTemperatureOptions = {
 	readonly tolerance?: number;
 	/** The model's constants; defaults to {@link TEMPERATURE_MODEL}. */
 	readonly model?: TemperatureModel;
+	/**
+	 * The winds heat is carried along with, in each time step after the
+	 * exchange between cells: an implicit upwind step by
+	 * {@link createHeatAdvector}, the air's heat capacity the model's
+	 * {@link TemperatureModel.windHeatCapacity}. Left out, or with that at
+	 * 0, the solve is the one with no winds, bit for bit. The first guess
+	 * for a solve from nothing does not use them.
+	 */
+	readonly winds?: TemperatureWinds;
 	/**
 	 * Whether to solve on the world's own grid whatever its resolution,
 	 * rather than on {@link solveResolution} of it; defaults to false.
@@ -398,6 +461,9 @@ export const MAX_STEPS_PER_MONTH = 48;
 
 /** The most iterations the model may allow one solve. */
 export const MAX_SOLVER_ITERATIONS = 10_000;
+
+/** The most passes the climate loop may be set to take. */
+export const MAX_CLIMATE_PASSES = 100;
 
 const SECONDS_PER_DAY = 86_400;
 
@@ -547,7 +613,7 @@ export const assertSolvableWorld = (world: World): void => {
 	}
 };
 
-const assertModel = (model: TemperatureModel): void => {
+export const assertModel = (model: TemperatureModel): void => {
 	if (typeof model !== 'object' || model === null) {
 		throw new RangeError("A model's constants must be an object");
 	}
@@ -576,6 +642,7 @@ const assertModel = (model: TemperatureModel): void => {
 	}
 	for (const name of [
 		'greenhouseFactor',
+		'windHeatCapacity',
 		'lapseRate',
 		'terrainDriftLimitK',
 		'correctionRefineK',
@@ -621,6 +688,25 @@ const assertModel = (model: TemperatureModel): void => {
 	) {
 		throw new RangeError(
 			`The model's stepsPerMonth must be a whole number from 1 to ${MAX_STEPS_PER_MONTH}`,
+		);
+	}
+	if (!(model.climateToleranceC > 0)) {
+		throw new RangeError("The model's climateToleranceC must be above zero");
+	}
+	if (
+		!(
+			Number.isInteger(model.climateMaxPasses) &&
+			model.climateMaxPasses >= 1 &&
+			model.climateMaxPasses <= MAX_CLIMATE_PASSES
+		)
+	) {
+		throw new RangeError(
+			`The model's climateMaxPasses must be a whole number from 1 to ${MAX_CLIMATE_PASSES}`,
+		);
+	}
+	if (!(model.climateOvershootShare > 0 && model.climateOvershootShare <= 1)) {
+		throw new RangeError(
+			"The model's climateOvershootShare must be above zero and at most one",
 		);
 	}
 	if (!(model.iceStartC > model.iceFullC)) {
@@ -1133,11 +1219,18 @@ type Stepper = {
 	runMonth(month: number, sum: Float64Array): void;
 };
 
+/** What a stepper needs to carry heat along the winds. */
+type Advection = {
+	readonly advector: HeatAdvector;
+	readonly flows: readonly ArrayLike<number>[];
+};
+
 const createStepper = (
 	setup: Setup,
 	solver: ExchangeSolver,
 	initial: Float64Array,
 	before: Float64Array,
+	advection?: Advection,
 ): Stepper => {
 	const { cellCount, areas, clearAlbedo, cooling, emission, land, model } =
 		setup;
@@ -1161,6 +1254,9 @@ const createStepper = (
 	const next = new Float64Array(cellCount);
 	const table = new Float64Array(SUNLIGHT_ROWS);
 	const light = new Float64Array(cellCount);
+	const stepFlows = new Float64Array(
+		advection === undefined ? 0 : NEIGHBOUR_COUNT * cellCount,
+	);
 
 	let solved = true;
 
@@ -1225,6 +1321,31 @@ const createStepper = (
 			solver.setMass(mass);
 			if (!solver.solve(rhs, next, solverToleranceK).converged) {
 				solved = false;
+			}
+			if (advection !== undefined) {
+				// The heat the winds carry, after the exchange: an operator
+				// split, with the flows of the time the step ends at.
+				for (let cell = 0; cell < cellCount; cell++) {
+					next[cell] = Math.max(MIN_TEMPERATURE_K, next[cell] as number);
+				}
+				advection.advector.setFlows(
+					interpolateFlows(
+						advection.flows,
+						(month * stepsPerMonth + step + 1) /
+							(MONTHS_PER_YEAR * stepsPerMonth),
+						stepFlows,
+					),
+				);
+				if (
+					!advection.advector.advect(
+						next,
+						capacity,
+						stepSeconds,
+						solverToleranceK,
+					).converged
+				) {
+					solved = false;
+				}
 			}
 			for (let cell = 0; cell < cellCount; cell++) {
 				const t = state[cell] as number;
@@ -1403,6 +1524,34 @@ export const estimateYearsLeft = (
 	return Math.min(years, yearsLeftUnderCap);
 };
 
+/**
+ * Throws unless the winds are twelve flows of four values for each of the
+ * `cellCount` cells of the grid solved on, all finite.
+ */
+const assertWinds = (winds: TemperatureWinds, cellCount: number): void => {
+	const { flows } = winds;
+	if (!Array.isArray(flows) || flows.length !== MONTHS_PER_YEAR) {
+		throw new RangeError(
+			`The winds must be ${MONTHS_PER_YEAR} monthly flows; got ${Array.isArray(flows) ? flows.length : typeof flows}`,
+		);
+	}
+	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
+		const field = flows[month] as ArrayLike<number>;
+		if (field?.length !== NEIGHBOUR_COUNT * cellCount) {
+			throw new RangeError(
+				`The winds' flows for month ${month + 1} must hold ${NEIGHBOUR_COUNT * cellCount} values, four for each cell of the grid solved on; got ${field?.length}`,
+			);
+		}
+		for (let entry = 0; entry < field.length; entry++) {
+			if (!Number.isFinite(field[entry])) {
+				throw new RangeError(
+					`Every flow of the winds must be finite; month ${month + 1} entry ${entry} is ${field[entry]}`,
+				);
+			}
+		}
+	}
+};
+
 const assertOptions = (maxYears: number, tolerance: number): void => {
 	if (
 		!(
@@ -1549,26 +1698,53 @@ const assertConditions = (value: unknown): void => {
 };
 
 /**
- * Whether a start's record, already checked, names the sea level and
- * planet of the world being solved, both brought to the forms the solver
- * uses and compared exactly. Only the settings the temperature reads,
- * {@link TEMPERATURE_SETTINGS}, are compared, each brought within its
- * limits by {@link clampSetting}, so a record of another day length, or of
- * none, names the same planet.
+ * Whether a record, already checked, names the given sea level and planet,
+ * both brought to the forms the solver uses and compared exactly. Only the
+ * settings the temperature reads, {@link TEMPERATURE_SETTINGS}, are
+ * compared, each brought within its limits by {@link clampSetting}, so a
+ * record of another day length, or of none, names the same planet.
  */
-const sameConditions = (
-	setup: Setup,
+const recordNames = (
+	seaLevel: number,
+	planet: TemperaturePlanet,
 	conditions: TemperatureConditions,
 ): boolean => {
-	if (Math.fround(conditions.seaLevel) !== setup.seaLevel) {
+	if (Math.fround(conditions.seaLevel) !== seaLevel) {
 		return false;
 	}
 	// Setting by setting rather than through normalisePlanet, which refuses
 	// settings without a day length, as a record's may be.
 	return TEMPERATURE_SETTINGS.every(
-		(name) =>
-			clampSetting(name, conditions.planet[name]) === setup.planet[name],
+		(name) => clampSetting(name, conditions.planet[name]) === planet[name],
 	);
+};
+
+/** {@link recordNames} for the world being solved. */
+const sameConditions = (
+	setup: Setup,
+	conditions: TemperatureConditions,
+): boolean => recordNames(setup.seaLevel, setup.planet, conditions);
+
+/**
+ * Whether a record of the conditions a result was solved for names a
+ * world's sea level and planet, as {@link solveTemperature} judges a start
+ * by its record: each brought to the forms the solver uses and compared
+ * exactly, only the settings the temperature reads compared, the day length
+ * not among them.
+ *
+ * @param world - The world. It is not changed.
+ * @param conditions - The record, such as {@link TemperatureResult.solvedFor}.
+ * @throws RangeError if the record does not hold a finite sea level and a
+ * finite number for each of the planet's {@link TEMPERATURE_SETTINGS}, or
+ * the world's planet has a setting that is not a number.
+ */
+export const conditionsMatch = (
+	world: World,
+	conditions: TemperatureConditions,
+): boolean => {
+	assertConditions(conditions);
+	const wanted = temperatureConditions(world);
+	return recordNames(wanted.seaLevel, wanted.planet, conditions);
 };
 
 /**
@@ -1713,6 +1889,7 @@ const solveOnGrid = (
 	tolerance: number,
 	model: TemperatureModel,
 	onYear: SolveTemperatureOptions['onYear'],
+	winds: TemperatureWinds | undefined,
 ): GridSolve => {
 	const setup = setUp(world, model);
 	const { cellCount, cooling } = setup;
@@ -1726,10 +1903,23 @@ const solveOnGrid = (
 		coupling(setup, grid),
 		model.solverMaxIterations,
 	);
+	const advection: Advection | undefined =
+		winds !== undefined && model.windHeatCapacity > 0
+			? {
+					advector: createHeatAdvector(grid, model.windHeatCapacity),
+					flows: winds.flows,
+				}
+			: undefined;
 	let stepper: Stepper;
 	let reference: Float64Array;
 	if (carried !== undefined) {
-		stepper = createStepper(setup, solver, carried.state, carried.before);
+		stepper = createStepper(
+			setup,
+			solver,
+			carried.state,
+			carried.before,
+			advection,
+		);
 		reference = carried.reference;
 	} else {
 		// Above the coarsest grid the balance is worked out a grid coarser:
@@ -1741,7 +1931,7 @@ const solveOnGrid = (
 						balanceOnGrid(coarsenWorld(world), model),
 						world.resolution,
 					);
-		stepper = createStepper(setup, solver, guess, guess);
+		stepper = createStepper(setup, solver, guess, guess, advection);
 		reference = Float64Array.from(cooling);
 	}
 	const { state, previous } = stepper;
@@ -1960,6 +2150,7 @@ export const solveTemperature = (
 		model = TEMPERATURE_MODEL,
 		fullResolution = false,
 		onYear,
+		winds,
 	} = options;
 	assertOptions(maxYears, tolerance);
 	assertModel(model);
@@ -1968,6 +2159,9 @@ export const solveTemperature = (
 		fullResolution || solveResolution(world.resolution) === world.resolution
 			? null
 			: coarsenWorld(world);
+	if (winds !== undefined) {
+		assertWinds(winds, (coarse ?? world).elevation.length);
+	}
 	const solved = solveOnGrid(
 		coarse ?? world,
 		options.start,
@@ -1975,6 +2169,7 @@ export const solveTemperature = (
 		tolerance,
 		model,
 		onYear,
+		winds,
 	);
 	const { seaLevelMonths, setup, state, yearsRun, converged, finalChangeK } =
 		solved;

@@ -1,11 +1,10 @@
 /**
- * The sea-level pressure layer: its settings, its words, where it stands
- * from the winds it comes from, and its description.
+ * The sea-level pressure layer: its settings, its words and its
+ * description.
  */
 
 import { DIFFERENCE_RAMP, PRESSURE_RAMP } from '../../globe/ramp';
 import type { UnitOf } from '../../settings/units';
-import type { LayerStatus } from '../layers';
 import { loadObservedPressure } from '../observedData';
 import { MONTH_NAMES, SUMMARY_LABELS } from '../view';
 import { formatInUnit } from './inUnit';
@@ -135,27 +134,6 @@ const CENTRED_ON_YEAR_MEAN: ScaleFit = {
 };
 
 /**
- * Where the winds and the pressure stand for showing, from where the
- * temperature and the winds do: what the pressure's legend and the info
- * box's status line say of them.
- *
- * @remarks
- * The winds are worked out from the temperature, and are not asked for
- * until there is one. So while there are no winds at all and the
- * temperature is being worked out, the winds are being worked out too,
- * since they follow it. Otherwise they stand where the store's winds do;
- * the store itself makes the winds unavailable when the temperature is.
- *
- * @param temperature - Where the temperature stands.
- * @param winds - Where the winds stand.
- */
-export const windsStatus = (
-	temperature: LayerStatus,
-	winds: LayerStatus,
-): LayerStatus =>
-	winds === 'empty' && temperature === 'calculating' ? 'calculating' : winds;
-
-/**
  * The sea-level pressure, held in hectopascals, of the winds' calculation.
  *
  * @remarks
@@ -169,11 +147,9 @@ export const windsStatus = (
  * hectopascals, such as `1,018`, and have two decimals in inHg, such as
  * `30.06`. On the measured Earth it is compared with the observed
  * sea-level pressure, as {@link PRESSURE_OBSERVED} says. It is read from
- * the store's winds, whose calculation tells nothing of its progress, and
- * is calculated by the winds; before the
- * first winds it is being calculated while the temperature the winds wait
- * for is, as {@link windsStatus} says. Over it, sunlight is shown as the
- * line between day and night, as over the temperature.
+ * the store's winds, whose status it has, and is calculated with them in
+ * the climate's passes. Over it, sunlight is shown as the line between day
+ * and night, as over the temperature.
  */
 export const PRESSURE_LAYER: ScalarLayerSpec = {
 	id: 'pressure',
@@ -183,7 +159,6 @@ export const PRESSURE_LAYER: ScalarLayerSpec = {
 	formatTick: (value, unit) => formatInUnit('pressure')(value, unit),
 	unavailableText: PRESSURE_UNAVAILABLE_TEXT,
 	notShownText: PRESSURE_NOT_SHOWN_TEXT,
-	yearProgress: false,
 	summaries: [
 		{
 			id: 'month',
@@ -205,11 +180,10 @@ export const PRESSURE_LAYER: ScalarLayerSpec = {
 	summarise: (months) => ({ annualMean: meanOfMonths(months) }),
 	minSpan: PRESSURE_MIN_SPANS,
 	observed: PRESSURE_OBSERVED,
-	read: ({ temperature, winds }) => ({
-		status: windsStatus(temperature.status, winds.status),
+	read: ({ winds }) => ({
+		status: winds.status,
 		result: winds.result,
 		months: winds.result?.winds.pressure ?? null,
-		progress: null,
 	}),
 	sunlightStyle: 'line',
 	summaryControlId: 'pressure-view',

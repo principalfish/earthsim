@@ -9,7 +9,7 @@
  * winds, it offers the Month and the Annual average alone, its scale is
  * centred on the year's mean by area, it measures a pressure, written in
  * whole numbers whatever the unit, it has no observed
- * year to compare with and its calculation tells nothing of its progress.
+ * year to compare with.
  */
 
 import { temperatureOf } from '../../core/testing/temperatureFixtures';
@@ -73,7 +73,6 @@ export const MADE_UP_LAYER: ScalarLayerSpec = {
 	formatTick: (value) => `≈${formatWhole(value, false)}`,
 	unavailableText: 'Made-up pressure unavailable',
 	notShownText: 'Made-up pressure could not be shown',
-	yearProgress: false,
 	summaries: [
 		{
 			id: 'month',
@@ -99,7 +98,6 @@ export const MADE_UP_LAYER: ScalarLayerSpec = {
 		status: winds.status,
 		result: winds.result,
 		months: winds.result?.winds.pressure ?? null,
-		progress: null,
 	}),
 	sunlightStyle: 'darkened',
 	summaryControlId: 'made-up-view',

@@ -24,8 +24,9 @@
  *   model's known faults on the Earth, and the observed Earth's beside
  *   them.
  *
- * Each form also takes `<setting>=<value>` arguments, which hold those
- * settings at those values throughout. Every case's temperatures are
+ * The runs work from each case's temperature without winds, not from the
+ * climate loop. Each form also takes `<setting>=<value>` arguments, which
+ * hold those settings at those values throughout. Every case's temperatures are
  * solved once at the start, which takes about ten seconds; a run of the
  * Earth then takes about half a second.
  */
@@ -96,6 +97,10 @@ export const main = (args: readonly string[]): void => {
 		say(['Run as one of:', '', ...USAGE.map((form) => `    ${form}`), '']);
 		say(
 			`\`search tuned\` searches the eleven settings tuned by hand against the observed Earth and three moved by hand for other reasons (earthContrastK, poleTaperDeg, sideContrastK): ${TUNED_SETTINGS.join(', ')}. Each search step stays within its setting's bounds: a share above 0 and at most 1, a latitude or a cells' width at most 90°, a width in longitude at most 360°, every setting above 0.`,
+		);
+		say();
+		say(
+			"The runs work from each case's temperature without winds, not from the climate loop, so the Earth's figures are not the baseline's; `thermalHpaPerK` is at its physical 0.7 and the loop does not settle at 3, the value it was tuned at. The winds' retuning waits for a later step.",
 		);
 		say();
 		say('The settings, with their values by default:');

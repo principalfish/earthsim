@@ -6,7 +6,7 @@ How the surface winds and sea-level pressure are worked out, which planet settin
 
 The winds are worked out from the temperature, a month at a time: first a map of sea-level pressure built by rules, then the wind that follows from it. It is a sketch of the real circulation, meant to be right in kind, not a simulation of the air.
 
-They are worked out again, in a worker of their own, as soon as each new temperature arrives and a moment after a change of the day length, whatever is on screen, and not while the [Pause button](user-guide.md#the-pause-button) is pressed.
+They come out of each pass of the [climate loop](temperature.md#the-climate-loop) with the temperature, worked out in a worker of its own a moment after every change of the world, the day length's included, whatever is on screen, and not while the [Pause button](user-guide.md#the-pause-button) is pressed.
 
 ### Bands of pressure
 
@@ -51,8 +51,8 @@ The band low over that ocean hardly moves: the ocean's own temperature peaks wit
 A place colder than its latitude's mean carries higher pressure, and a hotter one lower:
 
 - the temperature is brought down to sea level, by the temperature model's own cooling with height, and taken less the mean of its latitude;
-- each degree colder gives 3 hPa more, a warmth counts less the warmer it is, at most 6 K, and over the sea the response is 0.3 of the land's;
-- a cold counts in full up to 20 K below the latitude's mean and then less and less, at most 25 K, so a high on low land is at most 75 hPa above its latitude before smoothing, about the Earth's record of 1,084 hPa. The simulated Earth's coldest place against its latitude is 17.0 K below it (January, the basins north of Tibet), so the limit leaves the Earth's pressure exactly as it was; the Earth tilted 60° reaches 24.3 K, and its highest pressure is 1,054.3 hPa against 1,054.5 without the limit. A world made cold by a distant orbit gains nothing from it: the Earth twice as far from the Sun is frozen over and nearly as cold everywhere at a latitude, its coldest place only 1.4 K below its latitude and its highest pressure 1,020 hPa;
+- each degree colder gives 0.7 hPa more, a warmth counts less the warmer it is, at most 6 K, and over the sea the response is 0.3 of the land's;
+- a cold counts in full up to 20 K below the latitude's mean and then less and less, at most 25 K, so a high on low land is at most 17.5 hPa above its latitude before smoothing (75 hPa at the 3 hPa a kelvin the model was tuned at, about the Earth's record of 1,084 hPa; the figures in the rest of this item are at 3). The simulated Earth's coldest place against its latitude is 17.0 K below it (January, the basins north of Tibet), so the limit leaves the Earth's pressure exactly as it was; the Earth tilted 60° reaches 24.3 K, and its highest pressure is 1,054.3 hPa against 1,054.5 without the limit. A world made cold by a distant orbit gains nothing from it: the Earth twice as far from the Sun is frozen over and nearly as cold everywhere at a latitude, its coldest place only 1.4 K below its latitude and its highest pressure 1,020 hPa;
 - over land the response fades with height, by a factor of e every 2,500 m;
 - the result is smoothed over about 900 km, the size of the Siberian winter high.
 
@@ -66,6 +66,14 @@ The wind follows from the pressure by one balance everywhere: the push of the pr
 
 - **Land** slows the wind five times as much as the sea.
 - **High ground** turns the wind along its slopes rather than over them: the steeper the slope, the more of the wind across it is taken away. A sea cell beside a high coast has a slope too, so the wind there turns along the coast.
+
+### The flowing part
+
+The surface wind runs in towards the lows, which a model of the surface alone cannot follow: what flows in rises and is gone. Heat carried by the wind as it stands would pile up where it converges and be made from nothing. So heat is carried, in the climate loop (see [Temperature](temperature.md#the-climate-loop)), by the wind's **flowing part**, `flowingPart` in `src/core/wind/flowing.ts`: what the wind carries across every edge between cells, with the converging and spreading part taken out so that every cell has as much going in as coming out, to a ten-millionth of the typical flow across an edge. The part taken out is the flow down the gradient of a potential, found with the same solver as the temperature's heat exchange. It is returned as the flows across the edges, in square metres a second, not as a wind at the cell centres: a wind at the centres cannot be made to have no net flow in or out of every cell.
+
+For the temperature solve, `flowingPartForSolve` adds the flows of a world of 128 or 256 up onto the 64 grid, takes the converging part out there (a month costs 60 ms whatever the world's size), and for a world of 256, which is solved on 128, shares the result back up.
+
+On the Earth at 64, July's flowing part keeps about two thirds of the surface wind's flow (by squared size) in the same pattern, and a month takes about 60 ms. The grid's skewed cells, at the cube's corners above all, leave about an eighth of a purely converging wind's flow in place, going round and not in; that part carries heat but makes none.
 
 ## The settings it reads
 
@@ -89,21 +97,21 @@ The limit is 70° while the cells are no wider than the Earth's 30°, and moves 
 
 The reason is Guendelman and Kaspi, "An axisymmetric limit for the width of the Hadley cell on planets with large obliquity and long seasonality" (arXiv:1903.11656). It was read in its own text, the arXiv version 1, a manuscript submitted to Geophysical Research Letters; the journal version was not read. In their key points: "The Hadley cell ascending branch position in planets with strong seasonal variation of temperature is mainly bounded by the rotation rate." In section 2, the axisymmetric theory: "an Earth-like rotation rate or faster, limits the expansion of the circulation, such that even if φ0 is at the pole, and, for example, ∆H is increased (over a realistic range), it is unlikely for φ1 to reach the pole unless the rotation rate is slowed down", φ0 being the latitude of the hottest equilibrium temperature and φ1 that of the rising branch. In section 3.2, their simulations of ocean-covered planets tilted 90°, at the Earth's rotation rate and at a quarter of it: "shifting the maximal temperature poleward from a reference Earth-like state (Fig. 4a), does not result in a global pole-to-pole Hadley circulation for simulations with an Earth-like rotation rate (Fig. 4b), even when the temperature gradient is increased (Fig. 4c). However, slowing down the rotation rate, allows the ascending branch to reach the pole". A quarter of the Earth's rotation rate is the 4-day day. The paper gives no limit as a number: the 70°, and the way the limit moves with the cells' width, are this project's own choices.
 
-On the Earth tilted 60°, January's low now lies at 69.9°S, held short of the hottest latitude near 86°S, where it lay at the pole before; the lowest zonal-mean pressure is at 65°S, and the pressure rises only 1.3 hPa from there to the pole, against a cap 17 hPa high before. July's low, near 58°N, is short of the limit's knee and unchanged; the North Pole, 18 K cooler than the low, carries a high as any cooler pole does.
+On the Earth tilted 60°, at the 3 hPa a kelvin the model was tuned at, January's low now lies at 69.9°S, held short of the hottest latitude near 86°S, where it lay at the pole before; the lowest zonal-mean pressure is at 65°S, and the pressure rises only 1.3 hPa from there to the pole, against a cap 17 hPa high before. July's low, near 58°N, is short of the limit's knee and unchanged; the North Pole, 18 K cooler than the low, carries a high as any cooler pole does.
 
 ## How far to trust it
 
-The model's settings start from published or textbook figures where there are any, and the rest are guesses tuned by hand; they are not physical truth. Measured on the Earth at 64 cells per face edge, given the temperature model's own temperatures, against the observed winds 10 m above the surface and the observed sea-level pressure (simulated less observed, each place weighted by its area):
+The model's settings start from published or textbook figures where there are any, and the rest are guesses tuned by hand; they are not physical truth. Measured on the Earth at 64 cells per face edge, given the winds of the climate loop (the temperature and the winds solved together, see [Temperature](temperature.md#the-climate-loop)), against the observed winds 10 m above the surface and the observed sea-level pressure (simulated less observed, each place weighted by its area):
 
-| Months | RMS of the wind's difference as vectors | Mean speed difference | Direction within 45° | Mean pressure difference | RMS pressure difference |
-|-|-|-|-|-|-|
-| January | 3.79 m/s | 0.02 m/s | 63.4% | −0.44 hPa | 7.19 hPa |
-| July | 4.26 m/s | −0.13 m/s | 57.9% | −0.33 hPa | 6.78 hPa |
-| The whole year | 3.82 m/s | 0.00 m/s | 60.9% | −0.38 hPa | 7.08 hPa |
+| Months | RMS of the wind's difference as vectors | Direction within 45° | RMS pressure difference |
+|-|-|-|-|
+| January | 3.37 m/s | 62.8% | 7.71 hPa |
+| July | 4.08 m/s | 58.6% | 6.90 hPa |
+| The whole year | 3.61 m/s | 61.2% | 7.19 hPa |
 
-With one pattern of bands round the globe, before they varied by longitude, the whole year's were 3.81 m/s, −0.02 m/s, 60.6%, −0.38 hPa and 7.11 hPa.
+The thermal response, `thermalHpaPerK`, is at its physical 0.7 hPa a kelvin. It was tuned by hand to 3 before the winds carried heat, and put back when they did: at 3 the loop's feedback did not settle (see [Temperature](temperature.md#the-climate-loop)). Against the observed Earth the two are close, 0.7 better in the wind's difference as vectors (3.61 against 3.78 m/s for the year) and the direction share, 3 slightly better in the pressure (7.01 against 7.19 hPa); the Siberian high and the South Asian low come out weaker at 0.7. The figures before the loop, at 3 and given the temperature without winds, were 3.82 m/s, 60.9% and 7.08 hPa for the year.
 
-The direction is judged only where the observed wind is at least 1 m/s, 85% of the surface over the year.
+The direction is judged only where the observed wind is at least 1 m/s, 85% of the surface over the year. The mean speed and mean pressure differences are not kept in the baseline.
 
 The page shows the same comparison on an untouched Earth, at the world's own resolution: Pressure's Observed and Difference, with the mean and RMS pressure difference under the legend in the pressure's unit from Settings, hPa or inHg, and the observed winds, fetched by choosing Observed or Difference with Winds on, drawn in the chosen style, arrows or streaks, to set beside the simulated; the page gives no wind figures of its own; see the [user guide](user-guide.md#simulated-or-observed-winds).
 
@@ -116,7 +124,7 @@ The page shows the same comparison on an untouched Earth, at the world's own res
 
 `src/core/wind/baseline/earthWinds.json` records the figures above, so that a change to the model cannot make them worse unnoticed.
 
-- **What it holds:** for the Earth at 64 cells per face edge, given the temperature model's own temperatures, for the whole year, January and July: the RMS of the wind's difference as vectors (m/s), the share within 45° in direction (as a percentage) and the RMS pressure difference (hPa).
+- **What it holds:** for the Earth at 64 cells per face edge, given the winds of the climate loop, for the whole year, January and July: the RMS of the wind's difference as vectors (m/s), the share within 45° in direction (as a percentage) and the RMS pressure difference (hPa).
 - **The test:** a test solves that Earth and fails, naming each figure, if any is worse than the file's by more than its tolerance, or is not a number:
 
   | Figure | Worse when | Tolerance |
@@ -131,6 +139,8 @@ The page shows the same comparison on an untouched Earth, at the world's own res
 - **When a change is meant to move the figures:** run `npm run baseline:winds`, which rewrites the file and prints what moved, and commit the file with the change.
 
 ## What it gets wrong
+
+The figures here, up to [The Earth's known faults](#the-earths-known-faults), were measured before the temperature depended on the winds, at the thermal response of 3 hPa a kelvin the model was tuned at and given the temperature without winds, which is what `npm run tune:winds` still works from. The model's default is now the physical 0.7 and the baseline's temperature is the climate loop's, so they are not the shipped model's figures; they stand as the record of the faults, to be measured again when the winds are tuned next.
 
 - **The July heat low sits over Siberia, not South Asia**, and the northern subtropical high runs unbroken over North Africa and Asia in July. Both are the simulated temperature's (see below).
 - **The Asian winter high is too weak** and too far west: 1,032 hPa at 55°N 77°E over 35–70°N, 60–140°E, against an observed 1,036.5 hPa at 53°N 97°E.
@@ -148,7 +158,7 @@ The page shows the same comparison on an untouched Earth, at the world's own res
 
 ### Which faults are the temperature's
 
-`npm run tune:winds -- diagnose` runs the model on the Earth with the observed temperature, taken onto the cells as the page's comparison takes it, beside the run on the simulated temperature:
+`npm run tune:winds -- diagnose` runs the model on the Earth with the observed temperature, taken onto the cells as the page's comparison takes it, beside the run on the simulated temperature. Like the rest of the tuning script it works from the temperature without winds; the figures below are at 3 hPa a kelvin, before the loop:
 
 | | Simulated temperature | Observed temperature | Observed |
 |-|-|-|-|
@@ -163,7 +173,7 @@ The page shows the same comparison on an untouched Earth, at the world's own res
 
 ### The Earth's known faults
 
-These are recorded, not tuned. The model is not fitted any closer to the observed Earth until the rest of the loop it belongs to is built (heat carried by the winds, ocean currents and ice), since each of those will change the temperature the winds are worked out from, and a fit made now would have to be made again. The diagnostic above reads them:
+These are recorded, not tuned. The model is not fitted any closer to the observed Earth until the rest of the loop it belongs to is built (ocean currents and ice), since each of those will change the temperature the winds are worked out from, and a fit made now would have to be made again. The diagnostic above reads them:
 
 | Fault | Whose | What the observed temperature does |
 |-|-|-|
@@ -181,7 +191,7 @@ These are recorded, not tuned. The model is not fitted any closer to the observe
 - **The air above the surface.** There is one level, the surface, and no upper winds or jet streams.
 - **Weather.** The winds are monthly means of a steady balance: no storms, fronts or day-to-day change.
 - **The air's own motion.** The wind does not carry itself along, so nothing is steered by the flow upstream, and there is no difference between the hemispheres other than what their land and temperature give.
-- **The ocean.** There are no ocean currents, and the winds do not change the temperature.
+- **The ocean.** There are no ocean currents. On their own the winds do not change the temperature; the climate loop, which the page works the climate out with, feeds them back.
 
 ## The pressure of finer worlds is worked out on the 64 grid
 
@@ -206,6 +216,8 @@ Nearly all the time is the smoothing of the thermal highs and lows; placing the 
 `npm run time:winds` measures both; see [Development](development.md#commands).
 
 ## The settings and the tuning script
+
+The tuning script works from the temperature without winds, as the figures in [What it gets wrong](#what-it-gets-wrong) were measured, at whatever `thermalHpaPerK` it is given: 0.7 by default, where those figures were at 3. Its Earth figures are not the baseline's, which come from the climate loop. `thermalHpaPerK` is among the settings a search varies, and at 3 the loop does not settle (see [Temperature](temperature.md#the-climate-loop)), so a search that raises it needs the loop looked at again. The winds' own retuning, against the loop's temperature, is a later step.
 
 The model's settings, listed in [Model settings](../src/core/config.md), are its rough figures: one set with values by default (`DEFAULT_WIND_SETTINGS` in `src/core/wind/rules.ts`). They are written down as data in `WIND_CONFIG` in `src/core/config.ts`, each with its unit, what it controls, what raising and lowering it do, where it comes from, whether it was tuned, and the bounds a search keeps it within; the entries given a place in the tuning search are the ones `search tuned` takes. A run may change any of them, through `solveWinds`'s `settings` option; the page and its worker never do, and with none changed the run is the default one exactly.
 

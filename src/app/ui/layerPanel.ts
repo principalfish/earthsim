@@ -49,7 +49,6 @@ import {
 	scaleKey,
 	summaryOf,
 	toLayerUnit,
-	windsStatus,
 	type YearFieldKey,
 	yearField,
 } from '../layers/scalar';
@@ -219,9 +218,7 @@ export type {
  * arrives or another month or the annual mean is chosen, not again as the
  * status changes. Turned off, the globe is given no winds. While the winds
  * are shown, the info box's status line is given where the store's winds
- * stand, as {@link windKeyContent} words it from {@link windsStatus}, the
- * rule the pressure's legend follows, so that it says the winds are being
- * worked out while the temperature they wait for is.
+ * stand, as {@link windKeyContent} words it, as the pressure's legend does.
  *
  * While the world is the measured Earth, the arrows follow the source, as
  * {@link windSourceFor} says: the observed winds on Observed, and the
@@ -244,12 +241,12 @@ export type {
  *
  * Whatever is shown, the info box's status line is also given where the
  * calculation stands, as {@link calculationContent} words it from the
- * store's temperature and winds and whether it is paused, as
- * {@link LayerPanel.setPaused} last said; it starts unpaused. So it says
- * the temperature and then the winds are being calculated in Terrain view
- * too, and that the calculation is paused while it is and a result is not
- * current. It is given again whenever the legend is, and at each change of
- * being paused.
+ * store's temperature, which the climate's passes write with the winds, and
+ * whether it is paused, as {@link LayerPanel.setPaused} last said; it
+ * starts unpaused. So it says the climate is being calculated, and which
+ * pass, in Terrain view too, and that the calculation is paused while it
+ * is and a result is not current. It is given again whenever the legend
+ * is, and at each change of being paused.
  *
  * The legend's scale, ramp, caption and ticks are always those of what the
  * globe shows: what it was last given, or no scale while it shows the height
@@ -587,7 +584,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 				observedShown && showsTarget
 					? OBSERVED_WINDS_STATUS
 					: windKeyContent({
-							status: windsStatus(store.temperature.status, store.winds.status),
+							status: store.winds.status,
 						});
 			controls.showWindKey(
 				windsOn
@@ -703,9 +700,7 @@ export const createLayerPanel = (options: LayerPanelOptions): LayerPanel => {
 			try {
 				updateWinds();
 			} finally {
-				controls.showCalculation(
-					calculationContent(store.temperature, store.winds.status, paused),
-				);
+				controls.showCalculation(calculationContent(store.temperature, paused));
 			}
 		}
 	};

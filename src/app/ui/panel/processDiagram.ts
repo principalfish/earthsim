@@ -514,11 +514,11 @@ export const DIAGRAM_INTRO =
 export const DIAGRAM_STATUS = [
 	{
 		lead: 'Built today:',
-		text: 'temperature, then pressure, then winds, each worked out once in that order, with no feedback.',
+		text: 'temperature, pressure and winds in a loop, with heat carried by winds.',
 	},
 	{
 		lead: 'Planned, not built:',
-		text: 'the loop and heat carried by winds, rain, ocean currents, ice, storm zones, biomes.',
+		text: 'rain, ocean currents, ice, storm zones, biomes.',
 	},
 ] as const;
 

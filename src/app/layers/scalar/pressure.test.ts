@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getGrid, summariseWinds } from '../../../core/index';
-import {
-	progressOf,
-	temperatureOf,
-} from '../../../core/testing/temperatureFixtures';
+import { temperatureOf } from '../../../core/testing/temperatureFixtures';
 import { DIFFERENCE_RAMP, PRESSURE_RAMP } from '../../globe/ramp';
 import { pressureWinds } from '../../testing/scalarLayerFixtures';
 import { createLayerStore } from '../layers';
@@ -16,7 +13,6 @@ import {
 	PRESSURE_DIFFERENCE_TICK_STEP_HPA,
 	PRESSURE_LAYER,
 	PRESSURE_OBSERVED,
-	windsStatus,
 } from './pressure';
 import { offersSummary, summaryOf } from './spec';
 import { TEMPERATURE_LAYER, TEMPERATURE_OBSERVED } from './temperature';
@@ -29,7 +25,6 @@ describe('the pressure layer', () => {
 		expect(PRESSURE_LAYER.quantity).toBe('pressure');
 		expect(PRESSURE_LAYER.unavailableText).toBe('Pressure unavailable');
 		expect(PRESSURE_LAYER.notShownText).toBe('Pressure could not be shown');
-		expect(PRESSURE_LAYER.yearProgress).toBe(false);
 		expect(PRESSURE_LAYER.summaryControlId).toBe('pressure-view');
 		expect(PRESSURE_LAYER.sunlightStyle).toBe(TEMPERATURE_LAYER.sunlightStyle);
 		expect(PRESSURE_LAYER.minSpan.hPa).toBe(10);
@@ -129,61 +124,33 @@ describe('the pressure layer', () => {
 		);
 	});
 
-	it('reads the store’s winds, their months of pressure and no progress', () => {
+	it('reads the store’s winds, their status and their months of pressure', () => {
 		const store = createLayerStore(() => {});
 		expect(PRESSURE_LAYER.read(store)).toEqual({
 			status: 'empty',
 			result: null,
 			months: null,
-			progress: null,
 		});
-		store.markCalculating();
-		store.setProgress(progressOf(2));
-		store.markWindsCalculating();
-		expect(PRESSURE_LAYER.read(store).status).toBe('calculating');
-		expect(PRESSURE_LAYER.read(store).progress).toBeNull();
-		const solved = pressureWinds();
-		store.setWindsResult(solved, true);
-		const reading = PRESSURE_LAYER.read(store);
-		expect(reading.status).toBe('current');
-		expect(reading.result).toBe(solved);
-		expect(reading.months).toBe(solved.winds.pressure);
-		// The temperature is not the pressure's.
-		store.setResult(temperatureOf(1), true);
-		expect(PRESSURE_LAYER.read(store).months).toBe(solved.winds.pressure);
-	});
-
-	it('is being calculated before the first winds while the temperature they wait for is', () => {
-		const store = createLayerStore(() => {});
-		expect(PRESSURE_LAYER.read(store).status).toBe('empty');
-		// The winds are not asked for until there is a temperature.
-		store.markCalculating();
-		expect(store.winds.status).toBe('empty');
+		store.markClimateCalculating();
 		expect(PRESSURE_LAYER.read(store)).toEqual({
 			status: 'calculating',
 			result: null,
 			months: null,
-			progress: null,
 		});
-		// With a temperature and still no winds, nothing is under way yet.
-		store.setResult(temperatureOf(1), true);
-		expect(PRESSURE_LAYER.read(store).status).toBe('empty');
-		store.markWindsCalculating();
-		expect(PRESSURE_LAYER.read(store).status).toBe('calculating');
-	});
-
-	it('stands as the winds stand for showing, by the rule the key to the arrows shares', () => {
-		expect(windsStatus('calculating', 'empty')).toBe('calculating');
-		expect(windsStatus('empty', 'empty')).toBe('empty');
-		expect(windsStatus('current', 'empty')).toBe('empty');
-		expect(windsStatus('calculating', 'current')).toBe('current');
-		expect(windsStatus('calculating', 'outOfDate')).toBe('outOfDate');
-		expect(windsStatus('unavailable', 'unavailable')).toBe('unavailable');
-		const store = createLayerStore(() => {});
-		store.markCalculating();
-		expect(PRESSURE_LAYER.read(store).status).toBe(
-			windsStatus(store.temperature.status, store.winds.status),
-		);
+		const solved = { ...pressureWinds(), temperature: temperatureOf(1) };
+		store.setPass(solved, 1);
+		expect(PRESSURE_LAYER.read(store)).toEqual({
+			status: 'calculating',
+			result: solved,
+			months: solved.winds.pressure,
+		});
+		store.setClimateResult(solved, true);
+		const reading = PRESSURE_LAYER.read(store);
+		expect(reading.status).toBe('current');
+		expect(reading.result).toBe(solved);
+		expect(reading.months).toBe(solved.winds.pressure);
+		store.markOutOfDate();
+		expect(PRESSURE_LAYER.read(store).status).toBe('outOfDate');
 	});
 
 	it('averages months cell by cell as the winds’ own annual mean does, to the bit', () => {
@@ -198,21 +165,22 @@ describe('the pressure layer', () => {
 
 	it('cannot be calculated once the temperature cannot, as the winds cannot', () => {
 		const store = createLayerStore(() => {});
-		store.markCalculating();
+		store.markClimateCalculating();
 		store.markUnavailable();
 		expect(store.winds.status).toBe('unavailable');
 		expect(PRESSURE_LAYER.read(store).status).toBe('unavailable');
 	});
 
-	it('stands where the winds do once there are winds, whatever the temperature', () => {
+	it('keeps the winds it has while the next climate is worked out', () => {
 		const store = createLayerStore(() => {});
-		store.setResult(temperatureOf(1), true);
-		const solved = pressureWinds();
-		store.setWindsResult(solved, true);
-		store.markCalculating();
-		// The winds it has are still the latest worked out.
-		expect(PRESSURE_LAYER.read(store).status).toBe(store.winds.status);
-		expect(PRESSURE_LAYER.read(store).status).not.toBe('empty');
+		const solved = { ...pressureWinds(), temperature: temperatureOf(1) };
+		store.markClimateCalculating();
+		store.setClimateResult(solved, true);
+		store.markClimateCalculating();
+		expect(PRESSURE_LAYER.read(store)).toMatchObject({
+			status: 'calculating',
+			result: solved,
+		});
 	});
 
 	it('takes its annual average as the winds’ mean pressure, worked out once for each year', () => {

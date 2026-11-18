@@ -5,10 +5,14 @@
  * `earthTemperature.json`.
  *
  * The committed figures are for the Earth preset at 64 cells per face edge,
- * with Earth's planet settings and the preset's sea level, simulated less
- * observed, in kelvin, rounded to {@link BASELINE_DECIMALS} decimals. The
- * test beside this module solves that world and fails if any figure is
- * worse than its committed value by more than {@link BASELINE_TOLERANCE_K};
+ * with Earth's planet settings and the preset's sea level, solved by the
+ * climate loop that carries heat along the winds, simulated less observed,
+ * in kelvin, rounded to {@link BASELINE_DECIMALS} decimals. They also hold
+ * the west–east coast contrasts, simulated and observed (see
+ * {@link coastContrast}). The test beside this module solves that world and
+ * fails if any figure is worse than its committed value by more than
+ * {@link BASELINE_TOLERANCE_K}, or a simulated coast contrast is smaller
+ * than its committed value by more than {@link COAST_CONTRAST_TOLERANCE_K};
  * `npm run baseline:temperature` writes the figures afresh, to be
  * committed when a change is meant to move them.
  */
@@ -16,8 +20,14 @@
 import { compareField, type FieldDifference } from '../../compare';
 import type { Grid, Resolution } from '../../grid/grid';
 import { MONTH_NAMES, MONTHS_PER_YEAR } from '../../planet/insolation';
+import type { World } from '../../world/world';
 import type { MonthlyTemperature } from '../observed';
 import { summariseTemperature } from '../temperature';
+import {
+	type CoastContrast,
+	type CoastContrastFigure,
+	coastContrast,
+} from './coastContrast';
 
 /** The resolution the baseline is worked out at. */
 export const BASELINE_RESOLUTION: Resolution = 64;
@@ -29,6 +39,16 @@ export const BASELINE_RESOLUTION: Resolution = 64;
  * accuracy.
  */
 export const BASELINE_TOLERANCE_K = 0.05;
+
+/**
+ * How much smaller than the baseline a simulated west–east coast contrast
+ * may be, in kelvin, before the check fails: the contrast is what the
+ * winds' heat carrying is for, and a later step must not quietly lose it.
+ * More than the other figures' tolerance, since a contrast is a difference
+ * of two small areas' means and the loop that finds it settles to within
+ * 0.1 K.
+ */
+export const COAST_CONTRAST_TOLERANCE_K = 0.25;
 
 /** The decimals the committed figures are rounded to. */
 export const BASELINE_DECIMALS = 3;
@@ -58,6 +78,11 @@ export type EarthTemperatureFigures = {
 	readonly coldest: FieldDifference;
 	/** The seasonal range's: the warmest less the coldest month. */
 	readonly range: FieldDifference;
+	/**
+	 * The west–east coast contrasts, simulated and observed, in kelvin; left
+	 * out of figures made without the world.
+	 */
+	readonly coastContrast?: CoastContrast;
 };
 
 /**
@@ -75,6 +100,8 @@ export type EarthTemperatureFigures = {
  * @param observed - The twelve observed months on the same grid. Not
  * changed.
  * @param grid - The grid both are on.
+ * @param world - The Earth, to find the coasts the contrasts are of; left
+ * out, the figures hold none.
  * @returns New figures, unrounded.
  * @throws RangeError if either does not hold twelve fields of one value per
  * cell.
@@ -83,6 +110,7 @@ export const earthTemperatureFigures = (
 	simulated: MonthlyTemperature,
 	observed: MonthlyTemperature,
 	grid: Grid,
+	world?: World,
 ): EarthTemperatureFigures => {
 	if (
 		simulated.length !== MONTHS_PER_YEAR ||
@@ -104,6 +132,9 @@ export const earthTemperatureFigures = (
 		warmest: summary('warmest'),
 		coldest: summary('coldest'),
 		range: summary('range'),
+		...(world === undefined
+			? {}
+			: { coastContrast: coastContrast(world, simulated, observed) }),
 	};
 };
 
@@ -112,6 +143,18 @@ const rounded = (value: number): number => {
 	const result = Number(value.toFixed(BASELINE_DECIMALS));
 	return result === 0 ? 0 : result;
 };
+
+/** A coast contrast rounded as the baseline keeps it. */
+const roundedContrast = (figure: CoastContrastFigure): CoastContrastFigure => ({
+	simulated: {
+		annual: rounded(figure.simulated.annual),
+		january: rounded(figure.simulated.january),
+	},
+	observed: {
+		annual: rounded(figure.observed.annual),
+		january: rounded(figure.observed.january),
+	},
+});
 
 /** A pair of figures rounded as the baseline keeps them. */
 const roundedPair = (figures: FieldDifference): FieldDifference => ({
@@ -136,6 +179,14 @@ export const baselineText = (figures: EarthTemperatureFigures): string => {
 		warmest: roundedPair(figures.warmest),
 		coldest: roundedPair(figures.coldest),
 		range: roundedPair(figures.range),
+		...(figures.coastContrast === undefined
+			? {}
+			: {
+					coastContrast: {
+						europeAsia: roundedContrast(figures.coastContrast.europeAsia),
+						northAmerica: roundedContrast(figures.coastContrast.northAmerica),
+					},
+				}),
 	};
 	return `${JSON.stringify(file, null, 2)}\n`;
 };
@@ -235,6 +286,36 @@ export const baselineRegressions = (
 	});
 	for (const part of ['warmest', 'coldest', 'range'] as const) {
 		check(PART_NAMES[part], now[part], baseline[part]);
+	}
+	// A coast contrast is worse when it is smaller: the winds' heat carrying
+	// is what makes it. Only a baseline that holds contrasts is checked.
+	if (baseline.coastContrast !== undefined) {
+		for (const [region, label] of [
+			['europeAsia', 'Europe–Asia'],
+			['northAmerica', 'North America'],
+		] as const) {
+			for (const [period, name] of [
+				['annual', 'annual'],
+				['january', 'January'],
+			] as const) {
+				const before = baseline.coastContrast[region].simulated[period];
+				const after = now.coastContrast?.[region].simulated[period];
+				if (
+					!(
+						after !== undefined &&
+						Number.isFinite(after) &&
+						Number.isFinite(before) &&
+						after >= before - COAST_CONTRAST_TOLERANCE_K
+					)
+				) {
+					regressions.push({
+						figure: `${label} ${name} coast contrast`,
+						baseline: before,
+						now: after ?? Number.NaN,
+					});
+				}
+			}
+		}
 	}
 	return regressions;
 };

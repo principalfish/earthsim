@@ -141,11 +141,9 @@ export type DerivedWinds = {
 };
 
 /** Where the observed year shown stands: never out of date. */
-export const OBSERVED_STATUS: Pick<ScalarLayerReading, 'status' | 'progress'> =
-	{
-		status: 'current',
-		progress: null,
-	};
+export const OBSERVED_STATUS: Pick<ScalarLayerReading, 'status'> = {
+	status: 'current',
+};
 
 /**
  * What is said of observed winds on show: they are never out of date.
