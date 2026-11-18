@@ -20,7 +20,7 @@ _2026-11-18 · 5 of 6 pieces done · now: piece 6 in progress_
   Temperature, winds and the heat they carry, repeated until it settles (0.1 °C, at most 6 passes).
 - [x] **4/6 The setting's value, and the baselines** · `f8e7fc9`
   How strongly the wind carries heat is set from physics and checked against the Earth's coasts; both baselines re-recorded with the coast contrast.
-- [x] **5/6 One climate request in the worker** · `9728a32`
+- [x] **5/6 One climate request in the worker** · `9728a32`, `a406070`
   The worker answers one climate request with each pass as it lands.
 - [ ] **6/6 The page: one scheduler, passes shown as they land** · in progress
   The page shows the first pass at once and each refinement, with Pause between passes.
