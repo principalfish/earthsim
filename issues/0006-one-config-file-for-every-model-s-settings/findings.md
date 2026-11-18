@@ -90,11 +90,12 @@
 | round | docs | - | - | dropped | - | `src/core/config.md` | Missing backticks on names in prose — dropped: only the Setting column is backticked |
 | round | security | - | - | - | - | - | Clean |
 | round | coverage | - | - | - | - | - | Clean: 99% of 249 changed lines; 2 glue lines accepted |
-| re-check | correctness | low | docs | verified | open | `src/app/ui/panel/processDiagram.test.ts:21` | The rewritten header comment has a 131-character line |
-| re-check | correctness | low | docs | verified | open | `src/core/temperature/temperature.ts:1358` | The edited `estimateYearsLeft` remark has a 101-character line |
-| re-check | docs | low | docs | verified | open | `src/core/temperature/temperature.ts:1338` | `SLOWEST_SHRINK_TRUSTED`'s doc says "shrank by less" without saying than what |
-| re-check | common-mistakes | low | cleanup | verified | open | `src/app/ui/panel/modelSettings.test.ts:57` | Groups-plus-constants flattening left in two tests (also `scripts/write-config-doc.test.ts:59`) where `entriesOf` is not used |
-| re-check | correctness | - | cleanup | noticed | open | `src/core/config.ts:114` | `entriesOf<K>` casts to the caller's K unchecked, so the casts moved rather than went |
+| re-check | correctness | low | docs | verified | fixed | `src/app/ui/panel/processDiagram.test.ts:21` | The rewritten header comment has a 131-character line |
+| re-check | correctness | low | docs | verified | fixed | `src/core/temperature/temperature.ts:1358` | The edited `estimateYearsLeft` remark has a 101-character line |
+| re-check | docs | low | docs | verified | fixed | `src/core/temperature/temperature.ts:1338` | `SLOWEST_SHRINK_TRUSTED`'s doc says "shrank by less" without saying than what |
+| re-check | common-mistakes | low | cleanup | verified | fixed | `src/app/ui/panel/modelSettings.test.ts:57` | Groups-plus-constants flattening left in two tests (also `scripts/write-config-doc.test.ts:59`) where `entriesOf` is not used |
+| re-check | correctness | - | cleanup | noticed | accepted | `src/core/config.ts:114` | `entriesOf<K>` casts to the caller's K unchecked, so the casts moved rather than went |
 | re-check | common-mistakes | - | cleanup | dropped | - | `scripts/write-config-doc.ts:94` | `settingsIn` as a wrapper — dropped: two callers, a clear name |
 | re-check | common-mistakes | - | docs | dropped | - | `src/core/temperature/temperature.ts:622` | Over-long line — dropped: outside the change, a template literal in code |
 | re-check | common-mistakes | - | docs | dropped | - | `src/app/ui/panel/processDiagram.test.ts:263` | Over-long line — dropped: not changed here, 77 characters |
+| manual | user | - | - | - | fixed | the re-check findings | The user: "Approve, fix A–D" (2026-11-18): fix the four upheld re-check findings, leave the cast in `entriesOf` |

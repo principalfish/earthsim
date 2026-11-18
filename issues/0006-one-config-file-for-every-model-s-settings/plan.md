@@ -188,3 +188,7 @@ Decided by the builder:
 - Review: security clean; correctness raised one medium (the grids' `min-width`), four low and three nits, coverage three low and a note, docs three low: the verifier ruled on all of them (as the planner chat asked), 14 stood and were fixed or accepted (above in findings.md), 1 was dropped; the light re-check was clean.
 - The commit title was shortened to "the diagram on the screen" to stay within the 100-character limit; the body is as proposed.
 - Departures from the review rule: in pieces 2, 3 and 4 the verifier was not run on the checks' findings and fixes (I fixed every finding myself; piece 3 and 4's fixes got a light re-check, piece 2's did not); piece 5 ran the verifier as asked. Piece 1 ran the full process.
+
+### Review 01 fixes (2026-11-18)
+- The ten findings of review 01 were fixed in one commit, with the four findings the verifier upheld after the light re-check (long comment lines in `processDiagram.test.ts` and `estimateYearsLeft`'s doc, `SLOWEST_SHRINK_TRUSTED`'s rule said as a ratio, and `entriesOf` used in three more tests), as the user chose ("Approve, fix A–D"). The cast inside `entriesOf` stays, as the user said. No further re-check round was run for those four edits (the user's instruction through the planner chat).
+- Where the review rule asked it, the verifier ruled on the re-check's findings and the four it upheld went to the user instead of being fixed.
