@@ -10,11 +10,11 @@ Winds explain about a quarter of the Earth's temperature error, so its overall f
 
 ## Plan
 
-_2026-11-18 · 0 of 6 pieces done · now: piece 1 in progress_
+_2026-11-18 · 1 of 6 pieces done · now: piece 2 in progress_
 
-- [ ] **1/6 The wind's flowing part** · in progress
+- [x] **1/6 The wind's flowing part** · `26e4dcb`
   The part of the surface wind that converges into lows is removed, so the rest can carry heat without making any.
-- [ ] **2/6 Heat carried by the wind, in the temperature solve** · not started
+- [ ] **2/6 Heat carried by the wind, in the temperature solve** · in progress
   The temperature solve takes the winds and moves heat downwind each step; with no winds it is exactly today's.
 - [ ] **3/6 The climate loop in the core** · not started
   Temperature, winds and the heat they carry, repeated until it settles (0.1 °C, at most 6 passes).
