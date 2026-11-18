@@ -16,6 +16,7 @@ Requires Node.js and npm. Run `npm install` once.
 | `npm run build:observed-winds` | Rebuild the Earth's observed winds and sea-level pressure data; see [Data](data.md) |
 | `npm run baseline:temperature` | Write the Earth temperature baseline afresh; see below |
 | `npm run baseline:winds` | Write the Earth winds baseline afresh; see [Winds](winds.md#the-earth-winds-baseline) |
+| `npm run docs:config` | Write `src/core/config.md`, the list of every model's settings, from `src/core/config.ts`; a test fails when the committed page is not the one this writes |
 | `npm run time:temperature` | Time the temperature solver at every resolution and print the simulated Earth's error figures, as Markdown tables. Takes a few minutes |
 | `npm run time:winds` | Time a year of the Earth's winds at every resolution, as `solveWinds` solves them by default (the pressure on the 64 grid) and wholly on the world's own grid beside it, and print how far the two lie apart, as Markdown tables. Takes about half a minute; see [Winds](winds.md#the-pressure-of-finer-worlds-is-worked-out-on-the-64-grid) |
 | `npm run tune:winds` | Run the wind model many times with its settings changed, on the wind report's nine cases, and print the Earth's error figures and every case's measures, as Markdown tables: a sweep of one setting, a search over several, every case for some settings, or the model run on the observed temperature; run with nothing after it to list the settings and the forms. It changes no setting; see [Winds](winds.md#the-settings-and-the-tuning-script) |
@@ -50,7 +51,7 @@ python3 -m venv <dir>
 
 - **Re-running it with nothing changed** leaves the PDF byte-identical, so the PDF changes in a commit only when the script does. The committed PDF was drawn with reportlab 5.1.0; another version may write the same pages as different bytes.
 - **The diagram is a design,** mostly of parts not built yet. Redraw it when one of them, once built, changes it.
-- **The settings pages are a dated snapshot,** kept by hand in the script, with the date set once at its top. When a setting is added, removed or changed in `src/core/config.ts`, bring the pages up to the code. A future `src/core/config.md` is to become the living list of the settings.
+- **The settings pages are a dated snapshot,** kept by hand in the script, with the date set once at its top. When a setting is added, removed or changed in `src/core/config.ts`, bring the pages up to the code. `src/core/config.md`, written from the config, is the living list of the settings.
 
 ## Type-checking rules
 
@@ -69,6 +70,7 @@ A pure library with no DOM, Three.js or worker globals.
 | `grid/coarsen.ts` | A world or a field averaged onto the grid a step coarser, and a field or a vector field carried back from it |
 | `grid/vector.ts` | Vector fields on the grid, east and north at every cell, and the gradient, divergence, curl, Laplacian and smoothing of fields |
 | `grid/quantile.ts` | Area-weighted quantiles of values on the grid |
+| `config.md` | The list of every model's settings, written from `config.ts` by `npm run docs:config` |
 | `config.ts` | The models' settings as data, a section per model: each setting's value, unit, what it controls, what raising and lowering it do, where its value comes from and whether it was tuned, in titled groups; the temperature's 18 settings and the wind model's 36, each with its fixed choices beside them, and which of the wind settings a tuning search varies. The models build their value objects from it, and it imports nothing from them |
 | `world/world.ts` | A world: its settings, its date and the elevation of every cell |
 | `world/generate.ts`, `world/noise.ts` | Worlds with noise-shaped continents, and the seeded noise behind them |
@@ -152,6 +154,7 @@ Run with Node, not in the browser; `docs/` alone is Python.
 | `time-winds.ts` | The wind model's timings, and how far its solve with the pressure on the 64 grid lies from one wholly on the world's own grid |
 | `update-earth-temperature-baseline.ts` | Writes the Earth temperature baseline afresh |
 | `update-earth-winds-baseline.ts` | Writes the Earth winds baseline afresh |
+| `write-config-doc.ts` | Writes `src/core/config.md` from the config |
 | `baselineUpdate.ts` | What both baseline updates share: naming each number of a baseline, saying which moved, and writing the file |
 | `wind-report.ts` | Writes the wind report, and lists the wind models it runs |
 | `tune-winds.ts` | Runs the wind model with its settings changed and prints what each run gives |
