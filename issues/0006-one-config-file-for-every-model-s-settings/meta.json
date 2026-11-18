@@ -3,14 +3,14 @@
   "slug": "one-config-file-for-every-model-s-settings",
   "title": "One config file for every model's settings, with a screen to read them",
   "mode": "refactor",
-  "state": "ready",
+  "state": "done",
   "branch": "claude/one-config-file-for-every-model-s-settings-3f9895",
   "base": "main",
   "gh_issue": 11,
   "build_model": null,
   "created": "2026-11-18 09:04",
-  "updated": "2026-11-18 11:32",
-  "done": null,
+  "updated": "2026-11-18 11:33",
+  "done": "2026-11-18 11:33",
   "local": [
     {
       "kind": "session",
