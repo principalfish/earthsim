@@ -115,3 +115,16 @@
 | re-check | correctness | low | test | verified | fixed | `src/app/layers/refresh.test.ts:1354` | The pass numbering's reset after a world change or reset while paused is not asserted (three tests check only where the request starts; add `store.temperature.pass` is 1) |
 | re-check | docs | low | docs | verified | fixed | `src/app/layers/refresh.ts:548` | The doc comment of `stop` has `@param pass` but no `@param solved` |
 | manual | user | - | - | - | fixed | `src/app/layers/refresh.test.ts`, `refresh.ts` | After the manual review of piece 6 the user asked for the three re-check findings to be fixed ("Tried it, fix all", 2026-11-18) |
+
+## review 01 · 2026-11-18
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | defect | verified | open | `src/core/climate.ts:356` | After an edit a warm start's pass 1 carries heat along the pre-edit winds; a local sculpt moves the global rms by under 0.1 °C, so the loop settles at pass 1 and the edited region never sees winds of its own new temperature |
+| round | carried over | low | defect | verified | open | `src/core/climate.ts:311` | The half-step on overshoot does not damp the oscillation at stronger feedback (old 3 hPa/K); cannot arise with shipped settings. Raised as medium in the piece reviews; the verifier set it low |
+| round | coverage | low | cleanup | verified | open | `src/worker/handle.ts:213` | The `pass === undefined` arms (also `src/app/layers/refresh.ts:588`) are dead: only the climate reports progress, always with a pass |
+| round | docs | low | docs | verified | open | `src/core/temperature/temperature.ts:268` | `TemperatureStart` remark "the temperature does not depend on it" (day length) now ambiguous |
+| round | docs | - | docs | verified | open | `docs/temperature.md:36` | About ten measured timings that will go out of date |
+| round | correctness | low | - | dropped | - | `src/app/layers/refresh.ts:574` | Raw `world.planet.dayLengthHours` vs the clamped one in `suits()` — dropped: `world.planet` is always normalised and files reject out-of-limits settings |
+| round | docs | low | - | dropped | - | `docs/development.md:69` | The `planet/planet.ts` row doesn't say the climate record carries the day length — dropped: accurate as written |
+| round | coverage | - | - | - | - | coverage | 98% of changed lines (746/756); reasons accepted for flows.ts:95, flowing.ts:247, 263, temperature.ts:1346, main.ts:189-190, handle.ts:193, testing/climateStore.ts:23; rejected for handle.ts:213 and refresh.ts:588 (remove, finding 3) |
