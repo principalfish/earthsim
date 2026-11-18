@@ -10,7 +10,7 @@ Winds explain about a quarter of the Earth's temperature error, so its overall f
 
 ## Plan
 
-_2026-11-18 · 6 of 6 pieces done · now: self review_
+_2026-11-18 · 6 of 6 pieces done · self review done · now: PR text_
 
 - [x] **1/6 The wind's flowing part** · `26e4dcb`
   The part of the surface wind that converges into lows is removed, so the rest can carry heat without making any.
@@ -24,3 +24,5 @@ _2026-11-18 · 6 of 6 pieces done · now: self review_
   The worker answers one climate request with each pass as it lands.
 - [x] **6/6 The page: one scheduler, passes shown as they land** · `e54d423`
   The page shows the first pass at once and each refinement, with Pause between passes.
+- [x] **Review fixes (round 1)** · `c5061bf`, `32fd146`
+  A warm start settles from the second pass, so an edit meets its own new winds; progress always carries a pass; doc and wording fixes.

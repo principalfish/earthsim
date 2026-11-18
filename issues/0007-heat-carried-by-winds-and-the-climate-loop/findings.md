@@ -59,7 +59,7 @@
 | round | correctness | low | - | dropped | - | `src/core/climate.ts:311` | Overshoot needs a strictly growing change; equal or slowly decaying changes aren't damped — dropped: the ledger says "grows rather than shrinks"; damping equal changes would be an enhancement |
 | round | docs | - | - | dropped | - | `src/core/config.ts:486` | "Below about 0.05 the temperature's own tolerance sets the limit" unsupported — dropped: the temperature solve stops a year at DEFAULT_TOLERANCE_K = 0.05 |
 | round | coverage | - | - | dropped | - | `src/core/climate.test.ts` | "A test planet" no-wind case — dropped: the setting at zero is tested, which meets the plan |
-| round | - | medium | defect | noticed | open | `src/core/climate.ts:311` | At the shipped capacity the half-step stops some passes from growing but does not bring the oscillation down; whether the loop settles there rests on the damping (see the notes, and piece 4's table) |
+| round | - | medium | defect | noticed | fixed | `src/core/climate.ts:311` | At the shipped capacity the half-step stops some passes from growing but does not bring the oscillation down; whether the loop settles there rests on the damping (see the notes, and piece 4's table) — taken into review 01 (finding 2): the `climateOvershootShare` entry now says it only stops a pass growing (c5061bf); the damping itself is unchanged, and the shipped settings settle |
 | re-check | correctness | low | docs | verified | fixed | `src/core/climate.ts:113` | The `start` option doc and the `@throws` don't say that a start whose temperature has no valid record is refused with a RangeError (since `conditionsMatch`) |
 | re-check | correctness | low | test | verified | fixed | `src/core/climate.test.ts:117` | `changeC` is checked with `toBeLessThan(tolerance)` at lines 117 and 155, though settling is `<=` |
 
@@ -132,3 +132,4 @@
 | re-check | docs | low | docs | verified | fixed | `src/core/config.ts:501` | At a cap of one pass nothing settles and no start is kept; the `climateMaxPasses` entry (and the TemperatureStart doc) doesn't say so; regenerate config.md |
 | re-check | docs | low | docs | verified | fixed | `docs/temperature.md:81` | A resumed run's first pass can't settle, so it may take one more pass than a run never paused; add a clause (and in climate.ts's settled comment) |
 | re-check | docs | - | cleanup | verified | fixed | `src/core/temperature/temperature.ts:269` | The reworded doc line is 84 characters; re-wrap |
+| manual | user | - | - | - | fixed | `infoBox.test.ts`, `config.ts`, `docs/temperature.md`, `climate.ts`, `temperature.ts` | The user asked for the four re-check findings to be fixed ("Approve, fix all four", 2026-11-18); 32fd146 |
