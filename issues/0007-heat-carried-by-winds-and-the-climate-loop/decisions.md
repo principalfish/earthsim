@@ -16,11 +16,19 @@ The user's brief (2026-11-18): "Plan 3b", roadmap step 3b in `investigations/202
 - The new setting for how strongly the wind carries heat (in effect the depth of air that moves it) starts from a physical estimate and is checked against the Earth's west–east coast contrast landing in a believable range (observed about 11 K, western Europe against East Asia, 40–60°N); only this new setting is set, nothing else is retuned. The user: "Physics, then a sanity check (Recommended)" (2026-11-18)
 - The page shows each pass: the first pass (today's temperature and winds) appears at once, each later pass replaces it as it lands, and the status says which pass it is on; Pause lets the pass under way finish, then stops, and resume carries on from there. The user: "Show each pass (Recommended)" (2026-11-18)
 
+- Heat is carried by the wind's flowing part only: before carrying heat, the converging part of each month's surface wind is removed (one quick solve per month with the existing solver), so heat is moved around and never made. The converging air rises and takes its heat away, which a surface-only model cannot follow. The user: "Use the wind's flowing part (Recommended)" (2026-11-18)
+- The loop stops when no cell's monthly temperature changes by more than 0.1 °C between passes, with a cap of 6 passes; if a pass overshoots, only half its change is applied. The user: "0.1 °C, at most 6 passes (Recommended)" (2026-11-18)
+- One climate request: the loop lives in the core as one function, the worker runs it and reports each pass, and the page's separate temperature and wind requests become one climate request with one scheduler. About 190 test sites change. The user: "One climate request (Recommended)" (2026-11-18)
+- Both Earth baselines are re-recorded with the new figures, shown in the review, and the west–east coast contrast becomes a figure of its own in the temperature baseline, so a later step cannot quietly lose it. The user: "Re-record, add the coast contrast (Recommended)" (2026-11-18)
+
 ## Open
-- The loop's shape: the roadmap's proposal (separate solvers in sequence, repeated until the temperature changes by less than about 0.1 °C; damping if it oscillates) is to be confirmed, with a cap on passes.
-- Heat conservation with a converging surface wind: carrying heat with the wind as it is would create heat where the wind converges into lows.
-- Where the loop runs: one climate request with the loop in the core (the read's recommendation) or the page driving two requests.
-- What the Earth comparison and the baselines do: the temperature baseline will move.
-- How day length enters the temperature (only through the winds, or also elsewhere).
+- None.
 
 ## Assumed
+- Day length enters the temperature only through the winds (their turning and band widths); the heat exchange between neighbours does not change with it. The temperature's start record and the day-length tests change accordingly.
+- The first pass is today's temperature and winds unchanged, so a world with no wind effect looks as it does now; each later pass feeds the previous pass's winds into the temperature.
+- Warm starts come only from a settled result, never from a pass shown on the way.
+- A new world or an edit during the loop stops it and starts again, as a new solve does today; Pause lets the pass under way finish.
+- The settled wind heat carries the winds' own baseline and comparison forward; the winds are re-solved from the final temperature each pass.
+- The status line names the pass ("Refining climate (pass 2)"); the progress bar does not drop back to 0 between passes.
+- New settings (the heat-carrying depth, the loop's 0.1 °C and 6 passes, the half-step on overshoot) go in `config.ts` with their explanations, so they appear on the Model settings screen and in `config.md`; the climate process diagram's "Built today" line is updated.
