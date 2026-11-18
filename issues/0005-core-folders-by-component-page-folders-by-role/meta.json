@@ -22,12 +22,14 @@
     {
       "kind": "worktree",
       "name": "/home/philiph/workspace/earth_sim/.claude/worktrees/core-folders-by-component-page-folders-by-role-c9bcc4",
-      "added": "2026-11-17 19:46"
+      "added": "2026-11-17 19:46",
+      "removed": "2026-11-18 09:03"
     },
     {
       "kind": "branch",
       "name": "claude/core-folders-by-component-page-folders-by-role-c9bcc4",
-      "added": "2026-11-17 19:46"
+      "added": "2026-11-17 19:46",
+      "removed": "2026-11-18 09:03"
     }
   ],
   "pr": 10

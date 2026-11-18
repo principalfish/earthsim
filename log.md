@@ -109,3 +109,4 @@
 - 2026-11-18 09:02 · core-folders-by-component-page-folders-by-role (0005) · PR #10 description final
 - 2026-11-18 09:02 · core-folders-by-component-page-folders-by-role (0005) · merged → done
 - 2026-11-18 09:03 · core-folders-by-component-page-folders-by-role (0005) · session local_771afecd-71f4-4b84-9a42-3353235082da removed
+- 2026-11-18 09:03 · core-folders-by-component-page-folders-by-role (0005) · cleanup: removed worktree /home/philiph/workspace/earth_sim/.claude/worktrees/core-folders-by-component-page-folders-by-role-c9bcc4, branch claude/core-folders-by-component-page-folders-by-role-c9bcc4
