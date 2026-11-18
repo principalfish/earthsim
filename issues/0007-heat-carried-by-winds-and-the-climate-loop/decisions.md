@@ -35,6 +35,8 @@ The user's brief (2026-11-18): "Plan 3b", roadmap step 3b in `investigations/202
 
 - Piece 4's measurements also check whether the cells and months that do not settle sit in the snow-and-ice brightening range (`iceStartC` 0 °C to `iceFullC` −10 °C), i.e. whether the threshold flips between passes (a model artefact: monthly averages should settle; real weather would need step 10). The user: "Yes, add it" (2026-11-18), after asking "surely moving heat via the winds just creates some sort of weather which wont stop moving?"
 
+- Before choosing, piece 4 also measures the strong settings (1.2e6 and 6e5) with the winds' `thermalHpaPerK` at about its physical value (0.7 hPa/K, against 3 today, inflated in step 3 to make up for weak land–sea contrasts), under the stopping rules already measured, reporting the same columns: whether the inflated link from colder to stronger high is what keeps the loop from settling. A measurement only; whether to change `thermalHpaPerK` here or in step 6b is decided after. The user: "Yes, measure it" (2026-11-18), after asking how the loop works and what the problem is.
+
 ## Open
 - None.
 
