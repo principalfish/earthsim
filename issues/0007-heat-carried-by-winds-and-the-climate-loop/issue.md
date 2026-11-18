@@ -10,7 +10,7 @@ Winds explain about a quarter of the Earth's temperature error, so its overall f
 
 ## Plan
 
-_2026-11-18 · 5 of 6 pieces done · now: piece 6 in progress_
+_2026-11-18 · 5 of 6 pieces done · now: waiting on review of piece 6_
 
 - [x] **1/6 The wind's flowing part** · `26e4dcb`
   The part of the surface wind that converges into lows is removed, so the rest can carry heat without making any.
@@ -22,5 +22,5 @@ _2026-11-18 · 5 of 6 pieces done · now: piece 6 in progress_
   How strongly the wind carries heat is set from physics and checked against the Earth's coasts; both baselines re-recorded with the coast contrast.
 - [x] **5/6 One climate request in the worker** · `9728a32`, `a406070`
   The worker answers one climate request with each pass as it lands.
-- [ ] **6/6 The page: one scheduler, passes shown as they land** · in progress
+- [ ] **6/6 The page: one scheduler, passes shown as they land** · waiting on you
   The page shows the first pass at once and each refinement, with Pause between passes.
