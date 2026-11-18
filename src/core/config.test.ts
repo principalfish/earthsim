@@ -3,6 +3,7 @@ import {
 	type ConfigSection,
 	constantsOf,
 	defineSection,
+	formatConfigValue,
 	TEMPERATURE_CONFIG,
 	valuesOf,
 	WIND_CONFIG,
@@ -362,5 +363,33 @@ describe('WIND_CONFIG', () => {
 				}
 			}
 		}
+	});
+});
+
+describe('formatConfigValue', () => {
+	const written = (value: number, unit: string): string =>
+		formatConfigValue({ ...entry(value), unit });
+
+	it('writes a value with its unit', () => {
+		expect(written(0.55, 'W/m²/K')).toBe('0.55 W/m²/K');
+		expect(written(0.0065, 'K/m')).toBe('0.0065 K/m');
+		expect(written(-10, '°C')).toBe('-10 °C');
+	});
+
+	it('sets the degree sign against the number', () => {
+		expect(written(20, '°')).toBe('20°');
+	});
+
+	it('writes a million and over, and under a thousandth, with an exponent', () => {
+		expect(written(2.5e8, 'J/m²/K')).toBe('2.5e8 J/m²/K');
+		expect(written(1e6, 'K')).toBe('1e6 K');
+		expect(written(999999, 'K')).toBe('999999 K');
+		expect(written(2.5e-5, '1/s')).toBe('2.5e-5 1/s');
+		expect(written(0.001, 'K')).toBe('0.001 K');
+		expect(written(0.00099, 'K')).toBe('9.9e-4 K');
+	});
+
+	it('writes zero as it is', () => {
+		expect(written(0, 'fraction')).toBe('0 fraction');
 	});
 });

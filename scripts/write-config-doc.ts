@@ -15,6 +15,7 @@ import {
 	type ConfigEntry,
 	type ConfigGroup,
 	type ConfigSection,
+	formatConfigValue,
 	TEMPERATURE_CONFIG,
 	WIND_CONFIG,
 } from '../src/core/config';
@@ -59,21 +60,6 @@ const HEADINGS = [
 	'Tuned',
 ] as const;
 
-/** A number as the page writes it: long exponents as `2.5e8`, not zeros. */
-const numberText = (value: number): string => {
-	const size = Math.abs(value);
-	if (size !== 0 && (size >= 1e6 || size < 1e-3)) {
-		return value.toExponential().replace('e+', 'e');
-	}
-	return String(value);
-};
-
-/** A value and its unit, the degree sign set against the number. */
-const valueText = (entry: ConfigEntry): string => {
-	const gap = entry.unit === '°' ? '' : ' ';
-	return `${numberText(entry.value)}${gap}${entry.unit}`;
-};
-
 /** Text for a table cell: a pipe escaped, a line break made a space. */
 const cell = (text: string): string =>
 	text.replaceAll('|', '\\|').replaceAll(/\s*\n\s*/g, ' ');
@@ -83,7 +69,7 @@ const row = (cells: readonly string[]): string => `| ${cells.join(' | ')} |`;
 const entryRow = (name: string, entry: ConfigEntry): string =>
 	row([
 		`\`${name}\``,
-		cell(valueText(entry)),
+		cell(formatConfigValue(entry)),
 		cell(entry.what),
 		cell(entry.raising),
 		cell(entry.lowering),

@@ -393,6 +393,14 @@ export const startPage = (parts: PageParts): Promise<void> => {
 		},
 		onUnitSystem: units.chooseSystem,
 		onUnitOverride: units.setOverride,
+		// As for the new-world dialog: a stroke is driven by animation
+		// frames, which a modal screen does not stop, and the canvas no
+		// longer hears the pointer leave.
+		onModelSettings: () => {
+			sculpt.endStroke();
+			readout.clear();
+			parts.openModelSettings();
+		},
 	});
 	const dock = parts.createLayerDock({
 		view: startView,

@@ -53,6 +53,7 @@ describe('createSettingsPanel', () => {
 			onUnitSystem: (system) => told.push(`system ${system}`),
 			onUnitOverride: (quantity, unit) =>
 				told.push(`${quantity} ${unit ?? 'none'}`),
+			onModelSettings: () => told.push('model settings'),
 		});
 		const select = (id: string): FakeElement =>
 			byClass(section, 'field__select').find(
@@ -78,7 +79,7 @@ describe('createSettingsPanel', () => {
 
 	it('holds Winds drawn as, then the Units group of the system and a drop-down per quantity', () => {
 		const { section, told, systems } = make();
-		expect(section.children).toHaveLength(2);
+		expect(section.children).toHaveLength(3);
 		expect(selectIds(section)).toEqual([
 			'settings-wind-style',
 			'settings-unit-temperature',
@@ -119,6 +120,16 @@ describe('createSettingsPanel', () => {
 		expect(told).toEqual([]);
 	});
 
+	it('ends with the Model settings button, which tells whoever opens the screen', () => {
+		const { section, told } = make();
+		const button = section.children[2] as FakeElement;
+		expect(button.tagName).toBe('BUTTON');
+		expect(button.textContent).toBe('Model settings');
+		expect(button.type).toBe('button');
+		button.fire('click');
+		expect(told).toEqual(['model settings']);
+	});
+
 	it('adds them after what the section holds', () => {
 		const fakeSection = fake.createElement('div');
 		const first = fake.createElement('p');
@@ -129,8 +140,9 @@ describe('createSettingsPanel', () => {
 			onWindStyle: () => {},
 			onUnitSystem: () => {},
 			onUnitOverride: () => {},
+			onModelSettings: () => {},
 		});
-		expect(fakeSection.children).toHaveLength(3);
+		expect(fakeSection.children).toHaveLength(4);
 		expect(fakeSection.children[0]).toBe(first);
 	});
 

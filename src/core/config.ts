@@ -93,6 +93,20 @@ export type ConstantsOf<S extends ConfigSection> = {
 	readonly [K in keyof S['constants']['settings']]: number;
 };
 
+/**
+ * A setting's value and unit as they are written for a reader: numbers of
+ * a million and over or under a thousandth in the form `2.5e8`, the degree
+ * sign set against the number.
+ */
+export const formatConfigValue = (entry: ConfigEntry): string => {
+	const size = Math.abs(entry.value);
+	const number =
+		size !== 0 && (size >= 1e6 || size < 1e-3)
+			? entry.value.toExponential().replace('e+', 'e')
+			: String(entry.value);
+	return `${number}${entry.unit === '°' ? '' : ' '}${entry.unit}`;
+};
+
 const deepFreeze = <T extends object>(value: T): T => {
 	for (const inner of Object.values(value)) {
 		if (typeof inner === 'object' && inner !== null) {
