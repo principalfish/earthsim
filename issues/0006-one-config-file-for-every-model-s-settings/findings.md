@@ -35,3 +35,19 @@
 | round | security | - | - | - | - | - | Clean |
 | round | docs | - | - | - | - | - | Clean |
 | re-check | correctness | low | cleanup | - | fixed | `scripts/write-config-doc.ts:128` | The verb did not agree with a count of one |
+
+## piece 4 · 2026-11-18 · The "Model settings" screen
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | defect | - | fixed | `src/app/ui/panel/modelSettings.ts:175` | Switching tabs kept the body's scroll position, so the next tab opened part-way down |
+| round | correctness | low | docs | - | fixed | `docs/development.md:124` | The ui rows did not list the screen or the new button |
+| round | correctness | low | docs | - | fixed | `docs/user-guide.md:368` | "globe showing at its edges" is wrong in a narrow window |
+| round | correctness | low | test | - | fixed | `src/app/ui/modelSettings.test.ts:173` | Hard-coded counts of 23 and 40 broke whenever a setting was added |
+| round | correctness | nit | cleanup | - | fixed | `src/app/ui/panel/settingsPanel.ts:36` | ui/panel imported from ui/ for a title; the screen moved to ui/panel beside the New world dialog |
+| round | coverage | low | test | - | fixed | `src/app/ui/modelSettings.ts:215` | The default parent (document.body) was untested |
+| round | coverage | low | test | - | fixed | `src/app/ui/modelSettings.ts:171` | The Close button's autofocus was not asserted |
+| round | coverage | low | test | - | fixed | `src/app/ui/modelSettings.test.ts:131` | Same hard-coded counts |
+| round | coverage | low | test | - | accepted | `src/app/main.ts:224` | Two lines of glue in the untested bootstrap, each end tested separately |
+| round | docs | low | docs | - | fixed | `docs/development.md:125` | Same as the ui rows above |
+| round | security | - | - | - | - | - | Clean |
