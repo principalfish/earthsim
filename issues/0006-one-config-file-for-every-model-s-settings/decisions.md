@@ -33,6 +33,8 @@ The user's brief (2026-11-18): "Plan 3d", roadmap step 3d in `investigations/202
 
 - Piece 4 approved after the user tried the screen in a browser (the builder could not). The user: "Tried it, approve" (2026-11-18)
 
+- Piece 5 approved after the user compared the diagram with the PDF in a browser, with the builder's choice to leave out the PDF's title, subtitle and drawing date standing (no objection raised). The user: "Tried it, approve" (2026-11-18)
+
 ## Open
 - None.
 
