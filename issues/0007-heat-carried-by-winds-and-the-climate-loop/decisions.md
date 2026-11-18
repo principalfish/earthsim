@@ -24,6 +24,8 @@ The user's brief (2026-11-18): "Plan 3b", roadmap step 3b in `investigations/202
 - One manual review, at piece 6 (the page); piece 4's figures (the west–east coast contrast, the old and new baselines, timings) come in its review request. The user: "Piece 6 only (Recommended)" (2026-11-18)
 - The builder runs the pieces straight through: commit and push after each piece's review round and light re-check (with the verifier on every finding), fix verified findings, record each choice the plan leaves open as "Decided by the builder" and list them at the end; it stops for piece 6's manual review, for piece 4 if the coast contrast is far from believable, and for anything that changes behaviour beyond the plan, departs from the ledger, touches shared state or cannot be undone, or a check it cannot pass. The user: "Straight through" (2026-11-18)
 
+- The builder starts, and with it piece 1 (the wind's flowing part), with no decisions open. The user: "Start it" (2026-11-18)
+
 ## Open
 - None.
 

@@ -10,9 +10,9 @@ Winds explain about a quarter of the Earth's temperature error, so its overall f
 
 ## Plan
 
-_2026-11-18 · 0 of 6 pieces done · now: waiting on a decision (piece 1)_
+_2026-11-18 · 0 of 6 pieces done · now: piece 1 in progress_
 
-- [ ] **1/6 The wind's flowing part** · not started
+- [ ] **1/6 The wind's flowing part** · in progress
   The part of the surface wind that converges into lows is removed, so the rest can carry heat without making any.
 - [ ] **2/6 Heat carried by the wind, in the temperature solve** · not started
   The temperature solve takes the winds and moves heat downwind each step; with no winds it is exactly today's.
