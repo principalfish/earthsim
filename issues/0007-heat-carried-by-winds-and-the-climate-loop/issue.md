@@ -10,15 +10,15 @@ Winds explain about a quarter of the Earth's temperature error, so its overall f
 
 ## Plan
 
-_2026-11-18 · 2 of 6 pieces done · now: piece 3 in progress_
+_2026-11-18 · 3 of 6 pieces done · now: piece 4 in progress_
 
 - [x] **1/6 The wind's flowing part** · `26e4dcb`
   The part of the surface wind that converges into lows is removed, so the rest can carry heat without making any.
-- [x] **2/6 Heat carried by the wind, in the temperature solve** · `5fdab0c`
+- [x] **2/6 Heat carried by the wind, in the temperature solve** · `5fdab0c`, `35a6a00`
   The temperature solve takes the winds and moves heat downwind each step; with no winds it is exactly today's.
-- [ ] **3/6 The climate loop in the core** · in progress
+- [x] **3/6 The climate loop in the core** · `9735540`
   Temperature, winds and the heat they carry, repeated until it settles (0.1 °C, at most 6 passes).
-- [ ] **4/6 The setting's value, and the baselines** · not started
+- [ ] **4/6 The setting's value, and the baselines** · in progress
   How strongly the wind carries heat is set from physics and checked against the Earth's coasts; both baselines re-recorded with the coast contrast.
 - [ ] **5/6 One climate request in the worker** · not started
   The worker answers one climate request with each pass as it lands.
