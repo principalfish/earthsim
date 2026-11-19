@@ -18,8 +18,9 @@
 | round | correctness | low | cleanup | dropped | - | `scripts/oceanGdalRun.ts` | Near-copy of `observedGdalRun.ts` — dropped: both already share `gdalCheck.ts` |
 | round | correctness | nit | cleanup | dropped | - | `scripts/earth/oceanSource.ts:26` | Own `MONTHS = 12` — dropped: matches `observedSource.ts:63` |
 | round | coverage | low | test | dropped | - | `scripts/observedBuild.ts` | `readSubsetSource`/`forgetSubset` untested — dropped: thin I/O wiring, like the existing `readObservedSource` |
-| re-check | correctness | medium | test | verified | open | `src/core/earth/observedVectors.test.ts:30` | The renormalisation test passes without renormalisation (also raised by coverage) |
-| re-check | docs | low | docs | verified | open | `docs/development.md:75` | `src/core/` table lacks rows for `earth/observedVectors.ts` and `ocean/observed.ts`; the `wind/observedWind.ts` row still names `grid/vector.ts` for the vector sampling |
-| re-check | security | low | defect | verified | open | `scripts/downloadRetry.ts:86` | A rejected `cancel()` replaces `DownloadRefused`, so an over-cap download is retried |
-| re-check | correctness | nit | cleanup | verified | open | `scripts/earth/regrid.ts:78` | Ragged comment wrap (also raised by docs) |
+| re-check | correctness | medium | test | verified | fixed | `src/core/earth/observedVectors.test.ts:30` | The renormalisation test passes without renormalisation (also raised by coverage) |
+| re-check | docs | low | docs | verified | fixed | `docs/development.md:75` | `src/core/` table lacks rows for `earth/observedVectors.ts` and `ocean/observed.ts`; the `wind/observedWind.ts` row still names `grid/vector.ts` for the vector sampling |
+| re-check | security | low | defect | verified | fixed | `scripts/downloadRetry.ts:86` | A rejected `cancel()` replaces `DownloadRefused`, so an over-cap download is retried |
+| re-check | correctness | nit | cleanup | verified | fixed | `scripts/earth/regrid.ts:78` | Ragged comment wrap (also raised by docs) |
 | re-check | coverage | low | test | dropped | - | `src/core/earth/observedVectors.test.ts` | One-component NaN, zero-weight point and north-component checks untested — dropped: the check asked for no fix |
+| manual | user | - | - | - | fixed | piece 1's four re-check findings | The user: "Accept, fix all four" (fixed in piece 2's commit) |
