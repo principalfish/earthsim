@@ -67,7 +67,7 @@ const readCapped = async (
 		);
 	const declared = Number(response.headers.get('content-length'));
 	if (declared > maxBytes) {
-		await response.body?.cancel();
+		await response.body?.cancel().catch(() => {});
 		throw tooLong(declared);
 	}
 	if (response.body === null) {
@@ -83,7 +83,7 @@ const readCapped = async (
 		}
 		total += value.length;
 		if (total > maxBytes) {
-			await reader.cancel();
+			await reader.cancel().catch(() => {});
 			throw tooLong(total);
 		}
 		parts.push(value);
@@ -125,7 +125,7 @@ export const downloadWithRetry = async (
 			if (response.ok) {
 				return await readCapped(url, response, options.maxBytes);
 			}
-			await response.body?.cancel();
+			await response.body?.cancel().catch(() => {});
 			if (!isRetryable(response.status)) {
 				throw new DownloadRefused(
 					`The download of ${url} was refused with status ${response.status}`,

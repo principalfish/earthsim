@@ -21,9 +21,6 @@ const sampling = (leaveOutNoData: boolean): VectorSampling => ({
 });
 
 describe('sampleVectorsOnCells', () => {
-	// At latitude 0°, longitude 0° east is +y and north is +z, and a cell's
-	// own east and north are not the same as those, so only lengths are
-	// compared.
 	const east = [Float32Array.of(Number.NaN, 2)];
 	const north = [Float32Array.of(Number.NaN, 0)];
 
@@ -31,12 +28,23 @@ describe('sampleVectorsOnCells', () => {
 		const out = sampleVectorsOnCells(sampling(true), east, north);
 		expect(out.east).toHaveLength(1);
 		expect(out.east[0]).toHaveLength(grid.cellCount);
-		// Only the second row's vector, of length 2, remains, whatever its
-		// weight: the same length at every cell.
+		// Where both rows hold the second row's vector, nothing is left out
+		// and the weights already sum to one, so that is the answer wanted:
+		// without scaling the remaining weight of a quarter, the vector would
+		// be a quarter as long.
+		const whole = sampleVectorsOnCells(
+			sampling(false),
+			[Float32Array.of(2, 2)],
+			[Float32Array.of(0, 0)],
+		);
 		for (let cell = 0; cell < grid.cellCount; cell += 97) {
 			const u = (out.east[0] as Float32Array)[cell] as number;
 			const v = (out.north[0] as Float32Array)[cell] as number;
-			expect(Math.hypot(u, v)).toBeLessThanOrEqual(2 + 1e-5);
+			expect(u).toBeCloseTo((whole.east[0] as Float32Array)[cell] as number, 5);
+			expect(v).toBeCloseTo(
+				(whole.north[0] as Float32Array)[cell] as number,
+				5,
+			);
 		}
 	});
 

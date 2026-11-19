@@ -45,6 +45,8 @@ const balanceStart = (world: World, stepSeconds: number): TemperatureStart => {
 		state: {
 			temperatureK: balance,
 			previousK: Float64Array.from(balance),
+			seaTemperatureK: Float64Array.from(balance),
+			seaPreviousK: Float64Array.from(balance),
 			stepSeconds,
 			referenceCoolingK: lapseCooling(world),
 		},

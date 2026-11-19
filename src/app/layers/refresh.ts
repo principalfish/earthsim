@@ -443,6 +443,7 @@ export type ClimateScheduler = {
 const startFrom = (solved: SolvedWinds): ClimateStart => ({
 	temperature: {
 		months: solved.temperature.months,
+		seaMonths: solved.temperature.seaMonths,
 		state: solved.temperature.state,
 		solvedFor: solved.temperature.solvedFor,
 	},

@@ -188,6 +188,8 @@ const isStateShaped = (value: unknown): boolean =>
 	isRecord(value) &&
 	value.temperatureK instanceof Float64Array &&
 	value.previousK instanceof Float64Array &&
+	value.seaTemperatureK instanceof Float64Array &&
+	value.seaPreviousK instanceof Float64Array &&
 	value.referenceCoolingK instanceof Float64Array &&
 	typeof value.stepSeconds === 'number';
 
@@ -252,6 +254,7 @@ const isClimateStartShaped = (value: unknown): value is ClimateStart =>
 	isRecord(value) &&
 	isTemperatureStartShaped(value.temperature) &&
 	isMonthsShaped((value.temperature as { months?: unknown }).months) &&
+	isMonthsShaped((value.temperature as { seaMonths?: unknown }).seaMonths) &&
 	isRecord(value.winds) &&
 	isMonthsShaped(value.winds.east) &&
 	isMonthsShaped(value.winds.north) &&
@@ -287,16 +290,17 @@ const PAYLOADS: {
 			return { world };
 		}
 		if (!isClimateStartShaped(start)) {
-			return `A climate request's start must be an object whose temperature has ${MONTHS_PER_YEAR} Float32Array months, a state (temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number) and a solvedFor with a finite seaLevel and a planet whose settings, the day length aside, are finite, whose winds have ${MONTHS_PER_YEAR} Float32Array months each of east and north, and whose dayLengthHours is a finite number`;
+			return `A climate request's start must be an object whose temperature has ${MONTHS_PER_YEAR} Float32Array months and seaMonths, a state (temperatureK, previousK, seaTemperatureK, seaPreviousK and referenceCoolingK as Float64Arrays and stepSeconds as a number) and a solvedFor with a finite seaLevel and a planet whose settings, the day length aside, are finite, whose winds have ${MONTHS_PER_YEAR} Float32Array months each of east and north, and whose dayLengthHours is a finite number`;
 		}
 		// Only what a climate starts from is taken, whatever else came with
-		// it: the temperature's months, state and record, the winds' two
-		// components, and the day length.
+		// it: the temperature's months, the air's and the sea's, its state
+		// and record, the winds' two components, and the day length.
 		return {
 			world,
 			start: {
 				temperature: {
 					months: [...start.temperature.months],
+					seaMonths: [...start.temperature.seaMonths],
 					state: start.temperature.state,
 					solvedFor: copyConditions(start.temperature.solvedFor),
 				},
@@ -360,11 +364,11 @@ export const simFailure = (
  * nothing else in the message reaches whatever computes it: a climate
  * request is not given the solver's cap, tolerance or constants, the wind
  * model's settings, nor asked to solve on the world's own grid, whatever
- * the message says, and of its start only the temperature's months, state
- * and record, the winds' eastward and northward parts and the day length
- * are taken, so the pressure of a whole result sent as a start is left
- * behind, and of the record's planet only the settings the temperature
- * reads.
+ * the message says, and of its start only the temperature's months (the
+ * air's and the sea's), state and record, the winds' eastward and
+ * northward parts and the day length are taken, so the pressure of a whole
+ * result sent as a start is left behind, and of the record's planet only
+ * the settings the temperature reads.
  *
  * @param message - What arrived, of any type at all.
  * @returns The request, or the failure to answer it with: for a message

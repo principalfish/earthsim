@@ -903,13 +903,13 @@ describe('createClimateService', () => {
 		expect(climate.workers.posted()).toHaveLength(1);
 	});
 
-	// A climate of a world that settles at once: a few seconds, but several
+	// A climate of a world that settles quickly: a few seconds, but several
 	// times that under coverage.
 	it('gives the store what the climate gives, through the real handler', {
-		timeout: 120_000,
+		timeout: 240_000,
 	}, async () => {
-		// An ocean with its axis upright settles in its first year, and its
-		// winds carry little heat.
+		// An ocean with its axis upright settles in a few years, its sea ice
+		// the slowest part, and its winds carry little heat.
 		const world = blank();
 		world.planet = { ...world.planet, axialTiltDeg: 0 };
 		const climate = createClimate();

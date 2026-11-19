@@ -276,21 +276,52 @@ export const TEMPERATURE_CONFIG = defineSection(
 					tuned: null,
 				},
 				/**
-				 * Taken equal to land's, as ice insulates the water below; without
-				 * it the Arctic winter is 10 K too warm.
+				 * The column of air alone, as over land: 10⁴ kg m⁻² of air at
+				 * 1004 J kg⁻¹ K⁻¹.
 				 */
-				seaIceHeatCapacity: {
+				seaAirHeatCapacity: {
 					value: 1e7,
 					unit: 'J/m²/K',
 					what:
-						'The heat stored by sea wholly covered in ice. Ice cuts the air' +
-						' off from the water below, so frozen sea warms and cools like' +
-						' land; partly frozen sea takes a blend with open sea.',
+						'The heat the air over the sea stores for each kelvin it warms:' +
+						' the column of air alone, apart from the sea below it, which' +
+						' has a temperature of its own.',
 					raising:
-						'Frozen seas cool more slowly in winter: milder polar winters.' +
-						" At the open sea's value the Arctic winter was 10 K too warm.",
-					lowering: 'Frozen seas swing faster: colder polar winters.',
-					source: "Taken equal to land's.",
+						'The air over the sea follows the sea and the winds more slowly.',
+					lowering:
+						'The air over the sea follows the sea and the winds more' +
+						' closely; over sea ice, where it is cut off from the water, its' +
+						' winters are colder.',
+					source:
+						"Taken equal to land's: the column of air alone, 10 t/m² of air" +
+						' at 1004 J/kg/K.',
+					tuned: null,
+				},
+				/**
+				 * Bulk formulas for the heat flux between the sea and the air, with
+				 * transfer coefficients of 1.2e-3 (Large and Pond, 1982, "Sensible
+				 * and latent heat flux measurements over the ocean", J. Phys.
+				 * Oceanogr. 12) and a wind of 5 m s⁻¹, at 10 °C: sensible heat
+				 * ρ c_p C U ≈ 7, latent heat ρ L C U dq_s/dT ≈ 9 and long-wave
+				 * 4σT³ ≈ 5 W m⁻² K⁻¹.
+				 */
+				airSeaExchange: {
+					value: 20,
+					unit: 'W/m²/K',
+					what:
+						'How readily heat passes between the sea and the air over it,' +
+						' for each kelvin the two differ: sensible heat, evaporation and' +
+						' long-wave radiation together. Sea ice cuts it.',
+					raising:
+						'The air over the sea follows the sea more closely: milder' +
+						' winters and cooler summers over the sea and downwind of it.',
+					lowering:
+						'The air over the sea is freer of it: larger seasons over the' +
+						' sea. At 0 the two exchange nothing.',
+					source:
+						'Bulk formulas (Large and Pond, 1982) at a wind of 5 m/s and' +
+						' 10 °C: sensible heat about 7, evaporation about 9 and' +
+						' long-wave about 5 W/m²/K.',
 					tuned: null,
 				},
 				/**
@@ -298,10 +329,11 @@ export const TEMPERATURE_CONFIG = defineSection(
 				 * wind blows in, at the sea-level density of 1.2 kg m⁻³ and
 				 * 1004 J kg⁻¹ K⁻¹. Set from that estimate, not tuned. Its check is the
 				 * Earth's west-east coast contrast at 40-60°N, kept in the temperature
-				 * baseline: with it the winds give western Europe 2.9 K milder than East
-				 * Asia over the year and 7.8 K in January, against 0.7 and 2.4 K
-				 * without them and 11.5 and 22.9 K observed; for North America 0.0 and
-				 * 3.5 K, against about -0.8 and -0.6 K and 5.8 and 15.1 K observed.
+				 * baseline: with it the winds give western Europe 2.8 K milder than East
+				 * Asia over the year and 6.3 K in January, against 0.7 and 2.4 K
+				 * without them and 11.5 and 22.9 K observed; for North America -0.1
+				 * and 2.8 K, against about -0.8 and -0.6 K and 5.8 and 15.1 K
+				 * observed.
 				 */
 				windHeatCapacity: {
 					value: 1.2e6,
@@ -323,9 +355,9 @@ export const TEMPERATURE_CONFIG = defineSection(
 						'Physics: about a kilometre of air, the depth the surface wind' +
 						' blows in, at the sea-level density of 1.2 kg/m³ and 1004' +
 						" J/kg/K. Checked against the Earth's west-east coast contrast:" +
-						' about a quarter to a third of the observed in three of the' +
-						" four figures, in the right places, and none for North America's" +
-						' year.',
+						' about a quarter to a third of the observed for western Europe' +
+						" against East Asia, a sixth in North America's January, and" +
+						" none for North America's year.",
 					tuned: null,
 				},
 				/** The standard atmosphere's 6.5 K km⁻¹ (ICAO, 1993). */
@@ -474,6 +506,48 @@ export const TEMPERATURE_CONFIG = defineSection(
 					source: 'A smooth ramp rather than a single freezing point.',
 					tuned: null,
 				},
+				/**
+				 * A cell's mixed layer within about 2 K of freezing is taken to be
+				 * partly iced over: the ice edge of a cell over 100 km across.
+				 */
+				seaIceStartC: {
+					value: 0,
+					unit: '°C',
+					what:
+						'The sea temperature below which the sea starts to ice over. The' +
+						' ice share then rises smoothly to the whole at seaFreezingC; it' +
+						' brightens the sea and cuts the exchange with the air.',
+					raising:
+						'The sea ices over from milder temperatures: more sea ice, and' +
+						' colder polar air.',
+					lowering:
+						'A sharper ice edge, nearer freezing. It must stay above' +
+						' seaFreezingC; the model refuses it otherwise.',
+					source:
+						'Chosen: a mixed layer within about 2 K of freezing is partly' +
+						' iced over, across a cell over 100 km wide.',
+					tuned: null,
+				},
+				/**
+				 * The freezing point of sea water of salinity 33–35 at the surface,
+				 * −1.8 to −1.9 °C (UNESCO, 1983, "Algorithms for computation of
+				 * fundamental properties of seawater").
+				 */
+				seaFreezingC: {
+					value: -1.8,
+					unit: '°C',
+					what:
+						'The freezing point of sea water. The sea is wholly iced over' +
+						' there and does not cool below it, though the air over it can.',
+					raising:
+						'The sea freezes at a milder temperature: more sea ice. It must' +
+						' stay below seaIceStartC; the model refuses it otherwise.',
+					lowering: 'The sea cools further before it freezes: less sea ice.',
+					source:
+						'The freezing point of sea water of salinity 33 to 35 (UNESCO,' +
+						' 1983).',
+					tuned: null,
+				},
 			},
 		},
 		{
@@ -513,7 +587,7 @@ export const TEMPERATURE_CONFIG = defineSection(
 						' from.',
 					source:
 						'Chosen: the Earth settles in about four passes, and a generated' +
-						' world in four or five.',
+						' world in three or four.',
 					tuned: null,
 				},
 				climateOvershootShare: {

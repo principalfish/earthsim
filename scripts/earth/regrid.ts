@@ -75,8 +75,8 @@ const cellsOfAxis = (
  * degree centred on `c + 0.5` east, western longitudes wrapping to 180° to
  * 360° east, so that the fine cells either side of the date line fall in the
  * cells centred on 179.5 and 180.5. Fine cells north of 90° or south of −90°
- * are left out. The sums are made in a
- * fixed order, so the result is the same each time.
+ * are left out. The sums are made in a fixed order, so the result is the same
+ * each time.
  *
  * Each month of the input is laid out column by column from the west, each
  * column row by row from the south, which is how the source files lay out a

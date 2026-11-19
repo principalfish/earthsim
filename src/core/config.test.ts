@@ -32,15 +32,15 @@ const entry = (value: number) => ({
 	tuned: null,
 });
 
-// A literal copy of the temperature model's values, in the order the model
-// lists them: the first eighteen as they were before they moved into the
-// config, then those added since.
+// A literal copy of the temperature model's values, listing the settings in
+// the order the model lists them.
 const TEMPERATURE_LITERAL = {
 	diffusivity: 0.55,
 	landDiffusivity: 0.35,
 	oceanHeatCapacity: 2.5e8,
 	landHeatCapacity: 1e7,
-	seaIceHeatCapacity: 1e7,
+	seaAirHeatCapacity: 1e7,
+	airSeaExchange: 20,
 	windHeatCapacity: 1.2e6,
 	lapseRate: 6.5e-3,
 	greenhouseFactor: 0.633,
@@ -50,6 +50,8 @@ const TEMPERATURE_LITERAL = {
 	iceAlbedo: 0.62,
 	iceStartC: 0,
 	iceFullC: -10,
+	seaIceStartC: 0,
+	seaFreezingC: -1.8,
 	climateToleranceC: 0.1,
 	climateMaxPasses: 8,
 	climateOvershootShare: 0.5,
@@ -206,7 +208,8 @@ describe('TEMPERATURE_CONFIG', () => {
 				'landDiffusivity',
 				'oceanHeatCapacity',
 				'landHeatCapacity',
-				'seaIceHeatCapacity',
+				'seaAirHeatCapacity',
+				'airSeaExchange',
 				'windHeatCapacity',
 				'lapseRate',
 				'greenhouseFactor',
@@ -218,6 +221,8 @@ describe('TEMPERATURE_CONFIG', () => {
 				'iceAlbedo',
 				'iceStartC',
 				'iceFullC',
+				'seaIceStartC',
+				'seaFreezingC',
 			],
 			['climateToleranceC', 'climateMaxPasses', 'climateOvershootShare'],
 			[

@@ -84,7 +84,7 @@ export type ClimateSummary = Omit<ClimateResult, 'temperature' | 'winds'>;
 /** The part of a temperature result a climate is carried on from. */
 export type CarriedTemperature = Pick<
 	TemperatureResult,
-	'months' | 'state' | 'solvedFor'
+	'months' | 'seaMonths' | 'state' | 'solvedFor'
 >;
 
 /**
@@ -93,12 +93,16 @@ export type CarriedTemperature = Pick<
  *
  * @remarks
  * A {@link ClimateResult} is one. It carries the temperature to carry on
- * from, its months to compare the first pass with, the winds to carry heat
- * along in the first pass, and the day length they were solved for. Only
- * the winds' eastward and northward parts are read, not the pressure.
+ * from, the air's and the sea's, with its months to compare the first pass
+ * with, the winds to carry heat along in the first pass, and the day length
+ * they were solved for. Only the winds' eastward and northward parts are
+ * read, not the pressure.
  */
 export type ClimateStart = {
-	/** The temperature to carry on from: its months, state and record. */
+	/**
+	 * The temperature to carry on from: its months, the air's and the sea's,
+	 * its state and its record.
+	 */
 	readonly temperature: CarriedTemperature;
 	/** The winds to carry heat along in the first pass. */
 	readonly winds: Pick<WindResult, 'east' | 'north'>;
@@ -207,9 +211,10 @@ const blend = <T extends Float32Array | Float64Array>(
 
 /**
  * A pass's temperature a share of the way from the pass before's: its
- * months and the state it ends in, the rest of the result (the years run,
- * whether it converged, its last year's change and its record) being the
- * pass's own.
+ * months, the air's and the sea's, and the state it ends in, the rest of the
+ * result (the years run, whether it converged, its last year's change and
+ * its record) being the pass's own. A sea month stays NaN where the cell is
+ * land.
  */
 const dampened = (
 	before: CarriedTemperature,
@@ -220,6 +225,9 @@ const dampened = (
 	months: pass.months.map((month, index) =>
 		blend(before.months[index] as Float32Array, month, share),
 	),
+	seaMonths: pass.seaMonths.map((month, index) =>
+		blend(before.seaMonths[index] as Float32Array, month, share),
+	),
 	state: {
 		...pass.state,
 		temperatureK: blend(
@@ -228,6 +236,16 @@ const dampened = (
 			share,
 		),
 		previousK: blend(before.state.previousK, pass.state.previousK, share),
+		seaTemperatureK: blend(
+			before.state.seaTemperatureK,
+			pass.state.seaTemperatureK,
+			share,
+		),
+		seaPreviousK: blend(
+			before.state.seaPreviousK,
+			pass.state.seaPreviousK,
+			share,
+		),
 	},
 });
 
@@ -236,6 +254,7 @@ const assertStart = (start: ClimateStart, cellCount: number): void => {
 	const { temperature, winds } = start ?? {};
 	const fields: [string, unknown][] = [
 		['temperature months', temperature?.months],
+		['sea temperature months', temperature?.seaMonths],
 		['eastward winds', winds?.east],
 		['northward winds', winds?.north],
 	];

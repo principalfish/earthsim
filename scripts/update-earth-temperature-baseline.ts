@@ -1,7 +1,8 @@
 /**
  * Writes the Earth temperature baseline afresh: the error figures of the
  * Earth preset, as the climate loop solves it now, against the observed
- * temperature, and its west–east coast contrasts, into
+ * temperature, its west–east coast contrasts, and its sea's own temperature
+ * against the observed sea temperature, into
  * `src/core/temperature/baseline/earthTemperature.json`.
  *
  * Run with `npm run baseline:temperature` after a change that is meant to
@@ -13,9 +14,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
 	decodeEarth,
+	decodeObservedSeaTemperature,
 	decodeObservedTemperature,
 	earthWorld,
 	getGrid,
+	observedSeaTemperatureOn,
 	observedTemperature,
 	solveClimate,
 } from '../src/core/index';
@@ -28,6 +31,7 @@ import {
 import { writeBaseline } from './baselineUpdate';
 import {
 	readEarthDataFile,
+	readObservedSeaTemperatureFile,
 	readObservedTemperatureFile,
 } from './earth/dataFile.mjs';
 
@@ -58,11 +62,20 @@ export const main = (args: readonly string[]): void => {
 		decodeObservedTemperature(readObservedTemperatureFile()),
 		BASELINE_RESOLUTION,
 	);
+	const grid = getGrid(BASELINE_RESOLUTION);
+	const { temperature } = solveClimate(world);
 	const figures: EarthTemperatureFigures = earthTemperatureFigures(
-		solveClimate(world).temperature.months,
+		temperature.months,
 		observed,
-		getGrid(BASELINE_RESOLUTION),
+		grid,
 		world,
+		{
+			simulated: temperature.seaMonths,
+			observed: observedSeaTemperatureOn(
+				grid,
+				decodeObservedSeaTemperature(readObservedSeaTemperatureFile()),
+			),
+		},
 	);
 	writeBaseline(BASELINE_FILE, baselineText(figures));
 };

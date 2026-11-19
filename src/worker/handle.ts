@@ -81,9 +81,12 @@ const COMPUTE: {
 /** The buffers of a temperature result's arrays. */
 const temperatureBuffers = (result: TemperatureResult): ArrayBufferLike[] => [
 	...result.months.map((month) => month.buffer),
+	...result.seaMonths.map((month) => month.buffer),
 	result.state.temperatureK.buffer,
 	result.state.previousK.buffer,
 	result.state.referenceCoolingK.buffer,
+	result.state.seaTemperatureK.buffer,
+	result.state.seaPreviousK.buffer,
 ];
 
 /** The buffers of a winds result's arrays. */
@@ -109,11 +112,14 @@ const copyOfPass = (pass: ClimateProgress): ClimateProgress => {
 		temperature: {
 			...temperature,
 			months: temperature.months.map((month) => month.slice()),
+			seaMonths: temperature.seaMonths.map((month) => month.slice()),
 			state: {
 				...temperature.state,
 				temperatureK: temperature.state.temperatureK.slice(),
 				previousK: temperature.state.previousK.slice(),
 				referenceCoolingK: temperature.state.referenceCoolingK.slice(),
+				seaTemperatureK: temperature.state.seaTemperatureK.slice(),
+				seaPreviousK: temperature.state.seaPreviousK.slice(),
 			},
 		},
 		winds: {

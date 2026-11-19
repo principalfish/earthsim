@@ -119,8 +119,7 @@ describe('the Earth winds baseline', () => {
 		() => {
 			// The thermal response put up from 0.7 to 6 hPa a kelvin, the winds
 			// and the temperature solved together as the baseline is, worsens
-			// eight of the nine figures: every one but January's direction share,
-			// which the stronger highs help.
+			// all nine figures.
 			const worse = windBaselineRegressions(
 				solvedEarth({ thermalHpaPerK: 6 }),
 				committed,
@@ -130,6 +129,7 @@ describe('the Earth winds baseline', () => {
 				'whole year direction share',
 				'whole year pressure RMS',
 				'January wind RMS',
+				'January direction share',
 				'January pressure RMS',
 				'July wind RMS',
 				'July direction share',

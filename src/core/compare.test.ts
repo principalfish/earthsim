@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { compareField, compareFields, differenceField } from './compare';
+import {
+	compareField,
+	compareFields,
+	compareFieldWhereBoth,
+	differenceField,
+} from './compare';
 import { getGrid } from './grid/grid';
 import { cellLatitudes, MONTHS_PER_YEAR } from './planet/insolation';
 
@@ -124,6 +129,42 @@ describe('differenceField', () => {
 	it('refuses fields of unequal lengths', () => {
 		expect(() =>
 			differenceField(new Float32Array(3), new Float32Array(4)),
+		).toThrow(RangeError);
+	});
+});
+
+describe('compareFieldWhereBoth', () => {
+	it('is compareField where every cell of both is finite', () => {
+		const a = base[2] as Float32Array;
+		const b = base[5] as Float32Array;
+		expect(compareFieldWhereBoth(a, b, grid)).toEqual(compareField(a, b, grid));
+	});
+
+	it('weights only the cells where both are finite', () => {
+		const a = new Float32Array(cellCount).fill(3);
+		const b = new Float32Array(cellCount).fill(1);
+		// The first half of a is marked, and in the rest b differs by 2
+		// wherever it is not marked itself.
+		for (let cell = 0; cell < cellCount / 2; cell++) {
+			a[cell] = Number.NaN;
+		}
+		b[cellCount - 1] = Number.NaN;
+		const { meanDifference, rmsDifference } = compareFieldWhereBoth(a, b, grid);
+		expect(meanDifference).toBeCloseTo(2, 12);
+		expect(rmsDifference).toBeCloseTo(2, 12);
+	});
+
+	it('gives NaN when no cell of both is finite, and refuses fields of the wrong length', () => {
+		const marked = new Float32Array(cellCount).fill(Number.NaN);
+		const figures = compareFieldWhereBoth(
+			marked,
+			base[0] as Float32Array,
+			grid,
+		);
+		expect(figures.meanDifference).toBeNaN();
+		expect(figures.rmsDifference).toBeNaN();
+		expect(() =>
+			compareFieldWhereBoth(new Float32Array(3), marked, grid),
 		).toThrow(RangeError);
 	});
 });

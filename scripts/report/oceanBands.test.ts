@@ -150,14 +150,16 @@ describe('the one-continent world’s oceanic swing', () => {
 				}),
 			).change;
 		// With one pattern round the globe, as before the bands varied by
-		// longitude, the open ocean's southern high moved 18.2° from January
-		// to July, its band low 29.7° and its northern high 22.8°.
+		// longitude, the open ocean's southern high moves 18.0° from January
+		// to July, its band low 27.0° and its northern high 25.2°, given the
+		// temperature with the sea's own (18.2°, 29.7° and 22.8° before the
+		// sea had one).
 		const zonal = swingOf({ localBandsShare: 0 });
-		expect(measuredValue(zonal.southHigh)).toBeCloseTo(18.2, 1);
-		expect(measuredValue(zonal.low)).toBeCloseTo(29.7, 1);
-		expect(measuredValue(zonal.northHigh)).toBeCloseTo(22.8, 1);
-		// With them placed by longitude: about 5.4°, 1.2° and 7.0°, near the
-		// observed oceanic highs' 5° to 10°.
+		expect(measuredValue(zonal.southHigh)).toBeCloseTo(18, 1);
+		expect(measuredValue(zonal.low)).toBeCloseTo(27, 1);
+		expect(measuredValue(zonal.northHigh)).toBeCloseTo(25.2, 1);
+		// With them placed by longitude: about 3.4°, 4.7° and 5.7° (5.4°, 1.2°
+		// and 7.0° before), near the observed oceanic highs' 5° to 10°.
 		const local = swingOf();
 		for (const part of ['southHigh', 'low', 'northHigh'] as const) {
 			const moved = Math.abs(measuredValue(local[part]));

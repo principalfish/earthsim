@@ -8,32 +8,62 @@ The temperature is a seasonal energy balance: the year is stepped through month 
 
 - sunlight by latitude and time of year, from the axial tilt, the star and the orbit;
 - land warming and cooling faster than sea;
+- over the sea, two temperatures: the air's and the sea's own (see below);
 - heat spreading between neighbouring cells;
 - cooling with height;
-- snow and ice brightening cold surfaces;
+- snow and ice brightening cold surfaces, and sea ice standing in where the sea nears freezing;
 - the greenhouse strength;
 - heat carried along by the winds, when a solve is given them (see below).
 
 There are no ocean currents yet, so the aim is the right broad pattern, not a match to the real Earth.
 
+### The sea's own temperature
+
+Over the sea each cell holds two temperatures: the air's, near the surface, and the sea's, its mixed top 60 m. The Temperature layer shows the air's everywhere.
+
+- **The air** has its own heat store, the column of air's, as over land. It radiates to space, spreads heat to its neighbours and is carried by the winds.
+- **The sea** takes the sunlight that reaches it. It gives the year's mean of that sunlight up to the air at a steady rate, as evaporation and long-wave radiation do, whatever the two temperatures; so what the sea stores is the sunlight's swing through the year, and where nothing else moves heat the sea and the air come to the same temperature.
+- **The two exchange heat** as their difference drives it, at 20 W/m² for each kelvin (sensible heat, evaporation and long-wave radiation together, from the bulk formulas at a 5 m/s wind and 10 °C; see the `airSeaExchange` setting).
+- **Sea ice** follows the sea's temperature: the sea starts to ice over below 0 °C and is wholly iced at −1.8 °C, the freezing point of sea water, and does not cool below it. The ice brightens the sea and cuts it off from the air, the exchange and the steady giving-up of sunlight both, so the air above can cool far below freezing in winter while the sea stays at freezing. Over land the snow and ice still follow the air.
+- **The sea does not spread heat** to its neighbours by itself: the air's spreading over the sea still stands for all the heat carried sideways there, until ocean currents carry the sea's. Measured on the Earth, letting the sea spread heat as well, at the air's rate, made the error 5.6 K root-mean-square for the year against 3.7; splitting the rate between the two, 3.9.
+- **Numerically,** within each step the sea is solved for at once in terms of its air, and the ice share's change over the step is solved for with the rest, so that a sea at the ice's edge does not swing between iced and open from step to step. At the default two steps a month every world measured settles (the Earth, generated worlds, a frozen Earth, the Earth tilted 60°, a hot planet); at one step a month the Earth and some others do not settle within 60 years.
+- **A world with no sea** is solved exactly as it was before the sea had a temperature of its own.
+
+The sea and the air each have their own months in a result: the sea's are NaN over land, as the observed sea temperature marks land. The sea's, against the observed sea-surface temperature (NOAA OISST, 1991–2020; see [Data](data.md)), on the Earth at 64:
+
+| Where | Simulated less observed, annual | January | July |
+|-|-|-|-|
+| All the sea | −0.2 K (2.4 K RMS) | −0.1 K (2.4) | −0.4 K (3.0) |
+| Tropics, 20°S–20°N | −0.3 K (1.8) | −0.3 K (1.7) | −0.1 K (2.1) |
+| North Atlantic, 50–65°N | −6.1 K (6.3) | −5.9 K (6.3) | −6.7 K (6.9) |
+| Gulf Stream, Kuroshio and the other western boundary currents | −3.0 K (3.6) | −2.2 K (3.3) | −4.4 K (5.3) |
+| Peru, Benguela, California and Canary coasts | +2.8 K (3.6) | +2.4 K (2.9) | +3.1 K (4.3) |
+| Eastern tropical Pacific | +3.1 K (3.5) | +2.9 K (3.2) | +3.4 K (3.9) |
+| Southern Ocean, 40–55°S | +1.7 K (2.7) | +1.6 K (2.9) | +1.7 K (2.5) |
+| Where the sea ices over | +1.9 K (2.4) | +2.2 K (3.2) | +1.3 K (2.9) |
+
+These are the errors ocean currents are for: the warm currents' seas are too cold and the cold upwelling coasts too warm.
+
+The air's own error against the observed air temperature, on the Earth at 64, is 3.73 K root-mean-square for the year, 4.63 K in January and 4.09 K in July. The air over the sea, with its own small heat store, swings with the seasons more than the sea below it, as it does over the real sea: the northern summers come out a little cold (western Europe in July −4.9 K, Scandinavia −5.6 K), and the northern winters colder (western Europe in January −4.2 K, the North Atlantic at 50–65°N −7.1 K), where the sea lacks the currents' heat. Polar summers come out too warm, by 6.3 K over the sea ice in July and 9.3 K in Antarctica's January.
+
 The model's settings are listed, with what each does and where its value comes from, in [Model settings](../src/core/config.md).
 
 ### Heat carried by the winds
 
-A solve may be given a year of winds, as the flows they carry across every cell edge (the flowing part of the winds: see [Winds](winds.md#the-flowing-part)). After each time step's heat exchange, a second step moves heat downwind: each cell takes the temperature of the air flowing in from its upwind neighbours, weighted by how much flows in against the cell's own heat capacity. The step is stable however long it is, makes no new extreme (to within the solver's tolerance), keeps the heat exactly, and leaves a uniform temperature as it is. The flows are those of the time each step ends, as the sunlight is, interpolated between the months'; only the flows are interpolated, the sunlight is worked out for that time.
+A solve may be given a year of winds, as the flows they carry across every cell edge (the flowing part of the winds: see [Winds](winds.md#the-flowing-part)). After each time step's heat exchange, a second step moves heat downwind: each cell takes the temperature of the air flowing in from its upwind neighbours, weighted by how much flows in against the cell's own heat capacity. Over the sea the heat the wind brings goes to the air and the sea together, shared as the exchange between them shares it over a step. The step is stable however long it is, makes no new extreme (to within the solver's tolerance), keeps the heat exactly, and leaves a uniform temperature as it is. The flows are those of the time each step ends, as the sunlight is, interpolated between the months'; only the flows are interpolated, the sunlight is worked out for that time.
 
 How strongly the wind carries heat is one setting, the heat capacity of the air that moves it (about a kilometre of air); at 0 the solve is the one with no winds, exactly. A world of 128 or 256 is solved on a coarser grid, so its flows must be on that grid; `flowingPartForSolve` finds them there from the world's own winds (see [Winds](winds.md#the-flowing-part)).
 
 ### The climate loop
 
-`solveClimate` works the temperature and the winds out together, in passes. The first pass is the temperature without winds and the winds from it, exactly as before. Each later pass solves the temperature again, carried on from the last pass's and with heat carried along the last pass's winds, then works out the winds from the new temperature.
+`solveClimate` works the temperature and the winds out together, in passes. The first pass is the temperature without winds and the winds from it. Each later pass solves the temperature again, carried on from the last pass's, the air's and the sea's, and with heat carried along the last pass's winds, then works out the winds from the new temperature.
 
 - It stops when the root-mean-square change a pass makes to the monthly temperature, over the globe and the year, is no more than 0.1 °C, or after 8 passes. The largest change in a single cell is left out of the rule: a few cells of spring snow and ice keep moving by more than a degree for many passes.
 - A pass whose change is larger than the one before's is an overshoot, and only half its change is applied.
 - A result that settled can be carried on from: a solve for the same world again settles at the second pass at the earliest, since the first carries heat along the start's winds, which may be those of a world since edited, and a local edit moves the global change by less than the tolerance.
 - The page works the temperature out this way, as the climate; see [When it is recalculated](#when-it-is-recalculated).
 - The day length now changes the settled temperature, through the winds, though not the first pass.
-- On the Earth at 64 the loop settles in 4 passes, about 8 s from nothing, and carried on from the settled result in 2 passes, about 3 s. `npm run time:climate` measures every resolution and the parts of a pass.
+- On the Earth at 64 the loop settles in 4 passes, about 9 s from nothing, and carried on from the settled result in 2 passes, about 3 s; generated worlds settle in 3 or 4. `npm run time:climate` measures every resolution and the parts of a pass.
 - How fast the passes settle depends on how strongly the winds feed back. The thermal highs and lows are at their physical 0.7 hPa a kelvin for that reason: at the 3 they were tuned to before the winds carried heat, each pass shrank by about 0.7 and the Earth did not settle in 8. At 0.7 each pass shrinks by about 0.2 to 0.3.
 
 The loop's three settings are in the [Model settings](../src/core/config.md).
@@ -44,10 +74,12 @@ How strongly the wind carries heat is the heat capacity of the air that moves it
 
 | | Simulated, annual | Observed, annual | Simulated, January | Observed, January |
 |-|-|-|-|-|
-| Western Europe less East Asia | 2.9 K | 11.5 K | 7.8 K | 22.9 K |
-| West less east North America | 0.0 K | 5.8 K | 3.5 K | 15.1 K |
+| Western Europe less East Asia | 2.8 K | 11.5 K | 6.3 K | 22.9 K |
+| West less east North America | −0.1 K | 5.8 K | 2.8 K | 15.1 K |
 
-Without the winds the model gave 0.7 and 2.4 K for Europe against Asia and about −0.8 and −0.6 K for North America. So the winds make a contrast, in the right places: a quarter to a third of the observed size in three of the four figures, and none for North America's year; the rest is not theirs to make: the sea's own heat transport, ocean currents, is a later step. East Asia's January comes out 0.8 °C against an observed −4.0. The Earth's error against the observed falls from 3.93 to 3.66 K root-mean-square for the year.
+Without the winds the model gave 0.7 and 2.4 K for Europe against Asia and about −0.8 and −0.6 K for North America. So the winds make a contrast, in the right places: a quarter to a third of the observed size for Europe against Asia, a sixth of it in North America's January, and none for its year; the rest is not theirs to make: the sea's own heat transport, ocean currents, is a later step. The Earth's error against the observed falls from 3.93 to 3.73 K root-mean-square for the year.
+
+The air over the North Atlantic follows its sea, which without the currents' heat is about 6 K too cold, so the winter air the westerlies bring Europe is too cold and its contrast with East Asia too small.
 
 ### Finer worlds are solved on a coarser grid
 

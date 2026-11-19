@@ -44,6 +44,8 @@ The window's width and taper, and the blend's latitudes, are this project's choi
 | July less January, now | 5.4° | 1.2° | 7.0° |
 | July less January, one pattern round the globe | 18.2° | 29.7° | 22.8° |
 
+These were measured at 3 hPa a kelvin of thermal response, given the temperature without winds as it was before the sea had a temperature of its own. Given the temperature with it, the moves are 3.4°, 4.7° and 5.7°, and 18.0°, 27.0° and 25.2° with one pattern round the globe.
+
 The band low over that ocean hardly moves: the ocean's own temperature peaks within about 3° of the equator in both months, and the ocean north of the equator is cooler than its latitude's mean in July, the land being hotter, so its thermal part holds the low south. `npm run tune:winds -- cases` prints this table for any settings; `localBandsShare=0` gives the one pattern round the globe exactly, the model as it was before.
 
 ### Thermal highs and lows
@@ -105,11 +107,11 @@ The model's settings start from published or textbook figures where there are an
 
 | Months | RMS of the wind's difference as vectors | Direction within 45° | RMS pressure difference |
 |-|-|-|-|
-| January | 3.37 m/s | 62.8% | 7.71 hPa |
-| July | 4.08 m/s | 58.6% | 6.90 hPa |
-| The whole year | 3.61 m/s | 61.2% | 7.19 hPa |
+| January | 3.49 m/s | 61.0% | 7.94 hPa |
+| July | 4.39 m/s | 54.9% | 7.08 hPa |
+| The whole year | 3.63 m/s | 60.7% | 7.21 hPa |
 
-The thermal response, `thermalHpaPerK`, is at its physical 0.7 hPa a kelvin. It was tuned by hand to 3 before the winds carried heat, and put back when they did: at 3 the loop's feedback did not settle (see [Temperature](temperature.md#the-climate-loop)). Against the observed Earth the two are close, 0.7 better in the wind's difference as vectors (3.61 against 3.78 m/s for the year) and the direction share, 3 slightly better in the pressure (7.01 against 7.19 hPa); the Siberian high and the South Asian low come out weaker at 0.7. The figures before the loop, at 3 and given the temperature without winds, were 3.82 m/s, 60.9% and 7.08 hPa for the year.
+The thermal response, `thermalHpaPerK`, is at its physical 0.7 hPa a kelvin. It was tuned by hand to 3 before the winds carried heat, and put back when they did: at 3 the loop's feedback did not settle (see [Temperature](temperature.md#the-climate-loop)). Against the observed Earth, measured before the sea had a temperature of its own, the two are close, 0.7 better in the wind's difference as vectors (3.61 against 3.78 m/s for the year) and the direction share, 3 slightly better in the pressure (7.01 against 7.19 hPa); the Siberian high and the South Asian low come out weaker at 0.7. The figures before the loop, at 3 and given the temperature without winds, were 3.82 m/s, 60.9% and 7.08 hPa for the year.
 
 The direction is judged only where the observed wind is at least 1 m/s, 85% of the surface over the year. The mean speed and mean pressure differences are not kept in the baseline.
 

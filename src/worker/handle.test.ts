@@ -267,6 +267,7 @@ describe('handleRequest for climate', {
 		// reached the core's answer, so it never read them emptied, and the
 		// last pass's arrays, posted from the loop's own, are that answer.
 		expect(last?.temperature.months).toEqual(direct.temperature.months);
+		expect(last?.temperature.seaMonths).toEqual(direct.temperature.seaMonths);
 		expect(last?.winds).toEqual(direct.winds);
 		expect(last?.temperature.state).toEqual(direct.temperature.state);
 		// An earlier pass's arrays arrived whole.
@@ -275,15 +276,20 @@ describe('handleRequest for climate', {
 		expect(first?.temperature.months.every((month) => month.length > 0)).toBe(
 			true,
 		);
+		expect(
+			first?.temperature.seaMonths.every((month) => month.length > 0),
+		).toBe(true);
+		expect(first?.temperature.state.seaTemperatureK.length).toBeGreaterThan(0);
+		expect(first?.temperature.state.seaPreviousK.length).toBeGreaterThan(0);
 		expect(first?.winds.pressure.every((month) => month.length > 0)).toBe(true);
 	});
 
-	it('transfers each pass’s fifty-one buffers, the twelve months of temperature, three of state and thirty-six of winds, each once', () => {
+	it('transfers each pass’s sixty-five buffers, the twelve months of the air’s temperature and twelve of the sea’s, five of state and thirty-six of winds, each once', () => {
 		const { transfers } = answered();
 		expect(transfers).toHaveLength(directClimate().passes);
 		for (const transfer of transfers) {
-			expect(transfer).toHaveLength(51);
-			expect(new Set(transfer).size).toBe(51);
+			expect(transfer).toHaveLength(65);
+			expect(new Set(transfer).size).toBe(65);
 		}
 		// A pass shares no buffer with another: an earlier pass's are copies.
 		const all = transfers.flat();
@@ -374,6 +380,7 @@ describe('handleRequest for climate', {
 	): Record<string, unknown> => ({
 		temperature: {
 			months: monthsOf(world.elevation.length),
+			seaMonths: monthsOf(world.elevation.length),
 			state,
 			solvedFor: temperatureConditions(world),
 		},
@@ -388,6 +395,8 @@ describe('handleRequest for climate', {
 	const stateOn = (cells: number) => ({
 		temperatureK: new Float64Array(cells).fill(280),
 		previousK: new Float64Array(cells).fill(280),
+		seaTemperatureK: new Float64Array(cells).fill(280),
+		seaPreviousK: new Float64Array(cells).fill(280),
 		referenceCoolingK: new Float64Array(cells),
 		stepSeconds: 86_400,
 	});

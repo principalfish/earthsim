@@ -121,6 +121,41 @@ export const compareField = (
 };
 
 /**
+ * Area-weighted error figures of one field against another over only the
+ * cells where both hold a finite value, such as a simulated sea temperature,
+ * NaN over land, against an observed one, NaN where there is no data.
+ *
+ * @param a - One value per cell of `grid`. Not changed.
+ * @param b - The field to compare `a` with, in the same units and cell
+ * order. Not changed.
+ * @param grid - The grid both are on.
+ * @returns New figures, in the fields' units: the mean and the
+ * root-mean-square of `a` less `b` over the cells where both are finite,
+ * each weighted by its area; both NaN when there is no such cell.
+ * @throws RangeError if either does not hold one value per cell.
+ */
+export const compareFieldWhereBoth = (
+	a: ArrayLike<number>,
+	b: ArrayLike<number>,
+	grid: Grid,
+): FieldDifference => {
+	const { cellCount, areas } = grid;
+	if (a.length !== cellCount || b.length !== cellCount) {
+		throw new RangeError(`Comparing needs two fields of ${cellCount} values`);
+	}
+	let totalArea = 0;
+	for (let cell = 0; cell < cellCount; cell++) {
+		if (Number.isFinite(a[cell]) && Number.isFinite(b[cell])) {
+			totalArea += areas[cell] as number;
+		}
+	}
+	return figuresOf(areas, cellCount, totalArea, (cell) => {
+		const difference = (a[cell] as number) - (b[cell] as number);
+		return Number.isFinite(difference) ? difference : 0;
+	});
+};
+
+/**
  * Area-weighted error figures of twelve monthly fields against twelve
  * others, month by month and for the annual mean.
  *

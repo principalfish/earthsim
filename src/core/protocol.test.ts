@@ -31,6 +31,8 @@ const world = createBlankWorld(64);
 const state = (): TemperatureState => ({
 	temperatureK: new Float64Array(3),
 	previousK: new Float64Array(3),
+	seaTemperatureK: new Float64Array(3),
+	seaPreviousK: new Float64Array(3),
 	referenceCoolingK: new Float64Array(3),
 	stepSeconds: 1,
 });
@@ -306,7 +308,7 @@ const climateWith = (
 	kind: 'climate',
 	world,
 	start: {
-		temperature: { months: months(), ...temperature },
+		temperature: { months: months(), seaMonths: months(), ...temperature },
 		winds: { east: months(), north: months() },
 		dayLengthHours: 24,
 	},
@@ -388,6 +390,7 @@ describe('parseSimRequest for a climate’s temperature start', () => {
 		) as SimRequest<'climate'>;
 		expect(Object.keys(started.start?.temperature ?? {}).sort()).toEqual([
 			'months',
+			'seaMonths',
 			'solvedFor',
 			'state',
 		]);
@@ -576,13 +579,18 @@ describe('isSimResponse', () => {
 
 /** A start for a climate of the right form; its lengths and values are for the solver. */
 const climateStart = () => ({
-	temperature: { months: months(), state: state(), solvedFor: solvedFor() },
+	temperature: {
+		months: months(),
+		seaMonths: months(),
+		state: state(),
+		solvedFor: solvedFor(),
+	},
 	winds: { east: months(), north: months() },
 	dayLengthHours: 24,
 });
 
 const BAD_CLIMATE_START =
-	"A climate request's start must be an object whose temperature has 12 Float32Array months, a state (temperatureK, previousK and referenceCoolingK as Float64Arrays and stepSeconds as a number) and a solvedFor with a finite seaLevel and a planet whose settings, the day length aside, are finite, whose winds have 12 Float32Array months each of east and north, and whose dayLengthHours is a finite number";
+	"A climate request's start must be an object whose temperature has 12 Float32Array months and seaMonths, a state (temperatureK, previousK, seaTemperatureK, seaPreviousK and referenceCoolingK as Float64Arrays and stepSeconds as a number) and a solvedFor with a finite seaLevel and a planet whose settings, the day length aside, are finite, whose winds have 12 Float32Array months each of east and north, and whose dayLengthHours is a finite number";
 
 describe('parseSimRequest for climate', () => {
 	it('reads a request with no start as a request from nothing', () => {
@@ -623,6 +631,7 @@ describe('parseSimRequest for climate', () => {
 		]);
 		expect(Object.keys(parsed.start?.temperature ?? {}).sort()).toEqual([
 			'months',
+			'seaMonths',
 			'solvedFor',
 			'state',
 		]);
@@ -634,6 +643,12 @@ describe('parseSimRequest for climate', () => {
 		// The very arrays, the winds' in a new array, and a record of the
 		// planet settings the temperature reads.
 		expect(parsed.start?.temperature.state).toBe(start.temperature.state);
+		expect(parsed.start?.temperature.seaMonths).not.toBe(
+			start.temperature.seaMonths,
+		);
+		expect(parsed.start?.temperature.seaMonths[5]).toBe(
+			start.temperature.seaMonths[5],
+		);
 		expect(parsed.start?.winds.east).not.toBe(start.winds.east);
 		expect(parsed.start?.winds.east[3]).toBe(start.winds.east[3]);
 		expect(
@@ -659,6 +674,21 @@ describe('parseSimRequest for climate', () => {
 				temperature: {
 					...good.temperature,
 					months: months().map((m) => Array.from(m)),
+				},
+			},
+			{
+				...good,
+				temperature: { ...good.temperature, seaMonths: months().slice(1) },
+			},
+			{
+				...good,
+				temperature: { ...good.temperature, seaMonths: undefined },
+			},
+			{
+				...good,
+				temperature: {
+					...good.temperature,
+					state: { ...state(), seaPreviousK: [1, 2, 3] },
 				},
 			},
 			{ ...good, temperature: { ...good.temperature, state: undefined } },

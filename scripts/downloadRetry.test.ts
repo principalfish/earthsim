@@ -60,6 +60,31 @@ const respond = (
 	};
 };
 
+/**
+ * A response whose body, and the body's reader, fail when cancelled, with
+ * `reading.cancelled` set when a cancel was asked for.
+ */
+const cancelRejects = (
+	response: ScriptResponse,
+	reading: Reading,
+): ScriptResponse => {
+	const { body } = response;
+	if (body === null) {
+		return response;
+	}
+	const refuse = (): Promise<void> => {
+		reading.cancelled = true;
+		return Promise.reject(new Error('the connection was already closed'));
+	};
+	return {
+		...response,
+		body: {
+			cancel: refuse,
+			getReader: () => ({ ...body.getReader(), cancel: refuse }),
+		},
+	};
+};
+
 /** Options whose requests are answered in turn, and that record what they wait and say. */
 const scripted = (
 	answers: (ScriptResponse | Error)[],
@@ -195,6 +220,45 @@ describe('downloadWithRetry', () => {
 		expect(reading.chunksRead).toBe(3);
 		expect(reading.cancelled).toBe(true);
 		expect(chunked.urls).toHaveLength(1);
+	});
+
+	it('still refuses a body over the cap, declared or not, when cancelling it fails', async () => {
+		const declaredReading: Reading = { chunksRead: 0, cancelled: false };
+		const declared = scripted([
+			cancelRejects(
+				respond(200, new Uint8Array(5000), { 'content-length': '5000' }),
+				declaredReading,
+			),
+		]);
+		await expect(downloadWithRetry(URL, declared.options)).rejects.toThrow(
+			'is 5000 bytes, more than the 1000 expected',
+		);
+		expect(declaredReading.cancelled).toBe(true);
+		const chunkedReading: Reading = { chunksRead: 0, cancelled: false };
+		const chunked = scripted([
+			cancelRejects(
+				respond(200, new Uint8Array(100_000), {}, 400, chunkedReading),
+				chunkedReading,
+			),
+		]);
+		await expect(downloadWithRetry(URL, chunked.options)).rejects.toThrow(
+			'is 1200 bytes, more than the 1000 expected',
+		);
+		expect(chunkedReading.chunksRead).toBe(3);
+		expect(chunkedReading.cancelled).toBe(true);
+	});
+
+	it('still names the refused status when cancelling its body fails', async () => {
+		const reading: Reading = { chunksRead: 0, cancelled: false };
+		const { options, urls } = scripted([
+			cancelRejects(respond(404), reading),
+			respond(200),
+		]);
+		await expect(downloadWithRetry(URL, options)).rejects.toThrow(
+			`The download of ${URL} was refused with status 404`,
+		);
+		expect(reading.cancelled).toBe(true);
+		expect(urls).toHaveLength(1);
 	});
 
 	it('accepts a body of exactly the cap, joined from its chunks', async () => {

@@ -873,6 +873,7 @@ const solvedOf = (pass: ClimateProgress): SolvedWinds => ({
 const startOf = (pass: ClimateProgress): ClimateStart => ({
 	temperature: {
 		months: pass.temperature.months,
+		seaMonths: pass.temperature.seaMonths,
 		state: pass.temperature.state,
 		solvedFor: pass.temperature.solvedFor,
 	},
@@ -1092,7 +1093,7 @@ describe('createClimateScheduler starting from a settled climate only', () => {
 		expect(asked[2]?.start).toEqual(startOf(first));
 	});
 
-	it('hands on the temperature’s months, state and record, the eastward and northward winds and the day length, and nothing else', async () => {
+	it('hands on the temperature’s months (the air’s and the sea’s), state and record, the eastward and northward winds and the day length, and nothing else', async () => {
 		const { scheduler, asked, first } = await createAnsweredHarness();
 		scheduler.refreshNow();
 		const start = asked[1]?.start;
@@ -1103,12 +1104,14 @@ describe('createClimateScheduler starting from a settled climate only', () => {
 		]);
 		expect(Object.keys(start?.temperature ?? {}).sort()).toEqual([
 			'months',
+			'seaMonths',
 			'solvedFor',
 			'state',
 		]);
 		expect(Object.keys(start?.winds ?? {}).sort()).toEqual(['east', 'north']);
 		expect(start?.temperature.state).toBe(first.temperature.state);
 		expect(start?.temperature.months).toBe(first.temperature.months);
+		expect(start?.temperature.seaMonths).toBe(first.temperature.seaMonths);
 		expect(start?.winds.east).toBe(first.winds.east);
 		expect(start?.dayLengthHours).toBe(24);
 	});
