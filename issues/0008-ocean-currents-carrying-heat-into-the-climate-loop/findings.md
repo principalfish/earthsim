@@ -87,7 +87,7 @@
 | round | security | - | - | dropped | - | `maxIslands` | No upper bound: self-inflicted slowdown in a local app, informational |
 | round | docs | low | docs | dropped | - | `docs/development.md:42` | Still true for temperature and wind |
 | round | security | - | - | - | - | - | Clean otherwise |
-| re-check | coverage | low | test | verified | open | `src/core/ocean/basins.test.ts:106` | The documented cap rule (an island in a flowed-over island's lagoon can add one more) is untested; optional ring-island test |
-| re-check | docs | low | docs | verified | open | `docs/ocean.md:47`, `src/core/ocean/gyres.ts:64`, `:109` | "built once for a world's land (and settings)" omits the rotation rate, which now invalidates the kept solver |
+| re-check | coverage | low | test | verified | accepted | `src/core/ocean/basins.test.ts:106` | The documented cap rule (an island in a flowed-over island's lagoon can add one more) is untested; optional ring-island test |
+| re-check | docs | low | docs | verified | deferred to piece 5 | `docs/ocean.md:47`, `src/core/ocean/gyres.ts:64`, `:109` | "built once for a world's land (and settings)" omits the rotation rate, which now invalidates the kept solver |
 | re-check | correctness | - | - | - | - | - | Clean |
-
+| manual | planner | - | - | - | - | piece 4 re-check findings | Decided by the planner chat under the user's "make your own decisions!": the three "rotation" wording nits are fixed in piece 5's commit; the ring-island test is accepted as it is |
