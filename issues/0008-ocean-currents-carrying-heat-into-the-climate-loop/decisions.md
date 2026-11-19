@@ -21,6 +21,7 @@
 - **Piece 2's re-check findings:** the history wording (`docs/temperature.md:30`, `temperature.ts:41`, `temperature.test.ts:527`, `tuning.test.ts:85`, `docs/winds.md:47` and `:114`, the last two restated with current figures or dropped) and the look-ahead at `docs/temperature.md:28` are fixed in piece 5's commit; the two optional tests (a mid-exchange `seaFollows` case, a 503 with a failing cancel) are accepted as they are. The user: "Wording with piece 5" (2026-11-19)
 - **Review findings are the planner chat's to decide:** re-check findings the verifier upholds are settled by the planner chat and reported to the user, not asked; the user's stops (piece 7's rule, the manual reviews, worse regions, the loop not settling, anything beyond the plan) still go to the user. The user: "make your own decisions!" (2026-11-19)
 - **Piece 3's re-check findings (decided by the planner chat):** the net-coast first-guess test and the "may fail to converge" wording are fixed in piece 4's commit; `neighbourTable` stays public, since hiding it would replace the index's `export *` with about 30 names and only tests use it.
+- **Piece 4's re-check findings (decided by the planner chat):** the three "rotation" wording nits (`docs/ocean.md:47`, `gyres.ts:64` and `:109`) are fixed in piece 5's commit; the optional ring-island test for the island cap is accepted as it is.
 
 ## Open
 
