@@ -135,7 +135,7 @@ Rejected (with the user's choices): gyres alone (the North Atlantic barely warms
 
 ## Checkpoints
 - [x] 1. Observed sea temperatures and currents
-- [ ] 2. The sea's own temperature
+- [x] 2. The sea's own temperature
 - [ ] 3. Grid corners
 - [ ] 4. Wind-driven gyres
 - [ ] 5. Currents carry the sea's heat in the loop
@@ -167,6 +167,15 @@ Built on Sonnet (the piece's `Model:`). Decided by the builder:
 - Accepted reason for the coverage tool's scope: it measures only `src/`; the build scripts under `scripts/` have their own tests but are not in the changed-lines report (as for the existing observed builds). Under coverage instrumentation two tests exceeded Vitest's 5 s default; they got cheaper inputs and 60 s timeouts like the wind test.
 - Re-check findings left to the user, who chose "Accept, fix all four" (fixed in piece 2's commit; also the OISST licence reading accepted) (four, all low): the renormalisation test in `observedVectors.test.ts` passes without renormalisation (medium, test); `docs/development.md` lacks rows for `earth/observedVectors.ts` and `ocean/observed.ts`; `downloadRetry.ts` should swallow a rejected `cancel()` so an over-cap body is refused, not retried; a ragged comment wrap in `regrid.ts`.
 
-### Piece 2, paused for the user (2026-11-19)
+### Piece 2 (2026-11-19)
 
-Built and uncommitted in the worktree, not yet reviewed. Two stops raised to the user: (1) the plan's sea formula (sunlight warms the sea, the sea gives heat to the air only as k·(Ts − Ta), k = 20) left the sea 12.4 K too warm against OISST, so the builder's version has the sea give up its year-mean clear-sky absorbed sunlight to the air at a steady rate (a stand-in for evaporation and long-wave) with k = 20 exchanging only the difference (sea −0.2 K, rms 2.4 against OISST); (2) regions got clearly worse in January (western Europe −2.0 to −4.2, North Atlantic 50–65 N −5.1 to −7.1) and in polar summers (Antarctica January +5.5 to +9.3, Arctic July −3.0 to +4.3), while July is better nearly everywhere and the annual rms barely moved. Awaiting the user's decision before the review round and commit.
+Built on `claude-opus-5-5`. Two stops went to the user, who accepted both: the sea formula (the user: "Accept it (Recommended)") and the regions that got clearly worse (the user: "Accept, carry on (Recommended)"). Decided by the builder:
+- **Sea formula (deviation from the plan, accepted).** The plan's version (sunlight warms the sea; the sea gives heat to the air only as k·(Ts − Ta), k = 20 W/m²/K) left the sea 12.4 K too warm against OISST. The sea now gives up its year-mean clear-sky absorbed sunlight to the air at a steady rate (a stand-in for evaporation and long-wave loss), and k exchanges only the difference: sea −0.2 K, rms 2.4 K against OISST. The steady loss does not grow when the sea warms; piece 5 reports whether the warm water the currents bring warms the air downwind as it should.
+- **Regions worse, accepted.** January western Europe −2.0 to −4.2, North Atlantic 50–65 N −5.1 to −7.1, Scandinavia rms 9.0 to 10.1; Antarctica January +5.5 to +9.3, Arctic above 75 N July −3.0 to +4.3. July is better nearly everywhere and the annual rms barely moved (3.66 to 3.73). Look at the polar summers again at piece 6 or 7, or leave them for step 6 and real sea ice.
+- **Over land the sea's months are NaN**; a world with no sea gives the single-temperature answer bit for bit (pinned by digests).
+- **`correctYearEnd` weights the sea's yearly change by `seaFollows`**, the share of the air's shift the sea takes; recorded Earth figures and baselines are byte-identical with it.
+- Both baselines re-recorded (sea figures added to the temperature baseline with a regression check); `climate.test` and `temperatureWinds.test` moved to two steps a month; some tests got longer timeouts for coverage runs.
+- Piece 1's four re-check findings were fixed in this commit, on the user's "Accept, fix all four".
+- Coverage: changed lines in `src/`, no uncovered lines to account for (`scripts/` is not measured; its tests are in the diff).
+- Re-check findings left to the user (all low): history-style wording ("before the sea had a temperature of its own") at `docs/temperature.md:30`, `temperature.ts:41`, `temperature.test.ts:527`, `tuning.test.ts:85`, `docs/winds.md:47,114`; two optional tests (a mid-exchange `seaFollows` case; a 503 with a failing cancel); `docs/temperature.md:28` looks ahead to currents and goes stale in piece 5. See `findings.md`.
+
