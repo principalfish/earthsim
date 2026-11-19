@@ -24,3 +24,28 @@
 | re-check | correctness | nit | cleanup | verified | fixed | `scripts/earth/regrid.ts:78` | Ragged comment wrap (also raised by docs) |
 | re-check | coverage | low | test | dropped | - | `src/core/earth/observedVectors.test.ts` | One-component NaN, zero-weight point and north-component checks untested — dropped: the check asked for no fix |
 | manual | user | - | - | - | fixed | piece 1's four re-check findings | The user: "Accept, fix all four" (fixed in piece 2's commit) |
+
+## piece 2 · 2026-11-19 · The sea's own temperature
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | docs | medium | docs | verified | fixed | `docs/development.md:64` | The `config.ts` row said 22 settings; `config.md` says 25 |
+| round | correctness | low | defect | verified | fixed | `src/core/temperature/temperature.ts:1782` | `correctYearEnd` counted the sea's whole yearly change though the shift reaches the sea only by `seaFollows`; now weighted by it (Earth figures unchanged) |
+| round | coverage | low | test | verified | fixed | `src/core/temperature/temperature.test.ts:658` | No full solve with `airSeaExchange` 0; added (fails on the unweighted code) |
+| round | correctness | low | cleanup | verified | fixed | `src/worker/handle.ts:81` | `temperatureBuffers` and `copyOfPass` left out `seaMonths`, `seaTemperatureK`, `seaPreviousK` |
+| round | docs | low | docs | verified | fixed | `src/core/config.test.ts:35` | Comment narrated the edit's history |
+| round | docs | low | docs | verified | fixed | `src/core/config.ts:336`, `docs/temperature.md:47`, `docs/winds.md:114` | "Before the sea had a temperature of its own" comparisons (changelog that rots); the config.ts one also reached `config.md` |
+| round | correctness | nit | cleanup | verified | fixed | `temperature.ts:1389`, `earthTemperature.ts:13`, `protocol.ts:369`, `temperatureFixtures.ts:21` | Comment lines not re-wrapped after edits |
+| round | coverage | low | test | verified | fixed | `scripts/downloadRetry.test.ts` | The new `.catch(() => {})` on a rejecting cancel was untested; two tests added |
+| round | correctness | nit | cleanup | dropped | - | `temperature.ts:1612` | `share` comment should name the first-order step — dropped: it already says "a backward-difference step" |
+| round | security | - | - | - | - | - | Clean |
+| re-check | docs | low | docs | verified | open | `docs/temperature.md:30`, `src/core/temperature/temperature.ts:41` | "solved exactly as it was before the sea had a temperature of its own" is history; say a world with no sea is solved with the air alone and gives the single-temperature answer |
+| re-check | docs | low | docs | verified | open | `src/core/temperature/temperature.test.ts:527` | Test title and comment tell history; word as fact |
+| re-check | docs | low | docs | verified | open | `scripts/tune/tuning.test.ts:85` | Parentheticals "(… before the sea had one)" keep old figures as history; delete |
+| re-check | docs | low | docs | verified | open | `docs/winds.md:47` | Figures "as it was before the sea had a temperature of its own" come from an earlier model; restate with current figures or drop |
+| re-check | docs | low | docs | verified | open | `docs/winds.md:114` | Figures "measured before the sea had a temperature of its own"; restate with current figures or drop |
+| re-check | coverage | low | test | verified | open | `src/core/temperature/temperature.test.ts:658` | Only `seaFollows` 0 and about 1 are tested; the partial case is covered through the Earth baseline (optional mid-exchange test) |
+| re-check | coverage | low | test | verified | open | `scripts/downloadRetry.test.ts` | A retryable status (503) with a failing cancel is untested; same catch as the 404 test (optional) |
+| re-check | docs | low | docs | noticed | open | `docs/temperature.md:28` | "until ocean currents carry the sea's" looks ahead and goes stale when piece 5 lands; update it in piece 5 |
+| re-check | docs | low | docs | dropped | - | `config.ts:1518`, `winds.md:49` | "as before" wording predates this change |
+| re-check | correctness | - | - | - | - | - | Clean |
