@@ -39,13 +39,14 @@
 | round | coverage | low | test | verified | fixed | `scripts/downloadRetry.test.ts` | The new `.catch(() => {})` on a rejecting cancel was untested; two tests added |
 | round | correctness | nit | cleanup | dropped | - | `temperature.ts:1612` | `share` comment should name the first-order step — dropped: it already says "a backward-difference step" |
 | round | security | - | - | - | - | - | Clean |
-| re-check | docs | low | docs | verified | open | `docs/temperature.md:30`, `src/core/temperature/temperature.ts:41` | "solved exactly as it was before the sea had a temperature of its own" is history; say a world with no sea is solved with the air alone and gives the single-temperature answer |
-| re-check | docs | low | docs | verified | open | `src/core/temperature/temperature.test.ts:527` | Test title and comment tell history; word as fact |
-| re-check | docs | low | docs | verified | open | `scripts/tune/tuning.test.ts:85` | Parentheticals "(… before the sea had one)" keep old figures as history; delete |
-| re-check | docs | low | docs | verified | open | `docs/winds.md:47` | Figures "as it was before the sea had a temperature of its own" come from an earlier model; restate with current figures or drop |
-| re-check | docs | low | docs | verified | open | `docs/winds.md:114` | Figures "measured before the sea had a temperature of its own"; restate with current figures or drop |
-| re-check | coverage | low | test | verified | open | `src/core/temperature/temperature.test.ts:658` | Only `seaFollows` 0 and about 1 are tested; the partial case is covered through the Earth baseline (optional mid-exchange test) |
-| re-check | coverage | low | test | verified | open | `scripts/downloadRetry.test.ts` | A retryable status (503) with a failing cancel is untested; same catch as the 404 test (optional) |
-| re-check | docs | low | docs | noticed | open | `docs/temperature.md:28` | "until ocean currents carry the sea's" looks ahead and goes stale when piece 5 lands; update it in piece 5 |
+| re-check | docs | low | docs | verified | deferred to piece 5 | `docs/temperature.md:30`, `src/core/temperature/temperature.ts:41` | "solved exactly as it was before the sea had a temperature of its own" is history; say a world with no sea is solved with the air alone and gives the single-temperature answer |
+| re-check | docs | low | docs | verified | deferred to piece 5 | `src/core/temperature/temperature.test.ts:527` | Test title and comment tell history; word as fact |
+| re-check | docs | low | docs | verified | deferred to piece 5 | `scripts/tune/tuning.test.ts:85` | Parentheticals "(… before the sea had one)" keep old figures as history; delete |
+| re-check | docs | low | docs | verified | deferred to piece 5 | `docs/winds.md:47` | Figures "as it was before the sea had a temperature of its own" come from an earlier model; restate with current figures or drop |
+| re-check | docs | low | docs | verified | deferred to piece 5 | `docs/winds.md:114` | Figures "measured before the sea had a temperature of its own"; restate with current figures or drop |
+| re-check | coverage | low | test | verified | accepted | `src/core/temperature/temperature.test.ts:658` | Only `seaFollows` 0 and about 1 are tested; the partial case is covered through the Earth baseline (optional mid-exchange test) |
+| re-check | coverage | low | test | verified | accepted | `scripts/downloadRetry.test.ts` | A retryable status (503) with a failing cancel is untested; same catch as the 404 test (optional) |
+| re-check | docs | low | docs | noticed | deferred to piece 5 | `docs/temperature.md:28` | "until ocean currents carry the sea's" looks ahead and goes stale when piece 5 lands; update it in piece 5 |
 | re-check | docs | low | docs | dropped | - | `config.ts:1518`, `winds.md:49` | "as before" wording predates this change |
 | re-check | correctness | - | - | - | - | - | Clean |
+| manual | user | - | - | - | - | piece 2 re-check findings | The user: "Wording with piece 5" (the wording rows and the `docs/temperature.md:28` look-ahead are fixed in piece 5's commit); the two optional tests are accepted as they are and not added |
