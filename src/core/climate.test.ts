@@ -1,6 +1,6 @@
 /**
- * The climate loop: the temperature and the winds solved together on the
- * Earth at 64 and on a generated world.
+ * The climate loop: the temperature, the winds and the currents solved
+ * together on the Earth at 64, on an ocean planet and on a generated world.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -8,22 +8,29 @@ import { readEarthDataFile } from '../../scripts/earth/dataFile.mjs';
 import {
 	type ClimateProgress,
 	type ClimateResult,
+	type ClimateStart,
 	solveClimate,
 } from './climate';
 import { decodeEarth, earthWorld } from './earth/earth';
+import { getGrid } from './grid/grid';
+import { DEFAULT_GYRE_SETTINGS, solveGyres } from './ocean/gyres';
 import { MONTHS_PER_YEAR } from './planet/insolation';
 import { solveTemperature, TEMPERATURE_MODEL } from './temperature/temperature';
+import { FLOWING_RESOLUTION, flowingPartForSolve } from './wind/flowing';
 import { solveWinds } from './wind/solve';
 import { generateWorld } from './world/generate';
-import type { World } from './world/world';
+import { createBlankWorld, type World } from './world/world';
 
 /** Allows for coverage instrumentation, which makes the solves slower. */
 const SOLVE_TIMEOUT_MS = 180_000;
 
-/** One step a month, solved to 0.05 K: several times quicker than the default. */
+/**
+ * The default two steps a month, solved to 0.05 K: quicker than the
+ * default. One step a month does not resolve how fast a sea at the ice's
+ * edge turns, and the Earth does not settle at one.
+ */
 const COARSE = {
 	...TEMPERATURE_MODEL,
-	stepsPerMonth: 1,
 	solverToleranceK: 0.05,
 };
 
@@ -58,7 +65,10 @@ const run = (
 
 const earth = shared(() => run(EARTH, { model: COARSE }));
 
-/** The largest difference between two years of monthly fields. */
+/**
+ * The largest difference between two years of monthly fields, where both
+ * are numbers: the sea's are NaN over land.
+ */
 const largestDifference = (
 	a: readonly Float32Array[],
 	b: readonly Float32Array[],
@@ -66,13 +76,13 @@ const largestDifference = (
 	let largest = 0;
 	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
 		for (let cell = 0; cell < (a[month] as Float32Array).length; cell++) {
-			largest = Math.max(
-				largest,
-				Math.abs(
-					((a[month] as Float32Array)[cell] as number) -
-						((b[month] as Float32Array)[cell] as number),
-				),
+			const difference = Math.abs(
+				((a[month] as Float32Array)[cell] as number) -
+					((b[month] as Float32Array)[cell] as number),
 			);
+			if (!Number.isNaN(difference)) {
+				largest = Math.max(largest, difference);
+			}
 		}
 	}
 	return largest;
@@ -85,6 +95,7 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		expect(first.temperature.months).toEqual(temperature.months);
 		expect(first.temperature.state).toEqual(temperature.state);
 		expect(first.winds).toEqual(solveWinds(EARTH, temperature.months));
+		expect(first.currents).toEqual(solveGyres(EARTH, first.winds));
 		expect(first.pass).toBe(1);
 		expect(first.changeC).toBeNull();
 		expect(first.settled).toBe(false);
@@ -127,6 +138,7 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		// What is returned is the last pass.
 		expect(result.temperature).toBe(final.temperature);
 		expect(result.winds).toBe(final.winds);
+		expect(result.currents).toBe(final.currents);
 		expect(result.changeC).toBe(final.changeC);
 		expect(result.dayLengthHours).toBe(EARTH.planet.dayLengthHours);
 	});
@@ -135,6 +147,39 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		for (const pass of earth().passes) {
 			expect(pass.winds).toEqual(solveWinds(EARTH, pass.temperature.months));
 		}
+	});
+
+	it('solves each pass as temperature, winds, currents, the temperature carrying heat along the pass before’s winds and currents', () => {
+		const [first, second] = earth().passes as [
+			ClimateProgress,
+			ClimateProgress,
+		];
+		const flows = first.winds.east.map((east, month) =>
+			flowingPartForSolve(
+				64,
+				64,
+				east,
+				first.winds.north[month] as Float32Array,
+				new Float64Array(getGrid(FLOWING_RESOLUTION).cellCount),
+			),
+		);
+		const temperature = solveTemperature(EARTH, {
+			model: COARSE,
+			start: first.temperature,
+			winds: { flows },
+			currents: {
+				flows: first.currents.flows,
+				depthM: DEFAULT_GYRE_SETTINGS.layerDepthM,
+			},
+		});
+		expect(second.temperature.months).toEqual(temperature.months);
+		expect(second.temperature.seaMonths).toEqual(temperature.seaMonths);
+		expect(second.winds).toEqual(solveWinds(EARTH, temperature.months));
+		expect(second.currents).toEqual(
+			solveGyres(EARTH, second.winds, {
+				guess: first.currents.streamfunction,
+			}),
+		);
 	});
 
 	it('carries heat along the winds from the second pass: the coasts differ from the first pass’s', () => {
@@ -161,15 +206,96 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		expect(again.result.changeC).toBeLessThanOrEqual(
 			TEMPERATURE_MODEL.climateToleranceC,
 		);
-		// The root-mean-square change is within the tolerance while the
-		// largest in some cell is above it, a few times that: the rule is the
-		// rms, not the largest change.
+		// The largest change in some cell is several times the
+		// root-mean-square change: the rule is the rms, not the largest.
 		const largest = largestDifference(
 			first.temperature.months,
 			earth().result.temperature.months,
 		);
-		expect(largest).toBeGreaterThan(TEMPERATURE_MODEL.climateToleranceC);
+		expect(largest).toBeGreaterThan(3 * (first.changeC as number));
 		expect(largest).toBeLessThan(0.5);
+	});
+
+	it('carries on from a start with no currents, or with currents across what is now land, as from the currents of its winds', () => {
+		const start = earth().result;
+		const once = { ...COARSE, climateMaxPasses: 1 };
+		const carried = solveClimate(EARTH, { model: once, start });
+		const { currents: _, ...withoutCurrents } = start;
+		const without = solveClimate(EARTH, {
+			model: once,
+			start: withoutCurrents,
+		});
+		const across = solveClimate(EARTH, {
+			model: once,
+			start: {
+				...start,
+				currents: {
+					...start.currents,
+					flows: start.currents.flows.map((month) =>
+						new Float64Array(month.length).fill(1),
+					),
+				},
+			},
+		});
+		// The currents worked out afresh are those of the start's winds, to the
+		// gyres' tolerance.
+		for (const other of [without, across]) {
+			expect(
+				largestDifference(other.temperature.months, carried.temperature.months),
+			).toBeLessThan(0.05);
+		}
+	});
+
+	it('carries the sea’s own temperature in its result, NaN over land, and on from a start', () => {
+		const { temperature } = earth().result;
+		expect(temperature.seaMonths).toHaveLength(MONTHS_PER_YEAR);
+		const level = Math.fround(EARTH.seaLevel);
+		let misplaced = 0;
+		for (const month of temperature.seaMonths) {
+			for (let cell = 0; cell < month.length; cell++) {
+				const land = (EARTH.elevation[cell] as number) - level > 0;
+				if (Number.isNaN(month[cell]) !== land) {
+					misplaced++;
+				}
+			}
+		}
+		expect(misplaced).toBe(0);
+		// The start's sea is carried on: a start whose sea is 2 K warmer is
+		// further from settled, and takes more years to come back, and one
+		// whose sea is not a temperature is refused.
+		const start = earth().result;
+		const withSea = (shift: (value: number) => number): ClimateStart => {
+			const moved = (values: Float64Array): Float64Array =>
+				values.map((value, cell) =>
+					(EARTH.elevation[cell] as number) - level > 0 ? value : shift(value),
+				);
+			return {
+				...start,
+				temperature: {
+					...start.temperature,
+					state: {
+						...start.temperature.state,
+						seaTemperatureK: moved(start.temperature.state.seaTemperatureK),
+						seaPreviousK: moved(start.temperature.state.seaPreviousK),
+					},
+				},
+			};
+		};
+		const once = { ...COARSE, climateMaxPasses: 1 };
+		const plain = solveClimate(EARTH, { model: once, start });
+		const warmed = solveClimate(EARTH, {
+			model: once,
+			start: withSea((value) => value + 2),
+		});
+		expect(warmed.temperature.yearsRun).toBeGreaterThan(
+			plain.temperature.yearsRun,
+		);
+		expect(() =>
+			solveClimate(EARTH, {
+				model: once,
+				start: withSea(() => Number.NaN),
+			}),
+		).toThrow(RangeError);
 	});
 
 	it('solves from nothing, as the first pass of a cold solve does, when the start is for another day length or sea level', () => {
@@ -270,6 +396,20 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 					months: good.temperature.months.slice(1),
 				},
 			},
+			{
+				...good,
+				temperature: {
+					...good.temperature,
+					seaMonths: good.temperature.seaMonths.slice(1),
+				},
+			},
+			{
+				...good,
+				temperature: {
+					...good.temperature,
+					seaMonths: good.temperature.seaMonths.map(() => new Float32Array(5)),
+				},
+			},
 			{ ...good, winds: { ...good.winds, east: good.winds.east.slice(1) } },
 			{
 				...good,
@@ -279,6 +419,19 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 				},
 			},
 			{ ...good, dayLengthHours: Number.NaN },
+			{
+				...good,
+				currents: { ...good.currents, flows: good.currents.flows.slice(1) },
+			},
+			{
+				...good,
+				currents: {
+					...good.currents,
+					streamfunction: good.currents.streamfunction.map(
+						() => new Float64Array(4),
+					),
+				},
+			},
 			{},
 		];
 		for (const start of bad) {
@@ -324,12 +477,16 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 describe('solveClimate with no winds to carry heat', {
 	timeout: SOLVE_TIMEOUT_MS,
 }, () => {
-	it('settles after the second pass with the temperature of the first', () => {
+	it('settles after the second pass with the temperature of the first on a planet with no coast, whose currents are still', () => {
+		const ocean = createBlankWorld(64);
 		const model = { ...COARSE, windHeatCapacity: 0 };
-		const { result, passes } = run(EARTH, { model });
+		const { result, passes } = run(ocean, { model });
 		expect(result.passes).toBe(2);
 		expect(result.settled).toBe(true);
-		const today = solveTemperature(EARTH, { model });
+		expect(
+			result.currents.flows.every((month) => month.every((flow) => flow === 0)),
+		).toBe(true);
+		const today = solveTemperature(ocean, { model });
 		expect(
 			largestDifference(result.temperature.months, today.months),
 		).toBeLessThan(
@@ -337,15 +494,30 @@ describe('solveClimate with no winds to carry heat', {
 		);
 		expect(passes[0]?.temperature.months).toEqual(today.months);
 	});
+
+	it('carries the sea’s heat along the currents alone on the Earth, and settles within the passes allowed', () => {
+		const model = { ...COARSE, windHeatCapacity: 0 };
+		const { result, passes } = run(EARTH, { model });
+		expect(result.settled).toBe(true);
+		expect(result.passes).toBeGreaterThan(2);
+		expect(result.passes).toBeLessThanOrEqual(model.climateMaxPasses);
+		expect(
+			largestDifference(
+				(passes[0] as ClimateProgress).temperature.seaMonths,
+				(passes[1] as ClimateProgress).temperature.seaMonths,
+			),
+		).toBeGreaterThan(1);
+	});
 });
 
+// Two runs of six passes each: over three minutes under coverage.
 describe('solveClimate when the winds and the temperature chase each other', {
-	timeout: SOLVE_TIMEOUT_MS,
+	timeout: 3 * SOLVE_TIMEOUT_MS,
 }, () => {
 	// A generated world with the thermal highs and lows at 3 hPa a kelvin,
-	// the strength the winds were tuned at before the temperature depended on
-	// them: the loop does not settle, its change grows from the fourth pass to
-	// the fifth and, left whole, goes on growing.
+	// three times the winds' default: the loop does not settle, its change
+	// grows from the fourth pass to the fifth and, left whole, grows again to
+	// the sixth.
 	const WORLD = generateWorld({ resolution: 64, seed: 1, landFraction: 0.3 });
 	const MODEL = { ...COARSE, climateMaxPasses: 6 };
 	const WINDS = { thermalHpaPerK: 3 };
@@ -362,6 +534,15 @@ describe('solveClimate when the winds and the temperature chase each other', {
 		const wholePasses = whole().passes as ClimateProgress[];
 		const halfPasses = half().passes as ClimateProgress[];
 		// The first overshoot is the fifth pass.
+		expect(
+			wholePasses
+				.slice(2, 4)
+				.every(
+					(pass, index) =>
+						(pass.changeC as number) <=
+						((wholePasses[index + 1] as ClimateProgress).changeC as number),
+				),
+		).toBe(true);
 		expect((wholePasses[4] as ClimateProgress).changeC).toBeGreaterThan(
 			(wholePasses[3] as ClimateProgress).changeC as number,
 		);
@@ -386,7 +567,27 @@ describe('solveClimate when the winds and the temperature chase each other', {
 				).toBeCloseTo(0, 3);
 			}
 		}
-		for (const key of ['temperatureK', 'previousK'] as const) {
+		for (let month = 0; month < MONTHS_PER_YEAR; month++) {
+			for (let cell = 0; cell < 64 * 64 * 6; cell += 7) {
+				const from = (before.seaMonths[month] as Float32Array)[cell] as number;
+				const to = (pass.seaMonths[month] as Float32Array)[cell] as number;
+				const value = (applied.seaMonths[month] as Float32Array)[
+					cell
+				] as number;
+				if (Number.isNaN(to)) {
+					// Land, in both.
+					expect(value).toBeNaN();
+				} else {
+					expect(value - (from + 0.5 * (to - from))).toBeCloseTo(0, 3);
+				}
+			}
+		}
+		for (const key of [
+			'temperatureK',
+			'previousK',
+			'seaTemperatureK',
+			'seaPreviousK',
+		] as const) {
 			for (let cell = 0; cell < 64 * 64 * 6; cell += 7) {
 				const from = before.state[key][cell] as number;
 				const to = pass.state[key][cell] as number;
@@ -405,6 +606,12 @@ describe('solveClimate when the winds and the temperature chase each other', {
 		);
 		expect((wholePasses[4] as ClimateProgress).winds).toEqual(
 			winds(WINDS, pass.months),
+		);
+		// And the currents of those winds.
+		expect((halfPasses[4] as ClimateProgress).currents).toEqual(
+			solveGyres(WORLD, (halfPasses[4] as ClimateProgress).winds, {
+				guess: (halfPasses[3] as ClimateProgress).currents.streamfunction,
+			}),
 		);
 	});
 

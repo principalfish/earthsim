@@ -193,13 +193,20 @@ const shared = <T>(make: () => T): (() => T) => {
 	};
 };
 
-/** Time allowed for the tests that solve a climate: ten seconds or so a run. */
+/**
+ * Time allowed for the tests that solve a climate: several seconds a run,
+ * several times that under coverage instrumentation.
+ */
 const CLIMATE_SOLVE_TIMEOUT_MS = 300_000;
 
 describe('handleRequest for climate', {
 	timeout: CLIMATE_SOLVE_TIMEOUT_MS,
 }, () => {
-	const CLIMATE_WORLD = generated(1977, 0.3);
+	// A blank ocean on the smallest grid: its climate settles in three
+	// passes, at about half the cost of a generated world's, so it has
+	// passes before the last, whose arrays are posted as copies, and a
+	// settled result for a start to carry on from.
+	const CLIMATE_WORLD = createBlankWorld(64);
 	const climateRequest = (extras: Record<string, unknown> = {}) => ({
 		id: 50,
 		kind: 'climate',
@@ -267,7 +274,9 @@ describe('handleRequest for climate', {
 		// reached the core's answer, so it never read them emptied, and the
 		// last pass's arrays, posted from the loop's own, are that answer.
 		expect(last?.temperature.months).toEqual(direct.temperature.months);
+		expect(last?.temperature.seaMonths).toEqual(direct.temperature.seaMonths);
 		expect(last?.winds).toEqual(direct.winds);
+		expect(last?.currents).toEqual(direct.currents);
 		expect(last?.temperature.state).toEqual(direct.temperature.state);
 		// An earlier pass's arrays arrived whole.
 		const first = passes[0]?.climatePass;
@@ -275,15 +284,33 @@ describe('handleRequest for climate', {
 		expect(first?.temperature.months.every((month) => month.length > 0)).toBe(
 			true,
 		);
+		expect(
+			first?.temperature.seaMonths.every((month) => month.length > 0),
+		).toBe(true);
+		expect(first?.temperature.state.seaTemperatureK.length).toBeGreaterThan(0);
+		expect(first?.temperature.state.seaPreviousK.length).toBeGreaterThan(0);
 		expect(first?.winds.pressure.every((month) => month.length > 0)).toBe(true);
+		for (const field of [
+			'flows',
+			'east',
+			'north',
+			'ekmanEast',
+			'ekmanNorth',
+			'streamfunction',
+		] as const) {
+			expect(
+				first?.currents[field].every((month) => month.length > 0),
+				field,
+			).toBe(true);
+		}
 	});
 
-	it('transfers each pass’s fifty-one buffers, the twelve months of temperature, three of state and thirty-six of winds, each once', () => {
+	it('transfers each pass’s 137 buffers, the twelve months of the air’s temperature and twelve of the sea’s, five of state, thirty-six of winds and seventy-two of currents, each once', () => {
 		const { transfers } = answered();
 		expect(transfers).toHaveLength(directClimate().passes);
 		for (const transfer of transfers) {
-			expect(transfer).toHaveLength(51);
-			expect(new Set(transfer).size).toBe(51);
+			expect(transfer).toHaveLength(137);
+			expect(new Set(transfer).size).toBe(137);
 		}
 		// A pass shares no buffer with another: an earlier pass's are copies.
 		const all = transfers.flat();
@@ -374,6 +401,7 @@ describe('handleRequest for climate', {
 	): Record<string, unknown> => ({
 		temperature: {
 			months: monthsOf(world.elevation.length),
+			seaMonths: monthsOf(world.elevation.length),
 			state,
 			solvedFor: temperatureConditions(world),
 		},
@@ -388,6 +416,8 @@ describe('handleRequest for climate', {
 	const stateOn = (cells: number) => ({
 		temperatureK: new Float64Array(cells).fill(280),
 		previousK: new Float64Array(cells).fill(280),
+		seaTemperatureK: new Float64Array(cells).fill(280),
+		seaPreviousK: new Float64Array(cells).fill(280),
 		referenceCoolingK: new Float64Array(cells),
 		stepSeconds: 86_400,
 	});

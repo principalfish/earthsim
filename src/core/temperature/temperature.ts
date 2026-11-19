@@ -2,10 +2,11 @@
  * Near-surface air temperature through the year: a seasonal energy balance
  * on the world's own grid.
  *
- * Every cell holds one temperature, the temperature its air would have at
- * sea level, in kelvin. Its heat capacity times the rate at which that
- * temperature changes is the sunlight it absorbs, less the heat it
- * radiates to space, plus the heat its four neighbours pass it:
+ * Every cell holds the temperature its air would have at sea level, in
+ * kelvin, and a sea cell the sea's too (see below). Over land, the air's
+ * heat capacity times the rate at which that temperature changes is the
+ * sunlight it absorbs, less the heat it radiates to space, plus the heat
+ * its four neighbours pass it:
  *
  * `C dT/dt = (1 − α) Q − ε σ T⁴ + Σ_k D w_k (T_k − T) / A`
  *
@@ -13,26 +14,63 @@
  * cell's latitude and the time of year, `α` the reflectivity, `ε` an
  * emissivity that falls as the greenhouse effect strengthens, `D` a
  * diffusivity, `w_k` the edge weights of {@link edgeGeometry} and `A` the
- * cell's area on the unit sphere. Ocean cells hold the heat capacity of a
- * mixed layer of water, land cells much less. The air over land is cooled
- * by a fixed lapse rate for the land's height above sea level. As that air
+ * cell's area on the unit sphere. The air over land is cooled by a fixed
+ * lapse rate for the land's height above sea level. As that air
  * temperature falls below freezing, reflectivity rises smoothly, standing
- * for snow and sea ice, and an ocean cell's heat capacity falls towards
- * land's, standing for sea ice cutting the air off from the water.
+ * for snow and ice.
+ *
+ * A sea cell holds a second temperature, the sea's: its mixed top layer,
+ * with that layer's heat capacity, under the air with the air's own. The
+ * sunlight reaching the sea warms the sea, and the sea and the air pass
+ * heat as their difference drives it, at `k`,
+ * {@link TemperatureModel.airSeaExchange}:
+ *
+ * `C_s dT_s/dt = (1 − α) Q − c S̄ − c k (T_s − T)`
+ *
+ * while the air's balance above has, in place of the sunlight, `c S̄ +
+ * c k (T_s − T)`. `S̄` is the year's mean sunlight the sea absorbs clear of
+ * ice, which it gives up to the air as evaporation and long-wave radiation
+ * whatever their difference, so that the sea stores the sunlight's swing
+ * through the year and the two come to the same temperature where nothing
+ * else moves heat; `c` is the share of the sea clear of ice. The ice share
+ * follows the sea's own temperature: the sea ices over as it nears
+ * freezing, which brightens it and cuts it off from the air, and it does
+ * not cool below freezing, while the air above can. The sea does not spread
+ * heat to its neighbours by diffusion: the air's diffusivity over the sea
+ * stands for the heat carried sideways there that nothing else carries,
+ * and the sea's currents, when a solve is given them, carry the sea's own
+ * (see below). A world with no sea is solved with the air alone, one
+ * temperature per cell.
  *
  * Time runs in real seconds: a year lasts {@link yearLengthDays}, split into
  * twelve equal months, January first, each stepped a fixed number of times
  * by second-order backward differences. Each step is implicit: the exchange
  * between cells and the outgoing heat, linearised about where the step is
  * expected to end, are solved for together (see
- * {@link createExchangeSolver}); reflectivity and heat capacity are read at
- * that expected end. The year is repeated until it stops changing.
+ * {@link createExchangeSolver}); the air's reflectivity is read at that
+ * expected end, the sea's ice share at the step's start. The year is
+ * repeated until it stops changing.
  *
  * A solve may be given a year of winds, as the flows they carry across the
  * cells' edges. Each step is then followed by an implicit upwind step that
  * carries heat along the flows (see {@link createHeatAdvector}), with the
  * flows of the time the step ends at, interpolated between the months'; it
- * is skipped when {@link TemperatureModel.windHeatCapacity} is 0.
+ * is skipped when {@link TemperatureModel.windHeatCapacity} is 0. The winds
+ * carry the air's heat; at sea the heat they bring is shared with the sea
+ * as the exchange shares it over a step.
+ *
+ * A solve may also be given a year of the sea's currents, as the water
+ * they carry across the edges. Each step then ends with the same implicit
+ * upwind step for the sea alone: the water carries the sea's temperature
+ * at {@link SEA_WATER_HEAT_CAPACITY_J_M3_K} for each cubic metre, into the
+ * sea's heat store, {@link TemperatureModel.oceanHeatCapacity}, and the
+ * air over a sea cell takes its share of what the water brings through the
+ * exchange in the steps after. The land, which no current crosses, takes
+ * no part.
+ *
+ * A sea cell's sea has no neighbour but its air, so within each step it is
+ * solved for at once in terms of the air's temperature at the step's end
+ * (see {@link seaStep}), and the air's equations keep their form.
  *
  * A world of more than 64 cells per face edge is worked out on the grid a
  * step coarser (see {@link solveResolution}) and its sea-level temperatures
@@ -44,7 +82,12 @@
  * physical truth.
  */
 
-import { constantsOf, TEMPERATURE_CONFIG, valuesOf } from '../config';
+import {
+	constantsOf,
+	OCEAN_CONFIG,
+	TEMPERATURE_CONFIG,
+	valuesOf,
+} from '../config';
 import { coarsenWorld, refineField } from '../grid/coarsen';
 import {
 	edgeGeometry,
@@ -100,16 +143,24 @@ export type TemperatureModel = {
 	 * the two, so its coupling is the same seen from either side.
 	 */
 	readonly landDiffusivity: number;
-	/** Heat capacity of an ocean cell, in joules per square metre per kelvin. */
+	/**
+	 * Heat capacity of the sea's mixed top layer, in joules per square metre
+	 * per kelvin.
+	 */
 	readonly oceanHeatCapacity: number;
 	/** Heat capacity of a land cell, in joules per square metre per kelvin. */
 	readonly landHeatCapacity: number;
 	/**
-	 * Heat capacity of an ocean cell wholly covered by ice, in joules per
-	 * square metre per kelvin: the ice cuts the air off from the water
-	 * below, so the surface warms and cools like land.
+	 * Heat capacity of the air over the sea, in joules per square metre per
+	 * kelvin: the air's own, apart from the sea's below it.
 	 */
-	readonly seaIceHeatCapacity: number;
+	readonly seaAirHeatCapacity: number;
+	/**
+	 * How readily heat passes between the sea and the air over it, in watts
+	 * per square metre per kelvin of their difference, where the sea is
+	 * clear of ice. Not negative.
+	 */
+	readonly airSeaExchange: number;
 	/**
 	 * The heat capacity per square metre of the air that carries heat along
 	 * the wind, in joules per square metre per kelvin: how strongly the wind
@@ -140,6 +191,16 @@ export type TemperatureModel = {
 	readonly iceStartC: number;
 	/** Air temperature, in degrees Celsius, at and below which ice is complete. */
 	readonly iceFullC: number;
+	/**
+	 * Sea temperature, in degrees Celsius, below which the sea starts to ice
+	 * over.
+	 */
+	readonly seaIceStartC: number;
+	/**
+	 * The freezing point of sea water, in degrees Celsius: the sea is wholly
+	 * iced over there and does not cool below it.
+	 */
+	readonly seaFreezingC: number;
 	/** Implicit steps per month. */
 	readonly stepsPerMonth: number;
 	/**
@@ -202,6 +263,14 @@ export type TemperatureModel = {
 export const TEMPERATURE_MODEL: TemperatureModel = valuesOf(TEMPERATURE_CONFIG);
 
 /**
+ * The heat a cubic metre of sea water holds for each kelvin, in joules: what
+ * the currents' water carries of the sea's temperature. See
+ * {@link OCEAN_CONFIG}.
+ */
+export const SEA_WATER_HEAT_CAPACITY_J_M3_K =
+	constantsOf(OCEAN_CONFIG).seaWaterHeatCapacityJM3K;
+
+/**
  * The sea level and planet a temperature result was solved for, in the
  * forms the solver uses them: see {@link temperatureConditions}.
  *
@@ -243,6 +312,14 @@ export type TemperatureState = {
 	readonly temperatureK: Float64Array;
 	/** The same one step earlier, kelvin, per cell. */
 	readonly previousK: Float64Array;
+	/**
+	 * The sea's temperature at the turn of the year, kelvin, per cell; where
+	 * the cell is land, its air's sea-level temperature, so that a cell a
+	 * later edit floods starts its sea from its air.
+	 */
+	readonly seaTemperatureK: Float64Array;
+	/** The same one step earlier, kelvin, per cell. */
+	readonly seaPreviousK: Float64Array;
 	/**
 	 * The length of that step, in seconds, from {@link MIN_STEP_SECONDS} to
 	 * {@link MAX_STEP_SECONDS}.
@@ -296,6 +373,34 @@ export type TemperatureWinds = {
 	readonly flows: readonly ArrayLike<number>[];
 };
 
+/**
+ * What the sea's currents carry, for the sea's heat to be carried along
+ * with them: a year of monthly flows across the edges of the grid the world
+ * is solved on, and the depth they are spread over.
+ *
+ * @remarks
+ * The water carried across an edge each second is the edge's flow times
+ * {@link TemperatureCurrents.depthM}, in cubic metres, and it carries the
+ * sea's temperature with {@link SEA_WATER_HEAT_CAPACITY_J_M3_K} for each:
+ * the heat moved a second is that times the water times the temperature.
+ * The gyres' flows and their `layerDepthM` (see `solveGyres`) are one such
+ * pair, whose product is the whole transport of the wind-driven layer.
+ */
+export type TemperatureCurrents = {
+	/**
+	 * Twelve fields, January to December, of the water carried across every
+	 * edge, in square metres a second over {@link TemperatureCurrents.depthM},
+	 * laid out as {@link edgeFlows} gives them on the grid the world is
+	 * solved on, as {@link TemperatureWinds.flows} are. Each must carry
+	 * nothing across an edge of a land cell, and should carry nothing net in
+	 * or out of any cell, as the gyres' flows do, so that heat is moved and
+	 * never made. They must not be changed while the solve runs.
+	 */
+	readonly flows: readonly ArrayLike<number>[];
+	/** The depth the flows are spread over, in metres: above 0 and finite. */
+	readonly depthM: number;
+};
+
 /** What {@link solveTemperature} may be given besides the world. */
 export type SolveTemperatureOptions = {
 	/**
@@ -326,6 +431,14 @@ export type SolveTemperatureOptions = {
 	 * for a solve from nothing does not use them.
 	 */
 	readonly winds?: TemperatureWinds;
+	/**
+	 * The sea's currents its heat is carried along with, in each time step
+	 * after the winds: an implicit upwind step by {@link createHeatAdvector}
+	 * of the sea's temperature alone, with the sea's heat store. Left out,
+	 * the solve is the one with no currents, bit for bit. The first guess
+	 * for a solve from nothing does not use them.
+	 */
+	readonly currents?: TemperatureCurrents;
 	/**
 	 * Whether to solve on the world's own grid whatever its resolution,
 	 * rather than on {@link solveResolution} of it; defaults to false.
@@ -396,6 +509,17 @@ export type TemperatureResult = {
 	 * by {@link refineField}.
 	 */
 	readonly months: Float32Array[];
+	/**
+	 * Twelve fields, January to December, of the sea's own mean temperature
+	 * over each month, in degrees Celsius, one value per cell of the world's
+	 * own grid in cell order, and NaN where the cell is land, as the
+	 * observed sea temperature marks it. It is the temperature of the sea's
+	 * mixed top layer, apart from the air's in {@link months}. Above 64
+	 * cells per face edge it is carried from the grid the world was solved
+	 * on by {@link refineField}, a coarse land cell standing in with its
+	 * air's sea-level temperature.
+	 */
+	readonly seaMonths: Float32Array[];
 	/**
 	 * The state the solve ended in, to carry on from, on the grid the world
 	 * was solved on.
@@ -632,7 +756,7 @@ export const assertModel = (model: TemperatureModel): void => {
 		'landDiffusivity',
 		'oceanHeatCapacity',
 		'landHeatCapacity',
-		'seaIceHeatCapacity',
+		'seaAirHeatCapacity',
 		'solverToleranceK',
 	];
 	for (const name of positive) {
@@ -643,6 +767,7 @@ export const assertModel = (model: TemperatureModel): void => {
 	for (const name of [
 		'greenhouseFactor',
 		'windHeatCapacity',
+		'airSeaExchange',
 		'lapseRate',
 		'terrainDriftLimitK',
 		'correctionRefineK',
@@ -711,6 +836,11 @@ export const assertModel = (model: TemperatureModel): void => {
 	}
 	if (!(model.iceStartC > model.iceFullC)) {
 		throw new RangeError("The model's iceStartC must be above its iceFullC");
+	}
+	if (!(model.seaIceStartC > model.seaFreezingC)) {
+		throw new RangeError(
+			"The model's seaIceStartC must be above its seaFreezingC",
+		);
 	}
 };
 
@@ -1108,8 +1238,8 @@ const assertStartTemperatures = (values: Float64Array, what: string): void => {
 
 /**
  * The state at the turn of the year carried on from a previous solve's end
- * state, and the state a step before it, in kelvin, with the state's
- * reference cooling.
+ * state, and the state a step before it, in kelvin, the air's and the
+ * sea's, with the state's reference cooling.
  *
  * @remarks
  * The arrays are copied first and only the copies are checked and used. If
@@ -1117,7 +1247,7 @@ const assertStartTemperatures = (values: Float64Array, what: string): void => {
  * month differ, the state a step before is moved so that the rate of
  * change it implies is kept, and brought within the limits of a state.
  *
- * @throws RangeError if the state is not two Float64Arrays of one
+ * @throws RangeError if the state is not four Float64Arrays of one
  * temperature per cell of the grid the world is solved on, each from
  * {@link MIN_TEMPERATURE_K} to {@link MAX_START_K}, and a Float64Array of
  * one finite cooling per cell, none negative, with a step length from
@@ -1129,6 +1259,8 @@ const fromState = (
 ): {
 	readonly state: Float64Array;
 	readonly before: Float64Array;
+	readonly sea: Float64Array;
+	readonly seaBefore: Float64Array;
 	readonly reference: Float64Array;
 } => {
 	const { cellCount } = setup;
@@ -1156,6 +1288,18 @@ const fromState = (
 		cellCount,
 		"A starting state's previousK",
 	);
+	const sea = copyChecked(
+		start.seaTemperatureK,
+		'Float64Array',
+		cellCount,
+		"A starting state's seaTemperatureK",
+	);
+	const seaPrevious = copyChecked(
+		start.seaPreviousK,
+		'Float64Array',
+		cellCount,
+		"A starting state's seaPreviousK",
+	);
 	const reference = copyChecked(
 		start.referenceCoolingK,
 		'Float64Array',
@@ -1164,6 +1308,8 @@ const fromState = (
 	);
 	assertStartTemperatures(state, "A starting state's temperatureK");
 	assertStartTemperatures(previous, "A starting state's previousK");
+	assertStartTemperatures(sea, "A starting state's seaTemperatureK");
+	assertStartTemperatures(seaPrevious, "A starting state's seaPreviousK");
 	for (let cell = 0; cell < cellCount; cell++) {
 		const value = reference[cell] as number;
 		if (!(value >= 0 && Number.isFinite(value))) {
@@ -1180,9 +1326,12 @@ const fromState = (
 			`A starting state's step must last from ${MIN_STEP_SECONDS} to ${MAX_STEP_SECONDS} seconds, as some planet's can; got ${String(stepSeconds)}`,
 		);
 	}
+	const stepNow = stepSecondsOf(setup);
 	return {
 		state,
-		before: stepBefore(state, previous, stepSeconds, stepSecondsOf(setup)),
+		before: stepBefore(state, previous, stepSeconds, stepNow),
+		sea,
+		seaBefore: stepBefore(sea, seaPrevious, stepSeconds, stepNow),
 		reference,
 	};
 };
@@ -1193,13 +1342,34 @@ const stepSecondsOf = (setup: Setup): number =>
 
 /** The time stepping of one solve, holding the state it steps. */
 type Stepper = {
-	/** The sea-level temperature now, in kelvin. */
+	/** The sea-level air temperature now, in kelvin. */
 	readonly state: Float64Array;
-	/** The sea-level temperature a step before now, in kelvin. */
+	/** The sea-level air temperature a step before now, in kelvin. */
 	readonly previous: Float64Array;
-	/** Each cell's heat capacity in the latest step. */
+	/**
+	 * The sea's temperature now, in kelvin; at a land cell, its air's
+	 * sea-level temperature.
+	 */
+	readonly sea: Float64Array;
+	/** The sea's temperature a step before now, in kelvin, likewise. */
+	readonly seaPrevious: Float64Array;
+	/**
+	 * How much of a lasting shift of its air each sea cell's sea takes on, in
+	 * the latest step: its exchange with the air over that and the opening of
+	 * its ice (see {@link seaStep}), 1 for a sea clear of ice, near 0 for one
+	 * at the ice's edge whose own balance holds it; 0 on land.
+	 */
+	readonly seaFollows: Float64Array;
+	/**
+	 * Each cell's heat capacity in the latest step: land's, or at sea the
+	 * air's and the share of the sea's it was coupled to over the step.
+	 */
 	readonly capacity: Float64Array;
-	/** Each cell's least heat capacity over the year's steps so far. */
+	/**
+	 * Each cell's least heat capacity over the year's steps so far: land's,
+	 * or at sea the air's and the sea's, the sea's by the share of it clear
+	 * of ice.
+	 */
 	readonly leastCapacity: Float64Array;
 	/** The rise of outgoing heat with temperature, summed likewise. */
 	readonly damping: Float64Array;
@@ -1213,16 +1383,110 @@ type Stepper = {
 	/** Clears the sums kept over a year. */
 	startYear(): void;
 	/**
-	 * Steps through one month, adding each step's mean temperature to
-	 * `sum`.
+	 * Steps through one month, adding each step's mean air temperature to
+	 * `sum` and each step's mean sea temperature to `seaSum`.
 	 */
-	runMonth(month: number, sum: Float64Array): void;
+	runMonth(month: number, sum: Float64Array, seaSum: Float64Array): void;
 };
 
-/** What a stepper needs to carry heat along the winds. */
+/** What a stepper needs to carry heat along the winds or the currents. */
 type Advection = {
 	readonly advector: HeatAdvector;
 	readonly flows: readonly ArrayLike<number>[];
+};
+
+/**
+ * The share of the sea clear of ice at a sea temperature in kelvin: 1 above
+ * {@link TemperatureModel.seaIceStartC}, 0 at and below
+ * {@link TemperatureModel.seaFreezingC}, and a smooth step between whose
+ * slope is zero at both ends.
+ */
+const seaClearShare = (seaK: number, model: TemperatureModel): number => {
+	const share =
+		(seaK - ZERO_CELSIUS_K - model.seaFreezingC) /
+		(model.seaIceStartC - model.seaFreezingC);
+	if (share >= 1) {
+		return 1;
+	}
+	if (share <= 0) {
+		return 0;
+	}
+	return share * share * (3 - 2 * share);
+};
+
+/**
+ * The rate at which {@link seaClearShare} rises with sea temperature, per
+ * kelvin.
+ */
+const seaClearShareSlope = (seaK: number, model: TemperatureModel): number => {
+	const width = model.seaIceStartC - model.seaFreezingC;
+	const share = (seaK - ZERO_CELSIUS_K - model.seaFreezingC) / width;
+	if (share >= 1 || share <= 0) {
+		return 0;
+	}
+	return (6 * share * (1 - share)) / width;
+};
+
+/**
+ * One implicit step of a sea cell's sea, with the exchange between it and
+ * the air over it, written in terms of the air's temperature at the step's
+ * end.
+ *
+ * @remarks
+ * The sea's balance over a step of second-order backward differences is
+ *
+ * `C_s (3 T_s' − 4 T_s + T_s⁻) / 2Δt = S − k (T_s' − T_a') − (g − b) (T_s' − T_s)`
+ *
+ * for its heat capacity `C_s`, the sunlight it keeps `S` (what it absorbs
+ * less what it gives up at a steady rate), the exchange `k` with the air at
+ * `T_a'`, and `g`, how much faster the sea gives heat up per kelvin of its
+ * own warming as its ice opens, less `b`, how much more sunlight it absorbs
+ * per kelvin as the ice's brightness goes: the ice share's change over the
+ * step, taken at the sea's temperature now and solved for with the rest,
+ * which keeps a sea at the ice's edge from swinging between iced and open
+ * from step to step. `b` is taken at no more than three quarters of the
+ * sea's heat capacity over the step, so that the step stays well posed;
+ * only `g` is heat given to the air. The sea has no other neighbour, so it
+ * is solved for at once: `T_s' = base + gain · T_a'`. What it gives the
+ * air, `k (T_s' − T_a') + g (T_s' − T_s)`, is then `(k + g) · base − g T_s
+ * − (k − (k + g) gain) T_a'`: the air's mass grows by `k − (k + g) gain`,
+ * which is not negative, and its right-hand side by `(k + g) · base − g
+ * T_s`. The heat the air gains is exactly what the sea loses, whatever
+ * `T_a'` the air's solve settles on.
+ *
+ * @param step - The sea's temperature now and a step before, in kelvin; the
+ * sunlight it keeps, W m⁻²; the exchange `k`, the opening `g` and the
+ * brightening `b`, W m⁻² K⁻¹, none negative; and its heat capacity over the
+ * step's length.
+ * @returns The sea's `base` in kelvin, its `gain`, from 0 to below 1, and
+ * `coupling`, `k + g`.
+ */
+export const seaStep = (step: {
+	readonly sea: number;
+	readonly earlier: number;
+	readonly sunlight: number;
+	readonly exchange: number;
+	readonly opening: number;
+	readonly brightening: number;
+	readonly storage: number;
+}): {
+	readonly base: number;
+	readonly gain: number;
+	readonly coupling: number;
+} => {
+	const { sea, earlier, sunlight, exchange, opening, storage } = step;
+	const brightening = Math.min(step.brightening, 0.75 * storage);
+	const coupling = exchange + opening;
+	const diagonal = 1.5 * storage + coupling - brightening;
+	return {
+		base:
+			(storage * (2 * sea - 0.5 * earlier) +
+				sunlight +
+				(opening - brightening) * sea) /
+			diagonal,
+		gain: exchange / diagonal,
+		coupling,
+	};
 };
 
 const createStepper = (
@@ -1230,7 +1494,10 @@ const createStepper = (
 	solver: ExchangeSolver,
 	initial: Float64Array,
 	before: Float64Array,
+	initialSea: Float64Array,
+	beforeSea: Float64Array,
 	advection?: Advection,
+	currents?: Advection,
 ): Stepper => {
 	const { cellCount, areas, clearAlbedo, cooling, emission, land, model } =
 		setup;
@@ -1240,11 +1507,34 @@ const createStepper = (
 		iceAlbedo,
 		landHeatCapacity,
 		oceanHeatCapacity,
-		seaIceHeatCapacity,
+		seaAirHeatCapacity,
+		airSeaExchange,
 	} = model;
+	const freezingK = model.seaFreezingC + ZERO_CELSIUS_K;
 	const stepSeconds = stepSecondsOf(setup);
+	const seaStorage = oceanHeatCapacity / stepSeconds;
+	const seaAirStorage = seaAirHeatCapacity / stepSeconds;
+	// The year's mean sunlight each cell's sea absorbs clear of ice, W m⁻².
+	const seaSunlight = new Float64Array(cellCount);
+	for (let cell = 0; cell < cellCount; cell++) {
+		seaSunlight[cell] =
+			(1 - (clearAlbedo[cell] as number)) *
+			(setup.annualSunlight[cell] as number);
+	}
 	const state = Float64Array.from(initial);
 	const previous = Float64Array.from(before);
+	const sea = Float64Array.from(initialSea);
+	const seaPrevious = Float64Array.from(beforeSea);
+	for (let cell = 0; cell < cellCount; cell++) {
+		if (land[cell]) {
+			sea[cell] = state[cell] as number;
+			seaPrevious[cell] = previous[cell] as number;
+		} else {
+			sea[cell] = Math.max(freezingK, sea[cell] as number);
+			seaPrevious[cell] = Math.max(freezingK, seaPrevious[cell] as number);
+		}
+	}
+	const seaFollows = new Float64Array(cellCount);
 	const capacity = new Float64Array(cellCount);
 	const leastCapacity = new Float64Array(cellCount);
 	const damping = new Float64Array(cellCount);
@@ -1252,11 +1542,31 @@ const createStepper = (
 	const mass = new Float64Array(cellCount);
 	const rhs = new Float64Array(cellCount);
 	const next = new Float64Array(cellCount);
+	const seaNext = new Float64Array(cellCount);
+	// Each sea cell's sea at the step's end as base + gain · the air's: see
+	// seaStep. Reused every step.
+	const seaBase = new Float64Array(cellCount);
+	const seaGain = new Float64Array(cellCount);
+	// The share of the air's change over the winds' step that the sea takes
+	// with it, and the air before that step.
+	const seaShare = new Float64Array(cellCount);
+	const airBefore = new Float64Array(advection === undefined ? 0 : cellCount);
 	const table = new Float64Array(SUNLIGHT_ROWS);
 	const light = new Float64Array(cellCount);
 	const stepFlows = new Float64Array(
 		advection === undefined ? 0 : NEIGHBOUR_COUNT * cellCount,
 	);
+	const currentFlows = new Float64Array(
+		currents === undefined ? 0 : NEIGHBOUR_COUNT * cellCount,
+	);
+	// The sea's heat store, which the currents carry heat into and out of,
+	// and none on land, which they do not cross.
+	const seaCapacity = new Float64Array(currents === undefined ? 0 : cellCount);
+	if (currents !== undefined) {
+		for (let cell = 0; cell < cellCount; cell++) {
+			seaCapacity[cell] = land[cell] ? 0 : oceanHeatCapacity;
+		}
+	}
 
 	let solved = true;
 
@@ -1267,8 +1577,13 @@ const createStepper = (
 		feedback.fill(0);
 	};
 
-	const runMonth = (month: number, sum: Float64Array): void => {
+	const runMonth = (
+		month: number,
+		sum: Float64Array,
+		seaSum: Float64Array,
+	): void => {
 		sum.fill(0);
+		seaSum.fill(0);
 		for (let step = 0; step < stepsPerMonth; step++) {
 			sunlightAt(
 				setup,
@@ -1285,42 +1600,124 @@ const createStepper = (
 				// which outgoing heat is linearised, so that each of them is
 				// as accurate as the second-order stepping.
 				const ahead = Math.max(MIN_TEMPERATURE_K, 2 * t - earlier);
-				const air = airTemperature(ahead, cooling[cell] as number);
-				const clear = clearShare(air, model);
-				const clearValue = clearAlbedo[cell] as number;
-				const albedo = iceAlbedo + (clearValue - iceAlbedo) * clear;
-				const heatCapacity = land[cell]
-					? landHeatCapacity
-					: seaIceHeatCapacity +
-						(oceanHeatCapacity - seaIceHeatCapacity) * clear;
-				capacity[cell] = heatCapacity;
-				leastCapacity[cell] = Math.min(
-					leastCapacity[cell] as number,
-					heatCapacity,
-				);
 				const radiation = emission * ahead * ahead * ahead;
-				const storage = heatCapacity / stepSeconds;
 				const cellArea = areas[cell] as number;
 				const sunlight = light[cell] as number;
-				// Second-order backward differences:
-				// (3 T' − 4 T + T⁻) / 2Δt for the rate of change.
-				mass[cell] = cellArea * (1.5 * storage + 4 * radiation);
+				const clearValue = clearAlbedo[cell] as number;
+				damping[cell] = (damping[cell] as number) + 4 * radiation;
+				next[cell] = ahead;
+				if (land[cell]) {
+					const air = airTemperature(ahead, cooling[cell] as number);
+					const clear = clearShare(air, model);
+					const albedo = iceAlbedo + (clearValue - iceAlbedo) * clear;
+					capacity[cell] = landHeatCapacity;
+					leastCapacity[cell] = Math.min(
+						leastCapacity[cell] as number,
+						landHeatCapacity,
+					);
+					const storage = landHeatCapacity / stepSeconds;
+					// Second-order backward differences:
+					// (3 T' − 4 T + T⁻) / 2Δt for the rate of change.
+					mass[cell] = cellArea * (1.5 * storage + 4 * radiation);
+					rhs[cell] =
+						cellArea *
+						(storage * (2 * t - 0.5 * earlier) +
+							(1 - albedo) * sunlight +
+							3 * radiation * ahead);
+					// How much more sunlight the cell absorbs per kelvin of
+					// warming as its snow and ice retreat.
+					feedback[cell] =
+						(feedback[cell] as number) +
+						(iceAlbedo - clearValue) * clearShareSlope(air, model) * sunlight;
+					continue;
+				}
+				// At sea the air radiates and spreads heat, and the sea below
+				// it takes the sunlight and passes heat to the air as their
+				// difference drives it, cut by the share of it iced over, which
+				// follows the sea's own temperature.
+				const seaNow = sea[cell] as number;
+				const seaEarlier = seaPrevious[cell] as number;
+				// The sea's ice share is read at the sea's temperature now, not
+				// where the step is expected to end as the air's is: the sea
+				// moves slowly, and read ahead, a sea nearing freezing in steps
+				// of a month swings between iced and open from one year to the
+				// next (the Earth and a generated world at one step a month did
+				// not settle in 60 years; read now, they settle in 6).
+				const clear = seaClearShare(seaNow, model);
+				const albedo = iceAlbedo + (clearValue - iceAlbedo) * clear;
+				const exchange = airSeaExchange * clear;
+				// The sunlight the sea absorbs over the year, clear of ice, it
+				// gives up to the air at a steady rate as evaporation and
+				// long-wave radiation, whatever their difference: so it is the
+				// sunlight's swing through the year that the sea stores, and
+				// the sea and the air come to the same temperature where
+				// nothing else moves heat. Ice cuts this as it cuts the
+				// exchange.
+				const meanSunlight = seaSunlight[cell] as number;
+				const throughput = clear * meanSunlight;
+				// What the sea gives up rises as its ice opens with its warming:
+				// solved for with the rest, where it speeds the sea's loss, about
+				// the air the step is expected to end at. Taken as it is, a sea at
+				// the ice's edge under very cold air swings between iced and open
+				// from step to step, and a frozen Earth did not settle in 60
+				// years; solved for, it settles in 3.
+				const opening = Math.max(
+					0,
+					seaClearShareSlope(seaNow, model) *
+						(meanSunlight + airSeaExchange * (seaNow - ahead)),
+				);
+				const { base, gain, coupling } = seaStep({
+					sea: seaNow,
+					earlier: seaEarlier,
+					sunlight: (1 - albedo) * sunlight - throughput,
+					exchange,
+					opening,
+					brightening:
+						(iceAlbedo - clearValue) *
+						seaClearShareSlope(seaNow, model) *
+						sunlight,
+					storage: seaStorage,
+				});
+				seaBase[cell] = base;
+				seaGain[cell] = gain;
+				seaFollows[cell] = coupling > 0 ? exchange / coupling : 0;
+				// Over a step of the winds, a backward-difference step, the sea
+				// follows this share of the air's change.
+				const share =
+					(exchange * stepSeconds) /
+					(oceanHeatCapacity + coupling * stepSeconds);
+				seaShare[cell] = share;
+				capacity[cell] = seaAirHeatCapacity + share * oceanHeatCapacity;
+				leastCapacity[cell] = Math.min(
+					leastCapacity[cell] as number,
+					seaAirHeatCapacity + clear * oceanHeatCapacity,
+				);
+				mass[cell] =
+					cellArea *
+					(1.5 * seaAirStorage + 4 * radiation + exchange - coupling * gain);
 				rhs[cell] =
 					cellArea *
-					(storage * (2 * t - 0.5 * earlier) +
-						(1 - albedo) * sunlight +
-						3 * radiation * ahead);
-				damping[cell] = (damping[cell] as number) + 4 * radiation;
-				// How much more sunlight the cell absorbs per kelvin of
-				// warming as its snow and ice retreat.
+					(seaAirStorage * (2 * t - 0.5 * earlier) +
+						3 * radiation * ahead +
+						throughput -
+						opening * seaNow +
+						coupling * base);
 				feedback[cell] =
 					(feedback[cell] as number) +
-					(iceAlbedo - clearValue) * clearShareSlope(air, model) * sunlight;
-				next[cell] = ahead;
+					(iceAlbedo - clearValue) *
+						seaClearShareSlope(seaNow, model) *
+						sunlight;
 			}
 			solver.setMass(mass);
 			if (!solver.solve(rhs, next, solverToleranceK).converged) {
 				solved = false;
+			}
+			for (let cell = 0; cell < cellCount; cell++) {
+				if (!land[cell]) {
+					seaNext[cell] =
+						(seaBase[cell] as number) +
+						(seaGain[cell] as number) * (next[cell] as number);
+				}
 			}
 			if (advection !== undefined) {
 				// The heat the winds carry, after the exchange: an operator
@@ -1328,6 +1725,7 @@ const createStepper = (
 				for (let cell = 0; cell < cellCount; cell++) {
 					next[cell] = Math.max(MIN_TEMPERATURE_K, next[cell] as number);
 				}
+				airBefore.set(next);
 				advection.advector.setFlows(
 					interpolateFlows(
 						advection.flows,
@@ -1346,6 +1744,46 @@ const createStepper = (
 				) {
 					solved = false;
 				}
+				// The heat the winds bring a sea cell is shared between its air
+				// and its sea as the exchange shares it over the step, which is
+				// what the capacity the winds' step was given holds.
+				for (let cell = 0; cell < cellCount; cell++) {
+					if (!land[cell]) {
+						seaNext[cell] =
+							(seaNext[cell] as number) +
+							(seaShare[cell] as number) *
+								((next[cell] as number) - (airBefore[cell] as number));
+					}
+				}
+			}
+			if (currents !== undefined) {
+				// The heat the currents carry, after the winds': the sea's own,
+				// from its freezing point up, at its own heat store. Over land
+				// seaNext is not read, and with no heat store and no flow it is
+				// left as it is.
+				for (let cell = 0; cell < cellCount; cell++) {
+					if (!land[cell]) {
+						seaNext[cell] = Math.max(freezingK, seaNext[cell] as number);
+					}
+				}
+				currents.advector.setFlows(
+					interpolateFlows(
+						currents.flows,
+						(month * stepsPerMonth + step + 1) /
+							(MONTHS_PER_YEAR * stepsPerMonth),
+						currentFlows,
+					),
+				);
+				if (
+					!currents.advector.advect(
+						seaNext,
+						seaCapacity,
+						stepSeconds,
+						solverToleranceK,
+					).converged
+				) {
+					solved = false;
+				}
 			}
 			for (let cell = 0; cell < cellCount; cell++) {
 				const t = state[cell] as number;
@@ -1353,6 +1791,18 @@ const createStepper = (
 				sum[cell] = (sum[cell] as number) + 0.5 * (t + value);
 				previous[cell] = t;
 				state[cell] = value;
+				if (land[cell]) {
+					seaPrevious[cell] = t;
+					sea[cell] = value;
+				} else {
+					const seaNow = sea[cell] as number;
+					// The sea does not cool below freezing: the ice that would
+					// form keeps it there.
+					const seaValue = Math.max(freezingK, seaNext[cell] as number);
+					seaSum[cell] = (seaSum[cell] as number) + 0.5 * (seaNow + seaValue);
+					seaPrevious[cell] = seaNow;
+					sea[cell] = seaValue;
+				}
 			}
 		}
 	};
@@ -1360,6 +1810,9 @@ const createStepper = (
 	return {
 		state,
 		previous,
+		sea,
+		seaPrevious,
+		seaFollows,
 		capacity,
 		leastCapacity,
 		damping,
@@ -1371,6 +1824,28 @@ const createStepper = (
 };
 
 /**
+ * The cells the currents carry the sea's heat across an edge of, and the
+ * band of latitude each lies in, for the year-end correction.
+ */
+type CrossedSea = {
+	/** One value per cell: 1 where the currents cross one of its edges. */
+	readonly cells: Uint8Array;
+	/** Each cell's band of {@link CROSSED_BAND_DEG} of latitude, from 0. */
+	readonly band: Int32Array;
+	/** Each band's mean change of the carried sea over the year; reused. */
+	readonly bandChange: Float64Array;
+	/** Each band's area of carried sea; reused. */
+	readonly bandArea: Float64Array;
+};
+
+/**
+ * The width of the bands of latitude over which the carried sea's change
+ * is averaged for the year-end correction, in degrees: chosen by
+ * measurement on the Earth, where 2° and 5° settle alike.
+ */
+const CROSSED_BAND_DEG = 5;
+
+/**
  * The correction for the heat each cell gained or lost over the year,
  * into `correction`, in kelvin: zero exactly when the year ended where it
  * began.
@@ -1378,12 +1853,27 @@ const createStepper = (
  * @remarks
  * The heat gained per second is the change of temperature over the year
  * at the latest heat capacity, over the year's length, scaled by
- * {@link memory}. The correction is the shift that heat implies at the
- * balance with no heat capacity: the outgoing heat's rise with
- * temperature, less the rise of absorbed sunlight as ice retreats (kept to
- * at least {@link MIN_DAMPING_SHARE} of the former, so that the correction
- * stays bounded where the two nearly cancel), with the exchange between
- * cells.
+ * {@link memory}; at sea, the air's change at its own heat capacity and
+ * the sea's at the sea's, times the share of the correction the sea keeps
+ * (see {@link Stepper.seaFollows}). The correction is applied to the air,
+ * and to the sea by that share, so a sea that keeps none of it (with no
+ * exchange with the air, or held at its own balance by ice) does not turn
+ * its own drift into a shift of the air. The correction is the shift that
+ * heat implies at the balance with no heat capacity: the outgoing heat's
+ * rise with temperature, less the rise of absorbed sunlight as ice
+ * retreats (kept to at least {@link MIN_DAMPING_SHARE} of the former, so
+ * that the correction stays bounded where the two nearly cancel), with the
+ * exchange between cells.
+ *
+ * Where the currents carry the sea's heat across a cell's edges, its sea's
+ * own change is not counted, but the mean change of the carried sea in its
+ * band of {@link CROSSED_BAND_DEG} of latitude: the currents carry the
+ * sea's changes from cell to cell, and read as each cell's own gain or
+ * loss they would be carried on and grow, while round a band they mostly
+ * cancel. On the Earth, counted cell by cell, a warm and a cold patch went
+ * round the Southern Ocean every five years, and a solve carried on from
+ * the climate's first pass had not settled in 60 years; left out, it
+ * settles in 6, and with the band's mean in 5, to the same answer.
  *
  * Outgoing heat goes as T⁴, so its rise taken at the year's temperatures
  * badly understates it for a large warming, and a correction worked out
@@ -1396,6 +1886,8 @@ const createStepper = (
  * largest correction is under {@link TemperatureModel.correctionRefineK}
  * is kept and the later passes are not solved.
  *
+ * @param crossed - The cells the currents carry heat across an edge of,
+ * and their bands of latitude, or undefined with no currents.
  * @returns Whether every solve came within the solver's tolerance.
  */
 const correctYearEnd = (
@@ -1403,14 +1895,36 @@ const correctYearEnd = (
 	solver: ExchangeSolver,
 	stepper: Stepper,
 	yearStart: Float64Array,
+	yearSeaStart: Float64Array,
 	correction: Float64Array,
 	mass: Float64Array,
 	rhs: Float64Array,
+	crossed: CrossedSea | undefined,
 ): boolean => {
 	const { cellCount, areas, emission, yearSeconds, model } = setup;
-	const { state } = stepper;
+	const { state, sea } = stepper;
 	const steps = MONTHS_PER_YEAR * model.stepsPerMonth;
 	correction.fill(0);
+	if (crossed !== undefined) {
+		const { cells, band, bandChange, bandArea } = crossed;
+		bandChange.fill(0);
+		bandArea.fill(0);
+		for (let cell = 0; cell < cellCount; cell++) {
+			if (cells[cell] === 1) {
+				const at = band[cell] as number;
+				const area = areas[cell] as number;
+				bandChange[at] =
+					(bandChange[at] as number) +
+					area * ((sea[cell] as number) - (yearSeaStart[cell] as number));
+				bandArea[at] = (bandArea[at] as number) + area;
+			}
+		}
+		for (let at = 0; at < bandChange.length; at++) {
+			if ((bandArea[at] as number) > 0) {
+				bandChange[at] = (bandChange[at] as number) / (bandArea[at] as number);
+			}
+		}
+	}
 	let solved = true;
 	for (let pass = 0; pass < CORRECTION_PASSES; pass++) {
 		for (let cell = 0; cell < cellCount; cell++) {
@@ -1424,10 +1938,18 @@ const correctYearEnd = (
 				MIN_DAMPING_SHARE * radiationDamping,
 			);
 			mass[cell] = cellArea * meanDamping;
+			const airChange = (state[cell] as number) - (yearStart[cell] as number);
+			const gained = setup.land[cell]
+				? cellArea * (stepper.capacity[cell] as number) * airChange
+				: cellArea *
+					(model.seaAirHeatCapacity * airChange +
+						model.oceanHeatCapacity *
+							(stepper.seaFollows[cell] as number) *
+							(crossed?.cells[cell] === 1
+								? (crossed.bandChange[crossed.band[cell] as number] as number)
+								: (sea[cell] as number) - (yearSeaStart[cell] as number)));
 			rhs[cell] =
-				(cellArea *
-					(stepper.capacity[cell] as number) *
-					((state[cell] as number) - (yearStart[cell] as number)) *
+				(gained *
 					memory(
 						(meanDamping * yearSeconds) /
 							(stepper.leastCapacity[cell] as number),
@@ -1548,6 +2070,88 @@ const assertWinds = (winds: TemperatureWinds, cellCount: number): void => {
 					`Every flow of the winds must be finite; month ${month + 1} entry ${entry} is ${field[entry]}`,
 				);
 			}
+		}
+	}
+};
+
+/**
+ * The first entry of a field of edge flows on a world's own grid that
+ * carries something across an edge of a land cell, or -1 when none does.
+ *
+ * @remarks
+ * A cell is land as the temperature solve takes it: above the sea level
+ * in single precision. The gyres' flows on the world carry exactly nothing
+ * across a coast, so their land, above the sea level as it is, is never
+ * less than this.
+ *
+ * @param world - The world, on the grid the flows are on. Not changed.
+ * @param flows - Four values for each cell, laid out as {@link edgeFlows}
+ * gives them. Not changed.
+ * @returns The entry's index, or -1.
+ * @throws RangeError if `flows` does not hold four values for each cell.
+ */
+export const landCrossing = (
+	world: World,
+	flows: ArrayLike<number>,
+): number => {
+	const { cellCount, neighbours } = getGrid(world.resolution);
+	if (flows.length !== NEIGHBOUR_COUNT * cellCount) {
+		throw new RangeError(
+			`A grid of ${cellCount} cells has ${NEIGHBOUR_COUNT * cellCount} edge flows; got ${flows.length}`,
+		);
+	}
+	const level = Math.fround(world.seaLevel);
+	const isLand = (cell: number): boolean =>
+		(world.elevation[cell] as number) - level > 0;
+	for (let entry = 0; entry < flows.length; entry++) {
+		if (
+			flows[entry] !== 0 &&
+			(isLand(Math.floor(entry / NEIGHBOUR_COUNT)) ||
+				isLand(neighbours[entry] as number))
+		) {
+			return entry;
+		}
+	}
+	return -1;
+};
+
+/**
+ * Throws unless the currents are twelve flows of four finite values for
+ * each cell of `world`, the world on the grid solved on, none of them
+ * across an edge of a land cell, over a depth above 0 and finite.
+ */
+const assertCurrents = (currents: TemperatureCurrents, world: World): void => {
+	const { flows, depthM } = currents;
+	if (!(depthM > 0 && Number.isFinite(depthM))) {
+		throw new RangeError(
+			`The currents' depth must be above 0 and finite; got ${depthM}`,
+		);
+	}
+	const cellCount = world.elevation.length;
+	if (!Array.isArray(flows) || flows.length !== MONTHS_PER_YEAR) {
+		throw new RangeError(
+			`The currents must be ${MONTHS_PER_YEAR} monthly flows; got ${Array.isArray(flows) ? flows.length : typeof flows}`,
+		);
+	}
+	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
+		const field = flows[month] as ArrayLike<number>;
+		if (field?.length !== NEIGHBOUR_COUNT * cellCount) {
+			throw new RangeError(
+				`The currents' flows for month ${month + 1} must hold ${NEIGHBOUR_COUNT * cellCount} values, four for each cell of the grid solved on; got ${field?.length}`,
+			);
+		}
+		for (let entry = 0; entry < field.length; entry++) {
+			if (!Number.isFinite(field[entry])) {
+				throw new RangeError(
+					`Every flow of the currents must be finite; month ${month + 1} entry ${entry} is ${field[entry]}`,
+				);
+			}
+		}
+		const crossing = landCrossing(world, field);
+		if (crossing >= 0) {
+			throw new RangeError(
+				`The currents must carry nothing across an edge of a land cell; month ${month + 1} entry ${crossing} is ${field[crossing]}`,
+			);
 		}
 	}
 };
@@ -1870,10 +2474,82 @@ const refineInto = (
 	});
 };
 
+/**
+ * The sea's monthly temperatures in degrees Celsius on a world's own grid,
+ * NaN over its land, from those of the grid it was solved on.
+ *
+ * @remarks
+ * A world solved on a coarser grid has its sea carried to its own grid by
+ * {@link refineField}, which reads the coarse cells around each fine one.
+ * A fine sea cell may lie beside, or under, a coarse cell that is land, which
+ * has no sea: such a coarse cell stands in with the mean of its neighbours'
+ * seas, or where none is sea, with its air's sea-level temperature, kept
+ * from below freezing.
+ *
+ * @param seaK - Twelve fields of the sea's monthly mean temperature in
+ * kelvin on the grid solved on, a land cell holding its air's sea-level
+ * temperature. Not changed.
+ * @param world - The world.
+ * @param setup - The solve's setup: of the world itself, or of the coarser
+ * world it was solved as, whose fields are then carried to the world's grid.
+ */
+const seaMonthsOf = (
+	seaK: readonly Float64Array[],
+	world: World,
+	setup: Setup,
+): Float32Array[] => {
+	const level = Math.fround(world.seaLevel);
+	const count = world.elevation.length;
+	const onOwnGrid = setup.cellCount === count;
+	const freezingK = setup.model.seaFreezingC + ZERO_CELSIUS_K;
+	const { neighbours } = getGrid(setup.resolution);
+	const filled = new Float64Array(onOwnGrid ? 0 : setup.cellCount);
+	const fine = new Float64Array(onOwnGrid ? 0 : count);
+	return seaK.map((month) => {
+		let values: ArrayLike<number> = month;
+		if (!onOwnGrid) {
+			for (let cell = 0; cell < setup.cellCount; cell++) {
+				if (!setup.land[cell]) {
+					filled[cell] = month[cell] as number;
+					continue;
+				}
+				let total = 0;
+				let seas = 0;
+				for (let side = 0; side < NEIGHBOUR_COUNT; side++) {
+					const next = neighbours[NEIGHBOUR_COUNT * cell + side] as number;
+					if (!setup.land[next]) {
+						total += month[next] as number;
+						seas++;
+					}
+				}
+				filled[cell] =
+					seas > 0 ? total / seas : Math.max(freezingK, month[cell] as number);
+			}
+			values = refineField(filled, world.resolution, fine);
+		}
+		const field = new Float32Array(count);
+		for (let cell = 0; cell < count; cell++) {
+			field[cell] =
+				(world.elevation[cell] as number) - level > 0
+					? Number.NaN
+					: (values[cell] as number) - ZERO_CELSIUS_K;
+		}
+		return field;
+	});
+};
+
 /** A year solved on one grid, before its months are made air temperatures. */
-type GridSolve = Omit<TemperatureResult, 'months' | 'solvedFor'> & {
+type GridSolve = Omit<
+	TemperatureResult,
+	'months' | 'seaMonths' | 'solvedFor'
+> & {
 	/** The monthly mean sea-level temperature, in kelvin, per cell. */
 	readonly seaLevelMonths: Float64Array[];
+	/**
+	 * The monthly mean sea temperature, in kelvin, per cell; at a land cell,
+	 * its air's sea-level temperature.
+	 */
+	readonly seaKMonths: Float64Array[];
 	readonly setup: Setup;
 };
 
@@ -1890,6 +2566,7 @@ const solveOnGrid = (
 	model: TemperatureModel,
 	onYear: SolveTemperatureOptions['onYear'],
 	winds: TemperatureWinds | undefined,
+	currents: TemperatureCurrents | undefined,
 ): GridSolve => {
 	const setup = setUp(world, model);
 	const { cellCount, cooling } = setup;
@@ -1910,6 +2587,37 @@ const solveOnGrid = (
 					flows: winds.flows,
 				}
 			: undefined;
+	// The cells the currents carry the sea's heat across an edge of.
+	let crossedCells: CrossedSea | undefined;
+	if (currents !== undefined) {
+		const cells = new Uint8Array(cellCount);
+		for (const flows of currents.flows) {
+			for (let entry = 0; entry < flows.length; entry++) {
+				if (flows[entry] !== 0) {
+					cells[Math.floor(entry / NEIGHBOUR_COUNT)] = 1;
+				}
+			}
+		}
+		const bands = Math.ceil(180 / CROSSED_BAND_DEG);
+		crossedCells = {
+			cells,
+			band: Int32Array.from(cellLatitudes(grid), (latitude) =>
+				Math.min(bands - 1, Math.floor((latitude + 90) / CROSSED_BAND_DEG)),
+			),
+			bandChange: new Float64Array(bands),
+			bandArea: new Float64Array(bands),
+		};
+	}
+	const seaCurrents: Advection | undefined =
+		currents === undefined
+			? undefined
+			: {
+					advector: createHeatAdvector(
+						grid,
+						SEA_WATER_HEAT_CAPACITY_J_M3_K * currents.depthM,
+					),
+					flows: currents.flows,
+				};
 	let stepper: Stepper;
 	let reference: Float64Array;
 	if (carried !== undefined) {
@@ -1918,7 +2626,10 @@ const solveOnGrid = (
 			solver,
 			carried.state,
 			carried.before,
+			carried.sea,
+			carried.seaBefore,
 			advection,
+			seaCurrents,
 		);
 		reference = carried.reference;
 	} else {
@@ -1931,16 +2642,34 @@ const solveOnGrid = (
 						balanceOnGrid(coarsenWorld(world), model),
 						world.resolution,
 					);
-		stepper = createStepper(setup, solver, guess, guess, advection);
+		// The sea starts at its air's temperature, the balance having none
+		// of its own; the stepper keeps it from below freezing.
+		stepper = createStepper(
+			setup,
+			solver,
+			guess,
+			guess,
+			guess,
+			guess,
+			advection,
+			seaCurrents,
+		);
 		reference = Float64Array.from(cooling);
 	}
-	const { state, previous } = stepper;
+	const { state, previous, sea, seaPrevious } = stepper;
+	const { land } = setup;
+	const freezingK = model.seaFreezingC + ZERO_CELSIUS_K;
 
 	const monthSums = Array.from(
 		{ length: MONTHS_PER_YEAR },
 		() => new Float64Array(cellCount),
 	);
+	const seaSums = Array.from(
+		{ length: MONTHS_PER_YEAR },
+		() => new Float64Array(cellCount),
+	);
 	const yearStart = new Float64Array(cellCount);
+	const yearSeaStart = new Float64Array(cellCount);
 	const correction = new Float64Array(cellCount);
 	const mass = new Float64Array(cellCount);
 	const rhs = new Float64Array(cellCount);
@@ -1950,9 +2679,14 @@ const solveOnGrid = (
 	let finalChangeK = Number.POSITIVE_INFINITY;
 	while (yearsRun < maxYears && !converged) {
 		yearStart.set(state);
+		yearSeaStart.set(sea);
 		stepper.startYear();
 		for (let month = 0; month < MONTHS_PER_YEAR; month++) {
-			stepper.runMonth(month, monthSums[month] as Float64Array);
+			stepper.runMonth(
+				month,
+				monthSums[month] as Float64Array,
+				seaSums[month] as Float64Array,
+			);
 		}
 		yearsRun++;
 
@@ -1962,15 +2696,23 @@ const solveOnGrid = (
 				drift,
 				Math.abs((state[cell] as number) - (yearStart[cell] as number)),
 			);
+			if (!land[cell]) {
+				drift = Math.max(
+					drift,
+					Math.abs((sea[cell] as number) - (yearSeaStart[cell] as number)),
+				);
+			}
 		}
 		const correctionSolved = correctYearEnd(
 			setup,
 			solver,
 			stepper,
 			yearStart,
+			yearSeaStart,
 			correction,
 			mass,
 			rhs,
+			crossedCells,
 		);
 		let largestShift = 0;
 		for (let cell = 0; cell < cellCount; cell++) {
@@ -1983,6 +2725,21 @@ const solveOnGrid = (
 			previous[cell] =
 				(previous[cell] as number) + (value - (state[cell] as number));
 			state[cell] = value;
+			if (land[cell]) {
+				sea[cell] = value;
+				seaPrevious[cell] = previous[cell] as number;
+			} else {
+				// The sea takes on the share of the shift that it keeps: all of
+				// it clear of ice, little at the ice's edge, where its own
+				// balance holds it.
+				const seaValue = Math.max(
+					freezingK,
+					(sea[cell] as number) + shift * (stepper.seaFollows[cell] as number),
+				);
+				seaPrevious[cell] =
+					(seaPrevious[cell] as number) + (seaValue - (sea[cell] as number));
+				sea[cell] = seaValue;
+			}
 		}
 		const previousChangeK = yearsRun === 1 ? null : finalChangeK;
 		finalChangeK = Math.max(drift, largestShift);
@@ -2005,17 +2762,25 @@ const solveOnGrid = (
 		});
 	}
 
-	for (const sum of monthSums) {
+	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
+		const sum = monthSums[month] as Float64Array;
+		const seaSum = seaSums[month] as Float64Array;
 		for (let cell = 0; cell < cellCount; cell++) {
 			sum[cell] = (sum[cell] as number) / stepsPerMonth;
+			seaSum[cell] = land[cell]
+				? (sum[cell] as number)
+				: (seaSum[cell] as number) / stepsPerMonth;
 		}
 	}
 	return {
 		seaLevelMonths: monthSums,
+		seaKMonths: seaSums,
 		setup,
 		state: {
 			temperatureK: state.map(clampStart),
 			previousK: previous.map(clampStart),
+			seaTemperatureK: sea.map(clampStart),
+			seaPreviousK: seaPrevious.map(clampStart),
 			stepSeconds: stepSecondsOf(setup),
 			referenceCoolingK: reference,
 		},
@@ -2137,7 +2902,10 @@ const solveOnGrid = (
  * with a state and a record of a finite sea level and a finite number for
  * each of the planet's {@link TEMPERATURE_SETTINGS}, or if a start that
  * passes the first test has a state that is not valid (see
- * {@link TemperatureState}), on another grid included.
+ * {@link TemperatureState}), on another grid included, or if the winds or
+ * the currents given are not twelve months of finite flows on the grid
+ * solved on, the currents with a depth above 0 and finite and nothing
+ * across an edge of a land cell.
  * @throws Whatever `onYear` throws, as it is.
  */
 export const solveTemperature = (
@@ -2151,6 +2919,7 @@ export const solveTemperature = (
 		fullResolution = false,
 		onYear,
 		winds,
+		currents,
 	} = options;
 	assertOptions(maxYears, tolerance);
 	assertModel(model);
@@ -2162,6 +2931,9 @@ export const solveTemperature = (
 	if (winds !== undefined) {
 		assertWinds(winds, (coarse ?? world).elevation.length);
 	}
+	if (currents !== undefined) {
+		assertCurrents(currents, coarse ?? world);
+	}
 	const solved = solveOnGrid(
 		coarse ?? world,
 		options.start,
@@ -2170,9 +2942,17 @@ export const solveTemperature = (
 		model,
 		onYear,
 		winds,
+		currents,
 	);
-	const { seaLevelMonths, setup, state, yearsRun, converged, finalChangeK } =
-		solved;
+	const {
+		seaLevelMonths,
+		seaKMonths,
+		setup,
+		state,
+		yearsRun,
+		converged,
+		finalChangeK,
+	} = solved;
 	let months: Float32Array[];
 	if (coarse === null) {
 		const { cooling } = setup;
@@ -2192,6 +2972,7 @@ export const solveTemperature = (
 	}
 	return {
 		months,
+		seaMonths: seaMonthsOf(seaKMonths, world, setup),
 		state,
 		solvedFor: {
 			seaLevel: setup.seaLevel,

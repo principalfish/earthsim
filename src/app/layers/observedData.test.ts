@@ -1,31 +1,45 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+	readObservedCurrentsFile,
 	readObservedPressureFile,
+	readObservedSeaTemperatureFile,
 	readObservedTemperatureFile,
 	readObservedWindFile,
 } from '../../../scripts/earth/dataFile.mjs';
 import {
+	decodeObservedCurrents,
 	decodeObservedPressure,
+	decodeObservedSeaTemperature,
 	decodeObservedTemperature,
 	decodeObservedWind,
 	getGrid,
 	OBSERVED_BYTES,
 	OBSERVED_PRESSURE_BYTES,
 	OBSERVED_WIND_BYTES,
+	OCEAN_CURRENTS_BYTES,
+	observedCurrentsOn,
 	observedPressure,
+	observedSeaTemperatureOn,
 	observedTemperature,
 	observedWind,
+	SEA_TEMPERATURE_BYTES,
 } from '../../core/index';
 import type { EarthResponse } from './earthData';
 import {
 	createObservedLoader,
+	loadObservedCurrents,
 	loadObservedPressure,
+	loadObservedSeaTemperature,
 	loadObservedTemperature,
 	loadObservedWinds,
+	OBSERVED_CURRENTS_FILE,
+	OBSERVED_CURRENTS_PATH,
 	OBSERVED_DATA_PATH,
 	OBSERVED_FETCH_TIMEOUT_MS,
 	OBSERVED_PRESSURE_FILE,
 	OBSERVED_PRESSURE_PATH,
+	OBSERVED_SEA_TEMPERATURE_FILE,
+	OBSERVED_SEA_TEMPERATURE_PATH,
 	OBSERVED_TEMPERATURE_FILE,
 	OBSERVED_WIND_FILE,
 	OBSERVED_WIND_PATH,
@@ -322,6 +336,124 @@ describe('the observed pressure and winds files', () => {
 			'data/earth-wind-1deg.bin',
 			readObservedWindFile,
 			(bytes: Uint8Array) => observedWind(decodeObservedWind(bytes), 64),
+		],
+	] as const)(
+		'fetches the observed %s from beside the page, with a time limit, and keeps it',
+		async (_name, load, path, expectedPath, read, onGrid) => {
+			const file = read();
+			const requests: [unknown, RequestInit | undefined][] = [];
+			vi.stubGlobal('fetch', (input: unknown, init?: RequestInit) => {
+				requests.push([input, init]);
+				return respond(file.buffer as ArrayBuffer);
+			});
+			const loaded = await load();
+			expect(path).toBe(expectedPath);
+			expect(requests).toHaveLength(1);
+			const [input, init] = requests[0] as [unknown, RequestInit | undefined];
+			expect(input).toBe(`${import.meta.env.BASE_URL}${expectedPath}`);
+			expect(init?.signal).toBeInstanceOf(AbortSignal);
+			expect(loaded).toEqual(onGrid(file));
+			expect(await load()).toBe(loaded);
+			expect(requests).toHaveLength(1);
+		},
+	);
+});
+
+describe('the observed sea-surface temperature and currents files', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('read the sea temperature and the currents as the core reads them, onto the grid asked for', () => {
+		const sea = readObservedSeaTemperatureFile();
+		const currents = readObservedCurrentsFile();
+		expect(OBSERVED_SEA_TEMPERATURE_FILE.name).toBe('sea temperature');
+		expect(OBSERVED_CURRENTS_FILE.name).toBe('currents');
+		expect(
+			OBSERVED_SEA_TEMPERATURE_FILE.onGrid(
+				OBSERVED_SEA_TEMPERATURE_FILE.decode(sea),
+				64,
+			),
+		).toEqual(
+			observedSeaTemperatureOn(getGrid(64), decodeObservedSeaTemperature(sea)),
+		);
+		expect(
+			OBSERVED_CURRENTS_FILE.onGrid(
+				OBSERVED_CURRENTS_FILE.decode(currents),
+				64,
+			),
+		).toEqual(
+			observedCurrentsOn(getGrid(64), decodeObservedCurrents(currents)),
+		);
+		expect(() =>
+			OBSERVED_SEA_TEMPERATURE_FILE.decode(
+				new Uint8Array(SEA_TEMPERATURE_BYTES - 1),
+			),
+		).toThrow(RangeError);
+		expect(() =>
+			OBSERVED_CURRENTS_FILE.decode(new Uint8Array(OCEAN_CURRENTS_BYTES - 1)),
+		).toThrow(RangeError);
+	});
+
+	it('gives the currents on a grid through the general loader, and names them when the fetch fails', async () => {
+		const currents = readObservedCurrentsFile();
+		const { urls, fetchFile } = fetchGiving(
+			() => respond(new ArrayBuffer(0), 404),
+			() => respond(currents.buffer as ArrayBuffer),
+		);
+		const load = createObservedLoader({
+			fetchFile,
+			url: '/somewhere/data/earth-currents-1deg.bin',
+			file: OBSERVED_CURRENTS_FILE,
+		});
+		await expect(load(64)).rejects.toThrow(
+			'The observed currents could not be fetched: the server answered 404',
+		);
+		const loaded = await load(64);
+		expect(loaded).toEqual(
+			observedCurrentsOn(getGrid(64), decodeObservedCurrents(currents)),
+		);
+		expect(loaded.east).toHaveLength(12);
+		expect(loaded.east[0]).toHaveLength(getGrid(64).cellCount);
+		expect(await load(64)).toBe(loaded);
+		expect(urls).toHaveLength(2);
+	});
+
+	it('mark land as NaN, never zero, in the sea temperature on the grid', async () => {
+		const sea = readObservedSeaTemperatureFile();
+		const { fetchFile } = fetchGiving(() => respond(sea.buffer as ArrayBuffer));
+		const load = createObservedLoader({
+			fetchFile,
+			url: '/somewhere/data/earth-sea-temperature-1deg.bin',
+			file: OBSERVED_SEA_TEMPERATURE_FILE,
+		});
+		const months = await load(64);
+		const land = months[0]?.filter((value) => Number.isNaN(value)).length ?? 0;
+		expect(land).toBeGreaterThan(getGrid(64).cellCount * 0.15);
+		expect(land).toBeLessThan(getGrid(64).cellCount * 0.4);
+	});
+
+	it.each([
+		[
+			'sea temperature',
+			() => loadObservedSeaTemperature(64),
+			OBSERVED_SEA_TEMPERATURE_PATH,
+			'data/earth-sea-temperature-1deg.bin',
+			readObservedSeaTemperatureFile,
+			(bytes: Uint8Array) =>
+				observedSeaTemperatureOn(
+					getGrid(64),
+					decodeObservedSeaTemperature(bytes),
+				),
+		],
+		[
+			'currents',
+			() => loadObservedCurrents(64),
+			OBSERVED_CURRENTS_PATH,
+			'data/earth-currents-1deg.bin',
+			readObservedCurrentsFile,
+			(bytes: Uint8Array) =>
+				observedCurrentsOn(getGrid(64), decodeObservedCurrents(bytes)),
 		],
 	] as const)(
 		'fetches the observed %s from beside the page, with a time limit, and keeps it',

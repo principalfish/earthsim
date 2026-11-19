@@ -10,6 +10,7 @@
  */
 
 import type {
+	CarriedCurrents,
 	TemperatureProgress,
 	TemperatureResult,
 	WindResult,
@@ -75,6 +76,12 @@ export type SolvedWinds = {
 	 * result.
 	 */
 	readonly temperature: TemperatureResult;
+	/**
+	 * The currents those winds drive, from the same pass, which a climate
+	 * carried on from it starts from; left out where there are none to hand,
+	 * and the climate then works them out afresh from the winds.
+	 */
+	readonly currents?: CarriedCurrents;
 	/** The day length the winds were worked out for, in hours. */
 	readonly dayLengthHours: number;
 };

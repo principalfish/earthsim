@@ -6,13 +6,18 @@ import {
 	defineSection,
 	entriesOf,
 	formatConfigValue,
+	OCEAN_CONFIG,
 	TEMPERATURE_CONFIG,
 	valuesOf,
 	WIND_CONFIG,
 } from './config';
+import { DEFAULT_GYRE_SETTINGS, SEA_WATER_DENSITY_KG_M3 } from './ocean/gyres';
 import { GREENHOUSE_FACTOR } from './planet/planet';
 import { EXCHANGE_MAX_ITERATIONS } from './temperature/exchange';
-import { TEMPERATURE_MODEL } from './temperature/temperature';
+import {
+	SEA_WATER_HEAT_CAPACITY_J_M3_K,
+	TEMPERATURE_MODEL,
+} from './temperature/temperature';
 import {
 	AIR_DENSITY_KG_M3,
 	DEFAULT_WIND_SETTINGS,
@@ -32,15 +37,15 @@ const entry = (value: number) => ({
 	tuned: null,
 });
 
-// A literal copy of the temperature model's values, in the order the model
-// lists them: the first eighteen as they were before they moved into the
-// config, then those added since.
+// A literal copy of the temperature model's values, listing the settings in
+// the order the model lists them.
 const TEMPERATURE_LITERAL = {
-	diffusivity: 0.55,
+	diffusivity: 0.48,
 	landDiffusivity: 0.35,
 	oceanHeatCapacity: 2.5e8,
 	landHeatCapacity: 1e7,
-	seaIceHeatCapacity: 1e7,
+	seaAirHeatCapacity: 1e7,
+	airSeaExchange: 20,
 	windHeatCapacity: 1.2e6,
 	lapseRate: 6.5e-3,
 	greenhouseFactor: 0.633,
@@ -50,6 +55,8 @@ const TEMPERATURE_LITERAL = {
 	iceAlbedo: 0.62,
 	iceStartC: 0,
 	iceFullC: -10,
+	seaIceStartC: 0,
+	seaFreezingC: -1.8,
 	climateToleranceC: 0.1,
 	climateMaxPasses: 8,
 	climateOvershootShare: 0.5,
@@ -206,7 +213,8 @@ describe('TEMPERATURE_CONFIG', () => {
 				'landDiffusivity',
 				'oceanHeatCapacity',
 				'landHeatCapacity',
-				'seaIceHeatCapacity',
+				'seaAirHeatCapacity',
+				'airSeaExchange',
 				'windHeatCapacity',
 				'lapseRate',
 				'greenhouseFactor',
@@ -218,6 +226,8 @@ describe('TEMPERATURE_CONFIG', () => {
 				'iceAlbedo',
 				'iceStartC',
 				'iceFullC',
+				'seaIceStartC',
+				'seaFreezingC',
 			],
 			['climateToleranceC', 'climateMaxPasses', 'climateOvershootShare'],
 			[
@@ -384,6 +394,70 @@ describe('WIND_CONFIG', () => {
 				}
 			}
 		}
+	});
+});
+
+// A literal copy of the gyres' settings, in the order the model lists them.
+const OCEAN_LITERAL = {
+	dragCoefficient: 1.2e-3,
+	frictionPerS: 2e-6,
+	channelFrictionPerS: 2e-6,
+	layerDepthM: 200,
+	equatorFloorDeg: 5,
+	maxIslands: 32,
+	gyreTolerance: 1e-4,
+};
+
+describe('OCEAN_CONFIG', () => {
+	const section: ConfigSection = OCEAN_CONFIG;
+	const entries = entriesOf([...section.groups, section.constants]);
+
+	it('gives the gyres the same values, in the same order, frozen', () => {
+		expect(DEFAULT_GYRE_SETTINGS).toEqual(OCEAN_LITERAL);
+		expect(Object.keys(DEFAULT_GYRE_SETTINGS)).toEqual(
+			Object.keys(OCEAN_LITERAL),
+		);
+		expect(Object.isFrozen(DEFAULT_GYRE_SETTINGS)).toBe(true);
+	});
+
+	it("keeps the fixed choices of the sea water's density and heat capacity", () => {
+		expect(constantsOf(OCEAN_CONFIG)).toEqual({
+			seaWaterDensityKgM3: 1025,
+			seaWaterHeatCapacityJM3K: 4.18e6,
+		});
+		expect(SEA_WATER_DENSITY_KG_M3).toBe(1025);
+		expect(SEA_WATER_HEAT_CAPACITY_J_M3_K).toBe(4.18e6);
+	});
+
+	it('explains every setting, none tuned', () => {
+		for (const [name, setting] of entries) {
+			expect(Number.isFinite(setting.value), name).toBe(true);
+			for (const text of [
+				setting.unit,
+				setting.what,
+				setting.raising,
+				setting.lowering,
+				setting.source,
+			]) {
+				expect(text.trim(), name).not.toBe('');
+			}
+			expect(setting.tuned, name).toBeNull();
+		}
+	});
+
+	it('lists each setting once, in three groups, the solver last and numerical', () => {
+		const names = entries.map(([name]) => name);
+		expect(new Set(names).size).toBe(names.length);
+		expect(section.groups.map((group) => group.title)).toEqual([
+			"The wind's push on the sea",
+			'The gyres',
+			'How the gyres are solved (numerical, not physical)',
+		]);
+		expect(section.groups.map((group) => group.numerical === true)).toEqual([
+			false,
+			false,
+			true,
+		]);
 	});
 });
 

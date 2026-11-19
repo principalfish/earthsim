@@ -263,7 +263,7 @@ describe('solveWinds', () => {
 		expect(highest).toBeGreaterThan(REFERENCE_PRESSURE_HPA);
 		expect(highest).toBeLessThan(1084);
 		expect(limited).toEqual(solveWinds(cold, coldMonths, unlimited));
-	}, 60_000);
+	}, 120_000);
 
 	// A solve of the temperature of the Earth tilted 60°, a second or so,
 	// and a year of its winds, more under coverage, hence the longer time

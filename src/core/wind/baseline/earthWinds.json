@@ -1,18 +1,18 @@
 {
   "resolution": 64,
   "year": {
-    "rmsVectorDifference": 3.61,
-    "directionSharePercent": 61.197,
-    "pressureRmsDifference": 7.188
+    "rmsVectorDifference": 3.638,
+    "directionSharePercent": 60.338,
+    "pressureRmsDifference": 7.189
   },
   "january": {
-    "rmsVectorDifference": 3.374,
-    "directionSharePercent": 62.825,
-    "pressureRmsDifference": 7.714
+    "rmsVectorDifference": 3.515,
+    "directionSharePercent": 60.187,
+    "pressureRmsDifference": 7.905
   },
   "july": {
-    "rmsVectorDifference": 4.08,
-    "directionSharePercent": 58.581,
-    "pressureRmsDifference": 6.895
+    "rmsVectorDifference": 4.397,
+    "directionSharePercent": 54.369,
+    "pressureRmsDifference": 7.074
   }
 }

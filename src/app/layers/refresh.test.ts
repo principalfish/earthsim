@@ -866,6 +866,7 @@ const createClimateHarness = (
 const solvedOf = (pass: ClimateProgress): SolvedWinds => ({
 	temperature: pass.temperature,
 	winds: pass.winds,
+	currents: pass.currents,
 	dayLengthHours: 24,
 });
 
@@ -873,10 +874,15 @@ const solvedOf = (pass: ClimateProgress): SolvedWinds => ({
 const startOf = (pass: ClimateProgress): ClimateStart => ({
 	temperature: {
 		months: pass.temperature.months,
+		seaMonths: pass.temperature.seaMonths,
 		state: pass.temperature.state,
 		solvedFor: pass.temperature.solvedFor,
 	},
 	winds: { east: pass.winds.east, north: pass.winds.north },
+	currents: {
+		flows: pass.currents.flows,
+		streamfunction: pass.currents.streamfunction,
+	},
 	dayLengthHours: 24,
 });
 
@@ -1092,25 +1098,53 @@ describe('createClimateScheduler starting from a settled climate only', () => {
 		expect(asked[2]?.start).toEqual(startOf(first));
 	});
 
-	it('hands on the temperature’s months, state and record, the eastward and northward winds and the day length, and nothing else', async () => {
+	it('hands on the temperature’s months (the air’s and the sea’s), state and record, the eastward and northward winds, the currents’ flows and streamfunction and the day length, and nothing else', async () => {
 		const { scheduler, asked, first } = await createAnsweredHarness();
 		scheduler.refreshNow();
 		const start = asked[1]?.start;
 		expect(Object.keys(start ?? {}).sort()).toEqual([
+			'currents',
 			'dayLengthHours',
 			'temperature',
 			'winds',
 		]);
+		expect(Object.keys(start?.currents ?? {}).sort()).toEqual([
+			'flows',
+			'streamfunction',
+		]);
+		expect(start?.currents?.flows).toBe(first.currents.flows);
+		expect(start?.currents?.streamfunction).toBe(first.currents.streamfunction);
 		expect(Object.keys(start?.temperature ?? {}).sort()).toEqual([
 			'months',
+			'seaMonths',
 			'solvedFor',
 			'state',
 		]);
 		expect(Object.keys(start?.winds ?? {}).sort()).toEqual(['east', 'north']);
 		expect(start?.temperature.state).toBe(first.temperature.state);
 		expect(start?.temperature.months).toBe(first.temperature.months);
+		expect(start?.temperature.seaMonths).toBe(first.temperature.seaMonths);
 		expect(start?.winds.east).toBe(first.winds.east);
 		expect(start?.dayLengthHours).toBe(24);
+	});
+
+	it('leaves the currents out of the start when the pass it is carried on from has none', async () => {
+		const harness = createClimateHarness();
+		harness.scheduler.refreshNow();
+		const asked = harness.asked[0];
+		asked?.callbacks.onPass({
+			...climatePassOf(1, { last: true, settled: true }),
+			currents: undefined as never,
+		});
+		asked?.resolve({
+			superseded: false,
+			result: { dayLengthHours: 24, passes: 1, settled: true, changeC: 0 },
+		});
+		await settle();
+		harness.scheduler.refreshNow();
+		const start = harness.asked[1]?.start;
+		expect(start).toBeDefined();
+		expect('currents' in (start ?? {})).toBe(false);
 	});
 
 	it('shows a climate that ended unsettled as current, but starts the next from the settled one before it', async () => {

@@ -9,15 +9,21 @@
  * climate loop that carries heat along the winds, simulated less observed,
  * in kelvin, rounded to {@link BASELINE_DECIMALS} decimals. They also hold
  * the west–east coast contrasts, simulated and observed (see
- * {@link coastContrast}). The test beside this module solves that world and
- * fails if any figure is worse than its committed value by more than
+ * {@link coastContrast}), and the error of the sea's own temperature
+ * against the observed sea temperature, for the year and for January. The
+ * test beside this module solves that world and fails if any figure is
+ * worse than its committed value by more than
  * {@link BASELINE_TOLERANCE_K}, or a simulated coast contrast is smaller
  * than its committed value by more than {@link COAST_CONTRAST_TOLERANCE_K};
  * `npm run baseline:temperature` writes the figures afresh, to be
  * committed when a change is meant to move them.
  */
 
-import { compareField, type FieldDifference } from '../../compare';
+import {
+	compareField,
+	compareFieldWhereBoth,
+	type FieldDifference,
+} from '../../compare';
 import type { Grid, Resolution } from '../../grid/grid';
 import { MONTH_NAMES, MONTHS_PER_YEAR } from '../../planet/insolation';
 import type { World } from '../../world/world';
@@ -83,6 +89,70 @@ export type EarthTemperatureFigures = {
 	 * out of figures made without the world.
 	 */
 	readonly coastContrast?: CoastContrast;
+	/**
+	 * The sea's own temperature less the observed sea temperature, in
+	 * kelvin, over the cells that are sea in both; left out of figures made
+	 * without the sea's.
+	 */
+	readonly seaTemperature?: SeaTemperatureFigures;
+};
+
+/**
+ * The error figures of the sea's own temperature against the observed: of
+ * the annual mean and of January.
+ */
+export type SeaTemperatureFigures = {
+	readonly annualMean: FieldDifference;
+	readonly january: FieldDifference;
+};
+
+/** A simulated year of the sea's temperature and the observed one. */
+export type SeaTemperaturePair = {
+	/**
+	 * Twelve months of the sea's own temperature, NaN over land, one value
+	 * per cell, such as a temperature result's `seaMonths`.
+	 */
+	readonly simulated: MonthlyTemperature;
+	/** The twelve observed months on the same grid, NaN where there is none. */
+	readonly observed: MonthlyTemperature;
+};
+
+/**
+ * The error figures of a simulated year of the sea's temperature against the
+ * observed, over the cells where both have a value.
+ *
+ * @param sea - The simulated and the observed year. Not changed.
+ * @param grid - The grid both are on.
+ * @returns New figures, unrounded: the annual means' (each the mean of a
+ * cell's twelve months) and January's.
+ * @throws RangeError if either does not hold twelve fields of one value per
+ * cell.
+ */
+export const seaTemperatureFigures = (
+	sea: SeaTemperaturePair,
+	grid: Grid,
+): SeaTemperatureFigures => {
+	const { simulated, observed } = sea;
+	if (
+		simulated.length !== MONTHS_PER_YEAR ||
+		observed.length !== MONTHS_PER_YEAR
+	) {
+		throw new RangeError(
+			`Comparing the sea needs ${MONTHS_PER_YEAR} months of each`,
+		);
+	}
+	return {
+		annualMean: compareFieldWhereBoth(
+			summariseTemperature(simulated).annualMean,
+			summariseTemperature(observed).annualMean,
+			grid,
+		),
+		january: compareFieldWhereBoth(
+			simulated[0] as Float32Array,
+			observed[0] as Float32Array,
+			grid,
+		),
+	};
 };
 
 /**
@@ -102,6 +172,9 @@ export type EarthTemperatureFigures = {
  * @param grid - The grid both are on.
  * @param world - The Earth, to find the coasts the contrasts are of; left
  * out, the figures hold none.
+ * @param sea - The sea's own simulated year and the observed sea
+ * temperature, on the same grid; left out, the figures hold none of the
+ * sea's. See {@link seaTemperatureFigures}.
  * @returns New figures, unrounded.
  * @throws RangeError if either does not hold twelve fields of one value per
  * cell.
@@ -111,6 +184,7 @@ export const earthTemperatureFigures = (
 	observed: MonthlyTemperature,
 	grid: Grid,
 	world?: World,
+	sea?: SeaTemperaturePair,
 ): EarthTemperatureFigures => {
 	if (
 		simulated.length !== MONTHS_PER_YEAR ||
@@ -135,6 +209,9 @@ export const earthTemperatureFigures = (
 		...(world === undefined
 			? {}
 			: { coastContrast: coastContrast(world, simulated, observed) }),
+		...(sea === undefined
+			? {}
+			: { seaTemperature: seaTemperatureFigures(sea, grid) }),
 	};
 };
 
@@ -187,6 +264,14 @@ export const baselineText = (figures: EarthTemperatureFigures): string => {
 						northAmerica: roundedContrast(figures.coastContrast.northAmerica),
 					},
 				}),
+		...(figures.seaTemperature === undefined
+			? {}
+			: {
+					seaTemperature: {
+						annualMean: roundedPair(figures.seaTemperature.annualMean),
+						january: roundedPair(figures.seaTemperature.january),
+					},
+				}),
 	};
 	return `${JSON.stringify(file, null, 2)}\n`;
 };
@@ -227,8 +312,9 @@ const PART_NAMES: Readonly<Record<BaselineSummary, string>> = {
  * @param toleranceK - How much worse a figure may be; left out,
  * {@link BASELINE_TOLERANCE_K}.
  * @returns The figures that are worse, in the order annual average, the
- * months, warmest, coldest and seasonal range, each mean before its RMS;
- * empty when none is.
+ * months, warmest, coldest and seasonal range, each mean before its RMS,
+ * then the coast contrasts and the sea temperature's annual average and
+ * January; empty when none is.
  * @throws RangeError if the two are not for the same resolution, or either
  * does not hold twelve months.
  */
@@ -316,6 +402,21 @@ export const baselineRegressions = (
 				}
 			}
 		}
+	}
+	// The sea's own temperature, checked as the other figures are, only
+	// against a baseline that holds it.
+	if (baseline.seaTemperature !== undefined) {
+		const missing = { meanDifference: Number.NaN, rmsDifference: Number.NaN };
+		check(
+			'sea temperature annual average',
+			now.seaTemperature?.annualMean ?? missing,
+			baseline.seaTemperature.annualMean,
+		);
+		check(
+			'sea temperature January',
+			now.seaTemperature?.january ?? missing,
+			baseline.seaTemperature.january,
+		);
 	}
 	return regressions;
 };

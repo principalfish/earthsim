@@ -195,15 +195,24 @@ export const TEMPERATURE_CONFIG = defineSection(
 				 * 0.55 W m⁻² K⁻¹, a little below the value North, Cahalan and
 				 * Coakley (1981), "Energy balance climate models", Reviews of
 				 * Geophysics 19, use for diffusion on the unit sphere with outgoing
-				 * heat linear in temperature.
+				 * heat linear in temperature, lowered by the share of its poleward
+				 * heat transport that the currents carry: on the Earth at 64, in the
+				 * climate loop, the transport by the sea's diffusivity across 15°,
+				 * 30°, 45° and 60° north and south sums to 16.37 PW without the
+				 * currents, and the currents carry 2.05 PW across the same eight
+				 * circles, 12.5%; 0.55 × (1 − 0.125) = 0.48. The winds' flowing
+				 * part carries 0.05 PW or less across any of them, so nothing is
+				 * taken off for the winds.
 				 */
 				diffusivity: {
-					value: 0.55,
+					value: 0.48,
 					unit: 'W/m²/K',
 					what:
 						'How readily heat spreads between neighbouring places over the' +
-						' sea. It stands in for all the heat the winds and currents' +
-						' carry, which the model does not yet work out.',
+						' sea. It stands in for the heat carried sideways there that' +
+						" the climate's winds and currents do not carry: the eddies" +
+						' and storms of the air and the sea, and the currents the' +
+						' gyres leave out.',
 					raising:
 						'Heat spreads further: the poles warm and the tropics cool, so' +
 						' the equator-to-pole difference shrinks, with less polar ice' +
@@ -212,7 +221,10 @@ export const TEMPERATURE_CONFIG = defineSection(
 						'Each place keeps more of its own heat: hotter tropics, colder' +
 						' poles, more ice, and sharper differences between neighbours.',
 					source:
-						'Published (North, Cahalan and Coakley, 1981), set a little below.',
+						'Published (North, Cahalan and Coakley, 1981) as 0.55 W/m²/K,' +
+						' less the share of its poleward transport the currents carry' +
+						' in the climate loop: on the Earth at 64, across 15°, 30°,' +
+						' 45° and 60° north and south, 2.05 of 16.37 PW, 12.5%.',
 					tuned: null,
 				},
 				/**
@@ -229,12 +241,12 @@ export const TEMPERATURE_CONFIG = defineSection(
 						' of the two, so its coupling is the same seen from either side.',
 					raising:
 						"The sea's heat reaches further inland: milder continental" +
-						" interiors with smaller seasons. At the sea's value the" +
-						" interiors' seasonal range was about halved.",
+						" interiors with smaller seasons. At the sea's published value," +
+						" 0.55, the interiors' seasonal range was about halved.",
 					lowering:
 						'Continents keep more of their own seasons: hotter summers and' +
 						' colder winters inland.',
-					source: "Started at the sea's value, 0.55.",
+					source: "Started at the sea's published value, 0.55.",
 					tuned: "Lowered against the observed Earth's continental seasons.",
 				},
 				/**
@@ -276,21 +288,52 @@ export const TEMPERATURE_CONFIG = defineSection(
 					tuned: null,
 				},
 				/**
-				 * Taken equal to land's, as ice insulates the water below; without
-				 * it the Arctic winter is 10 K too warm.
+				 * The column of air alone, as over land: 10⁴ kg m⁻² of air at
+				 * 1004 J kg⁻¹ K⁻¹.
 				 */
-				seaIceHeatCapacity: {
+				seaAirHeatCapacity: {
 					value: 1e7,
 					unit: 'J/m²/K',
 					what:
-						'The heat stored by sea wholly covered in ice. Ice cuts the air' +
-						' off from the water below, so frozen sea warms and cools like' +
-						' land; partly frozen sea takes a blend with open sea.',
+						'The heat the air over the sea stores for each kelvin it warms:' +
+						' the column of air alone, apart from the sea below it, which' +
+						' has a temperature of its own.',
 					raising:
-						'Frozen seas cool more slowly in winter: milder polar winters.' +
-						" At the open sea's value the Arctic winter was 10 K too warm.",
-					lowering: 'Frozen seas swing faster: colder polar winters.',
-					source: "Taken equal to land's.",
+						'The air over the sea follows the sea and the winds more slowly.',
+					lowering:
+						'The air over the sea follows the sea and the winds more' +
+						' closely; over sea ice, where it is cut off from the water, its' +
+						' winters are colder.',
+					source:
+						"Taken equal to land's: the column of air alone, 10 t/m² of air" +
+						' at 1004 J/kg/K.',
+					tuned: null,
+				},
+				/**
+				 * Bulk formulas for the heat flux between the sea and the air, with
+				 * transfer coefficients of 1.2e-3 (Large and Pond, 1982, "Sensible
+				 * and latent heat flux measurements over the ocean", J. Phys.
+				 * Oceanogr. 12) and a wind of 5 m s⁻¹, at 10 °C: sensible heat
+				 * ρ c_p C U ≈ 7, latent heat ρ L C U dq_s/dT ≈ 9 and long-wave
+				 * 4σT³ ≈ 5 W m⁻² K⁻¹.
+				 */
+				airSeaExchange: {
+					value: 20,
+					unit: 'W/m²/K',
+					what:
+						'How readily heat passes between the sea and the air over it,' +
+						' for each kelvin the two differ: sensible heat, evaporation and' +
+						' long-wave radiation together. Sea ice cuts it.',
+					raising:
+						'The air over the sea follows the sea more closely: milder' +
+						' winters and cooler summers over the sea and downwind of it.',
+					lowering:
+						'The air over the sea is freer of it: larger seasons over the' +
+						' sea. At 0 the two exchange nothing.',
+					source:
+						'Bulk formulas (Large and Pond, 1982) at a wind of 5 m/s and' +
+						' 10 °C: sensible heat about 7, evaporation about 9 and' +
+						' long-wave about 5 W/m²/K.',
 					tuned: null,
 				},
 				/**
@@ -298,10 +341,11 @@ export const TEMPERATURE_CONFIG = defineSection(
 				 * wind blows in, at the sea-level density of 1.2 kg m⁻³ and
 				 * 1004 J kg⁻¹ K⁻¹. Set from that estimate, not tuned. Its check is the
 				 * Earth's west-east coast contrast at 40-60°N, kept in the temperature
-				 * baseline: with it the winds give western Europe 2.9 K milder than East
-				 * Asia over the year and 7.8 K in January, against 0.7 and 2.4 K
-				 * without them and 11.5 and 22.9 K observed; for North America 0.0 and
-				 * 3.5 K, against about -0.8 and -0.6 K and 5.8 and 15.1 K observed.
+				 * baseline: with it the winds give western Europe 2.8 K milder than East
+				 * Asia over the year and 6.3 K in January, against 0.7 and 2.4 K
+				 * without them and 11.5 and 22.9 K observed; for North America -0.1
+				 * and 2.8 K, against about -0.8 and -0.6 K and 5.8 and 15.1 K
+				 * observed.
 				 */
 				windHeatCapacity: {
 					value: 1.2e6,
@@ -323,9 +367,9 @@ export const TEMPERATURE_CONFIG = defineSection(
 						'Physics: about a kilometre of air, the depth the surface wind' +
 						' blows in, at the sea-level density of 1.2 kg/m³ and 1004' +
 						" J/kg/K. Checked against the Earth's west-east coast contrast:" +
-						' about a quarter to a third of the observed in three of the' +
-						" four figures, in the right places, and none for North America's" +
-						' year.',
+						' about a quarter to a third of the observed for western Europe' +
+						" against East Asia, a sixth in North America's January, and" +
+						" none for North America's year.",
 					tuned: null,
 				},
 				/** The standard atmosphere's 6.5 K km⁻¹ (ICAO, 1993). */
@@ -474,6 +518,48 @@ export const TEMPERATURE_CONFIG = defineSection(
 					source: 'A smooth ramp rather than a single freezing point.',
 					tuned: null,
 				},
+				/**
+				 * A cell's mixed layer within about 2 K of freezing is taken to be
+				 * partly iced over: the ice edge of a cell over 100 km across.
+				 */
+				seaIceStartC: {
+					value: 0,
+					unit: '°C',
+					what:
+						'The sea temperature below which the sea starts to ice over. The' +
+						' ice share then rises smoothly to the whole at seaFreezingC; it' +
+						' brightens the sea and cuts the exchange with the air.',
+					raising:
+						'The sea ices over from milder temperatures: more sea ice, and' +
+						' colder polar air.',
+					lowering:
+						'A sharper ice edge, nearer freezing. It must stay above' +
+						' seaFreezingC; the model refuses it otherwise.',
+					source:
+						'Chosen: a mixed layer within about 2 K of freezing is partly' +
+						' iced over, across a cell over 100 km wide.',
+					tuned: null,
+				},
+				/**
+				 * The freezing point of sea water of salinity 33–35 at the surface,
+				 * −1.8 to −1.9 °C (UNESCO, 1983, "Algorithms for computation of
+				 * fundamental properties of seawater").
+				 */
+				seaFreezingC: {
+					value: -1.8,
+					unit: '°C',
+					what:
+						'The freezing point of sea water. The sea is wholly iced over' +
+						' there and does not cool below it, though the air over it can.',
+					raising:
+						'The sea freezes at a milder temperature: more sea ice. It must' +
+						' stay below seaIceStartC; the model refuses it otherwise.',
+					lowering: 'The sea cools further before it freezes: less sea ice.',
+					source:
+						'The freezing point of sea water of salinity 33 to 35 (UNESCO,' +
+						' 1983).',
+					tuned: null,
+				},
 			},
 		},
 		{
@@ -503,7 +589,8 @@ export const TEMPERATURE_CONFIG = defineSection(
 					unit: 'passes',
 					what:
 						'The most passes of the loop, each a temperature solve with the' +
-						" last pass's winds and then the winds from the new temperature.",
+						" last pass's winds and currents, then the winds from the new" +
+						' temperature, then the currents from those winds.',
 					raising:
 						'A world whose climate settles slowly gets further; the climate' +
 						' takes longer to appear.',
@@ -512,8 +599,8 @@ export const TEMPERATURE_CONFIG = defineSection(
 						' such a world. At 1, no climate settles, and none is carried on' +
 						' from.',
 					source:
-						'Chosen: the Earth settles in about four passes, and a generated' +
-						' world in four or five.',
+						'Chosen: the Earth settles in four passes, and the generated' +
+						' worlds measured in four.',
 					tuned: null,
 				},
 				climateOvershootShare: {
@@ -2053,6 +2140,257 @@ export const WIND_CONFIG = defineSection(
 					'A sharper turn, nearer a corner in the bands as the day length' +
 					' changes.',
 				source: 'A guess.',
+				tuned: null,
+			},
+		},
+	},
+);
+
+/**
+ * The ocean model's settings: the wind-driven gyres.
+ *
+ * @remarks
+ * Each starts from a published or physical figure, or a figure worked out
+ * from observed ones; none was tuned. The model's value object is
+ * `DEFAULT_GYRE_SETTINGS`.
+ */
+export const OCEAN_CONFIG = defineSection(
+	'Ocean',
+	[
+		{
+			title: "The wind's push on the sea",
+			settings: {
+				/**
+				 * The bulk drag coefficient of the sea's surface for the wind at 10 m:
+				 * Large and Pond (1981), "Open ocean momentum flux measurements in
+				 * moderate to strong winds", Journal of Physical Oceanography 11, give
+				 * 1.2e-3 for winds of 4 to 11 m/s.
+				 */
+				dragCoefficient: {
+					value: 1.2e-3,
+					unit: 'ratio',
+					what:
+						"How hard the wind pushes on the sea: the push is the air's" +
+						' density times this times the wind speed squared. The push' +
+						' drives the gyres and the Ekman transport.',
+					raising:
+						'Every current driven by the wind is stronger, in proportion:' +
+						' the gyres, their western boundary currents and the Ekman' +
+						' transport.',
+					lowering:
+						'Every current driven by the wind is weaker, in proportion.',
+					source:
+						'Published: Large and Pond (1981), 1.2e-3 for winds of 4 to' +
+						' 11 m/s.',
+					tuned: null,
+				},
+			},
+		},
+		{
+			title: 'The gyres',
+			settings: {
+				/**
+				 * The friction rate of Stommel's gyre, which sets its western boundary
+				 * current's width `r / β`: 100 km at 30° latitude, where `β` is about
+				 * 2e-11 m⁻¹ s⁻¹, the width of the observed Gulf Stream off the
+				 * American coast. The 256 grid resolves it; on the 64 and 128 grids
+				 * the solve spreads the current over about a cell (see
+				 * `createCornerSolver`).
+				 */
+				frictionPerS: {
+					value: 2e-6,
+					unit: '1/s',
+					what:
+						"Friction on the sea's wind-driven flow. With the change of" +
+						" the Earth's turning with latitude it sets the width of each" +
+						" gyre's western boundary current: this over about 2e-11 /m/s" +
+						' at 30° latitude, 100 km.',
+					raising:
+						'A wider, slower western boundary current, and a little less' +
+						' carried round each gyre. At 6e-6 /s the current is about' +
+						' 300 km wide, and a gyre 60° wide carries about a third less.',
+					lowering:
+						'A narrower, faster boundary current, down to about a cell' +
+						' of the grid, where the solve adds its own spreading.',
+					source:
+						"Stommel's boundary-layer width r/β set to the observed Gulf" +
+						" Stream's, about 100 km at 30°.",
+					tuned: null,
+				},
+				/**
+				 * The friction in the channel round a land that reaches round the
+				 * globe, as Antarctica does: on every corner whose circle of latitude
+				 * crosses no land. There the flow round the globe is held back by
+				 * friction alone, and carries the wind's push over this rate, so with
+				 * the gyres' friction it would grow without bound as that is lowered.
+				 * The observed circumpolar current is held back mostly by the
+				 * pressure on the sea floor's ridges; as a linear drag, about
+				 * 0.15 N/m² of wind stress over a channel about 2000 km wide carrying
+				 * about 140 Sv (Cunningham et al. 2003, "Transport and variability of
+				 * the Antarctic Circumpolar Current in Drake Passage", Journal of
+				 * Geophysical Research 108) is `0.15 × 2e6 / (1025 × 1.4e8)`, about
+				 * 2e-6 s⁻¹.
+				 */
+				channelFrictionPerS: {
+					value: 2e-6,
+					unit: '1/s',
+					what:
+						'The friction on the sea where it can flow round the globe,' +
+						' along circles of latitude that cross no land, as between' +
+						' Antarctica and the southern tips of the continents. It' +
+						' stands for the pressure on the sea floor that holds the' +
+						' observed circumpolar current back, and keeps that current' +
+						" from following the gyres' friction.",
+					raising:
+						'Less flows round the globe, in proportion: a weaker' +
+						' circumpolar current.',
+					lowering:
+						'More flows round the globe, in proportion: a stronger' +
+						' circumpolar current.',
+					source:
+						'Worked out from the observed circumpolar current: about' +
+						' 140 Sv (Cunningham et al., 2003) under about 0.15 N/m² of' +
+						' wind stress across about 2000 km.',
+					tuned: null,
+				},
+				/**
+				 * The depth the transport is spread over for the surface current: the
+				 * Florida Current carries about 32 Sv (Meinen, Baringer and Garcia
+				 * 2010, "Florida Current transport variability: an analysis of annual
+				 * and longer-period signals", Deep-Sea Research I 57) at about
+				 * 1.8 m/s at the surface across about 90 km, which is
+				 * `3.2e7 / (1.8 × 9e4)`, about 200 m.
+				 */
+				layerDepthM: {
+					value: 200,
+					unit: 'm',
+					what:
+						"The depth the gyres' transport is taken to be spread over:" +
+						' the surface current is the transport over this depth, and' +
+						' so are the flows across the edges the heat is carried by.',
+					raising:
+						'Slower surface currents and smaller flows for the same' +
+						' transport.',
+					lowering:
+						'Faster surface currents and larger flows for the same' +
+						' transport.',
+					source:
+						"Worked out from the Florida Current's observed transport," +
+						' surface speed and width (Meinen et al., 2010).',
+					tuned: null,
+				},
+				/**
+				 * The Ekman transport, `τ / (ρ f)`, has no limit where `f` passes
+				 * through zero at the equator, where the balance it comes from no
+				 * longer holds; within about 5° of the equator the observed surface
+				 * flow follows the wind rather than turning from it.
+				 */
+				equatorFloorDeg: {
+					value: 5,
+					unit: '°',
+					what:
+						'Within this latitude of the equator the Coriolis parameter in' +
+						' the Ekman transport is held at its value here, so the' +
+						' transport stays finite where the parameter passes through' +
+						' zero.',
+					raising:
+						'A wider band of capped transport: a weaker Ekman transport' +
+						' near the equator.',
+					lowering:
+						'A narrower band: a stronger Ekman transport close to the' +
+						' equator, without limit as the floor nears 0°.',
+					source:
+						'Physical: the Ekman balance fails within a few degrees of' +
+						' the equator.',
+					tuned: null,
+				},
+			},
+		},
+		{
+			title: 'How the gyres are solved (numerical, not physical)',
+			numerical: true,
+			settings: {
+				/**
+				 * Each island is one more unknown on every level of the corner
+				 * solver down to its coarsest, which is solved densely; the Earth has
+				 * 26 islands on the 64 grid and more on the finer ones.
+				 */
+				maxIslands: {
+					value: 32,
+					unit: 'islands',
+					what:
+						'The most islands whose value of the streamfunction is found' +
+						' from the circulation round them, the largest first; the' +
+						' sea flows over the rest, and each is then held to one value,' +
+						' so the flow goes round it. The cap is on the islands found:' +
+						' an island in the lagoon of one flowed over can add one more.',
+					raising:
+						'More small islands block the flow as islands do, at more' +
+						' cost to build the solver.',
+					lowering:
+						'Fewer islands block the flow; the sea flows over the rest' +
+						' and round them.',
+					source:
+						'Chosen: the 26 islands of the Earth on the 64 grid, and a few more.',
+					tuned: null,
+				},
+				/**
+				 * The flows are the differences of the streamfunction, so whatever its
+				 * error they carry nothing net in or out of any cell; the tolerance
+				 * only sets how close the gyre is to the equation's answer. At 1e-4
+				 * the streamfunction is within 3e-4 of its largest value of the
+				 * answer at 1e-10 on the Earth.
+				 */
+				gyreTolerance: {
+					value: 1e-4,
+					unit: 'ratio',
+					what:
+						"How closely each month's solve must meet the equation, as a" +
+						' share of the forcing.',
+					raising:
+						'Fewer iterations, a gyre further from the answer; the flows' +
+						' still carry nothing net in or out of any cell.',
+					lowering: 'More iterations, a gyre closer to the answer.',
+					source: 'Chosen by measurement on the Earth.',
+					tuned: null,
+				},
+			},
+		},
+	],
+	{
+		title: 'Fixed choices (not overridable for a run)',
+		settings: {
+			/** The density of sea water near the surface, rounded. */
+			seaWaterDensityKgM3: {
+				value: 1025,
+				unit: 'kg/m³',
+				what:
+					"The density of the sea's water, which turns the wind's push" +
+					' into a push on the water.',
+				raising: 'The same push moves the water less: weaker currents.',
+				lowering: 'The same push moves the water more: stronger currents.',
+				source: 'A physical figure: sea water near the surface, rounded.',
+				tuned: null,
+			},
+			/**
+			 * The figure the sea's mixed layer is reckoned at in the temperature
+			 * model's `oceanHeatCapacity`, so that the heat the currents carry and
+			 * the heat the sea stores agree.
+			 */
+			seaWaterHeatCapacityJM3K: {
+				value: 4.18e6,
+				unit: 'J/m³/K',
+				what:
+					'The heat a cubic metre of sea water holds for each kelvin: the' +
+					" currents' water carries the sea's temperature with it at this" +
+					' much heat for each cubic metre.',
+				raising:
+					'The currents carry more heat for the same flow: the warm' +
+					' currents warm the seas they reach more.',
+				lowering: 'The currents carry less heat for the same flow.',
+				source:
+					'A physical figure: the density of sea water times its specific' +
+					' heat, about 4 kJ/kg/K, rounded as for the mixed layer.',
 				tuned: null,
 			},
 		},

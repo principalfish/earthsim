@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
 	readEarthDataFile,
+	readObservedSeaTemperatureFile,
 	readObservedTemperatureFile,
 } from '../../../../scripts/earth/dataFile.mjs';
 import { solveClimate } from '../../climate';
-import { compareField, compareFields } from '../../compare';
+import {
+	compareField,
+	compareFields,
+	compareFieldWhereBoth,
+} from '../../compare';
 import { decodeEarth, earthWorld, isMeasuredEarth } from '../../earth/earth';
 import { getGrid } from '../../grid/grid';
+import {
+	decodeObservedSeaTemperature,
+	observedSeaTemperatureOn,
+} from '../../ocean/observed';
 import { decodeObservedTemperature, observedTemperature } from '../observed';
 import { summariseTemperature } from '../temperature';
 import {
@@ -17,6 +26,7 @@ import {
 	COAST_CONTRAST_TOLERANCE_K,
 	type EarthTemperatureFigures,
 	earthTemperatureFigures,
+	seaTemperatureFigures,
 } from './earthTemperature';
 import committed from './earthTemperature.json';
 
@@ -71,11 +81,20 @@ describe('the Earth temperature baseline', () => {
 				decodeObservedTemperature(readObservedTemperatureFile()),
 				BASELINE_RESOLUTION,
 			);
+			const grid = getGrid(BASELINE_RESOLUTION);
+			const { temperature } = solveClimate(earth);
 			const now = earthTemperatureFigures(
-				solveClimate(earth).temperature.months,
+				temperature.months,
 				observed,
-				getGrid(BASELINE_RESOLUTION),
+				grid,
 				earth,
+				{
+					simulated: temperature.seaMonths,
+					observed: observedSeaTemperatureOn(
+						grid,
+						decodeObservedSeaTemperature(readObservedSeaTemperatureFile()),
+					),
+				},
 			);
 			const worse = baselineRegressions(now, committed);
 			expect(
@@ -94,14 +113,18 @@ describe('the Earth temperature baseline', () => {
 		expect(JSON.parse(baselineText(committed))).toEqual(committed);
 	});
 
-	it('holds the west–east coast contrasts, and the winds’ heat carrying keeps them well above what the winds-free model gave', () => {
-		// Without the winds the model gave Europe against Asia 0.7 K for the
-		// year and 2.4 K in January, and North America −0.8 and −0.6 K: almost
-		// nothing, against the observed 11.5 and 22.9, and 5.8 and 15.1.
+	it('holds the west–east coast contrasts, the winds’ and the currents’ heat carrying keeping them above what the model without either gives', () => {
+		// The model without winds or currents gives Europe against Asia 0.7 K
+		// for the year and 2.4 K in January, and North America −0.8 and −0.6 K,
+		// against the observed 11.5 and 22.9, and 5.8 and 15.1. The winds
+		// without the currents give 2.8 and 6.3, and −0.1 and 2.8; with the
+		// currents, 0.9 and 4.6, and 1.3 and 4.1: the currents warm East Asia's
+		// coasts, beside the Kuroshio, more than western Europe.
 		const { europeAsia, northAmerica } = committed.coastContrast;
-		expect(europeAsia.simulated.annual).toBeGreaterThan(2);
-		expect(europeAsia.simulated.january).toBeGreaterThan(6);
-		expect(northAmerica.simulated.january).toBeGreaterThan(3);
+		expect(europeAsia.simulated.annual).toBeGreaterThan(0.7);
+		expect(europeAsia.simulated.january).toBeGreaterThan(4);
+		expect(northAmerica.simulated.annual).toBeGreaterThan(1);
+		expect(northAmerica.simulated.january).toBeGreaterThan(3.5);
 		expect(europeAsia.observed.annual).toBeGreaterThan(11);
 		expect(europeAsia.observed.january).toBeGreaterThan(22);
 	});
@@ -144,6 +167,48 @@ describe('earthTemperatureFigures', () => {
 		).toThrow(RangeError);
 		expect(() =>
 			earthTemperatureFigures(months, months.slice(1), grid),
+		).toThrow(RangeError);
+	});
+
+	it("holds the sea's figures, over the cells that are sea in both, only when given the sea's year", () => {
+		const observed = year(() => 0);
+		const simulated = year((month) => 1 + month / 12);
+		// Land in the simulated sea, no data in the observed.
+		for (const field of simulated) {
+			field.fill(Number.NaN, 0, 1000);
+		}
+		for (const field of observed) {
+			field.fill(Number.NaN, 500, 2000);
+		}
+		const sea = { simulated, observed };
+		const figures = earthTemperatureFigures(
+			observed,
+			observed,
+			grid,
+			undefined,
+			sea,
+		);
+		expect(figures.seaTemperature).toEqual(seaTemperatureFigures(sea, grid));
+		expect(figures.seaTemperature?.january).toEqual(
+			compareFieldWhereBoth(
+				simulated[0] as Float32Array,
+				observed[0] as Float32Array,
+				grid,
+			),
+		);
+		// The annual means differ by the months' mean offset.
+		expect(figures.seaTemperature?.annualMean.meanDifference).toBeCloseTo(
+			1 + 11 / 24,
+			5,
+		);
+		expect(
+			earthTemperatureFigures(observed, observed, grid),
+		).not.toHaveProperty('seaTemperature');
+		expect(() =>
+			seaTemperatureFigures({ simulated: simulated.slice(1), observed }, grid),
+		).toThrow(RangeError);
+		expect(() =>
+			seaTemperatureFigures({ simulated, observed: observed.slice(2) }, grid),
 		).toThrow(RangeError);
 	});
 });
@@ -359,6 +424,57 @@ describe('the west–east coast contrasts in the baseline check', () => {
 		expect(read.coastContrast?.northAmerica.simulated.annual).toBe(0.038);
 		expect(JSON.parse(baselineText(uniform(0, 1)))).not.toHaveProperty(
 			'coastContrast',
+		);
+	});
+});
+
+describe("the sea's own temperature in the baseline check", () => {
+	const sea = (rms: number) => ({
+		annualMean: { meanDifference: -0.3, rmsDifference: rms },
+		january: { meanDifference: -0.1, rmsDifference: rms + 0.1 },
+	});
+	const baseline = { ...uniform(-0.5, 4), seaTemperature: sea(2.4) };
+
+	it('passes figures no worse than the tolerance allows, and checks none against a baseline without them', () => {
+		expect(baselineRegressions(baseline, baseline)).toEqual([]);
+		expect(
+			baselineRegressions(
+				{ ...baseline, seaTemperature: sea(2.4 + BASELINE_TOLERANCE_K * 0.9) },
+				baseline,
+			),
+		).toEqual([]);
+		expect(baselineRegressions(uniform(-0.5, 4), uniform(-0.5, 4))).toEqual([]);
+	});
+
+	it('names a worse or missing sea figure', () => {
+		expect(
+			baselineRegressions({ ...baseline, seaTemperature: sea(3) }, baseline),
+		).toEqual([
+			{ figure: 'sea temperature annual average RMS', baseline: 2.4, now: 3 },
+			{ figure: 'sea temperature January RMS', baseline: 2.5, now: 3.1 },
+		]);
+		expect(
+			baselineRegressions(uniform(-0.5, 4), baseline).map(
+				({ figure }) => figure,
+			),
+		).toEqual([
+			'sea temperature annual average mean',
+			'sea temperature annual average RMS',
+			'sea temperature January mean',
+			'sea temperature January RMS',
+		]);
+	});
+
+	it('writes the sea figures rounded to three decimals, and none when there are none', () => {
+		const read = JSON.parse(
+			baselineText({ ...uniform(0, 1), seaTemperature: sea(2.41449) }),
+		) as EarthTemperatureFigures;
+		expect(read.seaTemperature?.annualMean).toEqual({
+			meanDifference: -0.3,
+			rmsDifference: 2.414,
+		});
+		expect(JSON.parse(baselineText(uniform(0, 1)))).not.toHaveProperty(
+			'seaTemperature',
 		);
 	});
 });

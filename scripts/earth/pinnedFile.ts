@@ -17,6 +17,17 @@ export type PinnedFile = {
 };
 
 /**
+ * A source a server cuts afresh at each request, so that its bytes differ
+ * from one download to the next: what it holds is pinned instead.
+ */
+export type SubsetSource = {
+	/** Where the file is downloaded from. */
+	readonly url: string;
+	/** The name the downloaded file is kept under. */
+	readonly name: string;
+};
+
+/**
  * Says what is wrong with a file's SHA-256, if it is not that of the file
  * expected.
  *

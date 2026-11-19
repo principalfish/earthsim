@@ -29,3 +29,19 @@ export declare const readObservedWindFile: () => Uint8Array<ArrayBuffer>;
  * @throws Error if the file cannot be read.
  */
 export declare const readObservedPressureFile: () => Uint8Array<ArrayBuffer>;
+
+/**
+ * The bytes of `public/data/earth-sea-temperature-1deg.bin`, read afresh at
+ * each call, in an array of exactly their length that nothing else refers to.
+ *
+ * @throws Error if the file cannot be read.
+ */
+export declare const readObservedSeaTemperatureFile: () => Uint8Array<ArrayBuffer>;
+
+/**
+ * The bytes of `public/data/earth-currents-1deg.bin`, read afresh at each
+ * call, in an array of exactly their length that nothing else refers to.
+ *
+ * @throws Error if the file cannot be read.
+ */
+export declare const readObservedCurrentsFile: () => Uint8Array<ArrayBuffer>;

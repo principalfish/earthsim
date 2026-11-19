@@ -6,6 +6,7 @@
 import {
 	type ClimateProgress,
 	computeTerrainStats,
+	type GyreResult,
 	parseSimRequest,
 	type SimKind,
 	type SimPass,
@@ -81,9 +82,12 @@ const COMPUTE: {
 /** The buffers of a temperature result's arrays. */
 const temperatureBuffers = (result: TemperatureResult): ArrayBufferLike[] => [
 	...result.months.map((month) => month.buffer),
+	...result.seaMonths.map((month) => month.buffer),
 	result.state.temperatureK.buffer,
 	result.state.previousK.buffer,
 	result.state.referenceCoolingK.buffer,
+	result.state.seaTemperatureK.buffer,
+	result.state.seaPreviousK.buffer,
 ];
 
 /** The buffers of a winds result's arrays. */
@@ -92,10 +96,22 @@ const windBuffers = (result: WindResult): ArrayBufferLike[] =>
 		(month) => month.buffer,
 	);
 
-/** The buffers of a pass's temperature and winds arrays. */
+/** The buffers of a currents result's arrays. */
+const currentBuffers = (result: GyreResult): ArrayBufferLike[] =>
+	[
+		...result.flows,
+		...result.east,
+		...result.north,
+		...result.ekmanEast,
+		...result.ekmanNorth,
+		...result.streamfunction,
+	].map((month) => month.buffer);
+
+/** The buffers of a pass's temperature, winds and currents arrays. */
 const passBuffers = (pass: ClimateProgress): ArrayBufferLike[] => [
 	...temperatureBuffers(pass.temperature),
 	...windBuffers(pass.winds),
+	...currentBuffers(pass.currents),
 ];
 
 /**
@@ -103,23 +119,36 @@ const passBuffers = (pass: ClimateProgress): ArrayBufferLike[] => [
  * goes on to read the pass's, which a transfer would empty.
  */
 const copyOfPass = (pass: ClimateProgress): ClimateProgress => {
-	const { temperature, winds } = pass;
+	const { temperature, winds, currents } = pass;
 	return {
 		...pass,
 		temperature: {
 			...temperature,
 			months: temperature.months.map((month) => month.slice()),
+			seaMonths: temperature.seaMonths.map((month) => month.slice()),
 			state: {
 				...temperature.state,
 				temperatureK: temperature.state.temperatureK.slice(),
 				previousK: temperature.state.previousK.slice(),
 				referenceCoolingK: temperature.state.referenceCoolingK.slice(),
+				seaTemperatureK: temperature.state.seaTemperatureK.slice(),
+				seaPreviousK: temperature.state.seaPreviousK.slice(),
 			},
 		},
 		winds: {
 			east: winds.east.map((month) => month.slice()),
 			north: winds.north.map((month) => month.slice()),
 			pressure: winds.pressure.map((month) => month.slice()),
+		},
+		currents: {
+			...currents,
+			flows: currents.flows.map((month) => month.slice()),
+			east: currents.east.map((month) => month.slice()),
+			north: currents.north.map((month) => month.slice()),
+			ekmanEast: currents.ekmanEast.map((month) => month.slice()),
+			ekmanNorth: currents.ekmanNorth.map((month) => month.slice()),
+			streamfunction: currents.streamfunction.map((month) => month.slice()),
+			iterations: [...currents.iterations],
 		},
 	};
 };

@@ -17,6 +17,7 @@ import {
 	type ConfigSection,
 	entriesOf,
 	formatConfigValue,
+	OCEAN_CONFIG,
 	TEMPERATURE_CONFIG,
 	WIND_CONFIG,
 } from '../src/core/config';
@@ -48,6 +49,13 @@ export const CONFIG_DOC_SECTIONS: readonly ConfigDocSection[] = [
 			'The settings of the wind model, read from `WIND_CONFIG` into' +
 			' `DEFAULT_WIND_SETTINGS`. How the model works is in' +
 			' [Winds](../../docs/winds.md).',
+	},
+	{
+		section: OCEAN_CONFIG,
+		intro:
+			'The settings of the wind-driven gyres, read from `OCEAN_CONFIG` into' +
+			' `DEFAULT_GYRE_SETTINGS`. How the gyres work is in' +
+			' [Ocean](../../docs/ocean.md).',
 	},
 ];
 

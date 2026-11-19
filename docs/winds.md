@@ -39,12 +39,14 @@ The window's width and taper, and the blend's latitudes, are this project's choi
 
 | | Southern high | Band low | Northern high |
 |-|-|-|-|
-| January | 32.2°S | 2.3°S | 24.6°N |
-| July | 26.8°S | 1.1°S | 31.6°N |
-| July less January, now | 5.4° | 1.2° | 7.0° |
-| July less January, one pattern round the globe | 18.2° | 29.7° | 22.8° |
+| January | 30.9°S | 2.4°N | 25.9°N |
+| July | 27.6°S | 2.4°S | 31.4°N |
+| July less January, now | 3.4° | 4.8° | 5.5° |
+| July less January, one pattern round the globe | 17.5° | 23.4° | 22.0° |
 
-The band low over that ocean hardly moves: the ocean's own temperature peaks within about 3° of the equator in both months, and the ocean north of the equator is cooler than its latitude's mean in July, the land being hotter, so its thermal part holds the low south. `npm run tune:winds -- cases` prints this table for any settings; `localBandsShare=0` gives the one pattern round the globe exactly, the model as it was before.
+These were measured at 3 hPa a kelvin of thermal response, given the temperature without winds.
+
+The band low over that ocean moves against the season, south in July: the ocean north of the equator is cooler than its latitude's mean in July, the land being hotter, so its thermal part holds the low south. `npm run tune:winds -- cases` prints this table for any settings; `localBandsShare=0` gives the one pattern round the globe exactly, the model as it was before.
 
 ### Thermal highs and lows
 
@@ -105,11 +107,11 @@ The model's settings start from published or textbook figures where there are an
 
 | Months | RMS of the wind's difference as vectors | Direction within 45° | RMS pressure difference |
 |-|-|-|-|
-| January | 3.37 m/s | 62.8% | 7.71 hPa |
-| July | 4.08 m/s | 58.6% | 6.90 hPa |
-| The whole year | 3.61 m/s | 61.2% | 7.19 hPa |
+| January | 3.52 m/s | 60.2% | 7.91 hPa |
+| July | 4.40 m/s | 54.4% | 7.07 hPa |
+| The whole year | 3.64 m/s | 60.3% | 7.19 hPa |
 
-The thermal response, `thermalHpaPerK`, is at its physical 0.7 hPa a kelvin. It was tuned by hand to 3 before the winds carried heat, and put back when they did: at 3 the loop's feedback did not settle (see [Temperature](temperature.md#the-climate-loop)). Against the observed Earth the two are close, 0.7 better in the wind's difference as vectors (3.61 against 3.78 m/s for the year) and the direction share, 3 slightly better in the pressure (7.01 against 7.19 hPa); the Siberian high and the South Asian low come out weaker at 0.7. The figures before the loop, at 3 and given the temperature without winds, were 3.82 m/s, 60.9% and 7.08 hPa for the year.
+The thermal response, `thermalHpaPerK`, is at its physical 0.7 hPa a kelvin. It was tuned by hand to 3 before the winds carried heat, and put back when they did: at 3 the loop's feedback did not settle (see [Temperature](temperature.md#the-climate-loop)). The Siberian high and the South Asian low come out weaker at 0.7 than at 3. At 3, given the temperature without winds rather than the loop's, the figures for the year are 3.83 m/s, 61.3% and 7.06 hPa.
 
 The direction is judged only where the observed wind is at least 1 m/s, 85% of the surface over the year. The mean speed and mean pressure differences are not kept in the baseline.
 
@@ -191,7 +193,7 @@ These are recorded, not tuned. The model is not fitted any closer to the observe
 - **The air above the surface.** There is one level, the surface, and no upper winds or jet streams.
 - **Weather.** The winds are monthly means of a steady balance: no storms, fronts or day-to-day change.
 - **The air's own motion.** The wind does not carry itself along, so nothing is steered by the flow upstream, and there is no difference between the hemispheres other than what their land and temperature give.
-- **The ocean.** There are no ocean currents. On their own the winds do not change the temperature; the climate loop, which the page works the climate out with, feeds them back.
+- **The ocean.** On their own the winds do not change the temperature; the climate loop, which the page works the climate out with, feeds them back, and the wind-driven currents they drive carry the sea's heat (see [Ocean](ocean.md)). The currents do not change the winds except through the temperature.
 
 ## The pressure of finer worlds is worked out on the 64 grid
 

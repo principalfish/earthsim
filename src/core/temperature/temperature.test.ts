@@ -15,6 +15,8 @@ import {
 	type PlanetSettings,
 	TEMPERATURE_SETTINGS,
 } from '../planet/planet';
+import { flowingPart } from '../wind/flowing';
+import { solveWinds } from '../wind/solve';
 import { applyDab } from '../world/brush';
 import { generateWorld } from '../world/generate';
 import {
@@ -32,6 +34,7 @@ import {
 	MAX_STEP_SECONDS,
 	MIN_STEP_SECONDS,
 	type SolveTemperatureOptions,
+	seaStep,
 	solveResolution,
 	solveTemperature,
 	stepBefore,
@@ -44,6 +47,7 @@ import {
 	type TemperatureStart,
 	type TemperatureState,
 	temperatureConditions,
+	ZERO_CELSIUS_K,
 } from './temperature';
 
 /**
@@ -166,8 +170,13 @@ const blankTwoYears = shared(() =>
 	solveTemperature(BLANK, { ...COARSE, maxYears: 2 }),
 );
 const generatedHot = shared(() => solveTemperature(GENERATED_HOT, COARSE));
+/**
+ * The ocean planet with no seasons, solved until it settles: its first
+ * guess has no sea of its own, so its first year still moves as the sea
+ * and its ice settle.
+ */
 const seasonless = shared(() =>
-	solveTemperature(seasonlessOcean(), { maxYears: 1 }),
+	solveTemperature(seasonlessOcean(), { tolerance: 0.005 }),
 );
 const seasonlessCoarse = shared(() =>
 	solveTemperature(seasonlessOcean(), { ...COARSE, maxYears: 1 }),
@@ -306,19 +315,19 @@ describe('solveTemperature on the Earth', {
 				'from nothing',
 				earth(),
 				{
-					january: 12.9681,
-					july: 16.144,
-					annual: 14.4763,
-					spread: 13.3749,
+					january: 12.7151,
+					july: 17.309,
+					annual: 14.5994,
+					spread: 13.6374,
 					cells: [
-						[0, 22, JULY, 26.3341],
-						[62, 130, JANUARY, -20.2712],
-						[-80, 0, JULY, -31.2685],
-						[33, 90, JANUARY, -32.4105],
-						[40, -160, AUGUST, 16.4577],
-						[23, 10, JULY, 23.9904],
-						[35, 100, JANUARY, -24.1008],
-						[35, 100, JULY, 7.229],
+						[0, 22, JULY, 27.1295],
+						[62, 130, JANUARY, -21.7868],
+						[-80, 0, JULY, -34.0641],
+						[33, 90, JANUARY, -34.6271],
+						[40, -160, AUGUST, 17.1828],
+						[23, 10, JULY, 26.3132],
+						[35, 100, JANUARY, -26.1618],
+						[35, 100, JULY, 9.6692],
 					],
 				},
 			],
@@ -326,19 +335,19 @@ describe('solveTemperature on the Earth', {
 				'carried on',
 				carried,
 				{
-					january: 12.9575,
-					july: 16.1324,
-					annual: 14.4653,
-					spread: 13.382,
+					january: 12.7176,
+					july: 17.3107,
+					annual: 14.6002,
+					spread: 13.6387,
 					cells: [
-						[0, 22, JULY, 26.3304],
-						[62, 130, JANUARY, -20.2748],
-						[-80, 0, JULY, -31.2931],
-						[33, 90, JANUARY, -32.415],
-						[40, -160, AUGUST, 16.4494],
-						[23, 10, JULY, 23.9861],
-						[35, 100, JANUARY, -27.355],
-						[35, 100, JULY, 3.9149],
+						[0, 22, JULY, 27.1298],
+						[62, 130, JANUARY, -21.7842],
+						[-80, 0, JULY, -34.0292],
+						[33, 90, JANUARY, -34.6249],
+						[40, -160, AUGUST, 17.1844],
+						[23, 10, JULY, 26.3137],
+						[35, 100, JANUARY, -29.4096],
+						[35, 100, JULY, 6.3967],
 					],
 				},
 			],
@@ -491,16 +500,396 @@ describe('solveTemperature on the Earth', {
 	});
 });
 
+describe("the sea's own temperature", {
+	timeout: SOLVE_TIMEOUT_MS,
+}, () => {
+	const freezingC = TEMPERATURE_MODEL.seaFreezingC;
+	const isLand = (world: World, cell: number): boolean =>
+		(world.elevation[cell] as number) - Math.fround(world.seaLevel) > 0;
+
+	/**
+	 * A weighted sum of every value of some fields: two results whose fields
+	 * give the same sum to the last bit are, as near as a test can tell, the
+	 * same bit for bit.
+	 */
+	const digest = (fields: readonly ArrayLike<number>[]): number => {
+		let total = 0;
+		fields.forEach((field, index) => {
+			for (let cell = 0; cell < field.length; cell++) {
+				total += (field[cell] as number) * (1 + ((cell * 7 + index) % 101));
+			}
+		});
+		return total;
+	};
+
+	// Three solves of a year from nothing and a run of the winds, several
+	// times longer under coverage.
+	it('solves a world with no sea as the single-temperature model does', {
+		timeout: 120_000,
+	}, () => {
+		// Fixed values recorded from the single-temperature model: a world
+		// wholly of land, and a generated world with its sea level below every
+		// cell and heat carried along its winds.
+		const land = solveTemperature(ALL_LAND);
+		expect([
+			digest(land.months),
+			digest([land.state.temperatureK, land.state.previousK]),
+			land.yearsRun,
+			land.finalChangeK,
+		]).toEqual([
+			129240756.58557798, 712884281.3786669, 3, 0.00009397569004931938,
+		]);
+		const generated = generateWorld({
+			resolution: N,
+			seed: 3,
+			landFraction: 0.3,
+		});
+		const dry = { ...generated, seaLevel: -4792 };
+		expect(Math.min(...dry.elevation)).toBeGreaterThan(dry.seaLevel);
+		const winds = solveWinds(dry, solveTemperature(dry).months);
+		const flows = winds.east.map((east, month) =>
+			flowingPart(grid, east, winds.north[month] as Float32Array),
+		);
+		const carried = solveTemperature(dry, { winds: { flows } });
+		expect([
+			digest(carried.months),
+			digest([carried.state.temperatureK, carried.state.previousK]),
+			carried.yearsRun,
+			carried.finalChangeK,
+		]).toEqual([
+			-667351989.3927803, 616679838.5770601, 3, 0.00001639576024103917,
+		]);
+		// No sea: the sea's months are all NaN, and its state is the air's.
+		expect(land.seaMonths.every((month) => month.every(Number.isNaN))).toBe(
+			true,
+		);
+		expect(land.state.seaTemperatureK).toEqual(land.state.temperatureK);
+		expect(land.state.seaPreviousK).toEqual(land.state.previousK);
+	});
+
+	it('gives the Earth a sea temperature NaN exactly over land, and its state the air’s there', () => {
+		const result = earth();
+		const wrong: string[] = [];
+		result.seaMonths.forEach((month, index) => {
+			for (let cell = 0; cell < cellCount; cell++) {
+				const value = month[cell] as number;
+				const fits = isLand(EARTH, cell)
+					? Number.isNaN(value)
+					: value > freezingC - 1e-5 && value < 40;
+				if (!fits) {
+					wrong.push(`month ${index} cell ${cell}: ${value}`);
+				}
+			}
+		});
+		const { seaTemperatureK, temperatureK } = result.state;
+		for (let cell = 0; cell < cellCount; cell++) {
+			const sea = seaTemperatureK[cell] as number;
+			const fits = isLand(EARTH, cell)
+				? sea === temperatureK[cell]
+				: sea >= freezingC + ZERO_CELSIUS_K;
+			if (!fits) {
+				wrong.push(`state cell ${cell}: ${sea}`);
+			}
+		}
+		expect(wrong.slice(0, 5)).toEqual([]);
+	});
+
+	it('keeps an icy sea at freezing while the air over it cools far below in winter', () => {
+		const result = earth();
+		for (const [latitude, longitude, month] of [
+			[86, 0, JANUARY],
+			[80, 160, JANUARY],
+			[75, -150, JANUARY],
+		] as const) {
+			const cell = cellAt(grid, latLonToDirection(latitude, longitude));
+			expect(isLand(EARTH, cell)).toBe(false);
+			const sea = result.seaMonths[month]?.[cell] as number;
+			const air = result.months[month]?.[cell] as number;
+			expect(sea - freezingC, `${latitude}, ${longitude}`).toBeLessThan(0.5);
+			expect(air, `${latitude}, ${longitude}`).toBeLessThan(-15);
+		}
+	});
+
+	it('brings the sea and the air to the same temperature where nothing else moves heat', () => {
+		// A planet with no seasons is the same every day: the sea gives up
+		// the sunlight it absorbs, so where it is clear of ice the exchange
+		// carries nothing and the two agree.
+		const result = seasonless();
+		expect(result.converged).toBe(true);
+		const sea = summariseTemperature(result.seaMonths).annualMean;
+		const air = summariseTemperature(result.months).annualMean;
+		let compared = 0;
+		for (let cell = 0; cell < cellCount; cell++) {
+			if ((sea[cell] as number) > TEMPERATURE_MODEL.seaIceStartC + 1) {
+				expect(
+					Math.abs((sea[cell] as number) - (air[cell] as number)),
+				).toBeLessThan(0.05);
+				compared++;
+			}
+		}
+		expect(compared).toBeGreaterThan(cellCount / 2);
+	});
+
+	it('makes the sea and the air agree at a very large exchange', () => {
+		// The default numerics: one step a month does not resolve how fast the
+		// sea at the ice's edge turns, and does not settle here.
+		const result = solveTemperature(BLANK, {
+			model: { ...TEMPERATURE_MODEL, airSeaExchange: 1e5 },
+		});
+		expect(result.converged).toBe(true);
+		let largest = 0;
+		let compared = 0;
+		result.seaMonths.forEach((month, index) => {
+			const air = result.months[index] as Float32Array;
+			for (let cell = 0; cell < cellCount; cell++) {
+				if ((month[cell] as number) > TEMPERATURE_MODEL.seaIceStartC + 1) {
+					largest = Math.max(
+						largest,
+						Math.abs((month[cell] as number) - (air[cell] as number)),
+					);
+					compared++;
+				}
+			}
+		});
+		expect(compared).toBeGreaterThan(cellCount);
+		expect(largest).toBeLessThan(0.05);
+	});
+
+	it('with no exchange, leaves the air alone whatever the sea does, and the sea to the sun', () => {
+		const decoupled: SolveTemperatureOptions = {
+			model: {
+				...TEMPERATURE_MODEL,
+				stepsPerMonth: 1,
+				solverToleranceK: 0.05,
+				airSeaExchange: 0,
+			},
+		};
+		// A few years from nothing: the cells clear of ice settle in them,
+		// though the ice's edge does not at one step a month.
+		const settled = solveTemperature(BLANK, { ...decoupled, maxYears: 3 });
+		const clearAllYear = (cell: number): boolean =>
+			settled.seaMonths.every(
+				(month) => (month[cell] as number) > TEMPERATURE_MODEL.seaIceStartC + 1,
+			);
+		// A kick to the sea clear of ice all year, 3 K warmer now than a step
+		// before, which the sea's own stepping carries on as a drift.
+		const kickedSea = Float64Array.from(settled.state.seaTemperatureK);
+		let kicked = 0;
+		for (let cell = 0; cell < cellCount; cell++) {
+			if (clearAllYear(cell)) {
+				kickedSea[cell] = (kickedSea[cell] as number) + 3;
+				kicked++;
+			}
+		}
+		expect(kicked).toBeGreaterThan(cellCount / 2);
+		const year = { ...decoupled, maxYears: 1 };
+		const calm = solveTemperature(BLANK, { ...year, start: settled });
+		const drifting = solveTemperature(BLANK, {
+			...year,
+			start: {
+				...settled,
+				state: { ...settled.state, seaTemperatureK: kickedSea },
+			},
+		});
+		// The air is the same through the year and after its correction: the
+		// sea's drift is not taken for heat the air gained.
+		expect(largestDifference(drifting.months, calm.months)).toBeLessThan(1e-4);
+		let airAfter = 0;
+		for (let cell = 0; cell < cellCount; cell++) {
+			airAfter = Math.max(
+				airAfter,
+				Math.abs(
+					(drifting.state.temperatureK[cell] as number) -
+						(calm.state.temperatureK[cell] as number),
+				),
+			);
+		}
+		expect(airAfter).toBeLessThan(1e-4);
+		// The sea left alone keeps its level, giving up over the year the
+		// sunlight it absorbs; the kicked sea drifts on the same everywhere,
+		// the sun moving it no differently.
+		const settledSea = summariseTemperature(settled.seaMonths).annualMean;
+		const calmSea = summariseTemperature(calm.seaMonths).annualMean;
+		const driftingSea = summariseTemperature(drifting.seaMonths).annualMean;
+		let level = 0;
+		let least = Number.POSITIVE_INFINITY;
+		let most = Number.NEGATIVE_INFINITY;
+		for (let cell = 0; cell < cellCount; cell++) {
+			if (clearAllYear(cell)) {
+				const calmValue = calmSea[cell] as number;
+				level = Math.max(
+					level,
+					Math.abs(calmValue - (settledSea[cell] as number)),
+				);
+				const drift = (driftingSea[cell] as number) - calmValue;
+				least = Math.min(least, drift);
+				most = Math.max(most, drift);
+			}
+		}
+		expect(level).toBeLessThan(1e-3);
+		expect(least).toBeGreaterThan(3);
+		expect(most - least).toBeLessThan(1e-4);
+	});
+
+	it('takes the air at its own heat capacity over the sea, so the air over the sea swings more than the sea', () => {
+		const result = earth();
+		const air = summariseTemperature(result.months).range;
+		const sea = summariseTemperature(result.seaMonths).range;
+		// The North Pacific at 45°N, far from land.
+		const cell = cellAt(grid, latLonToDirection(45, -165));
+		expect(air[cell] as number).toBeGreaterThan(sea[cell] as number);
+	});
+
+	it('starts the sea of a cell an edit floods from its air', () => {
+		// Lowering the Congo basin below the sea, carried on from the Earth.
+		const flooded = { ...EARTH, elevation: Float32Array.from(EARTH.elevation) };
+		const cells = cellsWithin(
+			grid,
+			latLonToDirection(0, 22),
+			(4 * Math.PI) / 180,
+		);
+		for (const cell of cells) {
+			flooded.elevation[cell] = -100;
+		}
+		const result = solveTemperature(flooded, {
+			...COARSE,
+			start: earth(),
+			maxYears: 1,
+		});
+		for (const cell of cells) {
+			const sea = result.seaMonths[JANUARY]?.[cell] as number;
+			expect(Number.isFinite(sea)).toBe(true);
+			expect(
+				Math.abs(sea - (result.months[JANUARY]?.[cell] as number)),
+			).toBeLessThan(5);
+		}
+	});
+});
+
+describe('seaStep', () => {
+	const STORAGE = 2.5e8 / 1.3e6;
+	const step = (
+		sea: number,
+		earlier: number,
+		sunlight: number,
+		exchange: number,
+		opening = 0,
+		brightening = 0,
+	) =>
+		seaStep({
+			sea,
+			earlier,
+			sunlight,
+			exchange,
+			opening,
+			brightening,
+			storage: STORAGE,
+		});
+
+	it('gives the air exactly the heat the sea loses, whatever the air ends at', () => {
+		for (const [
+			sea,
+			earlier,
+			sunlight,
+			exchange,
+			opening,
+			brightening,
+			air,
+		] of [
+			[290, 289.5, 180, 20, 0, 0, 285],
+			[275, 276, 0, 7, 0, 0, 260],
+			[300, 300, 350, 0, 0, 0, 310],
+			[271.5, 271.6, 40, 4, 150, 30, 230],
+		] as const) {
+			const { base, gain, coupling } = step(
+				sea,
+				earlier,
+				sunlight,
+				exchange,
+				opening,
+				brightening,
+			);
+			expect(coupling).toBe(exchange + opening);
+			const seaEnd = base + gain * air;
+			// What the sea's balance says it lost to the air, and what the air
+			// is given in its own: (k + g) · base − g T_s − (k − (k + g) gain)
+			// T_a'.
+			// The brightening's sunlight comes from space, not the air.
+			const lost =
+				sunlight +
+				brightening * (seaEnd - sea) -
+				STORAGE * (1.5 * seaEnd - 2 * sea + 0.5 * earlier);
+			const given =
+				coupling * base - opening * sea - (exchange - coupling * gain) * air;
+			expect(given).toBeCloseTo(lost, 9);
+			expect(given).toBeCloseTo(
+				exchange * (seaEnd - air) + opening * (seaEnd - sea),
+				9,
+			);
+			// The air's mass grows by no less than nothing.
+			expect(exchange - coupling * gain).toBeGreaterThanOrEqual(0);
+		}
+	});
+
+	it('follows only the sun at zero exchange', () => {
+		const { base, gain } = step(290, 289, 200, 0);
+		expect(gain).toBe(0);
+		expect(base).toBeCloseTo(
+			(STORAGE * (2 * 290 - 0.5 * 289) + 200) / (1.5 * STORAGE),
+			12,
+		);
+	});
+
+	it('takes the air’s temperature at a very large exchange', () => {
+		const { base, gain } = step(290, 289, 200, 1e12);
+		expect(base + gain * 250).toBeCloseTo(250, 4);
+	});
+
+	it('settles to the air’s temperature with no sun', () => {
+		let sea = 300;
+		let earlier = 300;
+		for (let count = 0; count < 2000; count++) {
+			const { base, gain } = step(sea, earlier, 0, 20);
+			earlier = sea;
+			sea = base + gain * 270;
+		}
+		expect(sea).toBeCloseTo(270, 6);
+	});
+
+	it('keeps the step well posed however fast the ice brightens', () => {
+		const { gain, coupling } = step(272, 272, 0, 2, 0, 1e9);
+		expect(gain).toBeGreaterThan(0);
+		expect(2 - coupling * gain).toBeGreaterThan(0);
+	});
+
+	it('holds a sea whose ice opens quickly nearer where it is', () => {
+		const loose = step(272, 272, -50, 2, 0);
+		const held = step(272, 272, -50, 2, 500);
+		const air = 240;
+		expect(Math.abs(held.base + held.gain * air - 272)).toBeLessThan(
+			Math.abs(loose.base + loose.gain * air - 272),
+		);
+	});
+});
+
 describe('solveTemperature on simple worlds', {
 	timeout: SOLVE_TIMEOUT_MS,
 }, () => {
 	it('gives an ocean planet with an upright axis no seasons, symmetric and warmest at the equator', () => {
 		const { annualMean, range } = summariseTemperature(seasonless().months);
+		// Where the sea is iced over at the poles it settles slowly, cut off
+		// from the air, so the solve is settled more finely than by default;
+		// the year that settles it still drifts a little there.
 		let largestRange = 0;
-		for (const value of range) {
+		let largestRangeOpen = 0;
+		range.forEach((value, cell) => {
 			largestRange = Math.max(largestRange, value);
-		}
-		expect(largestRange).toBeLessThan(0.01);
+			if (Math.abs(latitudes[cell] as number) < 60) {
+				largestRangeOpen = Math.max(largestRangeOpen, value);
+			}
+		});
+		expect(largestRangeOpen).toBeLessThan(0.01);
+		expect(largestRange).toBeLessThan(0.25);
 		// Mirror cells: the centre (x, y, z) has its mirror at (x, y, -z).
 		const { centres } = grid;
 		let largestAsymmetry = 0;
@@ -565,7 +954,9 @@ describe('solveTemperature on simple worlds', {
 
 	it.each([
 		['a blank ocean', blank],
-		['a generated world', () => solveTemperature(GENERATED, COARSE)],
+		// In the model's own numerics, as the blank ocean is: they settle it
+		// in a fifth of the years the coarser take, and cost less.
+		['a generated world', () => solveTemperature(GENERATED)],
 		// Around a bright star with its axis on its side, in the coarser
 		// numerics, which the generated world's other tests share.
 		['a generated world around a bright star', generatedHot],
@@ -1087,9 +1478,33 @@ describe('solveTemperature above 64 cells per face edge', {
 			for (const month of result.months) {
 				expect(month).toHaveLength(cells(world.resolution));
 			}
+			// The sea's months are on the world's own grid, NaN exactly over
+			// its own land.
+			const level = Math.fround(world.seaLevel);
+			let misplaced = 0;
+			let belowFreezing = 0;
+			for (const month of result.seaMonths) {
+				expect(month).toHaveLength(cells(world.resolution));
+				for (let cell = 0; cell < month.length; cell++) {
+					const land = (world.elevation[cell] as number) - level > 0;
+					const value = month[cell] as number;
+					if (Number.isNaN(value) !== land) {
+						misplaced++;
+					}
+					if (value < TEMPERATURE_MODEL.seaFreezingC - 1e-5) {
+						belowFreezing++;
+					}
+				}
+			}
+			expect(misplaced).toBe(0);
+			// A coarse land cell beside the sea stands in with its
+			// neighbours' seas, so no fine sea cell takes a land's cold.
+			expect(belowFreezing).toBe(0);
 			for (const values of [
 				result.state.temperatureK,
 				result.state.previousK,
+				result.state.seaTemperatureK,
+				result.state.seaPreviousK,
 				result.state.referenceCoolingK,
 			]) {
 				expect(values).toHaveLength(cells(coarse));
@@ -1585,6 +2000,8 @@ describe('solveTemperature refuses what it cannot use', () => {
 	const STATE: TemperatureState = {
 		temperatureK: new Float64Array(cellCount).fill(280),
 		previousK: new Float64Array(cellCount).fill(280),
+		seaTemperatureK: new Float64Array(cellCount).fill(280),
+		seaPreviousK: new Float64Array(cellCount).fill(280),
 		stepSeconds: 1e6,
 		referenceCoolingK: lapseCooling(EARTH),
 	};
@@ -1609,6 +2026,11 @@ describe('solveTemperature refuses what it cannot use', () => {
 			{ ...STATE, previousK: undefined },
 			{ ...STATE, previousK: new Float64Array(cellCount - 1).fill(280) },
 			{ ...STATE, previousK: nan },
+			{ ...STATE, seaTemperatureK: undefined },
+			{ ...STATE, seaTemperatureK: new Float64Array(cellCount - 1).fill(280) },
+			{ ...STATE, seaTemperatureK: nan },
+			{ ...STATE, seaPreviousK: Float32Array.from(STATE.seaPreviousK) },
+			{ ...STATE, seaPreviousK: cold },
 			{ ...STATE, referenceCoolingK: undefined },
 			{ ...STATE, referenceCoolingK: new Float64Array(cellCount - 1) },
 			{ ...STATE, referenceCoolingK: new Float32Array(cellCount) },
@@ -1753,7 +2175,12 @@ describe('solveTemperature refuses what it cannot use', () => {
 			{ ...TEMPERATURE_MODEL, landDiffusivity: 0 },
 			{ ...TEMPERATURE_MODEL, oceanHeatCapacity: 0 },
 			{ ...TEMPERATURE_MODEL, landHeatCapacity: -1 },
-			{ ...TEMPERATURE_MODEL, seaIceHeatCapacity: -1 },
+			{ ...TEMPERATURE_MODEL, seaAirHeatCapacity: 0 },
+			{ ...TEMPERATURE_MODEL, airSeaExchange: -1 },
+			{ ...TEMPERATURE_MODEL, airSeaExchange: Number.POSITIVE_INFINITY },
+			{ ...TEMPERATURE_MODEL, seaIceStartC: -1.8 },
+			{ ...TEMPERATURE_MODEL, seaFreezingC: 1 },
+			{ ...TEMPERATURE_MODEL, seaFreezingC: Number.NaN },
 			{ ...TEMPERATURE_MODEL, solverToleranceK: 0 },
 			{ ...TEMPERATURE_MODEL, solverMaxIterations: 0 },
 			{ ...TEMPERATURE_MODEL, solverMaxIterations: 1.5 },

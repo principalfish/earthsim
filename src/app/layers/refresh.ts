@@ -443,10 +443,19 @@ export type ClimateScheduler = {
 const startFrom = (solved: SolvedWinds): ClimateStart => ({
 	temperature: {
 		months: solved.temperature.months,
+		seaMonths: solved.temperature.seaMonths,
 		state: solved.temperature.state,
 		solvedFor: solved.temperature.solvedFor,
 	},
 	winds: { east: solved.winds.east, north: solved.winds.north },
+	...(solved.currents === undefined
+		? {}
+		: {
+				currents: {
+					flows: solved.currents.flows,
+					streamfunction: solved.currents.streamfunction,
+				},
+			}),
 	dayLengthHours: solved.dayLengthHours,
 });
 
@@ -590,6 +599,7 @@ export const createClimateScheduler = <H>(
 						const solved: SolvedWinds = {
 							temperature: pass.temperature,
 							winds: pass.winds,
+							currents: pass.currents,
 							dayLengthHours,
 						};
 						kept.last = solved;

@@ -25,10 +25,14 @@ const SOLVE_TIMEOUT_MS = 120_000;
 const N = 64;
 const grid = getGrid(N);
 
-/** One step a month, solved to 0.05 K: several times quicker than the default. */
+/**
+ * The default two steps a month, solved to 0.05 K: quicker than the
+ * default. One step a month does not resolve how fast a sea at the ice's
+ * edge turns, and with five times the winds' heat capacity the Earth does
+ * not settle at one.
+ */
 const COARSE_MODEL = {
 	...TEMPERATURE_MODEL,
-	stepsPerMonth: 1,
 	solverToleranceK: 0.05,
 };
 

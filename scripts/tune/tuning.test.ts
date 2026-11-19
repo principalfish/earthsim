@@ -83,15 +83,15 @@ describe('the tuning runs', () => {
 		// which the tuning script works from; the model's own default is now
 		// the physical 0.7.
 		const figures = earthFigures(tuning, TUNED);
-		expect(figures.windRms).toBeCloseTo(3.822, 3);
-		expect(figures.directionShare).toBeCloseTo(0.6091, 4);
-		expect(figures.pressureRms).toBeCloseTo(7.085, 3);
-		// With the bands one pattern round the globe, the figures of the model
-		// before they varied by longitude: 3.813 m/s, 60.60% and 7.113 hPa.
+		expect(figures.windRms).toBeCloseTo(3.828, 3);
+		expect(figures.directionShare).toBeCloseTo(0.6126, 4);
+		expect(figures.pressureRms).toBeCloseTo(7.061, 3);
+		// With the bands one pattern round the globe, as the model had them
+		// before they varied by longitude: 3.821 m/s, 61.02% and 7.119 hPa.
 		const zonal = earthFigures(tuning, { ...TUNED, localBandsShare: 0 });
-		expect(zonal.windRms).toBeCloseTo(3.813, 3);
-		expect(zonal.directionShare).toBeCloseTo(0.606, 3);
-		expect(zonal.pressureRms).toBeCloseTo(7.113, 3);
+		expect(zonal.windRms).toBeCloseTo(3.821, 3);
+		expect(zonal.directionShare).toBeCloseTo(0.6102, 3);
+		expect(zonal.pressureRms).toBeCloseTo(7.119, 3);
 		const changed = earthFigures(tuning, { ...TUNED, bandAmplitudeHpa: 7 });
 		expect(changed.windRms).not.toBe(figures.windRms);
 

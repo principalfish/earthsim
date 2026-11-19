@@ -372,7 +372,7 @@ A wind speed unit saved by an older version of the page is kept once as the wind
 - **Temperature and Winds** each list their settings in groups, then the fixed choices the code reads directly.
 - **Each setting** shows its name, its value and unit, what it controls, what raising it does, what lowering it does, and where its value comes from. A setting tuned against the observed Earth carries a **Tuned** mark and says what it was tuned against.
 - **Close** or Escape closes it and returns to the page, with the keyboard focus back on the **Model settings** button. While it is open the rest of the page cannot be used.
-- **The same list** is written in [Model settings](../src/core/config.md), to read without opening the page.
+- **The same list** for temperature and winds is written in [Model settings](../src/core/config.md), with the ocean's settings added, to read without opening the page.
 
 ## What the browser remembers
 

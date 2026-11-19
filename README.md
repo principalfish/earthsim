@@ -39,7 +39,8 @@ Open the address Vite prints. The first visit shows the New world dialog; press 
 | [User guide](docs/user-guide.md) | Every control on the page: the layers, winds, sun, timeline and info box over the globe, then the panel's world, view, planet, tools, statistics and settings, and what the browser remembers |
 | [Temperature](docs/temperature.md) | How the temperature is worked out, when it is recalculated, its colours, and the Earth comparison |
 | [Winds](docs/winds.md) | How the surface winds and sea-level pressure are worked out, which planet settings they read, and how far to trust them |
-| [Model settings](src/core/config.md) | Every setting of the temperature and wind models, also on the page under Settings |
+| [Ocean](docs/ocean.md) | How the wind-driven gyres are worked out, what they cost, and how far to trust them |
+| [Model settings](src/core/config.md) | Every setting of the temperature, wind and ocean models; the temperature and wind ones are also on the page under Settings |
 | [Development](docs/development.md) | Commands, the Earth temperature baseline, the climate process diagram, and the source layout |
 | [Data](docs/data.md) | The Earth data files: formats, sources, licences and how to rebuild them |
 
@@ -59,5 +60,7 @@ The other scripts (data, baselines, timing, the wind report and tuning) are list
 
 - **Elevation:** NOAA's ETOPO 2022 global relief model (CC0-1.0).
 - **Observed temperature, winds and pressure:** NOAA/CIRES/DOE 20th Century Reanalysis V3, provided by the NOAA PSL, Boulder, Colorado, USA (CC0-1.0).
+- **Observed sea-surface temperature:** NOAA Optimum Interpolation SST V2, provided by the NOAA PSL, Boulder, Colorado, USA.
+- **Observed surface currents:** the Global Drifter Program's drifter-derived climatology (Laurindo, Mariano and Lumpkin, 2017; CC BY 4.0), regridded to 1°.
 
 Full citations, licences and caveats are in [Data](docs/data.md).

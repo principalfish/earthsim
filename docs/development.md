@@ -14,11 +14,13 @@ Requires Node.js and npm. Run `npm install` once.
 | `npm run build:earth` | Rebuild the Earth's elevation data from its source; see [Data](data.md) |
 | `npm run build:observed-temperature` | Rebuild the Earth's observed temperature data; see [Data](data.md) |
 | `npm run build:observed-winds` | Rebuild the Earth's observed winds and sea-level pressure data; see [Data](data.md) |
+| `npm run build:observed-sea-temperature` | Rebuild the Earth's observed sea-surface temperature data; see [Data](data.md) |
+| `npm run build:observed-currents` | Rebuild the Earth's observed surface currents data; see [Data](data.md) |
 | `npm run baseline:temperature` | Write the Earth temperature baseline afresh; see below |
 | `npm run baseline:winds` | Write the Earth winds baseline afresh; see [Winds](winds.md#the-earth-winds-baseline) |
 | `npm run docs:config` | Write `src/core/config.md`, the list of every model's settings, from `src/core/config.ts`; a test fails when the committed page is not the one this writes |
 | `npm run time:temperature` | Time the temperature solver at every resolution and print the simulated Earth's error figures, as Markdown tables. Takes a few minutes |
-| `npm run time:climate` | Time the climate loop on the Earth at every resolution, pass by pass, from nothing and carried on from the settled result, as Markdown tables. Takes about a minute; see [Temperature](temperature.md#the-climate-loop) |
+| `npm run time:climate` | Time the climate loop on the Earth at every resolution, pass by pass, from nothing and carried on from the settled result, and the currents' part of a pass, as Markdown tables. Takes about two minutes; see [Temperature](temperature.md#the-climate-loop) |
 | `npm run time:winds` | Time a year of the Earth's winds at every resolution, as `solveWinds` solves them by default (the pressure on the 64 grid) and wholly on the world's own grid beside it, and print how far the two lie apart, as Markdown tables. Takes about half a minute; see [Winds](winds.md#the-pressure-of-finer-worlds-is-worked-out-on-the-64-grid) |
 | `npm run tune:winds` | Run the wind model many times with its settings changed, on the wind report's nine cases, and print the Earth's error figures and every case's measures, as Markdown tables: a sweep of one setting, a search over several, every case for some settings, or the model run on the observed temperature; run with nothing after it to list the settings and the forms. It changes no setting; see [Winds](winds.md#the-settings-and-the-tuning-script) |
 | `npm run report:winds` | Write the wind report, `reports/winds/index.html`, to open in a browser: the observed Earth's winds and sea-level pressure in January and July, the nine worlds the wind models are run on, and each registered model's maps, error figures and solve times, and its section against published studies: how each paper was read, and for three checks (winds and the pressure low at a 60° tilt, and the tropical cell and bands of wind with a faster and a slower day) the papers' words beside what the model shows. The file is not committed |
@@ -27,7 +29,7 @@ Requires Node.js and npm. Run `npm install` once.
 
 `src/core/temperature/baseline/earthTemperature.json` records how far the simulated Earth is from the observed one, so that a change to the model cannot make it worse unnoticed.
 
-- **What it holds:** for the Earth at 64 cells per face edge solved by the climate loop, the mean and root-mean-square difference (simulated less observed, in kelvin) for the annual average, each month, the warmest month, the coldest month and the seasonal range; and the west–east coast contrasts, simulated and observed, for the year and January: western Europe against East Asia and the west of North America against its east, both at 40–60°N.
+- **What it holds:** for the Earth at 64 cells per face edge solved by the climate loop, the mean and root-mean-square difference (simulated less observed, in kelvin) for the annual average, each month, the warmest month, the coldest month and the seasonal range; and the west–east coast contrasts, simulated and observed, for the year and January: western Europe against East Asia and the west of North America against its east, both at 40–60°N; and the mean and root-mean-square difference of the sea's own temperature against the observed sea-surface temperature, for the annual average and January, over the cells that are sea in both.
 - **The test:** a test solves that Earth and fails, naming each figure, if any is worse than the file's by more than 0.05 K, or a simulated coast contrast is smaller than the file's by more than 0.25 K, so that a later step cannot quietly lose the winds' effect on the coasts. A figure that has improved passes.
 - **When a change is meant to move the figures:** run `npm run baseline:temperature`, which rewrites the file and prints what moved, and commit the file with the change.
 - **The winds follow the temperature,** so a change to the temperature model moves the Earth winds baseline too: run `npm run baseline:winds` as well; see [Winds](winds.md#the-earth-winds-baseline).
@@ -52,14 +54,16 @@ A pure library with no DOM, Three.js or worker globals.
 
 | File | What it holds |
 |-|-|
-| `grid/grid.ts` | The cubed-sphere grid every layer lives on |
+| `grid/grid.ts` | The cubed-sphere grid every layer lives on, and its table of neighbours for a grid of any size |
 | `grid/coarsen.ts` | A world or a field averaged onto the grid a step coarser, and a field or a vector field carried back from it |
 | `grid/vector.ts` | Vector fields on the grid, east and north at every cell, the gradient, divergence, curl, Laplacian and smoothing of fields, and what a vector field carries across every edge |
 | `grid/flows.ts` | What is carried across the edges of a grid, added up onto the grid a step coarser and shared out onto the finer |
+| `grid/corners.ts` | The corners of the cells, numbered once across the cube's faces; flows across the edges from a streamfunction on them; the coasts of a land mask; and the elliptic solve on the corners with one value of `ψ` along each coast |
+| `grid/sparse.ts` | Sparse matrices by rows and the linear algebra the corner solve is built from: products, incomplete LU, a Galerkin multigrid cycle and BiCGSTAB |
 | `grid/quantile.ts` | Area-weighted quantiles of values on the grid |
 | `climate.ts` | The climate: the temperature and winds solved together in passes, each feeding the other, with its stopping and damping; see [Temperature](temperature.md#the-climate-loop) |
 | `config.md` | The list of every model's settings, written from `config.ts` by `npm run docs:config` |
-| `config.ts` | The models' settings as data, a section per model: each setting's value, unit, what it controls, what raising and lowering it do, where its value comes from and whether it was tuned, in titled groups; the temperature's 22 settings and the wind model's 36, each with its fixed choices beside them, and which of the wind settings a tuning search varies. The models build their value objects from it, and it imports nothing from them |
+| `config.ts` | The models' settings as data, a section per model: each setting's value, unit, what it controls, what raising and lowering it do, where its value comes from and whether it was tuned, in titled groups; the temperature's 25 settings and the wind model's 36, each with its fixed choices beside them, and which of the wind settings a tuning search varies. The models build their value objects from it, and it imports nothing from them |
 | `world/world.ts` | A world: its settings, its date and the elevation of every cell |
 | `world/generate.ts`, `world/noise.ts` | Worlds with noise-shaped continents, and the seeded noise behind them |
 | `world/brush.ts` | The sculpting brushes: raise, lower and smooth |
@@ -71,8 +75,12 @@ A pure library with no DOM, Three.js or worker globals.
 | `planet/insolation.ts` | Sunlight by latitude and time of year, the twelve months, and each cell's latitude |
 | `earth/earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
 | `earth/observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
+| `earth/observedVectors.ts` | Taking a vector observed on a latitude–longitude grid onto a world's cells, as 3D vectors along each point's directions east and north; shared by the observed winds and currents |
+| `ocean/gyres.ts` | The wind-driven gyres: the wind's push on the sea, Stommel's gyre solved on the corners each month with an island rule and the circumpolar channel's own friction, the flows across the edges, the surface current and the Ekman transport; see [Ocean](ocean.md) |
+| `ocean/basins.ts` | The seas and coasts a gyre is solved between: which coast of each sea holds its value, which are islands, the small islands the sea flows over, the enclosed seas held still, and the corners beside which the sea can flow round the globe |
+| `ocean/observed.ts` | Reading the observed sea-surface temperature and surface currents files and taking them onto a world's cells |
 | `temperature/observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
-| `temperature/temperature.ts` | The temperature model, its values read from `config.ts`, and its solve, which may be given a year of winds to carry heat along |
+| `temperature/temperature.ts` | The temperature model, its values read from `config.ts`, and its solve: the air's temperature everywhere and the sea's own over the sea, exchanging heat, with a year of winds to carry heat along if given; see [Temperature](temperature.md#the-seas-own-temperature) |
 | `temperature/advection.ts` | Heat carried along by the winds: an implicit upwind step on the grid that keeps the heat exactly, and the flows' interpolation between months; see [Temperature](temperature.md#heat-carried-by-the-winds) |
 | `temperature/exchange.ts` | Heat passed between neighbouring cells, and the multigrid-preconditioned solver for it |
 | `temperature/baseline/` | The Earth temperature baseline (`earthTemperature.ts`, the figures in `earthTemperature.json`), the west–east coast contrasts it holds (`coastContrast.ts`) and its check |
@@ -80,11 +88,11 @@ A pure library with no DOM, Three.js or worker globals.
 | `wind/model.ts` | The shape every wind model shares, its error figures against the observed winds and pressure, and the mean of a field by bands of latitude |
 | `wind/rules.ts` | The rules wind model on a world's own grid, its settings read from `config.ts`, and its parts: sea-level pressure from zonal bands placed by the temperature and the day length plus thermal highs and lows, and the wind from it by a balance of pressure gradient, turning and friction; see [Winds](winds.md) |
 | `wind/solve.ts` | The winds of a world: its input checked, the rules model's pressure worked out on the 64 grid and carried back to the world's grid, the winds from it there, and the annual mean of a year of winds |
-| `wind/observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector along `grid/vector.ts`'s directions east and north |
+| `wind/observedWind.ts` | Reading the observed wind and pressure files and taking them onto a world's cells, the wind as a vector, sampled with `earth/observedVectors.ts` |
 | `wind/baseline/` | The Earth winds baseline (`earthWinds.ts`, the figures in `earthWinds.json`) and its check |
 | `index.ts` | What the core exports |
 | `protocol.ts` | The messages between the page and the worker, of two kinds: the terrain statistics and the climate (the temperature and winds solved together, which tells of each pass as it finishes) |
-| `compare.ts` | One field less another, and area-weighted error figures |
+| `compare.ts` | One field less another, and area-weighted error figures, over every cell or only where both fields hold a value |
 | `testing/` | Helpers only the tests use |
 
 ### `src/app/`: the page
@@ -136,10 +144,13 @@ Run with Node, not in the browser.
 | `build-earth-data.ts` | Downloads the source and writes `public/data/earth-256.bin` |
 | `build-observed-temperature.ts` | Downloads the source and writes `public/data/earth-temperature-1deg.bin` |
 | `build-observed-winds.ts` | Downloads the three sources and writes `public/data/earth-wind-1deg.bin` and `public/data/earth-pressure-1deg.bin` |
-| `observedGdalRun.ts` | Runs GDAL's `gdallocationinfo` on an observed source and compares it with this project's reader, for both observed builds |
-| `observedBuild.ts` | What both observed builds share: the option, reading a source, and writing the data file; their range and storing-error checks are `earth/storedValues.ts` |
+| `build-observed-sea-temperature.ts` | Downloads the two sources and writes `public/data/earth-sea-temperature-1deg.bin` |
+| `build-observed-currents.ts` | Downloads the two sources and writes `public/data/earth-currents-1deg.bin` |
+| `observedGdalRun.ts` | Runs GDAL's `gdallocationinfo` on an observed source and compares it with this project's reader, for the air temperature and wind builds; `oceanGdalRun.ts` does the same for the sea temperature build |
+| `observedBuild.ts` | What the observed builds share: the option, reading a source, and writing the data file; their range and storing-error checks are `earth/storedValues.ts` |
 | `download.ts` | Downloads a source file into `.cache/` once, checked against its pinned length and SHA-256 |
-| `earth/` | The parts of the build that touch no file: reading TIFF and netCDF, averaging pixels into cells, and the comparison with GDAL. `dataFile.mjs` reads the finished data files |
+| `downloadRetry.ts` | Downloads a file a server cuts afresh at each request, waiting and asking again when the server is busy |
+| `earth/` | The parts of the build that touch no file: reading TIFF and netCDF, averaging pixels into cells, the sea sources (`oceanSource.ts`), the one-degree averaging of the currents (`regrid.ts`), and the comparison with GDAL. `dataFile.mjs` reads the finished data files |
 | `time-temperature.ts` | The solver's timings and the simulated Earth's error figures |
 | `time-winds.ts` | The wind model's timings, and how far its solve with the pressure on the 64 grid lies from one wholly on the world's own grid |
 | `time-climate.ts` | Times the climate loop pass by pass |
@@ -155,4 +166,4 @@ Run with Node, not in the browser.
 
 ### `public/data/`
 
-The four Earth data files, served beside the page as they are; see [Data](data.md).
+The six Earth data files, served beside the page as they are; see [Data](data.md).
