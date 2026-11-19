@@ -372,8 +372,9 @@ const denseFactorise = (matrix: SparseMatrix): DenseLU => {
 			}
 		}
 		// A singular system is given a unit pivot so the cycle stays finite;
-		// the Krylov solve around it then fails to converge rather than
-		// giving numbers that are not.
+		// the Krylov solve around it then may fail to converge, or return an
+		// answer up to an arbitrary constant, rather than giving numbers that
+		// are not finite.
 		if (largest === 0) {
 			lu[k * size + k] = 1;
 		}

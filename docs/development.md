@@ -76,6 +76,8 @@ A pure library with no DOM, Three.js or worker globals.
 | `earth/earth.ts` | Reading the Earth data file; the Earth as a world at each resolution |
 | `earth/observedGrid.ts` | What the observed files share: the one-degree grid, the checks on twelve months of it, storing a value as one byte, and bilinear interpolation onto a world's cells |
 | `earth/observedVectors.ts` | Taking a vector observed on a latitude–longitude grid onto a world's cells, as 3D vectors along each point's directions east and north; shared by the observed winds and currents |
+| `ocean/gyres.ts` | The wind-driven gyres: the wind's push on the sea, Stommel's gyre solved on the corners each month with an island rule and the circumpolar channel's own friction, the flows across the edges, the surface current and the Ekman transport; see [Ocean](ocean.md) |
+| `ocean/basins.ts` | The seas and coasts a gyre is solved between: which coast of each sea holds its value, which are islands, the small islands the sea flows over, the enclosed seas held still, and the corners beside which the sea can flow round the globe |
 | `ocean/observed.ts` | Reading the observed sea-surface temperature and surface currents files and taking them onto a world's cells |
 | `temperature/observed.ts` | Reading the observed temperature file and taking it onto a world's cells |
 | `temperature/temperature.ts` | The temperature model, its values read from `config.ts`, and its solve: the air's temperature everywhere and the sea's own over the sea, exchanging heat, with a year of winds to carry heat along if given; see [Temperature](temperature.md#the-seas-own-temperature) |

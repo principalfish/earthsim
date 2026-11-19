@@ -6,10 +6,12 @@ import {
 	defineSection,
 	entriesOf,
 	formatConfigValue,
+	OCEAN_CONFIG,
 	TEMPERATURE_CONFIG,
 	valuesOf,
 	WIND_CONFIG,
 } from './config';
+import { DEFAULT_GYRE_SETTINGS, SEA_WATER_DENSITY_KG_M3 } from './ocean/gyres';
 import { GREENHOUSE_FACTOR } from './planet/planet';
 import { EXCHANGE_MAX_ITERATIONS } from './temperature/exchange';
 import { TEMPERATURE_MODEL } from './temperature/temperature';
@@ -389,6 +391,66 @@ describe('WIND_CONFIG', () => {
 				}
 			}
 		}
+	});
+});
+
+// A literal copy of the gyres' settings, in the order the model lists them.
+const OCEAN_LITERAL = {
+	dragCoefficient: 1.2e-3,
+	frictionPerS: 2e-6,
+	channelFrictionPerS: 2e-6,
+	layerDepthM: 200,
+	equatorFloorDeg: 5,
+	maxIslands: 32,
+	gyreTolerance: 1e-4,
+};
+
+describe('OCEAN_CONFIG', () => {
+	const section: ConfigSection = OCEAN_CONFIG;
+	const entries = entriesOf([...section.groups, section.constants]);
+
+	it('gives the gyres the same values, in the same order, frozen', () => {
+		expect(DEFAULT_GYRE_SETTINGS).toEqual(OCEAN_LITERAL);
+		expect(Object.keys(DEFAULT_GYRE_SETTINGS)).toEqual(
+			Object.keys(OCEAN_LITERAL),
+		);
+		expect(Object.isFrozen(DEFAULT_GYRE_SETTINGS)).toBe(true);
+	});
+
+	it('keeps the fixed choice of the sea water density', () => {
+		expect(constantsOf(OCEAN_CONFIG)).toEqual({ seaWaterDensityKgM3: 1025 });
+		expect(SEA_WATER_DENSITY_KG_M3).toBe(1025);
+	});
+
+	it('explains every setting, none tuned', () => {
+		for (const [name, setting] of entries) {
+			expect(Number.isFinite(setting.value), name).toBe(true);
+			for (const text of [
+				setting.unit,
+				setting.what,
+				setting.raising,
+				setting.lowering,
+				setting.source,
+			]) {
+				expect(text.trim(), name).not.toBe('');
+			}
+			expect(setting.tuned, name).toBeNull();
+		}
+	});
+
+	it('lists each setting once, in three groups, the solver last and numerical', () => {
+		const names = entries.map(([name]) => name);
+		expect(new Set(names).size).toBe(names.length);
+		expect(section.groups.map((group) => group.title)).toEqual([
+			"The wind's push on the sea",
+			'The gyres',
+			'How the gyres are solved (numerical, not physical)',
+		]);
+		expect(section.groups.map((group) => group.numerical === true)).toEqual([
+			false,
+			false,
+			true,
+		]);
 	});
 });
 

@@ -224,7 +224,8 @@ export type CornerIndex = {
  * notice of a constant added to `ψ`. That holds for each connected piece of
  * sea too: every piece must touch at least one `'value'` coast. A piece
  * whose coasts are all `'net'` leaves a constant undetermined, so the system
- * is singular and the solve reports `converged: false`.
+ * is singular and the solve may fail to converge (`converged: false`) or
+ * return `ψ` up to an arbitrary constant.
  * {@link createCornerSolver} checks only that some coast is a `'value'`
  * coast.
  */
@@ -1126,8 +1127,9 @@ const prolongations = (
  * should hold them as `'value'` coasts or fold each into a neighbour.
  *
  * Every connected piece of sea must touch at least one `'value'` coast;
- * otherwise the system is singular and the solve reports
- * `converged: false`, with no error thrown.
+ * otherwise the system is singular and the solve may fail to converge
+ * (`converged: false`) or return `ψ` up to an arbitrary constant, with no
+ * error thrown.
  *
  * @param grid - The grid.
  * @param operator - The coefficients, the coasts and the radius. Copied.

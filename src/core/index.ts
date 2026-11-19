@@ -11,6 +11,8 @@ export * from './grid/flows';
 export * from './grid/grid';
 export * from './grid/quantile';
 export * from './grid/vector';
+export * from './ocean/basins';
+export * from './ocean/gyres';
 export * from './ocean/observed';
 export * from './planet/insolation';
 export * from './planet/planet';

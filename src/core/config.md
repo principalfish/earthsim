@@ -155,3 +155,37 @@ The settings of the wind model, read from `WIND_CONFIG` into `DEFAULT_WIND_SETTI
 | `airDensityKgM3` | 1.2 kg/m³ | The density of the air near the surface, which turns a pressure gradient into the push on the wind's momentum. | The same pressure gradient pushes the wind less: weaker winds everywhere, in proportion. | The same gradient pushes harder: stronger winds everywhere, in proportion. | The standard atmosphere's 1.225 kg/m³, rounded down for air a little warmer and higher on average. | No |
 | `earthCellWidthDeg` | 30° | The width of the Earth's tropical cell, from the low to the subtropical high, and of each cell beyond it: the width every other planet's cells are scaled from. | Every planet's cells come out wider in proportion. Settings in degrees written against the Earth's 30° (lowLimitFromWidthDeg, fullBandsReachDeg) do not follow it. | The opposite: narrower cells, with the same settings left behind. | The observed Earth: its subtropical highs lie near 30° in both hemispheres, and its subpolar lows near 60°. | No |
 | `fullBandsEaseCells` | 0.25 cells | Over how many cells the start of the outer bands' weakening turns from the third band to fullBandsReachDeg from the low, so that the bands have no corner as the day length changes. | A gentler turn: the start of the weakening changes over a wider run of day lengths. | A sharper turn, nearer a corner in the bands as the day length changes. | A guess. | No |
+
+## Ocean
+
+The settings of the wind-driven gyres, read from `OCEAN_CONFIG` into `DEFAULT_GYRE_SETTINGS`. How the gyres work is in [Ocean](../../docs/ocean.md).
+
+7 settings: 5 physical and 2 numerical, 0 of them tuned against the observed Earth. A run may override these. Beyond them the code reads 1 fixed choice directly, which a run cannot override.
+
+### The wind's push on the sea
+
+| Setting | Value | What it controls | Raising it | Lowering it | Where it comes from | Tuned |
+|-|-|-|-|-|-|-|
+| `dragCoefficient` | 0.0012 ratio | How hard the wind pushes on the sea: the push is the air's density times this times the wind speed squared. The push drives the gyres and the Ekman transport. | Every current driven by the wind is stronger, in proportion: the gyres, their western boundary currents and the Ekman transport. | Every current driven by the wind is weaker, in proportion. | Published: Large and Pond (1981), 1.2e-3 for winds of 4 to 11 m/s. | No |
+
+### The gyres
+
+| Setting | Value | What it controls | Raising it | Lowering it | Where it comes from | Tuned |
+|-|-|-|-|-|-|-|
+| `frictionPerS` | 2e-6 1/s | Friction on the sea's wind-driven flow. With the change of the Earth's turning with latitude it sets the width of each gyre's western boundary current: this over about 2e-11 /m/s at 30° latitude, 100 km. | A wider, slower western boundary current, and a little less carried round each gyre. At 6e-6 /s the current is about 300 km wide, and a gyre 60° wide carries about a third less. | A narrower, faster boundary current, down to about a cell of the grid, where the solve adds its own spreading. | Stommel's boundary-layer width r/β set to the observed Gulf Stream's, about 100 km at 30°. | No |
+| `channelFrictionPerS` | 2e-6 1/s | The friction on the sea where it can flow round the globe, along circles of latitude that cross no land, as between Antarctica and the southern tips of the continents. It stands for the pressure on the sea floor that holds the observed circumpolar current back, and keeps that current from following the gyres' friction. | Less flows round the globe, in proportion: a weaker circumpolar current. | More flows round the globe, in proportion: a stronger circumpolar current. | Worked out from the observed circumpolar current: about 140 Sv (Cunningham et al., 2003) under about 0.15 N/m² of wind stress across about 2000 km. | No |
+| `layerDepthM` | 200 m | The depth the gyres' transport is taken to be spread over: the surface current is the transport over this depth, and so are the flows across the edges the heat is carried by. | Slower surface currents and smaller flows for the same transport. | Faster surface currents and larger flows for the same transport. | Worked out from the Florida Current's observed transport, surface speed and width (Meinen et al., 2010). | No |
+| `equatorFloorDeg` | 5° | Within this latitude of the equator the Coriolis parameter in the Ekman transport is held at its value here, so the transport stays finite where the parameter passes through zero. | A wider band of capped transport: a weaker Ekman transport near the equator. | A narrower band: a stronger Ekman transport close to the equator, without limit as the floor nears 0°. | Physical: the Ekman balance fails within a few degrees of the equator. | No |
+
+### How the gyres are solved (numerical, not physical)
+
+| Setting | Value | What it controls | Raising it | Lowering it | Where it comes from | Tuned |
+|-|-|-|-|-|-|-|
+| `maxIslands` | 32 islands | The most islands whose value of the streamfunction is found from the circulation round them, the largest first; the sea flows over the rest, and each is then held to one value, so the flow goes round it. The cap is on the islands found: an island in the lagoon of one flowed over can add one more. | More small islands block the flow as islands do, at more cost to build the solver. | Fewer islands block the flow; the sea flows over the rest and round them. | Chosen: the 26 islands of the Earth on the 64 grid, and a few more. | No |
+| `gyreTolerance` | 1e-4 ratio | How closely each month's solve must meet the equation, as a share of the forcing. | Fewer iterations, a gyre further from the answer; the flows still carry nothing net in or out of any cell. | More iterations, a gyre closer to the answer. | Chosen by measurement on the Earth. | No |
+
+### Fixed choices (not overridable for a run)
+
+| Setting | Value | What it controls | Raising it | Lowering it | Where it comes from | Tuned |
+|-|-|-|-|-|-|-|
+| `seaWaterDensityKgM3` | 1025 kg/m³ | The density of the sea's water, which turns the wind's push into a push on the water. | The same push moves the water less: weaker currents. | The same push moves the water more: stronger currents. | A physical figure: sea water near the surface, rounded. | No |

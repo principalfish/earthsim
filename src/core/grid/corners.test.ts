@@ -661,6 +661,29 @@ describe('createCornerSolver', () => {
 		expect(cut.values.every((value) => Number.isFinite(value))).toBe(true);
 	});
 
+	it("reads a 'net' coast's guess at its first corner only", () => {
+		const { solver, forcing, island, labels } = basin(64);
+		const coastValues = new Float64Array(2);
+		const result = solver.solve(forcing, coastValues);
+		const first = labels.indexOf(island + 1);
+		const others = new Float64Array(result.values);
+		for (let p = first + 1; p < labels.length; p++) {
+			if (labels[p] === island + 1) {
+				others[p] = 1e6;
+			}
+		}
+		const fromFirst = solver.solve(forcing, coastValues, { guess: others });
+		expect(fromFirst.iterations).toBe(0);
+		expect(fromFirst.converged).toBe(true);
+		const wrongFirst = new Float64Array(result.values);
+		wrongFirst[first] = 1e6;
+		const fromWrong = solver.solve(forcing, coastValues, {
+			guess: wrongFirst,
+		});
+		expect(fromWrong.iterations).toBeGreaterThan(0);
+		expect(fromWrong.converged).toBe(true);
+	});
+
 	it('gives zero for no forcing and coasts at zero, at once', () => {
 		const { solver, labels } = basin(64);
 		const result = solver.solve(

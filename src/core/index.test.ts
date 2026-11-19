@@ -35,6 +35,19 @@ describe('core', () => {
 		}
 	});
 
+	it('exports the gyres and the basins they are solved between', () => {
+		for (const name of [
+			'solveGyres',
+			'createGyreSolver',
+			'gyreForcing',
+			'findBasins',
+			'DEFAULT_GYRE_SETTINGS',
+			'SEA_WATER_DENSITY_KG_M3',
+		]) {
+			expect(core, name).toHaveProperty(name);
+		}
+	});
+
 	it('exports sunlight by latitude and season', () => {
 		for (const name of [
 			'SOLAR_CONSTANT_W_M2',
@@ -82,6 +95,7 @@ describe('core', () => {
 		for (const name of [
 			'TEMPERATURE_CONFIG',
 			'WIND_CONFIG',
+			'OCEAN_CONFIG',
 			'defineSection',
 			'valuesOf',
 			'constantsOf',

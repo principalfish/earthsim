@@ -2132,3 +2132,233 @@ export const WIND_CONFIG = defineSection(
 		},
 	},
 );
+
+/**
+ * The ocean model's settings: the wind-driven gyres.
+ *
+ * @remarks
+ * Each starts from a published or physical figure, or a figure worked out
+ * from observed ones; none was tuned. The model's value object is
+ * `DEFAULT_GYRE_SETTINGS`.
+ */
+export const OCEAN_CONFIG = defineSection(
+	'Ocean',
+	[
+		{
+			title: "The wind's push on the sea",
+			settings: {
+				/**
+				 * The bulk drag coefficient of the sea's surface for the wind at 10 m:
+				 * Large and Pond (1981), "Open ocean momentum flux measurements in
+				 * moderate to strong winds", Journal of Physical Oceanography 11, give
+				 * 1.2e-3 for winds of 4 to 11 m/s.
+				 */
+				dragCoefficient: {
+					value: 1.2e-3,
+					unit: 'ratio',
+					what:
+						"How hard the wind pushes on the sea: the push is the air's" +
+						' density times this times the wind speed squared. The push' +
+						' drives the gyres and the Ekman transport.',
+					raising:
+						'Every current driven by the wind is stronger, in proportion:' +
+						' the gyres, their western boundary currents and the Ekman' +
+						' transport.',
+					lowering:
+						'Every current driven by the wind is weaker, in proportion.',
+					source:
+						'Published: Large and Pond (1981), 1.2e-3 for winds of 4 to' +
+						' 11 m/s.',
+					tuned: null,
+				},
+			},
+		},
+		{
+			title: 'The gyres',
+			settings: {
+				/**
+				 * The friction rate of Stommel's gyre, which sets its western boundary
+				 * current's width `r / β`: 100 km at 30° latitude, where `β` is about
+				 * 2e-11 m⁻¹ s⁻¹, the width of the observed Gulf Stream off the
+				 * American coast. The 256 grid resolves it; on the 64 and 128 grids
+				 * the solve spreads the current over about a cell (see
+				 * `createCornerSolver`).
+				 */
+				frictionPerS: {
+					value: 2e-6,
+					unit: '1/s',
+					what:
+						"Friction on the sea's wind-driven flow. With the change of" +
+						" the Earth's turning with latitude it sets the width of each" +
+						" gyre's western boundary current: this over about 2e-11 /m/s" +
+						' at 30° latitude, 100 km.',
+					raising:
+						'A wider, slower western boundary current, and a little less' +
+						' carried round each gyre. At 6e-6 /s the current is about' +
+						' 300 km wide, and a gyre 60° wide carries about a third less.',
+					lowering:
+						'A narrower, faster boundary current, down to about a cell' +
+						' of the grid, where the solve adds its own spreading.',
+					source:
+						"Stommel's boundary-layer width r/β set to the observed Gulf" +
+						" Stream's, about 100 km at 30°.",
+					tuned: null,
+				},
+				/**
+				 * The friction in the channel round a land that reaches round the
+				 * globe, as Antarctica does: on every corner whose circle of latitude
+				 * crosses no land. There the flow round the globe is held back by
+				 * friction alone, and carries the wind's push over this rate, so with
+				 * the gyres' friction it would grow without bound as that is lowered.
+				 * The observed circumpolar current is held back mostly by the
+				 * pressure on the sea floor's ridges; as a linear drag, about
+				 * 0.15 N/m² of wind stress over a channel about 2000 km wide carrying
+				 * about 140 Sv (Cunningham et al. 2003, "Transport and variability of
+				 * the Antarctic Circumpolar Current in Drake Passage", Journal of
+				 * Geophysical Research 108) is `0.15 × 2e6 / (1025 × 1.4e8)`, about
+				 * 2e-6 s⁻¹.
+				 */
+				channelFrictionPerS: {
+					value: 2e-6,
+					unit: '1/s',
+					what:
+						'The friction on the sea where it can flow round the globe,' +
+						' along circles of latitude that cross no land, as between' +
+						' Antarctica and the southern tips of the continents. It' +
+						' stands for the pressure on the sea floor that holds the' +
+						' observed circumpolar current back, and keeps that current' +
+						" from following the gyres' friction.",
+					raising:
+						'Less flows round the globe, in proportion: a weaker' +
+						' circumpolar current.',
+					lowering:
+						'More flows round the globe, in proportion: a stronger' +
+						' circumpolar current.',
+					source:
+						'Worked out from the observed circumpolar current: about' +
+						' 140 Sv (Cunningham et al., 2003) under about 0.15 N/m² of' +
+						' wind stress across about 2000 km.',
+					tuned: null,
+				},
+				/**
+				 * The depth the transport is spread over for the surface current: the
+				 * Florida Current carries about 32 Sv (Meinen, Baringer and Garcia
+				 * 2010, "Florida Current transport variability: an analysis of annual
+				 * and longer-period signals", Deep-Sea Research I 57) at about
+				 * 1.8 m/s at the surface across about 90 km, which is
+				 * `3.2e7 / (1.8 × 9e4)`, about 200 m.
+				 */
+				layerDepthM: {
+					value: 200,
+					unit: 'm',
+					what:
+						"The depth the gyres' transport is taken to be spread over:" +
+						' the surface current is the transport over this depth, and' +
+						' so are the flows across the edges the heat is carried by.',
+					raising:
+						'Slower surface currents and smaller flows for the same' +
+						' transport.',
+					lowering:
+						'Faster surface currents and larger flows for the same' +
+						' transport.',
+					source:
+						"Worked out from the Florida Current's observed transport," +
+						' surface speed and width (Meinen et al., 2010).',
+					tuned: null,
+				},
+				/**
+				 * The Ekman transport, `τ / (ρ f)`, has no limit where `f` passes
+				 * through zero at the equator, where the balance it comes from no
+				 * longer holds; within about 5° of the equator the observed surface
+				 * flow follows the wind rather than turning from it.
+				 */
+				equatorFloorDeg: {
+					value: 5,
+					unit: '°',
+					what:
+						'Within this latitude of the equator the Coriolis parameter in' +
+						' the Ekman transport is held at its value here, so the' +
+						' transport stays finite where the parameter passes through' +
+						' zero.',
+					raising:
+						'A wider band of capped transport: a weaker Ekman transport' +
+						' near the equator.',
+					lowering:
+						'A narrower band: a stronger Ekman transport close to the' +
+						' equator, without limit as the floor nears 0°.',
+					source:
+						'Physical: the Ekman balance fails within a few degrees of' +
+						' the equator.',
+					tuned: null,
+				},
+			},
+		},
+		{
+			title: 'How the gyres are solved (numerical, not physical)',
+			numerical: true,
+			settings: {
+				/**
+				 * Each island is one more unknown on every level of the corner
+				 * solver down to its coarsest, which is solved densely; the Earth has
+				 * 26 islands on the 64 grid and more on the finer ones.
+				 */
+				maxIslands: {
+					value: 32,
+					unit: 'islands',
+					what:
+						'The most islands whose value of the streamfunction is found' +
+						' from the circulation round them, the largest first; the' +
+						' sea flows over the rest, and each is then held to one value,' +
+						' so the flow goes round it. The cap is on the islands found:' +
+						' an island in the lagoon of one flowed over can add one more.',
+					raising:
+						'More small islands block the flow as islands do, at more' +
+						' cost to build the solver.',
+					lowering:
+						'Fewer islands block the flow; the sea flows over the rest' +
+						' and round them.',
+					source:
+						'Chosen: the 26 islands of the Earth on the 64 grid, and a few more.',
+					tuned: null,
+				},
+				/**
+				 * The flows are the differences of the streamfunction, so whatever its
+				 * error they carry nothing net in or out of any cell; the tolerance
+				 * only sets how close the gyre is to the equation's answer. At 1e-4
+				 * the streamfunction is within 3e-4 of its largest value of the
+				 * answer at 1e-10 on the Earth.
+				 */
+				gyreTolerance: {
+					value: 1e-4,
+					unit: 'ratio',
+					what:
+						"How closely each month's solve must meet the equation, as a" +
+						' share of the forcing.',
+					raising:
+						'Fewer iterations, a gyre further from the answer; the flows' +
+						' still carry nothing net in or out of any cell.',
+					lowering: 'More iterations, a gyre closer to the answer.',
+					source: 'Chosen by measurement on the Earth.',
+					tuned: null,
+				},
+			},
+		},
+	],
+	{
+		title: 'Fixed choices (not overridable for a run)',
+		settings: {
+			/** The density of sea water near the surface, rounded. */
+			seaWaterDensityKgM3: {
+				value: 1025,
+				unit: 'kg/m³',
+				what:
+					"The density of the sea's water, which turns the wind's push" +
+					' into a push on the water.',
+				raising: 'The same push moves the water less: weaker currents.',
+				lowering: 'The same push moves the water more: stronger currents.',
+				source: 'A physical figure: sea water near the surface, rounded.',
+				tuned: null,
+			},
+		},
+	},
+);
