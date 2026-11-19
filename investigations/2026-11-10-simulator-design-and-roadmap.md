@@ -89,7 +89,7 @@ Keep this section current when a step is merged.
 | 3d One config.ts for every model's settings, with config.md; also a read-only Model settings screen with the climate process diagram, replacing the PDF | Done 2026-11-18 (PR #12 merged at 9463afa) | 0006, GitHub #11 |
 | 3a follow-up: the deeper splits of `ui/layerPanel.ts` and `wiring.ts`, and the `ui/` type dependency (see under step 3a) | Deferred by the user (2026-11-18: "Skip to step 5"); step 5 goes first, so the panel grows by the currents layer before the split. Revisit before step 4 | |
 | 3b Heat carried by winds, and the climate loop | Done 2026-11-18 (PR #14 merged at 05ec69d) | 0007, GitHub #13 |
-| 5 Ocean currents | In progress: 5 of 9 pieces committed (2026-11-19); left-for-later items under "Step 5: left for later steps" | 0008, GitHub #15, PR #16 (draft) |
+| 5 Ocean currents | In progress: 6 of 9 pieces committed (2026-11-19); left-for-later items under "Step 5: left for later steps" | 0008, GitHub #15, PR #16 (draft) |
 | 4 Moisture, rainfall and Köppen zones | Not started; after step 5, so rain and the Köppen zones are built and tuned against sea temperatures that the currents have already set (the user, 2026-11-18). Before planning it, settle fixed or fitted colour scales (see the open follow-ups), since rainfall is the next colour layer | |
 | 6 Ice sheets and sea ice | Not started | |
 | 6b Tune the whole climate loop against the Earth | Not started; after steps 3b, 5 and 6, when every part of the loop is in | |
@@ -156,6 +156,8 @@ Each item was decided by the user or the planner chat while building step 5; the
 - **Equatorial upwelling is off** (piece 6, the user: "Coasts only (Recommended)"). Its setting is kept, default 0, because piece 4's 5° floor on the Coriolis term in the Ekman transport gives about 150 Sv, three times the observed. Make that floor physical (smaller, with the transport capped), then turn it on and measure.
 - **Currents are a fifth to a half of the drifters' strength** (piece 4), because the wind stress comes from monthly mean winds. A gust term in the stress is the candidate fix, and it changes the rule, so it isn't tuning. Also from piece 4: Drake Passage 7–36 Sv against about 140 observed; no equatorial currents; Panama open on the 64 grid.
 - **The sea's heat loss doesn't grow with its temperature** (piece 2, the user: "Accept it (Recommended)"). A steady loss equal to each cell's year-mean absorbed sunlight stands in for evaporation and long-wave. So warm water warms the air downwind less than it should: along the North Atlantic drift the sea warms 1.7 K and its air only 0.9 K. A loss that rises with sea temperature is the candidate.
+- **Coastal upwelling is overstated by about 6%** (12.5% in a channel two cells wide; piece 6, decided by the planner chat). The shared `edgeFlows` reads a land outer cell as zero transport. The fix is a local edge evaluation at coasts that leaves `edgeFlows` unchanged.
+- **Upwelling takes about 0.8 PW out of the sea and nothing returns it** (piece 6). In the real ocean, the overturning's sinking at the poles supplies the cold water. See piece 7 for whether the two balance.
 - **Upwelling's depth figures** (4 °C at 1000 m from the World Ocean Atlas, a 150 m source depth, a 300 m scale) are the builder's estimates, checked only against the planner's memory, not the data.
 
 **For step 6 (ice):**

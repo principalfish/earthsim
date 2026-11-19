@@ -10,7 +10,7 @@ Not included: real sea ice (step 6), rain (step 4), the deep ocean beyond the ov
 
 ## Plan
 
-_2026-11-19 · 5 of 9 pieces done · now: piece 6 in progress_
+_2026-11-19 · 6 of 9 pieces done · now: piece 7 in progress_
 
 - [x] **1/9 Observed sea temperatures and currents** · `5354dc1`
   The observed sea temperatures (OISST) and drifter currents, built into shipped data files with their loaders.
@@ -22,9 +22,9 @@ _2026-11-19 · 5 of 9 pieces done · now: piece 6 in progress_
   Monthly gyres from the winds on any coastline, with strong currents on each basin's western side.
 - [x] **5/9 Currents carry the sea's heat in the loop** · `56e6cd9`
   Each pass becomes temperature, winds, currents; the sea's heat moves along the currents.
-- [ ] **6/9 Upwelling** · in progress
-  Cold water comes up where the wind pushes coastal water offshore, and at the equator.
-- [ ] **7/9 The overturning** · not started
+- [x] **6/9 Upwelling** · `272f152`
+  Cold water comes up where the wind pushes coastal water offshore (coasts only; the equatorial band is off until its Coriolis floor is fixed).
+- [ ] **7/9 The overturning** · in progress
   Heat taken from a basin's tropics to its open polar end; candidate rules measured, you choose.
 - [ ] **8/9 The worker, the store and the Sea temperature layer** · not started
   A Sea temperature layer with a Difference view against the observed.
