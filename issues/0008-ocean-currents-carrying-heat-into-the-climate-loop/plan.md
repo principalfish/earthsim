@@ -179,3 +179,6 @@ Built on `claude-opus-5-5`. Two stops went to the user, who accepted both: the s
 - Coverage: changed lines in `src/`, no uncovered lines to account for (`scripts/` is not measured; its tests are in the diff).
 - Re-check findings left to the user (all low): history-style wording ("before the sea had a temperature of its own") at `docs/temperature.md:30`, `temperature.ts:41`, `temperature.test.ts:527`, `tuning.test.ts:85`, `docs/winds.md:47,114`; two optional tests (a mid-exchange `seaFollows` case; a 503 with a failing cancel); `docs/temperature.md:28` looks ahead to currents and goes stale in piece 5. See `findings.md`.
 
+### Piece 5: carried over from piece 2 (2026-11-19)
+
+The user: "Wording with piece 5". Piece 5's commit also fixes piece 2's re-check wording: say what the model does, not what it did before the sea had a temperature of its own, at `docs/temperature.md:30`, `src/core/temperature/temperature.ts:41`, `src/core/temperature/temperature.test.ts:527` and `scripts/tune/tuning.test.ts:85`; restate the figures at `docs/winds.md:47` and `:114` with the current model or drop them; and update `docs/temperature.md:28` once currents carry the sea's heat. The two optional tests are not added.
