@@ -115,3 +115,21 @@
 | re-check | docs | low | docs | dropped | - | `docs/ocean.md` "What it costs" | 0.17-0.20 s for a year from a 5% different start against 0.05 s a pass in the loop: plausible, no contradiction |
 | re-check | security | - | - | - | - | - | Clean |
 | manual | planner | - | - | - | - | piece 5 re-check findings | Decided by the planner chat under the user's "make your own decisions!": all four are fixed in piece 6's commit (the worker test gets a world with a coast and asserts its currents are non-zero; the comments say the currents are carried too; `climate.ts:365` gives pass 2's years; `climate.ts:372` gets its verb) |
+
+## piece 6 · 2026-11-19 · Upwelling
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | medium | defect | verified | fixed | `src/core/ocean/upwelling.ts:156` | Each edge's direction was the chord between cell centres, not the edge's outward normal: across the cube seams a flow with no divergence gave a false upwelling up to about 70% of a coastal signal (reproduced at 64 and 256; 400-560 of about 1500 seam cells above 20% at 64); now `edgeFlows` (great-circle normals), summed over driven neighbours; tests for a coast on the 45 E seam and for solid-body transport about three axes giving zero; pieces 3, 4 and 5 probed for the same defect: none had it |
+| round | docs | low | docs | verified | fixed | `docs/ocean.md:96` | The new "What it gets wrong" took the bare anchor and two links in `docs/temperature.md` meant for the gyres' section; renamed "What upwelling gets wrong" |
+| round | coverage | low | cleanup | verified | fixed | `temperature.ts:1552` | `seaStep`'s optional `deepK` relaxed the sea toward 0 K when `upwelling` was given alone; now required with it (union type) |
+| round | docs | low | docs | verified | fixed | `docs/temperature.md:84` | Quoted upwelling timings the script did not measure; `scripts/time-climate.ts` times it now |
+| round | coverage | low | test | verified | fixed | `temperature.ts:2331` | The `typeof rates` arm of the refusal message was untested |
+| round | correctness | low | cleanup | verified | fixed | `temperature.ts:1662`, `upwelling.ts:117` | Month interpolation repeated (now `monthsAround`); the sea water heat capacity worked out again (now imported) |
+| round | docs | low | docs | verified | fixed | `README.md:42`, `docs/ocean.md:3`, `upwelling.ts:22` | Ocean row omitted upwelling; a doubled "and"; a ragged header wrap |
+| round | security | - | - | - | - | - | Clean |
+| re-check | correctness | low | defect | verified | open | `src/core/ocean/upwelling.ts:264` | `edgeFlows` reads a 4-cell line (9/16, 9/16, -1/16, -1/16) and a land or still-sea outer cell has zero transport, so the offshore edge of a coast cell carries 17/16 of a uniform transport (+6.25%), 18/16 (+12.5%) in a channel two cells wide: coastal upwelling overstated by that; documenting it is the cheap fix, a local edge evaluation counting a land outer cell as the near cell's value is exact for a uniform field but more work (the shared `edgeFlows` must not change) |
+| re-check | docs | low | docs | verified | open | `docs/ocean.md:75` | Still says the transport crosses each edge as "the mean of the two cells' transports"; it is `edgeFlows`' cubic across the great-circle normal |
+| re-check | docs | low | cleanup | verified | open | `src/core/ocean/upwelling.ts:12` | A short line left by the header rewrap |
+| re-check | coverage | low | test | verified | open | `src/core/temperature/advection.ts:281` | `monthsAround` is tested only through `interpolateFlows` (12 months); optional direct test with 3 months |
+| re-check | security | - | - | - | - | - | Not re-run (clean in the round) |
