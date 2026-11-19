@@ -6,6 +6,7 @@
 import {
 	type ClimateProgress,
 	computeTerrainStats,
+	type GyreResult,
 	parseSimRequest,
 	type SimKind,
 	type SimPass,
@@ -95,10 +96,22 @@ const windBuffers = (result: WindResult): ArrayBufferLike[] =>
 		(month) => month.buffer,
 	);
 
-/** The buffers of a pass's temperature and winds arrays. */
+/** The buffers of a currents result's arrays. */
+const currentBuffers = (result: GyreResult): ArrayBufferLike[] =>
+	[
+		...result.flows,
+		...result.east,
+		...result.north,
+		...result.ekmanEast,
+		...result.ekmanNorth,
+		...result.streamfunction,
+	].map((month) => month.buffer);
+
+/** The buffers of a pass's temperature, winds and currents arrays. */
 const passBuffers = (pass: ClimateProgress): ArrayBufferLike[] => [
 	...temperatureBuffers(pass.temperature),
 	...windBuffers(pass.winds),
+	...currentBuffers(pass.currents),
 ];
 
 /**
@@ -106,7 +119,7 @@ const passBuffers = (pass: ClimateProgress): ArrayBufferLike[] => [
  * goes on to read the pass's, which a transfer would empty.
  */
 const copyOfPass = (pass: ClimateProgress): ClimateProgress => {
-	const { temperature, winds } = pass;
+	const { temperature, winds, currents } = pass;
 	return {
 		...pass,
 		temperature: {
@@ -126,6 +139,16 @@ const copyOfPass = (pass: ClimateProgress): ClimateProgress => {
 			east: winds.east.map((month) => month.slice()),
 			north: winds.north.map((month) => month.slice()),
 			pressure: winds.pressure.map((month) => month.slice()),
+		},
+		currents: {
+			...currents,
+			flows: currents.flows.map((month) => month.slice()),
+			east: currents.east.map((month) => month.slice()),
+			north: currents.north.map((month) => month.slice()),
+			ekmanEast: currents.ekmanEast.map((month) => month.slice()),
+			ekmanNorth: currents.ekmanNorth.map((month) => month.slice()),
+			streamfunction: currents.streamfunction.map((month) => month.slice()),
+			iterations: [...currents.iterations],
 		},
 	};
 };

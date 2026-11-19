@@ -113,17 +113,18 @@ describe('the Earth temperature baseline', () => {
 		expect(JSON.parse(baselineText(committed))).toEqual(committed);
 	});
 
-	it('holds the west–east coast contrasts, and the winds’ heat carrying keeps them well above what the winds-free model gave', () => {
-		// Without the winds the model gave Europe against Asia 0.7 K for the
-		// year and 2.4 K in January, and North America −0.8 and −0.6 K: almost
-		// nothing, against the observed 11.5 and 22.9, and 5.8 and 15.1. With
-		// the winds and one temperature per cell they were 2.9 and 7.8, and 0.0
-		// and 3.5; with the sea's own temperature, 2.8 and 6.3, and −0.1 and
-		// 2.8.
+	it('holds the west–east coast contrasts, the winds’ and the currents’ heat carrying keeping them above what the model without either gives', () => {
+		// The model without winds or currents gives Europe against Asia 0.7 K
+		// for the year and 2.4 K in January, and North America −0.8 and −0.6 K,
+		// against the observed 11.5 and 22.9, and 5.8 and 15.1. The winds
+		// without the currents give 2.8 and 6.3, and −0.1 and 2.8; with the
+		// currents, 0.9 and 4.6, and 1.3 and 4.1: the currents warm East Asia's
+		// coasts, beside the Kuroshio, more than western Europe.
 		const { europeAsia, northAmerica } = committed.coastContrast;
-		expect(europeAsia.simulated.annual).toBeGreaterThan(2);
-		expect(europeAsia.simulated.january).toBeGreaterThan(6);
-		expect(northAmerica.simulated.january).toBeGreaterThan(2);
+		expect(europeAsia.simulated.annual).toBeGreaterThan(0.7);
+		expect(europeAsia.simulated.january).toBeGreaterThan(4);
+		expect(northAmerica.simulated.annual).toBeGreaterThan(1);
+		expect(northAmerica.simulated.january).toBeGreaterThan(3.5);
 		expect(europeAsia.observed.annual).toBeGreaterThan(11);
 		expect(europeAsia.observed.january).toBeGreaterThan(22);
 	});

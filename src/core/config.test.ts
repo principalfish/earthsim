@@ -14,7 +14,10 @@ import {
 import { DEFAULT_GYRE_SETTINGS, SEA_WATER_DENSITY_KG_M3 } from './ocean/gyres';
 import { GREENHOUSE_FACTOR } from './planet/planet';
 import { EXCHANGE_MAX_ITERATIONS } from './temperature/exchange';
-import { TEMPERATURE_MODEL } from './temperature/temperature';
+import {
+	SEA_WATER_HEAT_CAPACITY_J_M3_K,
+	TEMPERATURE_MODEL,
+} from './temperature/temperature';
 import {
 	AIR_DENSITY_KG_M3,
 	DEFAULT_WIND_SETTINGS,
@@ -37,7 +40,7 @@ const entry = (value: number) => ({
 // A literal copy of the temperature model's values, listing the settings in
 // the order the model lists them.
 const TEMPERATURE_LITERAL = {
-	diffusivity: 0.55,
+	diffusivity: 0.48,
 	landDiffusivity: 0.35,
 	oceanHeatCapacity: 2.5e8,
 	landHeatCapacity: 1e7,
@@ -417,9 +420,13 @@ describe('OCEAN_CONFIG', () => {
 		expect(Object.isFrozen(DEFAULT_GYRE_SETTINGS)).toBe(true);
 	});
 
-	it('keeps the fixed choice of the sea water density', () => {
-		expect(constantsOf(OCEAN_CONFIG)).toEqual({ seaWaterDensityKgM3: 1025 });
+	it("keeps the fixed choices of the sea water's density and heat capacity", () => {
+		expect(constantsOf(OCEAN_CONFIG)).toEqual({
+			seaWaterDensityKgM3: 1025,
+			seaWaterHeatCapacityJM3K: 4.18e6,
+		});
 		expect(SEA_WATER_DENSITY_KG_M3).toBe(1025);
+		expect(SEA_WATER_HEAT_CAPACITY_J_M3_K).toBe(4.18e6);
 	});
 
 	it('explains every setting, none tuned', () => {

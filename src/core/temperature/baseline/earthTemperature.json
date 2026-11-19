@@ -1,76 +1,76 @@
 {
   "resolution": 64,
   "annualMean": {
-    "meanDifference": 0.304,
-    "rmsDifference": 3.727
+    "meanDifference": 0.41,
+    "rmsDifference": 3.878
   },
   "months": [
     {
-      "meanDifference": 0.337,
-      "rmsDifference": 4.628
+      "meanDifference": 0.443,
+      "rmsDifference": 4.868
     },
     {
-      "meanDifference": -0.409,
-      "rmsDifference": 5.227
+      "meanDifference": -0.296,
+      "rmsDifference": 5.275
     },
     {
-      "meanDifference": -0.823,
-      "rmsDifference": 5.782
+      "meanDifference": -0.676,
+      "rmsDifference": 5.73
     },
     {
-      "meanDifference": -0.624,
-      "rmsDifference": 5.562
+      "meanDifference": -0.462,
+      "rmsDifference": 5.453
     },
     {
-      "meanDifference": 0.313,
-      "rmsDifference": 4.604
+      "meanDifference": 0.434,
+      "rmsDifference": 4.596
     },
     {
-      "meanDifference": 1.043,
-      "rmsDifference": 4.209
+      "meanDifference": 1.115,
+      "rmsDifference": 4.357
     },
     {
-      "meanDifference": 0.968,
-      "rmsDifference": 4.092
+      "meanDifference": 1.05,
+      "rmsDifference": 4.281
     },
     {
-      "meanDifference": 0.471,
-      "rmsDifference": 3.735
+      "meanDifference": 0.598,
+      "rmsDifference": 3.911
     },
     {
-      "meanDifference": 0.232,
-      "rmsDifference": 3.561
+      "meanDifference": 0.389,
+      "rmsDifference": 3.699
     },
     {
-      "meanDifference": 0.4,
-      "rmsDifference": 3.8
+      "meanDifference": 0.522,
+      "rmsDifference": 3.966
     },
     {
-      "meanDifference": 0.819,
-      "rmsDifference": 4.406
+      "meanDifference": 0.858,
+      "rmsDifference": 4.6
     },
     {
-      "meanDifference": 0.917,
-      "rmsDifference": 4.752
+      "meanDifference": 0.948,
+      "rmsDifference": 5.005
     }
   ],
   "warmest": {
-    "meanDifference": -0.042,
-    "rmsDifference": 3.671
+    "meanDifference": 0.086,
+    "rmsDifference": 3.809
   },
   "coldest": {
-    "meanDifference": -0.115,
-    "rmsDifference": 4.9
+    "meanDifference": 0.059,
+    "rmsDifference": 4.945
   },
   "range": {
-    "meanDifference": 0.073,
-    "rmsDifference": 4.901
+    "meanDifference": 0.027,
+    "rmsDifference": 4.802
   },
   "coastContrast": {
     "europeAsia": {
       "simulated": {
-        "annual": 2.766,
-        "january": 6.327
+        "annual": 0.928,
+        "january": 4.597
       },
       "observed": {
         "annual": 11.496,
@@ -79,8 +79,8 @@
     },
     "northAmerica": {
       "simulated": {
-        "annual": -0.055,
-        "january": 2.8
+        "annual": 1.276,
+        "january": 4.132
       },
       "observed": {
         "annual": 5.838,
@@ -90,12 +90,12 @@
   },
   "seaTemperature": {
     "annualMean": {
-      "meanDifference": -0.2,
-      "rmsDifference": 2.402
+      "meanDifference": -0.211,
+      "rmsDifference": 3.059
     },
     "january": {
-      "meanDifference": -0.088,
-      "rmsDifference": 2.443
+      "meanDifference": -0.1,
+      "rmsDifference": 3.292
     }
   }
 }

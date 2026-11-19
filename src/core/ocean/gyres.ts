@@ -61,8 +61,8 @@
  * the 64 grid, 50 to 70 ms on the 128 and 175 to 265 ms on the 256,
  * started from the month before or from the last solve's answer for winds
  * a few percent different. Building the solver takes about 0.25, 0.65 and
- * 2 s, once for a world's land, and {@link solveGyres} keeps the last one
- * built for each grid.
+ * 2 s, once for a world's land, settings and rotation, and
+ * {@link solveGyres} keeps the last one built for each grid.
  */
 
 import { constantsOf, OCEAN_CONFIG, type ValuesOf, valuesOf } from '../config';
@@ -106,8 +106,8 @@ export const SEA_WATER_DENSITY_KG_M3 =
 	constantsOf(OCEAN_CONFIG).seaWaterDensityKgM3;
 
 /**
- * The gyres' solver for one world's land and one set of settings, built
- * once and used for any number of months' winds.
+ * The gyres' solver for one world's land, one set of settings and one
+ * rotation rate, built once and used for any number of months' winds.
  */
 export type GyreSolver = {
 	/** The grid of the world it was built for. */

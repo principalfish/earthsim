@@ -1,12 +1,14 @@
 /**
- * Heat carried along by the wind: an implicit upwind step on the grid.
+ * Heat carried along by the wind or the sea's currents: an implicit upwind
+ * step on the grid.
  *
- * A cell's temperature is carried by the air that flows through it. Where
- * `F` is what the wind carries across an edge out of a cell, in square
- * metres a second (see {@link edgeFlows}), and `c` the heat capacity per
- * square metre of the air that moves the heat, the air flowing into a cell
- * across an edge brings the heat `c F T_up` a second from its upwind
- * neighbour and takes away `c F T` at the cell's own temperature. One
+ * A cell's temperature is carried by the air, or the water, that flows
+ * through it. Where `F` is what the wind or the current carries across an
+ * edge out of a cell, in square metres a second (see {@link edgeFlows}),
+ * and `c` the heat capacity per square metre of the air or water that moves
+ * the heat, what flows into a cell across an edge brings the heat
+ * `c F T_up` a second from its upwind neighbour and takes away `c F T` at
+ * the cell's own temperature. One
  * implicit step of length `Δt` solves, for the temperatures `T'` after it,
  *
  * `C (T'_i − T̃_i) / Δt = Σ_in r_ki (T'_k − T'_i)`
@@ -30,6 +32,10 @@
  * other, and the heat kept is made exact at the end by a shift of the same
  * size everywhere in proportion to each cell's heat capacity, however far
  * the sweeps got.
+ *
+ * A cell may be given no heat capacity when no flow crosses any of its
+ * edges, as for the land under the sea's currents: it is left as it is and
+ * takes no part in the heat kept.
  *
  * It is meant to follow a step of the heat exchange in the model's time
  * stepping, as an operator split: first order in time, while the exchange
@@ -60,8 +66,9 @@ export type AdvectionOutcome = {
 };
 
 /**
- * The advection of heat on one grid, for one heat capacity of moving air,
- * reused for many steps that differ in their flows and temperatures.
+ * The advection of heat on one grid, for one heat capacity of the moving
+ * air or water, reused for many steps that differ in their flows and
+ * temperatures.
  */
 export type HeatAdvector = {
 	/** The grid the flows and temperatures are on. */
@@ -81,8 +88,9 @@ export type HeatAdvector = {
 	 *
 	 * @param temperature - One value per cell: on entry the temperatures
 	 * before the step, on return those after it.
-	 * @param capacity - Each cell's heat capacity, one positive, finite
-	 * value per cell, in joules per square metre per kelvin. Not changed.
+	 * @param capacity - Each cell's heat capacity, one finite value per
+	 * cell, in joules per square metre per kelvin: positive, or zero for a
+	 * cell no flow crosses an edge of, which is left as it is. Not changed.
 	 * @param seconds - The length of the step, above zero.
 	 * @param tolerance - In kelvin, finite and above zero: the sweeps stop
 	 * when no cell changed by more than this in the last one.
@@ -101,19 +109,23 @@ export type HeatAdvector = {
 /**
  * An advection of heat on a grid.
  *
+ * @remarks
+ * A cell no flow enters keeps the value its own heat store gives it, and
+ * is left out of the sweeps.
+ *
  * @param grid - The grid.
- * @param airHeatCapacity - The heat capacity per square metre of the air
- * that moves the heat, in joules per square metre per kelvin: positive and
- * finite.
- * @throws RangeError if `airHeatCapacity` is not positive and finite.
+ * @param movingHeatCapacity - The heat capacity per square metre of the
+ * air or water that moves the heat, in joules per square metre per kelvin,
+ * for flows in square metres a second: positive and finite.
+ * @throws RangeError if `movingHeatCapacity` is not positive and finite.
  */
 export const createHeatAdvector = (
 	grid: Grid,
-	airHeatCapacity: number,
+	movingHeatCapacity: number,
 ): HeatAdvector => {
-	if (!(airHeatCapacity > 0 && Number.isFinite(airHeatCapacity))) {
+	if (!(movingHeatCapacity > 0 && Number.isFinite(movingHeatCapacity))) {
 		throw new RangeError(
-			`The heat capacity of the moving air must be positive and finite; got ${airHeatCapacity}`,
+			`The heat capacity of the moving air or water must be positive and finite; got ${movingHeatCapacity}`,
 		);
 	}
 	const { cellCount, areas, neighbours } = grid;
@@ -125,9 +137,13 @@ export const createHeatAdvector = (
 	const diagonal = new Float64Array(cellCount);
 	const target = new Float64Array(cellCount);
 	const before = new Float64Array(cellCount);
+	// The cells some flow enters, which the sweeps visit, in order.
+	const active = new Int32Array(cellCount);
+	let activeCount = 0;
 	const scale = new Float64Array(cellCount);
 	for (let cell = 0; cell < cellCount; cell++) {
-		scale[cell] = airHeatCapacity / ((areas[cell] as number) * RADIUS_M ** 2);
+		scale[cell] =
+			movingHeatCapacity / ((areas[cell] as number) * RADIUS_M ** 2);
 	}
 
 	const setFlows = (flows: ArrayLike<number>): void => {
@@ -143,6 +159,7 @@ export const createHeatAdvector = (
 				);
 			}
 		}
+		activeCount = 0;
 		for (let cell = 0; cell < cellCount; cell++) {
 			let sum = 0;
 			for (let side = 0; side < SIDES; side++) {
@@ -154,6 +171,10 @@ export const createHeatAdvector = (
 				sum += rate;
 			}
 			inflowSum[cell] = sum;
+			if (sum > 0) {
+				active[activeCount] = cell;
+				activeCount++;
+			}
 		}
 	};
 
@@ -179,8 +200,20 @@ export const createHeatAdvector = (
 		before.set(temperature);
 		for (let cell = 0; cell < cellCount; cell++) {
 			const storage = (capacity[cell] as number) / seconds;
-			diagonal[cell] = storage + (inflowSum[cell] as number);
-			target[cell] = storage * (before[cell] as number);
+			const total = storage + (inflowSum[cell] as number);
+			// A cell with no heat capacity and no flow in keeps its value.
+			diagonal[cell] = total > 0 ? total : 1;
+			target[cell] =
+				total > 0
+					? storage * (before[cell] as number)
+					: (before[cell] as number);
+			// A cell no flow enters depends on nothing but itself: its value
+			// is the sweeps' first and last.
+			temperature[cell] = (target[cell] as number) / (diagonal[cell] as number);
+		}
+		for (let k = 0; k < activeCount; k++) {
+			const cell = active[k] as number;
+			temperature[cell] = before[cell] as number;
 		}
 		const update = (cell: number): number => {
 			let value = target[cell] as number;
@@ -201,11 +234,11 @@ export const createHeatAdvector = (
 		let converged = false;
 		while (!converged && sweeps < ADVECTION_MAX_SWEEPS) {
 			let largest = 0;
-			for (let cell = 0; cell < cellCount; cell++) {
-				largest = Math.max(largest, update(cell));
+			for (let k = 0; k < activeCount; k++) {
+				largest = Math.max(largest, update(active[k] as number));
 			}
-			for (let cell = cellCount - 1; cell >= 0; cell--) {
-				largest = Math.max(largest, update(cell));
+			for (let k = activeCount - 1; k >= 0; k--) {
+				largest = Math.max(largest, update(active[k] as number));
 			}
 			sweeps++;
 			converged = largest < tolerance;
@@ -222,7 +255,9 @@ export const createHeatAdvector = (
 		}
 		const shift = heat / weight;
 		for (let cell = 0; cell < cellCount; cell++) {
-			temperature[cell] = (temperature[cell] as number) - shift;
+			if ((capacity[cell] as number) > 0) {
+				temperature[cell] = (temperature[cell] as number) - shift;
+			}
 		}
 		return { sweeps, converged };
 	};

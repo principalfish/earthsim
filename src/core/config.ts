@@ -195,15 +195,24 @@ export const TEMPERATURE_CONFIG = defineSection(
 				 * 0.55 W m⁻² K⁻¹, a little below the value North, Cahalan and
 				 * Coakley (1981), "Energy balance climate models", Reviews of
 				 * Geophysics 19, use for diffusion on the unit sphere with outgoing
-				 * heat linear in temperature.
+				 * heat linear in temperature, lowered by the share of its poleward
+				 * heat transport that the currents carry: on the Earth at 64, in the
+				 * climate loop, the transport by the sea's diffusivity across 15°,
+				 * 30°, 45° and 60° north and south sums to 16.37 PW without the
+				 * currents, and the currents carry 2.05 PW across the same eight
+				 * circles, 12.5%; 0.55 × (1 − 0.125) = 0.48. The winds' flowing
+				 * part carries 0.05 PW or less across any of them, so nothing is
+				 * taken off for the winds.
 				 */
 				diffusivity: {
-					value: 0.55,
+					value: 0.48,
 					unit: 'W/m²/K',
 					what:
 						'How readily heat spreads between neighbouring places over the' +
-						' sea. It stands in for all the heat the winds and currents' +
-						' carry, which the model does not yet work out.',
+						' sea. It stands in for the heat carried sideways there that' +
+						" the climate's winds and currents do not carry: the eddies" +
+						' and storms of the air and the sea, and the currents the' +
+						' gyres leave out.',
 					raising:
 						'Heat spreads further: the poles warm and the tropics cool, so' +
 						' the equator-to-pole difference shrinks, with less polar ice' +
@@ -212,7 +221,10 @@ export const TEMPERATURE_CONFIG = defineSection(
 						'Each place keeps more of its own heat: hotter tropics, colder' +
 						' poles, more ice, and sharper differences between neighbours.',
 					source:
-						'Published (North, Cahalan and Coakley, 1981), set a little below.',
+						'Published (North, Cahalan and Coakley, 1981) as 0.55 W/m²/K,' +
+						' less the share of its poleward transport the currents carry' +
+						' in the climate loop: on the Earth at 64, across 15°, 30°,' +
+						' 45° and 60° north and south, 2.05 of 16.37 PW, 12.5%.',
 					tuned: null,
 				},
 				/**
@@ -229,12 +241,12 @@ export const TEMPERATURE_CONFIG = defineSection(
 						' of the two, so its coupling is the same seen from either side.',
 					raising:
 						"The sea's heat reaches further inland: milder continental" +
-						" interiors with smaller seasons. At the sea's value the" +
-						" interiors' seasonal range was about halved.",
+						" interiors with smaller seasons. At the sea's published value," +
+						" 0.55, the interiors' seasonal range was about halved.",
 					lowering:
 						'Continents keep more of their own seasons: hotter summers and' +
 						' colder winters inland.',
-					source: "Started at the sea's value, 0.55.",
+					source: "Started at the sea's published value, 0.55.",
 					tuned: "Lowered against the observed Earth's continental seasons.",
 				},
 				/**
@@ -577,7 +589,8 @@ export const TEMPERATURE_CONFIG = defineSection(
 					unit: 'passes',
 					what:
 						'The most passes of the loop, each a temperature solve with the' +
-						" last pass's winds and then the winds from the new temperature.",
+						" last pass's winds and currents, then the winds from the new" +
+						' temperature, then the currents from those winds.',
 					raising:
 						'A world whose climate settles slowly gets further; the climate' +
 						' takes longer to appear.',
@@ -586,8 +599,8 @@ export const TEMPERATURE_CONFIG = defineSection(
 						' such a world. At 1, no climate settles, and none is carried on' +
 						' from.',
 					source:
-						'Chosen: the Earth settles in about four passes, and a generated' +
-						' world in three or four.',
+						'Chosen: the Earth settles in four passes, and the generated' +
+						' worlds measured in four.',
 					tuned: null,
 				},
 				climateOvershootShare: {
@@ -2357,6 +2370,27 @@ export const OCEAN_CONFIG = defineSection(
 				raising: 'The same push moves the water less: weaker currents.',
 				lowering: 'The same push moves the water more: stronger currents.',
 				source: 'A physical figure: sea water near the surface, rounded.',
+				tuned: null,
+			},
+			/**
+			 * The figure the sea's mixed layer is reckoned at in the temperature
+			 * model's `oceanHeatCapacity`, so that the heat the currents carry and
+			 * the heat the sea stores agree.
+			 */
+			seaWaterHeatCapacityJM3K: {
+				value: 4.18e6,
+				unit: 'J/m³/K',
+				what:
+					'The heat a cubic metre of sea water holds for each kelvin: the' +
+					" currents' water carries the sea's temperature with it at this" +
+					' much heat for each cubic metre.',
+				raising:
+					'The currents carry more heat for the same flow: the warm' +
+					' currents warm the seas they reach more.',
+				lowering: 'The currents carry less heat for the same flow.',
+				source:
+					'A physical figure: the density of sea water times its specific' +
+					' heat, about 4 kJ/kg/K, rounded as for the mixed layer.',
 				tuned: null,
 			},
 		},

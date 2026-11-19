@@ -315,19 +315,19 @@ describe('solveTemperature on the Earth', {
 				'from nothing',
 				earth(),
 				{
-					january: 12.8657,
-					july: 17.4706,
-					annual: 14.7751,
-					spread: 13.0522,
+					january: 12.7151,
+					july: 17.309,
+					annual: 14.5994,
+					spread: 13.6374,
 					cells: [
-						[0, 22, JULY, 26.9146],
-						[62, 130, JANUARY, -20.5283],
-						[-80, 0, JULY, -31.1724],
-						[33, 90, JANUARY, -34.2125],
-						[40, -160, AUGUST, 17.4709],
-						[23, 10, JULY, 26.1035],
-						[35, 100, JANUARY, -25.6985],
-						[35, 100, JULY, 9.6914],
+						[0, 22, JULY, 27.1295],
+						[62, 130, JANUARY, -21.7868],
+						[-80, 0, JULY, -34.0641],
+						[33, 90, JANUARY, -34.6271],
+						[40, -160, AUGUST, 17.1828],
+						[23, 10, JULY, 26.3132],
+						[35, 100, JANUARY, -26.1618],
+						[35, 100, JULY, 9.6692],
 					],
 				},
 			],
@@ -335,19 +335,19 @@ describe('solveTemperature on the Earth', {
 				'carried on',
 				carried,
 				{
-					january: 12.8661,
-					july: 17.4698,
-					annual: 14.7741,
-					spread: 13.0554,
+					january: 12.7176,
+					july: 17.3107,
+					annual: 14.6002,
+					spread: 13.6387,
 					cells: [
-						[0, 22, JULY, 26.9146],
-						[62, 130, JANUARY, -20.5271],
-						[-80, 0, JULY, -31.156],
-						[33, 90, JANUARY, -34.2113],
-						[40, -160, AUGUST, 17.4717],
-						[23, 10, JULY, 26.1036],
-						[35, 100, JANUARY, -28.9473],
-						[35, 100, JULY, 6.4216],
+						[0, 22, JULY, 27.1298],
+						[62, 130, JANUARY, -21.7842],
+						[-80, 0, JULY, -34.0292],
+						[33, 90, JANUARY, -34.6249],
+						[40, -160, AUGUST, 17.1844],
+						[23, 10, JULY, 26.3137],
+						[35, 100, JANUARY, -29.4096],
+						[35, 100, JULY, 6.3967],
 					],
 				},
 			],
@@ -524,12 +524,12 @@ describe("the sea's own temperature", {
 
 	// Three solves of a year from nothing and a run of the winds, several
 	// times longer under coverage.
-	it('solves a world with no sea exactly as before the sea had a temperature of its own', {
+	it('solves a world with no sea as the single-temperature model does', {
 		timeout: 120_000,
 	}, () => {
-		// Recorded from the model before the sea had a temperature of its
-		// own: a world wholly of land, and a generated world with its sea
-		// level below every cell and heat carried along its winds.
+		// Fixed values recorded from the single-temperature model: a world
+		// wholly of land, and a generated world with its sea level below every
+		// cell and heat carried along its winds.
 		const land = solveTemperature(ALL_LAND);
 		expect([
 			digest(land.months),
@@ -954,7 +954,9 @@ describe('solveTemperature on simple worlds', {
 
 	it.each([
 		['a blank ocean', blank],
-		['a generated world', () => solveTemperature(GENERATED, COARSE)],
+		// In the model's own numerics, as the blank ocean is: they settle it
+		// in a fifth of the years the coarser take, and cost less.
+		['a generated world', () => solveTemperature(GENERATED)],
 		// Around a bright star with its axis on its side, in the coarser
 		// numerics, which the generated world's other tests share.
 		['a generated world around a bright star', generatedHot],

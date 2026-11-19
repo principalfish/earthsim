@@ -760,6 +760,7 @@ describe('createClimateService', () => {
 			result: {
 				temperature: climatePassOf(2).temperature,
 				winds: climatePassOf(2).winds,
+				currents: climatePassOf(2).currents,
 				dayLengthHours: 24,
 			},
 		});
@@ -936,6 +937,7 @@ describe('createClimateService', () => {
 			result: {
 				temperature: direct.temperature,
 				winds: direct.winds,
+				currents: direct.currents,
 				dayLengthHours: direct.dayLengthHours,
 			},
 		});

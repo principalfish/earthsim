@@ -8,6 +8,10 @@ import { solveClimate } from '../../climate';
 import { decodeEarth, earthWorld, isMeasuredEarth } from '../../earth/earth';
 import { getGrid } from '../../grid/grid';
 import {
+	TEMPERATURE_MODEL,
+	type TemperatureModel,
+} from '../../temperature/temperature';
+import {
 	type WindErrorFigures,
 	type WindResult,
 	windErrorFigures,
@@ -32,13 +36,18 @@ import committed from './earthWinds.json';
 
 /**
  * Time allowed for each test that solves the Earth's climate: ten seconds or
- * so, more for a setting that keeps the loop from settling, and several times
- * that under coverage instrumentation.
+ * so, and several times that under coverage instrumentation.
  */
 const SOLVE_TIMEOUT_MS = 300_000;
 
-/** The Earth's year of winds as solved now, against the observed. */
-const solvedEarth = (settings?: Partial<WindSettings>): EarthWindFigures => {
+/**
+ * The Earth's year of winds as solved now, against the observed, by the
+ * model given, by default the model's own.
+ */
+const solvedEarth = (
+	settings?: Partial<WindSettings>,
+	model: TemperatureModel = TEMPERATURE_MODEL,
+): EarthWindFigures => {
 	const earth = earthWorld(
 		decodeEarth(readEarthDataFile()),
 		WIND_BASELINE_RESOLUTION,
@@ -55,7 +64,7 @@ const solvedEarth = (settings?: Partial<WindSettings>): EarthWindFigures => {
 		),
 	};
 	return earthWindFigures(
-		solveClimate(earth, { windSettings: settings }).winds,
+		solveClimate(earth, { windSettings: settings, model }).winds,
 		observed,
 		getGrid(WIND_BASELINE_RESOLUTION),
 	);
@@ -119,9 +128,17 @@ describe('the Earth winds baseline', () => {
 		() => {
 			// The thermal response put up from 0.7 to 6 hPa a kelvin, the winds
 			// and the temperature solved together as the baseline is, worsens
-			// all nine figures.
+			// all nine figures. The loop does not settle at that response, so
+			// it is stopped at the second pass, the first whose temperature is
+			// solved with the winds of the stronger response: every pass to the
+			// cap of eight worsens all nine, the second by at least 1.7 m/s of
+			// wind, 2.8 percentage points of direction share and 1.8 hPa of
+			// pressure, against tolerances of 0.02, 0.2 and 0.05.
 			const worse = windBaselineRegressions(
-				solvedEarth({ thermalHpaPerK: 6 }),
+				solvedEarth(
+					{ thermalHpaPerK: 6 },
+					{ ...TEMPERATURE_MODEL, climateMaxPasses: 2 },
+				),
 				committed,
 			);
 			expect(worse.map(({ figure }) => figure)).toEqual([

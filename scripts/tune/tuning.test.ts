@@ -81,20 +81,17 @@ describe('the tuning runs', () => {
 		// The figures are those of 3 hPa a kelvin of thermal response, the
 		// strength the model was tuned at, and of the temperature without winds,
 		// which the tuning script works from; the model's own default is now
-		// the physical 0.7. Measured with the sea's own temperature (3.822
-		// m/s, 60.91% and 7.085 hPa before the sea had one).
+		// the physical 0.7.
 		const figures = earthFigures(tuning, TUNED);
-		expect(figures.windRms).toBeCloseTo(3.855, 3);
-		expect(figures.directionShare).toBeCloseTo(0.6059, 4);
-		expect(figures.pressureRms).toBeCloseTo(7.085, 3);
+		expect(figures.windRms).toBeCloseTo(3.828, 3);
+		expect(figures.directionShare).toBeCloseTo(0.6126, 4);
+		expect(figures.pressureRms).toBeCloseTo(7.061, 3);
 		// With the bands one pattern round the globe, as the model had them
-		// before they varied by longitude: 3.863 m/s, 60.17% and 7.146 hPa
-		// (3.813 m/s, 60.60% and 7.113 hPa before the sea had a temperature
-		// of its own).
+		// before they varied by longitude: 3.821 m/s, 61.02% and 7.119 hPa.
 		const zonal = earthFigures(tuning, { ...TUNED, localBandsShare: 0 });
-		expect(zonal.windRms).toBeCloseTo(3.863, 3);
-		expect(zonal.directionShare).toBeCloseTo(0.602, 3);
-		expect(zonal.pressureRms).toBeCloseTo(7.146, 3);
+		expect(zonal.windRms).toBeCloseTo(3.821, 3);
+		expect(zonal.directionShare).toBeCloseTo(0.6102, 3);
+		expect(zonal.pressureRms).toBeCloseTo(7.119, 3);
 		const changed = earthFigures(tuning, { ...TUNED, bandAmplitudeHpa: 7 });
 		expect(changed.windRms).not.toBe(figures.windRms);
 

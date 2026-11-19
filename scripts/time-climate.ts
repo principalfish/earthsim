@@ -1,6 +1,6 @@
 /**
- * Measures how long the climate loop takes: the temperature and the winds
- * solved together, pass by pass.
+ * Measures how long the climate loop takes: the temperature, the winds and
+ * the currents solved together, pass by pass.
  *
  * Run with `npm run time:climate`. It prints Markdown tables:
  *
@@ -8,7 +8,10 @@
  *   takes, the time of the first pass and of each later pass, and the time
  *   in all;
  * - the same carried on from the settled result, which is the case after an
- *   edit that changes little: the passes and the time.
+ *   edit that changes little: the passes and the time;
+ * - the currents' part of a pass: the gyres of the settled winds, on the
+ *   grid the temperature is solved on, started from the settled currents'
+ *   streamfunction, as a later pass solves them.
  *
  * One climate is solved first and not timed, so that the times do not
  * include the JavaScript engine's warming up. The output depends on the
@@ -18,10 +21,14 @@
 import { stdout } from 'node:process';
 import {
 	type ClimateStart,
+	coarsenField,
+	coarsenWorld,
 	decodeEarth,
 	earthWorld,
 	SUPPORTED_RESOLUTIONS,
 	solveClimate,
+	solveGyres,
+	solveResolution,
 	TEMPERATURE_MODEL,
 } from '../src/core/index';
 import { readEarthDataFile } from './earth/dataFile.mjs';
@@ -73,6 +80,7 @@ export const main = (): void => {
 	say();
 	const cold: string[][] = [];
 	const warm: string[][] = [];
+	const currents: string[][] = [];
 	for (const resolution of SUPPORTED_RESOLUTIONS) {
 		const world = earthWorld(data, resolution);
 		if (resolution === SUPPORTED_RESOLUTIONS[0]) {
@@ -96,6 +104,22 @@ export const main = (): void => {
 			String(again.result.passes),
 			seconds(again.times.reduce((a, b) => a + b, 0)),
 		]);
+		const solvedOn = solveResolution(resolution);
+		const own = solvedOn === resolution;
+		const onGrid = (field: Float32Array): Float32Array =>
+			own ? field : Float32Array.from(coarsenField(field, resolution));
+		const { winds } = again.result;
+		const begun = performance.now();
+		solveGyres(
+			own ? world : coarsenWorld(world),
+			{ east: winds.east.map(onGrid), north: winds.north.map(onGrid) },
+			{ guess: again.result.currents.streamfunction },
+		);
+		currents.push([
+			String(resolution),
+			String(solvedOn),
+			seconds((performance.now() - begun) / 1000),
+		]);
 	}
 	say('## From nothing, on the Earth');
 	say();
@@ -113,4 +137,7 @@ export const main = (): void => {
 	say('## Carried on from the settled result');
 	say();
 	table(['Cells per face edge', 'Passes', 'In all (s)'], warm);
+	say("## The currents' part of a pass");
+	say();
+	table(['Cells per face edge', 'Solved on', 'Twelve months (s)'], currents);
 };

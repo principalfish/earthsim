@@ -5,7 +5,7 @@
  * out on the solve's own grid.
  *
  * In a file of its own, so that the runner solves it beside the rest. It
- * makes two solves on the 128 grid, about four seconds each.
+ * makes two solves on the 128 grid, about five seconds each.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -16,7 +16,9 @@ import type { World } from '../world/world';
 import {
 	annualBalance,
 	lapseCooling,
+	type SolveTemperatureOptions,
 	solveTemperature,
+	TEMPERATURE_MODEL,
 	type TemperatureStart,
 	temperatureConditions,
 } from './temperature';
@@ -27,11 +29,22 @@ const SOLVE_TIMEOUT_MS = 120_000;
 /**
  * The most the two answers may differ in any cell and month, in kelvin.
  * Both are converged, each year's change below 0.05 K, so they differ by
- * no more than that slack allows: measured, 0.0038 K in the worst cell and
- * month and 0.0004 K root-mean-square on this world, and 0.0016 K and
- * 0.0001 K on the Earth at 128.
+ * no more than that slack allows: measured in {@link SOLVE}'s numerics,
+ * 0.0005 K in the worst cell and month and 0.0001 K root-mean-square on
+ * this world, and 0.0004 K and 0.0001 K on the Earth at 128.
  */
 const MAX_CELL_K = 0.01;
+
+/**
+ * Both solves on the world's own grid, each step's linear solve to 0.05 K
+ * rather than the model's 0.005 K: a third cheaper, with the model's own
+ * steps, so each takes as many years as in the model's numerics. The two
+ * solves differ only in their start, which is what the test compares.
+ */
+const SOLVE: SolveTemperatureOptions = {
+	fullResolution: true,
+	model: { ...TEMPERATURE_MODEL, solverToleranceK: 0.05 },
+};
 
 /**
  * A start that makes a solve begin exactly as a solve from nothing on the
@@ -63,9 +76,9 @@ describe('solveTemperature from nothing on the 128 grid', {
 			seed: 20_261_111,
 			landFraction: 0.3,
 		});
-		const cold = solveTemperature(world, { fullResolution: true });
+		const cold = solveTemperature(world, SOLVE);
 		const fromOwnGrid = solveTemperature(world, {
-			fullResolution: true,
+			...SOLVE,
 			start: balanceStart(world, cold.state.stepSeconds),
 		});
 		expect(cold.converged).toBe(true);

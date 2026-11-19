@@ -2,7 +2,7 @@
 
 How the wind-driven ocean currents are worked out, what they cost, how they compare with the observed Earth's, and what they leave out. The code is `src/core/ocean/gyres.ts` and `src/core/ocean/basins.ts`; the settings are listed in [Model settings](../src/core/config.md#ocean).
 
-The currents are worked out by `solveGyres` from a world and a year of its surface winds. The climate loop does not yet carry the sea's heat along them, and the page does not yet draw them.
+The currents are worked out by `solveGyres` from a world and a year of its surface winds. The climate loop works them out from each pass's winds and carries the sea's heat along them in the next pass (see [Temperature](temperature.md#heat-carried-by-the-currents)); the page does not draw them.
 
 ## The gyres
 
@@ -44,7 +44,7 @@ The flows across the edges, in the layout the heat advection takes, and the surf
 
 ## What it costs
 
-The solver is built once for a world's land and settings, and `solveGyres` keeps the last one built for each grid; each month then is one solve, started from the month before's answer, or from the last solve's when one is given. On the Earth, on the development machine, in Node:
+The solver is built once for a world's land, settings and rotation, and `solveGyres` keeps the last one built for each grid; each month then is one solve, started from the month before's answer, or from the last solve's when one is given. On the Earth, on the development machine, in Node:
 
 | Grid | Building the solver | Twelve months, each from the month before | Twelve months from the last solve's answer, winds 5% different |
 |-|-|-|-|
@@ -52,7 +52,7 @@ The solver is built once for a world's land and settings, and `solveGyres` keeps
 | 128 | 0.65 s | 0.82 s | 0.60 to 0.74 s |
 | 256 | 2.0 s | 3.2 s | 2.1 s |
 
-Each month takes one to three iterations at the default tolerance of 10⁻⁴, at which `ψ` is within 3 × 10⁻⁴ of its largest value of the exact answer. `solveGyres` solves on the world's own grid; for the flows to be those of the coasts the heat is carried between, it is given the world on the grid the temperature is solved on: the 64 grid for worlds of 64 and 128, the 128 grid for a world of 256. Against today's climate solve of the Earth, about 9.6 s on the 64 grid and 31 s for a world of 256, each four passes, twelve months a pass with the solver built once add about 10 to 15% on the 64 grid and 10 to 12% on the 128. On the 256 grid itself they would add 35 to 45%.
+Each month takes one to three iterations at the default tolerance of 10⁻⁴, at which `ψ` is within 3 × 10⁻⁴ of its largest value of the exact answer. `solveGyres` solves on the world's own grid; for the flows to be those of the coasts the heat is carried between, it is given the world on the grid the temperature is solved on: the 64 grid for worlds of 64 and 128, the 128 grid for a world of 256. In the climate loop the solver is built once and each pass's months start from the last pass's answer: on the Earth that takes about 0.05 s a pass on the 64 grid and 0.5 s on the 128, against a climate solve of about 13 s for a world of 64 and 51 s for a world of 256, each four passes; most of what the currents add to the loop is the temperature's carrying of the sea's heat along them (see [Temperature](temperature.md#the-climate-loop)). On the 256 grid itself the gyres would take about three times as long as on the 128.
 
 The western boundary current, in a basin from 10°N to 50°N and 60° of longitude wide under trades and westerlies, measured along 30°N:
 
@@ -61,6 +61,10 @@ The western boundary current, in a basin from 10°N to 50°N and 60° of longitu
 | 64 | 0.13 m/s | 160 km | 560 km | 5.8 Sv |
 | 128 | 0.19 m/s | 190 km | 460 km | 6.4 Sv |
 | 256 | 0.22 m/s | 110 km | 410 km | 6.7 Sv |
+
+## The heat they carry
+
+The climate loop carries the sea's heat along the flows, the whole transport of the 200 m layer at 4.18 MJ/m³/K (see [Temperature](temperature.md#heat-carried-by-the-currents)). On the Earth at 64 they carry 0.47 PW northward across 30°N and 0.45 PW southward across 30°S, over the year.
 
 ## How far to trust it
 

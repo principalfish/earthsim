@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { cornerIndex, edgeFlowsFromCorners } from '../grid/corners';
 import { getGrid } from '../grid/grid';
 import { flowingPart } from '../wind/flowing';
 import {
@@ -91,6 +92,57 @@ describe('createHeatAdvector', () => {
 			expect(
 				Math.abs(heatOf(temperature, LAND_OR_SEA) - before) / before,
 			).toBeLessThan(1e-13);
+		}
+	});
+
+	it('leaves a cell of no heat capacity that no flow crosses as it is, and keeps the heat of the rest exactly', () => {
+		// Currents of a random streamfunction, held at zero round the land, a
+		// band of each face, so that no flow crosses an edge of it.
+		const random = createRandom(11);
+		const { cornerCount, cellCorners } = cornerIndex(grid);
+		const psi = Float64Array.from(
+			{ length: cornerCount },
+			() => 4e5 * random() - 2e5,
+		);
+		const land = Uint8Array.from({ length: cellCount }, (_, cell) =>
+			cell % 64 < 16 ? 1 : 0,
+		);
+		for (let cell = 0; cell < cellCount; cell++) {
+			if (land[cell] === 1) {
+				for (let k = 0; k < 4; k++) {
+					psi[cellCorners[4 * cell + k] as number] = 0;
+				}
+			}
+		}
+		const flows = edgeFlowsFromCorners(grid, psi);
+		const sea = Float64Array.from({ length: cellCount }, (_, cell) =>
+			land[cell] === 1 ? 0 : 2.5e8,
+		);
+		const start = Float64Array.from(
+			{ length: cellCount },
+			() => 271 + 30 * random(),
+		);
+		for (const tolerance of [1e-6, 10]) {
+			const advector = createHeatAdvector(grid, 8.36e8);
+			advector.setFlows(flows);
+			const temperature = Float64Array.from(start);
+			advector.advect(temperature, sea, STEP_S, tolerance);
+			let moved = 0;
+			for (let cell = 0; cell < cellCount; cell++) {
+				if (land[cell] === 1) {
+					expect(temperature[cell]).toBe(start[cell]);
+				} else {
+					moved = Math.max(
+						moved,
+						Math.abs((temperature[cell] as number) - (start[cell] as number)),
+					);
+				}
+			}
+			expect(moved).toBeGreaterThan(1);
+			const before = heatOf(start, sea);
+			expect(Math.abs(heatOf(temperature, sea) - before) / before).toBeLessThan(
+				1e-13,
+			);
 		}
 	});
 

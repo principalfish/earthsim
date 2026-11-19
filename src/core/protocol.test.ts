@@ -586,11 +586,16 @@ const climateStart = () => ({
 		solvedFor: solvedFor(),
 	},
 	winds: { east: months(), north: months() },
+	currents: { flows: doubleMonths(), streamfunction: doubleMonths() },
 	dayLengthHours: 24,
 });
 
+/** Twelve double-precision months of two values each. */
+const doubleMonths = (): Float64Array[] =>
+	Array.from({ length: 12 }, () => new Float64Array([1, 2]));
+
 const BAD_CLIMATE_START =
-	"A climate request's start must be an object whose temperature has 12 Float32Array months and seaMonths, a state (temperatureK, previousK, seaTemperatureK, seaPreviousK and referenceCoolingK as Float64Arrays and stepSeconds as a number) and a solvedFor with a finite seaLevel and a planet whose settings, the day length aside, are finite, whose winds have 12 Float32Array months each of east and north, and whose dayLengthHours is a finite number";
+	"A climate request's start must be an object whose temperature has 12 Float32Array months and seaMonths, a state (temperatureK, previousK, seaTemperatureK, seaPreviousK and referenceCoolingK as Float64Arrays and stepSeconds as a number) and a solvedFor with a finite seaLevel and a planet whose settings, the day length aside, are finite, whose winds have 12 Float32Array months each of east and north, whose currents, if any, have 12 Float64Array months each of flows and streamfunction, and whose dayLengthHours is a finite number";
 
 describe('parseSimRequest for climate', () => {
 	it('reads a request with no start as a request from nothing', () => {
@@ -609,6 +614,12 @@ describe('parseSimRequest for climate', () => {
 				converged: true,
 			},
 			winds: { ...climateStart().winds, pressure: months() },
+			currents: {
+				...climateStart().currents,
+				east: months(),
+				ekmanEast: months(),
+				iterations: [1],
+			},
 		};
 		const parsed = parseSimRequest({
 			id: 4,
@@ -625,10 +636,20 @@ describe('parseSimRequest for climate', () => {
 			'world',
 		]);
 		expect(Object.keys(parsed.start ?? {}).sort()).toEqual([
+			'currents',
 			'dayLengthHours',
 			'temperature',
 			'winds',
 		]);
+		expect(Object.keys(parsed.start?.currents ?? {}).sort()).toEqual([
+			'flows',
+			'streamfunction',
+		]);
+		expect(parsed.start?.currents?.flows).not.toBe(start.currents.flows);
+		expect(parsed.start?.currents?.flows[2]).toBe(start.currents.flows[2]);
+		expect(parsed.start?.currents?.streamfunction[7]).toBe(
+			start.currents.streamfunction[7],
+		);
 		expect(Object.keys(parsed.start?.temperature ?? {}).sort()).toEqual([
 			'months',
 			'seaMonths',
@@ -699,11 +720,36 @@ describe('parseSimRequest for climate', () => {
 			{ ...good, winds: undefined },
 			{ ...good, winds: { east: months(), north: months().slice(1) } },
 			{ ...good, winds: { east: months() } },
+			{ ...good, currents: null },
+			{ ...good, currents: { flows: doubleMonths() } },
+			{
+				...good,
+				currents: { flows: months(), streamfunction: doubleMonths() },
+			},
+			{
+				...good,
+				currents: {
+					flows: doubleMonths(),
+					streamfunction: doubleMonths().slice(1),
+				},
+			},
 		];
 		for (const start of bad) {
 			const failure = refusal({ id: 9, kind: 'climate', world, start });
 			expect(failure).toEqual(simFailure(9, 'climate', BAD_CLIMATE_START));
 		}
+	});
+
+	it('reads a start with no currents, leaving them out', () => {
+		const { currents: _, ...start } = climateStart();
+		const parsed = parseSimRequest({
+			id: 4,
+			kind: 'climate',
+			world,
+			start,
+		}) as SimRequest<'climate'>;
+		expect(parsed.start).toBeDefined();
+		expect('currents' in (parsed.start ?? {})).toBe(false);
 	});
 
 	it('refuses a world that is not of the form of one, as for any kind', () => {

@@ -19,7 +19,12 @@
  * is plain data that survives a structured clone.
  */
 
-import type { ClimateProgress, ClimateStart, ClimateSummary } from './climate';
+import type {
+	CarriedCurrents,
+	ClimateProgress,
+	ClimateStart,
+	ClimateSummary,
+} from './climate';
 import { MONTHS_PER_YEAR } from './planet/insolation';
 import {
 	PLANET_SETTINGS,
@@ -240,10 +245,31 @@ const isMonthsShaped = (value: unknown): value is Float32Array[] =>
 	value.every((month) => month instanceof Float32Array);
 
 /**
+ * Whether a value has the form of a year of a field in double precision:
+ * an array of twelve `Float64Array`s, checked for their form only, as
+ * {@link isMonthsShaped} checks.
+ */
+const isDoubleMonthsShaped = (value: unknown): value is Float64Array[] =>
+	Array.isArray(value) &&
+	value.length === MONTHS_PER_YEAR &&
+	value.every((month) => month instanceof Float64Array);
+
+/**
+ * Whether a value has the form of a climate start's currents, which it may
+ * leave out: twelve months each of flows and streamfunction.
+ */
+const isCurrentsShaped = (value: unknown): value is CarriedCurrents =>
+	value === undefined ||
+	(isRecord(value) &&
+		isDoubleMonthsShaped(value.flows) &&
+		isDoubleMonthsShaped(value.streamfunction));
+
+/**
  * Whether a value has the form of a start for a climate: its temperature
  * with twelve months, a state and a record of what it was solved for, its
- * winds with twelve months each of eastward and northward wind, and a day
- * length that is a finite number.
+ * winds with twelve months each of eastward and northward wind, its
+ * currents, if it has any, with twelve months each of flows and
+ * streamfunction, and a day length that is a finite number.
  *
  * @remarks
  * As for a world, how many values each array holds and what they are is
@@ -258,6 +284,7 @@ const isClimateStartShaped = (value: unknown): value is ClimateStart =>
 	isRecord(value.winds) &&
 	isMonthsShaped(value.winds.east) &&
 	isMonthsShaped(value.winds.north) &&
+	isCurrentsShaped(value.currents) &&
 	isFiniteNumber(value.dayLengthHours);
 
 /**
@@ -290,11 +317,13 @@ const PAYLOADS: {
 			return { world };
 		}
 		if (!isClimateStartShaped(start)) {
-			return `A climate request's start must be an object whose temperature has ${MONTHS_PER_YEAR} Float32Array months and seaMonths, a state (temperatureK, previousK, seaTemperatureK, seaPreviousK and referenceCoolingK as Float64Arrays and stepSeconds as a number) and a solvedFor with a finite seaLevel and a planet whose settings, the day length aside, are finite, whose winds have ${MONTHS_PER_YEAR} Float32Array months each of east and north, and whose dayLengthHours is a finite number`;
+			return `A climate request's start must be an object whose temperature has ${MONTHS_PER_YEAR} Float32Array months and seaMonths, a state (temperatureK, previousK, seaTemperatureK, seaPreviousK and referenceCoolingK as Float64Arrays and stepSeconds as a number) and a solvedFor with a finite seaLevel and a planet whose settings, the day length aside, are finite, whose winds have ${MONTHS_PER_YEAR} Float32Array months each of east and north, whose currents, if any, have ${MONTHS_PER_YEAR} Float64Array months each of flows and streamfunction, and whose dayLengthHours is a finite number`;
 		}
 		// Only what a climate starts from is taken, whatever else came with
 		// it: the temperature's months, the air's and the sea's, its state
-		// and record, the winds' two components, and the day length.
+		// and record, the winds' two components, the currents' flows and
+		// streamfunction, and the day length.
+		const { currents } = start;
 		return {
 			world,
 			start: {
@@ -308,6 +337,14 @@ const PAYLOADS: {
 					east: [...start.winds.east],
 					north: [...start.winds.north],
 				},
+				...(currents === undefined
+					? {}
+					: {
+							currents: {
+								flows: [...currents.flows],
+								streamfunction: [...currents.streamfunction],
+							},
+						}),
 				dayLengthHours: start.dayLengthHours,
 			},
 		};
@@ -366,9 +403,10 @@ export const simFailure = (
  * model's settings, nor asked to solve on the world's own grid, whatever
  * the message says, and of its start only the temperature's months (the
  * air's and the sea's), state and record, the winds' eastward and
- * northward parts and the day length are taken, so the pressure of a whole
- * result sent as a start is left behind, and of the record's planet only
- * the settings the temperature reads.
+ * northward parts, the currents' flows and streamfunction and the day
+ * length are taken, so the pressure of a whole result sent as a start, and
+ * its surface currents and Ekman transport, are left behind, and of the
+ * record's planet only the settings the temperature reads.
  *
  * @param message - What arrived, of any type at all.
  * @returns The request, or the failure to answer it with: for a message
