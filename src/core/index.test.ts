@@ -19,6 +19,22 @@ describe('core', () => {
 		}
 	});
 
+	it('exports the grid corners, the flows from them and the solve on them', () => {
+		for (const name of [
+			'cornerIndex',
+			'cornerAreas',
+			'coastLabels',
+			'edgeFlowsFromCorners',
+			'createCornerSolver',
+			'solveOnCorners',
+			'CORNER_SOLVE_TOLERANCE',
+			'CORNER_MAX_ITERATIONS',
+			'neighbourTable',
+		]) {
+			expect(core, name).toHaveProperty(name);
+		}
+	});
+
 	it('exports sunlight by latitude and season', () => {
 		for (const name of [
 			'SOLAR_CONSTANT_W_M2',

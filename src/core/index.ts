@@ -6,6 +6,7 @@ export * from './compare';
 export * from './config';
 export * from './earth/earth';
 export * from './grid/coarsen';
+export * from './grid/corners';
 export * from './grid/flows';
 export * from './grid/grid';
 export * from './grid/quantile';

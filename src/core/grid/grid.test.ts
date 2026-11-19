@@ -19,6 +19,7 @@ import {
 	latLonToDirection,
 	NEIGHBOUR_COUNT,
 	neighbours,
+	neighbourTable,
 	SUPPORTED_RESOLUTIONS,
 	type Vec3,
 } from './grid';
@@ -553,6 +554,29 @@ describe.each(SUPPORTED_RESOLUTIONS)('grid at %i cells per face edge', (n) => {
 				}
 			}
 		}
+	});
+
+	it('builds the same neighbour table for any size', () => {
+		expect(neighbourTable(64)).toEqual(getGrid(64).neighbours);
+		// One cell a face: each touches the four faces around its own.
+		const single = neighbourTable(1);
+		for (let face = 0; face < FACE_COUNT; face++) {
+			const around = new Set(single.slice(4 * face, 4 * face + 4));
+			expect(around.size).toBe(4);
+			expect(around.has(face)).toBe(false);
+		}
+		for (const n of [2, 3]) {
+			const table = neighbourTable(n);
+			for (let entry = 0; entry < table.length; entry++) {
+				const back = table.slice(
+					4 * (table[entry] as number),
+					4 * (table[entry] as number) + 4,
+				);
+				expect(back).toContain(Math.floor(entry / 4));
+			}
+		}
+		expect(() => neighbourTable(0)).toThrow(RangeError);
+		expect(() => neighbourTable(1.5)).toThrow(RangeError);
 	});
 
 	it('finds each cell from its own centre', () => {

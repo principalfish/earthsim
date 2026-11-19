@@ -54,10 +54,12 @@ A pure library with no DOM, Three.js or worker globals.
 
 | File | What it holds |
 |-|-|
-| `grid/grid.ts` | The cubed-sphere grid every layer lives on |
+| `grid/grid.ts` | The cubed-sphere grid every layer lives on, and its table of neighbours for a grid of any size |
 | `grid/coarsen.ts` | A world or a field averaged onto the grid a step coarser, and a field or a vector field carried back from it |
 | `grid/vector.ts` | Vector fields on the grid, east and north at every cell, the gradient, divergence, curl, Laplacian and smoothing of fields, and what a vector field carries across every edge |
 | `grid/flows.ts` | What is carried across the edges of a grid, added up onto the grid a step coarser and shared out onto the finer |
+| `grid/corners.ts` | The corners of the cells, numbered once across the cube's faces; flows across the edges from a streamfunction on them; the coasts of a land mask; and the elliptic solve on the corners with one value of `ψ` along each coast |
+| `grid/sparse.ts` | Sparse matrices by rows and the linear algebra the corner solve is built from: products, incomplete LU, a Galerkin multigrid cycle and BiCGSTAB |
 | `grid/quantile.ts` | Area-weighted quantiles of values on the grid |
 | `climate.ts` | The climate: the temperature and winds solved together in passes, each feeding the other, with its stopping and damping; see [Temperature](temperature.md#the-climate-loop) |
 | `config.md` | The list of every model's settings, written from `config.ts` by `npm run docs:config` |

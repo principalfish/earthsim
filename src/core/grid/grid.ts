@@ -479,6 +479,26 @@ const buildNeighbours = (n: number): Int32Array => {
 };
 
 /**
+ * The edge neighbours of every cell of a grid of any size, laid out as
+ * {@link Grid.neighbours}: the table {@link getGrid} builds, for any number
+ * of cells per face edge rather than only the supported resolutions, so that
+ * tables which depend only on how the cells join can be checked on grids
+ * small enough to follow by hand.
+ *
+ * @param n - Cells along a face edge: a whole number from 1.
+ * @returns A new array of `4 * 6 * n * n` cell indices, owned by the caller.
+ * @throws RangeError if `n` is not a whole number from 1.
+ */
+export const neighbourTable = (n: number): Int32Array => {
+	if (!Number.isInteger(n) || n < 1) {
+		throw new RangeError(
+			`A grid has a whole number of cells per face edge from 1; got ${n}`,
+		);
+	}
+	return buildNeighbours(n);
+};
+
+/**
  * The grid geometry for a resolution, built on first use and then shared.
  *
  * @param n - Cells along a face edge; one of {@link SUPPORTED_RESOLUTIONS}.
