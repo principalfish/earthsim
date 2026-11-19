@@ -89,7 +89,7 @@ Keep this section current when a step is merged.
 | 3d One config.ts for every model's settings, with config.md; also a read-only Model settings screen with the climate process diagram, replacing the PDF | Done 2026-11-18 (PR #12 merged at 9463afa) | 0006, GitHub #11 |
 | 3a follow-up: the deeper splits of `ui/layerPanel.ts` and `wiring.ts`, and the `ui/` type dependency (see under step 3a) | Deferred by the user (2026-11-18: "Skip to step 5"); step 5 goes first, so the panel grows by the currents layer before the split. Revisit before step 4 | |
 | 3b Heat carried by winds, and the climate loop | Done 2026-11-18 (PR #14 merged at 05ec69d) | 0007, GitHub #13 |
-| 5 Ocean currents | In progress: 6 of 9 pieces committed (2026-11-19); left-for-later items under "Step 5: left for later steps" | 0008, GitHub #15, PR #16 (draft) |
+| 5 Ocean currents | In progress: 6 of 9 pieces committed, piece 7's rule chosen (2026-11-19); left-for-later items under "Step 5: left for later steps" | 0008, GitHub #15, PR #16 (draft) |
 | 4 Moisture, rainfall and Köppen zones | Not started; after step 5, so rain and the Köppen zones are built and tuned against sea temperatures that the currents have already set (the user, 2026-11-18). Before planning it, settle fixed or fitted colour scales (see the open follow-ups), since rainfall is the next colour layer | |
 | 6 Ice sheets and sea ice | Not started | |
 | 6b Tune the whole climate loop against the Earth | Not started; after steps 3b, 5 and 6, when every part of the loop is in | |
@@ -163,6 +163,8 @@ Each item was decided by the user or the planner chat while building step 5; the
 - **The overturning is geometry only** (piece 7, the user: "go ahead" to rule E). The model has no salt, so the Atlantic–Pacific asymmetry (a narrower, saltier Atlantic, and water vapour carried across Central America) is stood in for by passage width and sill depth. Revisit after step 4 (rain): an evaporation-minus-rain test of the polar end would be the physical gate. The 0.5 PW strength per basin, and the paper figures behind it (Lozier 2019; Ganachaud and Wunsch 2000; Johns 2011), are from memory, not checked.
 
 **For step 6 (ice):**
+- **The overturning warms the Arctic** (piece 7, the user: "Accept, carry on (Recommended)"): Arctic land north of 75°N 3.7 → 5.7 K, the Arctic Ocean 4.3 → 5.7, with the heat given out up to 75°. Real sea ice should cut the Arctic air off from the Atlantic water. If it doesn't, the polar end limit (75°) is the setting to look at in 6b.
+- **The North America coast contrast fell with the overturning** (1.4 → 0.3 K annual, 4.2 → 2.0 January; observed 5.8/15.1): for 6b.
 - **Polar summers too warm** with the sea-ice stand-in following the sea (piece 2, the user: "Accept, carry on (Recommended)"): Antarctica January +5.5 → +9.3 K, the Arctic >75N July −3.0 → +4.3. To look at again at piece 7 if it bears on it; otherwise with real sea ice.
 
 **Follow-up, no step yet:**
