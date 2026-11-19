@@ -27,6 +27,7 @@
 - **Piece 5: the year-end correction leaves out the sea's own change where currents cross a cell's edges** (counted, pass 2 did not settle in 60 years; left out, it settles in 6 to the same answer). Accepted by the planner chat.
 - **Piece 5: the derived diffusivity 0.48 and its regions accepted.** 0.55 × (1 − 0.125), the currents' share of the diffusive poleward heat; global air rms 3.88 K (3.73 before currents); the Kuroshio extension (2.4 → 4.0) and North Pacific (+1.4) stay worse, and the Europe–Asia contrast falls (2.8 → 0.9 annual), left for step 6b. The user: "Accept 0.48 (Recommended)" (2026-11-19)
 - **Piece 5: one more bounded speed round** (the sea and its currents solved together in one step, pass 2's sea started from pass 1's); if it does not get within about 20% of the old times (8.9 s at 64, 29.5 s at 256 from nothing), accept the slowdown and report its cost, then the review round. The user: "One more round (Recommended)" (2026-11-19)
+- **Piece 5's re-check findings (decided by the planner chat):** all four fixed in piece 6's commit: the worker currents test gets a world with a coast (`handle.test.ts:209`, `:296`), the "temperature and winds" comments include the currents, `climate.ts:365` gives pass 2's years, and `climate.ts:372` gets its verb.
 
 ## Open
 

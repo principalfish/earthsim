@@ -10,7 +10,7 @@ Not included: real sea ice (step 6), rain (step 4), the deep ocean beyond the ov
 
 ## Plan
 
-_2026-11-19 · 4 of 9 pieces done · now: piece 5 in progress_
+_2026-11-19 · 5 of 9 pieces done · now: piece 6 in progress_
 
 - [x] **1/9 Observed sea temperatures and currents** · `5354dc1`
   The observed sea temperatures (OISST) and drifter currents, built into shipped data files with their loaders.
@@ -20,9 +20,9 @@ _2026-11-19 · 4 of 9 pieces done · now: piece 5 in progress_
   A shared corner index on the globe's grid, with exact flows from corner values and a solve that holds each coast.
 - [x] **4/9 Wind-driven gyres** · `8e019fd`
   Monthly gyres from the winds on any coastline, with strong currents on each basin's western side.
-- [ ] **5/9 Currents carry the sea's heat in the loop** · in progress
+- [x] **5/9 Currents carry the sea's heat in the loop** · `56e6cd9`
   Each pass becomes temperature, winds, currents; the sea's heat moves along the currents.
-- [ ] **6/9 Upwelling** · not started
+- [ ] **6/9 Upwelling** · in progress
   Cold water comes up where the wind pushes coastal water offshore, and at the equator.
 - [ ] **7/9 The overturning** · not started
   Heat taken from a basin's tropics to its open polar end; candidate rules measured, you choose.
