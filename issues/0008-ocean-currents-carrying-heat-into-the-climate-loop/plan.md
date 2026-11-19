@@ -248,3 +248,7 @@ The user chose "Correct the double count (Recommended)" and "Yes, in piece 5 (Re
 ### Piece 6: coastal upwelling only (2026-11-19)
 
 The user chose "Coasts only (Recommended)": piece 6 ships the coastal upwelling, with the equatorial band kept as a setting whose default is 0 (its config entry says why: the 5° Coriolis floor gives about three times the observed equatorial upwelling). Piece 6's Acceptance on the equator no longer applies; the equatorial divergence is left for step 6b or a later fix of the Ekman floor.
+
+### Piece 7: the rule chosen (2026-11-19)
+
+The user said "go ahead" to rule E with the polar test relaxed to about 80° and a sill-depth condition (shallowest point of each passage deeper than about 500 m, as a setting with its reason). Strip candidates A–D and the +ret variants, keep `overturningRule` only if a setting to switch it off is still wanted (off = piece 6 bit for bit), re-measure the Earth at 64/128/256 and the generated worlds (which basins, the regions, the loop, timings), and stop again only if a region crosses the lines or the Earth no longer picks the North Atlantic alone. Then re-record the baselines and run the review round.

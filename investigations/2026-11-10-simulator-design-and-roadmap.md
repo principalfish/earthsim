@@ -160,6 +160,8 @@ Each item was decided by the user or the planner chat while building step 5; the
 - **Upwelling takes about 0.8 PW out of the sea and nothing returns it** (piece 6). In the real ocean, the overturning's sinking at the poles supplies the cold water. See piece 7 for whether the two balance.
 - **Upwelling's depth figures** (4 °C at 1000 m from the World Ocean Atlas, a 150 m source depth, a 300 m scale) are the builder's estimates, checked only against the planner's memory, not the data.
 
+- **The overturning is geometry only** (piece 7, the user: "go ahead" to rule E). The model has no salt, so the Atlantic–Pacific asymmetry (a narrower, saltier Atlantic, and water vapour carried across Central America) is stood in for by passage width and sill depth. Revisit after step 4 (rain): an evaporation-minus-rain test of the polar end would be the physical gate. The 0.5 PW strength per basin, and the paper figures behind it (Lozier 2019; Ganachaud and Wunsch 2000; Johns 2011), are from memory, not checked.
+
 **For step 6 (ice):**
 - **Polar summers too warm** with the sea-ice stand-in following the sea (piece 2, the user: "Accept, carry on (Recommended)"): Antarctica January +5.5 → +9.3 K, the Arctic >75N July −3.0 → +4.3. To look at again at piece 7 if it bears on it; otherwise with real sea ice.
 
