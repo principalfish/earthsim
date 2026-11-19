@@ -50,3 +50,22 @@
 | re-check | docs | low | docs | dropped | - | `config.ts:1518`, `winds.md:49` | "as before" wording predates this change |
 | re-check | correctness | - | - | - | - | - | Clean |
 | manual | user | - | - | - | - | piece 2 re-check findings | The user: "Wording with piece 5" (the wording rows and the `docs/temperature.md:28` look-ahead are fixed in piece 5's commit); the two optional tests are accepted as they are and not added |
+
+## piece 3 · 2026-11-19 · Grid corners
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | coverage | low | test | verified | fixed | `src/core/grid/sparse.ts:617` | BiCGSTAB breakdown exit never run; test added (identity matrix, x = 1e200), singular 2x2 test tightened |
+| round | correctness | low | docs | verified | fixed | `src/core/grid/corners.ts:505` | Comment on side orientation backwards (code right; all six faces are left-handed) |
+| round | correctness | low | docs | verified | fixed | `src/core/grid/corners.ts:270`, `:1362` | `guess` docs said a net coast's guess is read at its first corner but the last won; the loop now runs backwards |
+| round | correctness | low | defect | verified | fixed | `src/core/grid/corners.ts:1175` | A sea piece with only net coasts is singular; now documented (no connectivity check) |
+| round | docs | low | docs | verified | fixed | `docs/development.md:61` | `corners.ts` table row a paragraph long, duplicating the header; cut to one clause, timings moved into the header |
+| round | security | low | defect | verified | fixed | `src/core/grid/corners.ts:1111`, `sparse.ts:346` | Dense coarsest level: memory grows with the square of the net coasts (about 800 MB for 10^4); documented |
+| round | correctness | low | cleanup | verified | open | `src/core/grid/grid.ts:492` | `neighbourTable` is public through `export *` but only tests use it; left: hiding it needs about 30 explicit grid.ts names in index.ts, which breaks the `export *` convention (the builder's reason, for the user) |
+| round | docs | low | docs | dropped | - | `corners.ts:1` | Timings missing from the header: dropped as stated, folded into the table-row finding |
+| round | coverage | low | test | dropped | - | `corners.ts:453`, `:777` | Internal-invariant throws: accepted, cannot fire on a valid grid |
+| round | security | - | - | - | - | - | Clean otherwise |
+| re-check | coverage | medium | test | verified | open | `src/core/grid/corners.ts:1383`, `corners.test.ts:642` | No test pins that a net coast takes its first corner's guess; overwrite all but the first island corner with 1e6 and expect 0 iterations (also raised by correctness) |
+| re-check | docs | low | docs | verified | open | `src/core/grid/corners.ts:226`, `:1129`, `sparse.ts:374` | "singular and the solve reports converged: false" is stated as certain; a consistent right-hand side can still converge; soften |
+| re-check | correctness | - | - | - | - | - | Clean |
+| re-check | security | - | - | - | - | - | Clean |

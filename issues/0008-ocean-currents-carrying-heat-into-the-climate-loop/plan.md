@@ -136,7 +136,7 @@ Rejected (with the user's choices): gyres alone (the North Atlantic barely warms
 ## Checkpoints
 - [x] 1. Observed sea temperatures and currents
 - [x] 2. The sea's own temperature
-- [ ] 3. Grid corners
+- [x] 3. Grid corners
 - [ ] 4. Wind-driven gyres
 - [ ] 5. Currents carry the sea's heat in the loop
 - [ ] 6. Upwelling
@@ -178,6 +178,16 @@ Built on `claude-opus-5-5`. Two stops went to the user, who accepted both: the s
 - Piece 1's four re-check findings were fixed in this commit, on the user's "Accept, fix all four".
 - Coverage: changed lines in `src/`, no uncovered lines to account for (`scripts/` is not measured; its tests are in the diff).
 - Re-check findings left to the user (all low): history-style wording ("before the sea had a temperature of its own") at `docs/temperature.md:30`, `temperature.ts:41`, `temperature.test.ts:527`, `tuning.test.ts:85`, `docs/winds.md:47,114`; two optional tests (a mid-exchange `seaFollows` case; a 503 with a failing cancel); `docs/temperature.md:28` looks ahead to currents and goes stale in piece 5. See `findings.md`.
+
+### Piece 3 (2026-11-19)
+
+Built on `claude-opus-5-5`. Decided by the builder:
+- **Discretisation.** A corner's area is a quarter of each cell touching it. The Laplacian is a bilinear finite-element one with lumped mass on an 8-neighbour stencil (a two-point Laplacian was 30% wrong inside faces and O(1/h) wrong at cube edges). The east slope is a least-squares fit over the edge neighbours, zero exactly at a pole. Where the grid cannot resolve the boundary layer, the least extra two-point diffusion keeps all weights non-negative (hybrid upwinding), so the system is an M-matrix. Approximate: first order (0.4–0.8% at 64), 13–15% off at the eight cube corners at every resolution, the east slope up to 0.3%.
+- **Solver.** BiCGSTAB with one multigrid V-cycle as preconditioner (ILU(0) smoother, Galerkin coarse grids down to 4 cells per face edge, dense solve at the bottom); ILU-only BiCGSTAB stalled at 256. For a basin with a continent and an island at tolerance 1e-8: solve 0.07 s at 64, 0.18 s at 128, 0.5–0.8 s at 256, 4–6 iterations; operator build 0.13, 0.33 and 1.1 s, once per operator and coasts; a warm start takes 0 iterations; 217 islands at 256 take 0.8 s and 8 iterations.
+- **Coasts.** Label 0 is sea and k ≥ 1 is coast k. A `'value'` coast has its psi given; a `'net'` coast's psi is found so the net over its corners equals a given number. At least one `'value'` coast is required, and every connected piece of sea must touch one. Many `'net'` coasts cost memory with the square (about 800 MB for 10^4); piece 4 should hold small islands as `'value'`.
+- **Deviations from the plan.** An extra module `sparse.ts` (sparse matrices, ILU(0), the V-cycle, BiCGSTAB, with its own tests), plus `coastLabels`, `neighbourTable` (grid.ts; neighbours for any n so tests run at n = 8), `apply`, `cornerAreas` and face ids in the index. A solve that runs out of iterations returns `converged: false` rather than throwing.
+- Accepted reasons for uncovered lines (changed-lines report, `src/`): `corners.ts:453` and `:777` throw on internal invariants the construction guarantees (cannot fire on a valid grid); `sparse.ts:617`'s `rhoNext === 0` half cannot fire when the residual is above tolerance, and its overflow half is now tested.
+- Findings left to the user (see `findings.md`): `neighbourTable` stays public through `export *` (hiding it needs about 30 explicit names in `index.ts`, which breaks the `export *` convention; it validates its input, is documented, and sits beside `sideCorners` and `faceCorners`); a test that pins the net coast's first-corner guess (medium); softening "the solve reports converged: false" for a singular system to "may fail to converge" in `corners.ts:226`, `:1129` and `sparse.ts:374`. All three are cheap to do in piece 4's commit, which touches `corners.ts`.
 
 ### Piece 5: carried over from piece 2 (2026-11-19)
 
