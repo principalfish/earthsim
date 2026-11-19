@@ -75,7 +75,7 @@ Reordered by the user on 2026-11-18: step 5 (ocean currents) comes before step 4
 
 Added since (see the status table): 3c, the layers brought into the main view; 3a, the core and page folders; 3d, one config file for every model's settings; and 3b, heat carried by winds and the climate loop; all between steps 3 and 4, in that order. Also 10, an optional simulated atmosphere, after step 9.
 
-## Status and carried-over items (as of 2026-11-18)
+## Status and carried-over items (as of 2026-11-19)
 
 Keep this section current when a step is merged.
 
@@ -89,7 +89,7 @@ Keep this section current when a step is merged.
 | 3d One config.ts for every model's settings, with config.md; also a read-only Model settings screen with the climate process diagram, replacing the PDF | Done 2026-11-18 (PR #12 merged at 9463afa) | 0006, GitHub #11 |
 | 3a follow-up: the deeper splits of `ui/layerPanel.ts` and `wiring.ts`, and the `ui/` type dependency (see under step 3a) | Deferred by the user (2026-11-18: "Skip to step 5"); step 5 goes first, so the panel grows by the currents layer before the split. Revisit before step 4 | |
 | 3b Heat carried by winds, and the climate loop | Done 2026-11-18 (PR #14 merged at 05ec69d) | 0007, GitHub #13 |
-| 5 Ocean currents | Next (the user, 2026-11-18: "Skip to step 5"); before step 4 | |
+| 5 Ocean currents | In progress: 5 of 9 pieces committed (2026-11-19); left-for-later items under "Step 5: left for later steps" | 0008, GitHub #15, PR #16 (draft) |
 | 4 Moisture, rainfall and Köppen zones | Not started; after step 5, so rain and the Köppen zones are built and tuned against sea temperatures that the currents have already set (the user, 2026-11-18). Before planning it, settle fixed or fitted colour scales (see the open follow-ups), since rainfall is the next colour layer | |
 | 6 Ice sheets and sea ice | Not started | |
 | 6b Tune the whole climate loop against the Earth | Not started; after steps 3b, 5 and 6, when every part of the loop is in | |
@@ -145,6 +145,24 @@ The first feedback into temperature, and the loop that later feedbacks (ocean cu
 - **Two rule problems found while planning 3b, for step 6b** (the user, 2026-11-18: "Winds and loop only"): the cooling with height is too strong (Tibet about 12 K too cold, its worst cells −15 K at 5 km), and Antarctica and its ice shelves are about 8 K too warm. Also found: all northern land is 3–9 K too cold in summer, which the winds will not fix. The region-by-region figures are in issue 0007's `sweeps-2026-11-18.md`.
 - **Retuning waits for step 6b** (the user's decision above): note here what moves, do not chase the Earth's figures. **Two wind settings to revisit then:** step 3's rules model makes up for the temperature model's weak seasons and weak land and sea contrasts with `LOW_SHIFT_GAIN` (2.5, where 1 is the plain rule: it pushes the equatorial low further from the equator than the warmest latitude) and `THERMAL_HPA_PER_K` (3 hPa a kelvin, where the physics suggests about 0.7). When the temperature improves here, and again with ocean currents, both should come back towards their natural values; retune them and reset the winds baseline. **Update (2026-11-18, issue 0007):** `thermalHpaPerK` was brought down to its physical 0.7 in step 3b, because at 3 it made the climate loop's wind–heat feedback too strong to settle (the user's choice, option A); `lowShiftGain` still waits for 6b.
 - **Known costs:** the temperature solver relies on heat exchange being symmetric between neighbours, which carrying heat with the wind is not, so it needs a different method; the temperature starts to depend on day length; the worker's one-request-per-layer design becomes one climate solve.
+
+### Step 5: left for later steps (issue 0008, kept current as pieces land)
+
+Each item was decided by the user or the planner chat while building step 5; the full entries are in issue 0008's `decisions.md`.
+
+**For step 6b (tuning the whole loop):**
+- **Regions the currents made worse** (piece 5, the user: "Accept 0.48 (Recommended)"): the Kuroshio extension (NW Pacific 30–45N, annual air rms 2.4 → 4.0 K) and the North Pacific 40–60N (2.1 → 3.5). The Kuroshio now brings in about the right warm water, and the air downwind was already about 6 K too warm in January. The Europe–Asia coast contrast also fell (2.8/6.3 → 0.9/4.6 K annual/January, observed 11.5/22.9).
+- **Diffusivity:** the sea's `diffusivity` was cut from 0.55 to 0.48, the share of poleward heat the currents now carry (12.5%), derived rather than tuned. `landDiffusivity` (0.35) was not re-derived, although it too stands in for heat the winds now carry.
+- **Equatorial upwelling is off** (piece 6, the user: "Coasts only (Recommended)"). Its setting is kept, default 0, because piece 4's 5° floor on the Coriolis term in the Ekman transport gives about 150 Sv, three times the observed. Make that floor physical (smaller, with the transport capped), then turn it on and measure.
+- **Currents are a fifth to a half of the drifters' strength** (piece 4), because the wind stress comes from monthly mean winds. A gust term in the stress is the candidate fix, and it changes the rule, so it isn't tuning. Also from piece 4: Drake Passage 7–36 Sv against about 140 observed; no equatorial currents; Panama open on the 64 grid.
+- **The sea's heat loss doesn't grow with its temperature** (piece 2, the user: "Accept it (Recommended)"). A steady loss equal to each cell's year-mean absorbed sunlight stands in for evaporation and long-wave. So warm water warms the air downwind less than it should: along the North Atlantic drift the sea warms 1.7 K and its air only 0.9 K. A loss that rises with sea temperature is the candidate.
+- **Upwelling's depth figures** (4 °C at 1000 m from the World Ocean Atlas, a 150 m source depth, a 300 m scale) are the builder's estimates, checked only against the planner's memory, not the data.
+
+**For step 6 (ice):**
+- **Polar summers too warm** with the sea-ice stand-in following the sea (piece 2, the user: "Accept, carry on (Recommended)"): Antarctica January +5.5 → +9.3 K, the Arctic >75N July −3.0 → +4.3. To look at again at piece 7 if it bears on it; otherwise with real sea ice.
+
+**Follow-up, no step yet:**
+- **The climate is slower with currents** (piece 5, the user: "One more round (Recommended)", after which the slowdown was accepted): from nothing 8.9 → 13.0 s at 64 and 29.5 → 51.4 s at 256; after an edit 3.2 → 4.6 s and 7.9 → 18.6 s. The cost is the sea's step (about 10 heat-carrying sweeps a step) and pass 2 needing 5–6 simulated years instead of 3. The gyres themselves cost 0.05–0.5 s a pass. Tried and dropped: over-relaxed sweeps and a year-end correction with the currents' transport (both diverged), starting the sweeps from the last step's change (about 3%), and a global-mean sea correction. Untried: solving the sea and its currents together as one implicit system.
 
 ### Step 10 (optional): a simulated atmosphere
 Step 3 planned to prototype two wind models and choose. After the rules prototype (step 3, piece 5) the user deferred the simulated one to here: "ok lets maybe defer the simulated atmosphere til the end of the roadmap - if you are confident it will take so long to solve then its not worth doing here yet", then "Yes, defer it". Step 3 builds the rules model.
