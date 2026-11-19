@@ -167,16 +167,17 @@ export type LayerStore = {
 	setProgress(progress: TemperatureProgress, pass?: number): void;
 	/**
 	 * Keeps a pass of the climate under way that has finished, before the
-	 * loop has: the pass's temperature and winds become both layers' results
-	 * in one change, to show at once, and both stay `calculating`. The next
+	 * loop has: the pass's temperature and winds, with the currents the next
+	 * start carries on from, become both layers' results in one change, to
+	 * show at once, and both stay `calculating`. The next
 	 * pass is then under way, with no progress yet; or, if this pass is the
 	 * last, whose answer is to follow, it stays under way with its progress
 	 * as it last was. The pass is not `current`: only
 	 * {@link setClimateResult} settles it. Does nothing unless the
 	 * temperature is `calculating`.
 	 *
-	 * @param solved - The pass's temperature and winds, and the day length
-	 * they were worked out for.
+	 * @param solved - The pass's temperature, winds and currents, and the
+	 * day length they were worked out for.
 	 * @param pass - The pass, from 1.
 	 * @param last - Whether the loop ends with it; false when left out.
 	 */
@@ -184,8 +185,8 @@ export type LayerStore = {
 	/**
 	 * Keeps the climate's last pass as both layers' results, in one change.
 	 *
-	 * @param solved - The last pass's temperature and winds, and the day
-	 * length they were worked out for.
+	 * @param solved - The last pass's temperature, winds and currents, and
+	 * the day length they were worked out for.
 	 * @param current - Whether it describes the world as it is now, rather
 	 * than as it was before a change made while it was being calculated.
 	 * Both statuses become `current` or `outOfDate`, unless they are

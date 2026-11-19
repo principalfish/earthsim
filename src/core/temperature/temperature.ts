@@ -115,11 +115,17 @@ import {
 	temperaturePlanet,
 	yearLengthDays,
 } from '../planet/planet';
-import { MAX_ELEVATION_M, MIN_ELEVATION_M, type World } from '../world/world';
+import {
+	MAX_ELEVATION_M,
+	MIN_ELEVATION_M,
+	PLANET_RADIUS_KM,
+	type World,
+} from '../world/world';
 import {
 	createHeatAdvector,
 	type HeatAdvector,
 	interpolateFlows,
+	monthsAround,
 } from './advection';
 import { createExchangeSolver, type ExchangeSolver } from './exchange';
 import type { MonthlyTemperature } from './observed';
@@ -401,6 +407,31 @@ export type TemperatureCurrents = {
 	readonly depthM: number;
 };
 
+/**
+ * Where water wells up into the sea's mixed layer from below and cools it:
+ * a year of monthly rates on the grid the world is solved on, and the deep
+ * sea's temperature they cool the sea toward.
+ *
+ * @remarks
+ * The sea of a cell gives up `rate × (T_s − deep)` watts a square metre to
+ * the water welling up while it is warmer than `deepC`, and nothing while
+ * it is not; the heat leaves the climate. `upwelling` in `ocean/upwelling`
+ * works the rates out from the winds.
+ */
+export type TemperatureUpwelling = {
+	/**
+	 * Twelve fields, January to December, of the rate at which each cell's
+	 * sea gives up heat to the water welling up, for each kelvin it is above
+	 * {@link TemperatureUpwelling.deepC}, in watts a square metre a kelvin:
+	 * finite, zero or above, one value per cell of the grid the world is
+	 * solved on, as {@link TemperatureCurrents.flows} are; a land cell's is
+	 * not read. They must not be changed while the solve runs.
+	 */
+	readonly rates: readonly ArrayLike<number>[];
+	/** The deep sea's temperature, in degrees Celsius: finite. */
+	readonly deepC: number;
+};
+
 /** What {@link solveTemperature} may be given besides the world. */
 export type SolveTemperatureOptions = {
 	/**
@@ -439,6 +470,15 @@ export type SolveTemperatureOptions = {
 	 * for a solve from nothing does not use them.
 	 */
 	readonly currents?: TemperatureCurrents;
+	/**
+	 * The water welling up from below that cools the sea, in each time step
+	 * with the sea's exchange with the air: solved for with the rest of the
+	 * sea's step (see {@link seaStep}), the rates of the time the step ends
+	 * at, interpolated between the months'. Left out, the solve is the one
+	 * with no upwelling, bit for bit. The first guess for a solve from
+	 * nothing does not use it.
+	 */
+	readonly upwelling?: TemperatureUpwelling;
 	/**
 	 * Whether to solve on the world's own grid whatever its resolution,
 	 * rather than on {@link solveResolution} of it; defaults to false.
@@ -554,6 +594,13 @@ export type TemperatureResult = {
 	 * is larger. See {@link solveTemperature}.
 	 */
 	readonly finalChangeK: number;
+	/**
+	 * The heat the water welling up took from the sea over the last year, as
+	 * a mean over the year, in watts, summed over the planet: what the steps
+	 * took, each step's at the sea's temperature it ended at. Zero for a
+	 * solve given no upwelling.
+	 */
+	readonly upwellingW: number;
 };
 
 /** The annual summaries of a temperature result, one value per cell. */
@@ -1376,6 +1423,19 @@ type Stepper = {
 	/** The rise of absorbed sunlight with temperature, summed likewise. */
 	readonly feedback: Float64Array;
 	/**
+	 * The rate at which the water welling up takes each cell's sea's heat,
+	 * W m⁻² K⁻¹, summed over the year's steps so far; empty with no
+	 * upwelling.
+	 */
+	readonly upwellingDamping: Float64Array;
+	/**
+	 * The heat the water welling up took from the sea over the year's steps
+	 * so far, summed over the steps, in watts on the unit sphere: each step's
+	 * rate times the sea's excess over the deep sea's temperature at the
+	 * step's end, times the cell's area.
+	 */
+	upwellingTaken(): number;
+	/**
 	 * Whether every step since the year's sums were last cleared was solved
 	 * to its accuracy.
 	 */
@@ -1435,54 +1495,65 @@ const seaClearShareSlope = (seaK: number, model: TemperatureModel): number => {
  * @remarks
  * The sea's balance over a step of second-order backward differences is
  *
- * `C_s (3 T_s' − 4 T_s + T_s⁻) / 2Δt = S − k (T_s' − T_a') − (g − b) (T_s' − T_s)`
+ * `C_s (3 T_s' − 4 T_s + T_s⁻) / 2Δt = S − k (T_s' − T_a') − (g − b) (T_s' − T_s) − u (T_s' − T_d)`
  *
  * for its heat capacity `C_s`, the sunlight it keeps `S` (what it absorbs
  * less what it gives up at a steady rate), the exchange `k` with the air at
- * `T_a'`, and `g`, how much faster the sea gives heat up per kelvin of its
- * own warming as its ice opens, less `b`, how much more sunlight it absorbs
- * per kelvin as the ice's brightness goes: the ice share's change over the
- * step, taken at the sea's temperature now and solved for with the rest,
- * which keeps a sea at the ice's edge from swinging between iced and open
- * from step to step. `b` is taken at no more than three quarters of the
- * sea's heat capacity over the step, so that the step stays well posed;
- * only `g` is heat given to the air. The sea has no other neighbour, so it
- * is solved for at once: `T_s' = base + gain · T_a'`. What it gives the
- * air, `k (T_s' − T_a') + g (T_s' − T_s)`, is then `(k + g) · base − g T_s
- * − (k − (k + g) gain) T_a'`: the air's mass grows by `k − (k + g) gain`,
- * which is not negative, and its right-hand side by `(k + g) · base − g
- * T_s`. The heat the air gains is exactly what the sea loses, whatever
- * `T_a'` the air's solve settles on.
+ * `T_a'`, the rate `u` at which the water welling up from below takes its
+ * heat toward the deep sea's temperature `T_d` (see
+ * {@link TemperatureUpwelling}; 0 with none), and `g`, how much faster the
+ * sea gives heat up per kelvin of its own warming as its ice opens, less
+ * `b`, how much more sunlight it absorbs per kelvin as the ice's brightness
+ * goes: the ice share's change over the step, taken at the sea's
+ * temperature now and solved for with the rest, which keeps a sea at the
+ * ice's edge from swinging between iced and open from step to step. `b` is
+ * taken at no more than three quarters of the sea's heat capacity over the
+ * step, so that the step stays well posed; only `g` is heat given to the
+ * air, and what `u` takes leaves the climate. The sea has no other
+ * neighbour, so it is solved for at once: `T_s' = base + gain · T_a'`. What
+ * it gives the air, `k (T_s' − T_a') + g (T_s' − T_s)`, is then `(k + g) ·
+ * base − g T_s − (k − (k + g) gain) T_a'`: the air's mass grows by `k −
+ * (k + g) gain`, which is not negative, and its right-hand side by `(k + g)
+ * · base − g T_s`. The heat the air gains is exactly what the sea loses to
+ * it, whatever `T_a'` the air's solve settles on.
  *
  * @param step - The sea's temperature now and a step before, in kelvin; the
- * sunlight it keeps, W m⁻²; the exchange `k`, the opening `g` and the
- * brightening `b`, W m⁻² K⁻¹, none negative; and its heat capacity over the
- * step's length.
+ * sunlight it keeps, W m⁻²; the exchange `k`, the opening `g`, the
+ * brightening `b` and the upwelling `u`, W m⁻² K⁻¹, none negative, `u` 0
+ * when left out; the deep sea's temperature `T_d`, in kelvin, read only
+ * with `u`; and its heat capacity over the step's length.
  * @returns The sea's `base` in kelvin, its `gain`, from 0 to below 1, and
  * `coupling`, `k + g`.
  */
-export const seaStep = (step: {
-	readonly sea: number;
-	readonly earlier: number;
-	readonly sunlight: number;
-	readonly exchange: number;
-	readonly opening: number;
-	readonly brightening: number;
-	readonly storage: number;
-}): {
+export const seaStep = (
+	step: {
+		readonly sea: number;
+		readonly earlier: number;
+		readonly sunlight: number;
+		readonly exchange: number;
+		readonly opening: number;
+		readonly brightening: number;
+		readonly storage: number;
+	} & (
+		| { readonly upwelling?: undefined; readonly deepK?: undefined }
+		| { readonly upwelling: number; readonly deepK: number }
+	),
+): {
 	readonly base: number;
 	readonly gain: number;
 	readonly coupling: number;
 } => {
 	const { sea, earlier, sunlight, exchange, opening, storage } = step;
 	const brightening = Math.min(step.brightening, 0.75 * storage);
+	const upwelling = step.upwelling ?? 0;
 	const coupling = exchange + opening;
-	const diagonal = 1.5 * storage + coupling - brightening;
+	const diagonal = 1.5 * storage + coupling + upwelling - brightening;
 	return {
 		base:
 			(storage * (2 * sea - 0.5 * earlier) +
 				sunlight +
-				(opening - brightening) * sea) /
+				(opening - brightening) * sea +
+				(step.upwelling === undefined ? 0 : upwelling * step.deepK)) /
 			diagonal,
 		gain: exchange / diagonal,
 		coupling,
@@ -1498,6 +1569,7 @@ const createStepper = (
 	beforeSea: Float64Array,
 	advection?: Advection,
 	currents?: Advection,
+	upwelling?: TemperatureUpwelling,
 ): Stepper => {
 	const { cellCount, areas, clearAlbedo, cooling, emission, land, model } =
 		setup;
@@ -1567,6 +1639,41 @@ const createStepper = (
 			seaCapacity[cell] = land[cell] ? 0 : oceanHeatCapacity;
 		}
 	}
+	// The sea cells that well up in some month, the only ones whose rates
+	// are worked out at each step's time; each sea cell's rate in the step
+	// (0 where its sea is no warmer than the deep sea's), and their sum over
+	// the year.
+	const welling: number[] = [];
+	if (upwelling !== undefined) {
+		for (let cell = 0; cell < cellCount; cell++) {
+			if (
+				!land[cell] &&
+				upwelling.rates.some((month) => (month[cell] as number) > 0)
+			) {
+				welling.push(cell);
+			}
+		}
+	}
+	const wellingCells = Int32Array.from(welling);
+	const upwellingCells = upwelling === undefined ? 0 : cellCount;
+	const upwellingRates = new Float64Array(upwellingCells);
+	const upwellingNow = new Float64Array(upwellingCells);
+	const upwellingDamping = new Float64Array(upwellingCells);
+	const deepK = upwelling === undefined ? 0 : upwelling.deepC + ZERO_CELSIUS_K;
+	let upwellingSum = 0;
+
+	/** Writes the rates of the welling cells at a time of the year. */
+	const upwellingAt = (
+		rates: readonly ArrayLike<number>[],
+		yearFraction: number,
+	): void => {
+		const { from, to, weight } = monthsAround(rates, yearFraction);
+		for (let k = 0; k < wellingCells.length; k++) {
+			const cell = wellingCells[k] as number;
+			upwellingRates[cell] =
+				(1 - weight) * (from[cell] as number) + weight * (to[cell] as number);
+		}
+	};
 
 	let solved = true;
 
@@ -1575,6 +1682,8 @@ const createStepper = (
 		leastCapacity.fill(Number.POSITIVE_INFINITY);
 		damping.fill(0);
 		feedback.fill(0);
+		upwellingDamping.fill(0);
+		upwellingSum = 0;
 	};
 
 	const runMonth = (
@@ -1591,6 +1700,13 @@ const createStepper = (
 				table,
 				light,
 			);
+			if (upwelling !== undefined) {
+				upwellingAt(
+					upwelling.rates,
+					(month * stepsPerMonth + step + 1) /
+						(MONTHS_PER_YEAR * stepsPerMonth),
+				);
+			}
 			for (let cell = 0; cell < cellCount; cell++) {
 				const t = state[cell] as number;
 				const earlier = previous[cell] as number;
@@ -1666,6 +1782,15 @@ const createStepper = (
 					seaClearShareSlope(seaNow, model) *
 						(meanSunlight + airSeaExchange * (seaNow - ahead)),
 				);
+				// The water welling up cools the sea only while the sea is warmer
+				// than the deep sea's water it relaxes toward.
+				let upwelled = 0;
+				if (upwelling !== undefined) {
+					upwelled = seaNow > deepK ? (upwellingRates[cell] as number) : 0;
+					upwellingNow[cell] = upwelled;
+					upwellingDamping[cell] =
+						(upwellingDamping[cell] as number) + upwelled;
+				}
 				const { base, gain, coupling } = seaStep({
 					sea: seaNow,
 					earlier: seaEarlier,
@@ -1677,15 +1802,18 @@ const createStepper = (
 						seaClearShareSlope(seaNow, model) *
 						sunlight,
 					storage: seaStorage,
+					upwelling: upwelled,
+					deepK,
 				});
 				seaBase[cell] = base;
 				seaGain[cell] = gain;
-				seaFollows[cell] = coupling > 0 ? exchange / coupling : 0;
+				// The sea's own losses, to the air and to the water welling up.
+				const losses = coupling + upwelled;
+				seaFollows[cell] = losses > 0 ? exchange / losses : 0;
 				// Over a step of the winds, a backward-difference step, the sea
 				// follows this share of the air's change.
 				const share =
-					(exchange * stepSeconds) /
-					(oceanHeatCapacity + coupling * stepSeconds);
+					(exchange * stepSeconds) / (oceanHeatCapacity + losses * stepSeconds);
 				seaShare[cell] = share;
 				capacity[cell] = seaAirHeatCapacity + share * oceanHeatCapacity;
 				leastCapacity[cell] = Math.min(
@@ -1717,6 +1845,20 @@ const createStepper = (
 					seaNext[cell] =
 						(seaBase[cell] as number) +
 						(seaGain[cell] as number) * (next[cell] as number);
+				}
+			}
+			if (upwelling !== undefined) {
+				// The heat the water welling up took over the step, at the
+				// sea's temperature the step solved it to.
+				for (let k = 0; k < wellingCells.length; k++) {
+					const cell = wellingCells[k] as number;
+					const rate = upwellingNow[cell] as number;
+					if (rate > 0) {
+						upwellingSum +=
+							(areas[cell] as number) *
+							rate *
+							((seaNext[cell] as number) - deepK);
+					}
 				}
 			}
 			if (advection !== undefined) {
@@ -1817,6 +1959,8 @@ const createStepper = (
 		leastCapacity,
 		damping,
 		feedback,
+		upwellingDamping,
+		upwellingTaken: () => upwellingSum,
 		allSolved: () => solved,
 		startYear,
 		runMonth,
@@ -1862,8 +2006,9 @@ const CROSSED_BAND_DEG = 5;
  * heat implies at the balance with no heat capacity: the outgoing heat's
  * rise with temperature, less the rise of absorbed sunlight as ice
  * retreats (kept to at least {@link MIN_DAMPING_SHARE} of the former, so
- * that the correction stays bounded where the two nearly cancel), with the
- * exchange between cells.
+ * that the correction stays bounded where the two nearly cancel), and at
+ * sea the year's mean rate at which the water welling up takes the sea's
+ * share of the shift, with the exchange between cells.
  *
  * Where the currents carry the sea's heat across a cell's edges, its sea's
  * own change is not counted, but the mean change of the carried sea in its
@@ -1904,6 +2049,7 @@ const correctYearEnd = (
 	const { cellCount, areas, emission, yearSeconds, model } = setup;
 	const { state, sea } = stepper;
 	const steps = MONTHS_PER_YEAR * model.stepsPerMonth;
+	const upwelled = stepper.upwellingDamping.length > 0;
 	correction.fill(0);
 	if (crossed !== undefined) {
 		const { cells, band, bandChange, bandArea } = crossed;
@@ -1933,10 +2079,16 @@ const correctYearEnd = (
 			const a = Math.cbrt(tangent / (4 * emission));
 			const b = Math.max(MIN_TEMPERATURE_K, a + (correction[cell] as number));
 			const radiationDamping = emission * (a * a + b * b) * (a + b);
-			const meanDamping = Math.max(
+			let meanDamping = Math.max(
 				radiationDamping - (stepper.feedback[cell] as number) / steps,
 				MIN_DAMPING_SHARE * radiationDamping,
 			);
+			if (upwelled) {
+				// The water welling up takes the sea's share of the shift too.
+				meanDamping +=
+					((stepper.upwellingDamping[cell] as number) / steps) *
+					(stepper.seaFollows[cell] as number);
+			}
 			mass[cell] = cellArea * meanDamping;
 			const airChange = (state[cell] as number) - (yearStart[cell] as number);
 			const gained = setup.land[cell]
@@ -2152,6 +2304,43 @@ const assertCurrents = (currents: TemperatureCurrents, world: World): void => {
 			throw new RangeError(
 				`The currents must carry nothing across an edge of a land cell; month ${month + 1} entry ${crossing} is ${field[crossing]}`,
 			);
+		}
+	}
+};
+
+/**
+ * Throws unless the upwelling is twelve rates of one finite value, zero or
+ * above, for each of `cellCount` cells, with a finite deep temperature.
+ */
+const assertUpwelling = (
+	upwelling: TemperatureUpwelling,
+	cellCount: number,
+): void => {
+	const { rates, deepC } = upwelling;
+	if (!Number.isFinite(deepC)) {
+		throw new RangeError(
+			`The upwelling's deep temperature must be finite; got ${deepC}`,
+		);
+	}
+	if (!Array.isArray(rates) || rates.length !== MONTHS_PER_YEAR) {
+		throw new RangeError(
+			`The upwelling must be ${MONTHS_PER_YEAR} monthly rates; got ${Array.isArray(rates) ? rates.length : typeof rates}`,
+		);
+	}
+	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
+		const field = rates[month] as ArrayLike<number>;
+		if (field?.length !== cellCount) {
+			throw new RangeError(
+				`The upwelling's rates for month ${month + 1} must hold ${cellCount} values, one for each cell of the grid solved on; got ${field?.length}`,
+			);
+		}
+		for (let cell = 0; cell < cellCount; cell++) {
+			const rate = field[cell] as number;
+			if (!(rate >= 0 && Number.isFinite(rate))) {
+				throw new RangeError(
+					`Every rate of the upwelling must be finite and not negative; month ${month + 1} cell ${cell} is ${rate}`,
+				);
+			}
 		}
 	}
 };
@@ -2567,6 +2756,7 @@ const solveOnGrid = (
 	onYear: SolveTemperatureOptions['onYear'],
 	winds: TemperatureWinds | undefined,
 	currents: TemperatureCurrents | undefined,
+	upwelling: TemperatureUpwelling | undefined,
 ): GridSolve => {
 	const setup = setUp(world, model);
 	const { cellCount, cooling } = setup;
@@ -2630,6 +2820,7 @@ const solveOnGrid = (
 			carried.seaBefore,
 			advection,
 			seaCurrents,
+			upwelling,
 		);
 		reference = carried.reference;
 	} else {
@@ -2653,6 +2844,7 @@ const solveOnGrid = (
 			guess,
 			advection,
 			seaCurrents,
+			upwelling,
 		);
 		reference = Float64Array.from(cooling);
 	}
@@ -2787,6 +2979,9 @@ const solveOnGrid = (
 		yearsRun,
 		converged,
 		finalChangeK,
+		upwellingW:
+			(stepper.upwellingTaken() * (PLANET_RADIUS_KM * 1000) ** 2) /
+			(MONTHS_PER_YEAR * stepsPerMonth),
 	};
 };
 
@@ -2905,7 +3100,9 @@ const solveOnGrid = (
  * {@link TemperatureState}), on another grid included, or if the winds or
  * the currents given are not twelve months of finite flows on the grid
  * solved on, the currents with a depth above 0 and finite and nothing
- * across an edge of a land cell.
+ * across an edge of a land cell, or if the upwelling given is not twelve
+ * months of finite rates, none negative, one for each cell of the grid
+ * solved on, with a finite deep temperature.
  * @throws Whatever `onYear` throws, as it is.
  */
 export const solveTemperature = (
@@ -2920,6 +3117,7 @@ export const solveTemperature = (
 		onYear,
 		winds,
 		currents,
+		upwelling,
 	} = options;
 	assertOptions(maxYears, tolerance);
 	assertModel(model);
@@ -2934,6 +3132,9 @@ export const solveTemperature = (
 	if (currents !== undefined) {
 		assertCurrents(currents, coarse ?? world);
 	}
+	if (upwelling !== undefined) {
+		assertUpwelling(upwelling, (coarse ?? world).elevation.length);
+	}
 	const solved = solveOnGrid(
 		coarse ?? world,
 		options.start,
@@ -2943,6 +3144,7 @@ export const solveTemperature = (
 		onYear,
 		winds,
 		currents,
+		upwelling,
 	);
 	const {
 		seaLevelMonths,
@@ -2952,6 +3154,7 @@ export const solveTemperature = (
 		yearsRun,
 		converged,
 		finalChangeK,
+		upwellingW,
 	} = solved;
 	let months: Float32Array[];
 	if (coarse === null) {
@@ -2981,6 +3184,7 @@ export const solveTemperature = (
 		yearsRun,
 		converged,
 		finalChangeK,
+		upwellingW,
 	};
 };
 

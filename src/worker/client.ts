@@ -53,8 +53,8 @@ export type RequestOptions = {
 	readonly onProgress?: (progress: TemperatureProgress, pass: number) => void;
 	/**
 	 * Told of each pass of a climate as the worker finishes it, before it
-	 * answers, in order: the pass's temperature and winds, which are the
-	 * caller's alone. Only a climate says so.
+	 * answers, in order: the pass's temperature, winds and currents, which
+	 * are the caller's alone. Only a climate says so.
 	 */
 	readonly onPass?: (pass: ClimateProgress) => void;
 };

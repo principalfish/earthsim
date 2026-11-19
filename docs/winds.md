@@ -107,9 +107,9 @@ The model's settings start from published or textbook figures where there are an
 
 | Months | RMS of the wind's difference as vectors | Direction within 45° | RMS pressure difference |
 |-|-|-|-|
-| January | 3.52 m/s | 60.2% | 7.91 hPa |
-| July | 4.40 m/s | 54.4% | 7.07 hPa |
-| The whole year | 3.64 m/s | 60.3% | 7.19 hPa |
+| January | 3.59 m/s | 59.4% | 8.00 hPa |
+| July | 4.45 m/s | 53.4% | 7.14 hPa |
+| The whole year | 3.69 m/s | 59.7% | 7.26 hPa |
 
 The thermal response, `thermalHpaPerK`, is at its physical 0.7 hPa a kelvin. It was tuned by hand to 3 before the winds carried heat, and put back when they did: at 3 the loop's feedback did not settle (see [Temperature](temperature.md#the-climate-loop)). The Siberian high and the South Asian low come out weaker at 0.7 than at 3. At 3, given the temperature without winds rather than the loop's, the figures for the year are 3.83 m/s, 61.3% and 7.06 hPa.
 

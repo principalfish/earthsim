@@ -487,9 +487,10 @@ type ClimateAnswer = {
  *
  * In the store, both layers become `calculating` when a request is made.
  * Each pass of the newest request is kept there as it finishes, the
- * temperature and the winds together ({@link LayerStore.setPass}), so the
- * first pass shows the world at once and the later ones refine it, and
- * the progress follows the solve of the pass under way. Neither is
+ * temperature and the winds together, with the currents the next start
+ * carries on from ({@link LayerStore.setPass}), so the first pass shows the
+ * world at once and the later ones refine it, and the progress follows the
+ * solve of the pass under way. Neither is
  * `current` until the answer arrives, which keeps the last pass as both
  * results, current if nothing has changed since the request was made and
  * out of date if something has. Passes and progress from a request that a
@@ -558,8 +559,8 @@ export const createClimateScheduler = <H>(
 	 * out of date and where it reached, if nothing has changed since it was
 	 * asked for.
 	 *
-	 * @param solved - The pass that finished, with the temperature and winds
-	 * it gave.
+	 * @param solved - The pass that finished, with the temperature, winds
+	 * and currents it gave.
 	 * @param pass - The pass that finished, counted as shown.
 	 */
 	const stop = (solved: SolvedWinds, pass: number): void => {

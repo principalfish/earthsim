@@ -55,8 +55,8 @@ type Reports = {
  * which are always the model's own, nor over the wind model's settings or
  * the grids they are solved on, so that no message can make a solve run
  * longer than the solver allows by default; of its start only the
- * temperature's months, state and record, the winds' two components and the
- * day length are used.
+ * temperature's months, state and record, the winds' two components, the
+ * currents' flows and streamfunction and the day length are used.
  */
 const COMPUTE: {
 	readonly [K in SimKind]: (

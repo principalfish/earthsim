@@ -1,6 +1,6 @@
 # Ocean
 
-How the wind-driven ocean currents are worked out, what they cost, how they compare with the observed Earth's, and what they leave out. The code is `src/core/ocean/gyres.ts` and `src/core/ocean/basins.ts`; the settings are listed in [Model settings](../src/core/config.md#ocean).
+How the wind-driven ocean currents are worked out, what they cost, how they compare with the observed Earth's, what they leave out, and the upwelling of cold water from below. The code is `src/core/ocean/gyres.ts`, `src/core/ocean/basins.ts` and `src/core/ocean/upwelling.ts`; the settings are listed in [Model settings](../src/core/config.md#ocean).
 
 The currents are worked out by `solveGyres` from a world and a year of its surface winds. The climate loop works them out from each pass's winds and carries the sea's heat along them in the next pass (see [Temperature](temperature.md#heat-carried-by-the-currents)); the page does not draw them.
 
@@ -64,7 +64,41 @@ The western boundary current, in a basin from 10°N to 50°N and 60° of longitu
 
 ## The heat they carry
 
-The climate loop carries the sea's heat along the flows, the whole transport of the 200 m layer at 4.18 MJ/m³/K (see [Temperature](temperature.md#heat-carried-by-the-currents)). On the Earth at 64 they carry 0.47 PW northward across 30°N and 0.45 PW southward across 30°S, over the year.
+The climate loop carries the sea's heat along the flows, the whole transport of the 200 m layer at 4.18 MJ/m³/K (see [Temperature](temperature.md#heat-carried-by-the-currents)). On the Earth at 64 they carry 0.44 PW northward across 30°N and 0.42 PW southward across 30°S, over the year.
+
+## Upwelling
+
+Where the Ekman transport draws the sea's top layer apart, water wells up from below to take its place, and the colder water cools the sea's mixed layer. `upwelling` works it out from a world and a year of its winds, one pass over the cells for each month after the Ekman transport (`ekmanTransport`, the same transport `solveGyres` returns). The climate loop works it out from each pass's winds, on the grid the temperature is solved on, and cools the sea with it in the next pass (see [Temperature](temperature.md#cooling-by-upwelling)); a start needs nothing of its own for it, since it carries its winds.
+
+### Where and how fast
+
+The Ekman transport crosses each edge between two cells the wind drives it in as the mean of the two cells' transports across the edge, and nothing crosses an edge to land or to a sea held still. What leaves a cell net, over its area, is the speed `w` at which water rises into it from below: square metres a second times the edges' lengths over the cell's area, in metres a second. Only two places are counted, and by default only the first:
+
+- **Beside a coast**, a sea cell with land beside it: where the wind drives the transport offshore, as the equatorward winds along the oceans' eastern sides do off California, Peru, northwest and southwest Africa, nothing comes in across the coast to replace what leaves. Where the wind drives the water onshore, as the same winds do along the oceans' western sides, the water is drawn together and nothing wells up.
+- **Within a band of the equator** (`upwellingEquatorDeg`), where the trades' transport turns poleward on both sides of the equator and draws the water apart along it. The band is 0°, off, by default: the transport there is held finite by the floor on `|f|` at 5° (`equatorFloorDeg`), and held there it draws about 150 Sv apart round the globe on the Earth at 64, all through the two rows of cells beside the equator, against about 50 Sv observed across the equatorial Pacific (Wyrtki, 1981). With the band at the floor's width, 5°, it took 1.1 PW of the sea's heat, and the tropics' sea came out 2.8 K too cold, against 0.8 K without upwelling. It stays off until the floor is physical.
+
+The Ekman pumping of the open sea, the twist of the wind's push drawing water up or down across the gyres, about 10⁻⁶ m/s against 10⁻⁵ m/s beside a coast over a cell of the 64 grid, is left out, and so is the water sinking where the transport converges.
+
+### How cold the water is
+
+The water rises from 150 m (`upwellingSourceDepthM`; 100 to 200 m off the upwelling coasts and at the equator, Talley et al. 2011), and below the mixed layer the sea is taken to cool with depth toward 4 °C (`deepSeaC`, about the temperature at 1000 m at low and middle latitudes), its excess over that falling by 1/e in 300 m (`thermoclineScaleM`, the mean profile between about 40°S and 40°N). These three are estimates from the World Ocean Atlas's annual means as remembered, not checked against its data files; together they give about 13 to 14 °C at the source under Peru, against 13 to 15 °C observed at 100 to 150 m. The mixed layer is the 60 m the temperature model's sea is reckoned at. So the water that wells up is
+
+`T_b = T_d + r (T_s − T_d)`, with `r = exp(−(D − H) / h) = exp(−90 / 300) ≈ 0.74`
+
+and as it mixes in it takes `ρc w (T_s − T_b) = ρc w (1 − r) (T_s − T_d)` watts a square metre from the sea, 4.18 MJ/m³/K times `w` times 0.26 of the sea's excess over 4 °C: for a sea at 22 °C, about 5 K colder water. It only cools: a sea no warmer than 4 °C gives up nothing. The heat it takes leaves the climate, into the deep sea, which is not modelled.
+
+### On the Earth
+
+On the Earth at 64, in the climate loop, the upwelling takes 0.80 PW from the sea over the year, about 2 W/m² over the sea. Off Peru (5–35°S, within 8° of the coast) it takes 41 TW, off Benguela 16 TW, off the Canaries 19 TW and off California 1.7 TW, and in the eastern tropical Pacific (20°S–5°N, 120–75°W), along the coast of the Americas, 59 TW. The water wells up at up to 5 × 10⁻⁵ m/s, beside the coasts nearest the equator, where the Ekman transport is largest.
+
+Against the observed sea-surface temperature (OISST), the year's root-mean-square error off Peru falls from 3.7 to 2.2 K, off Benguela from 4.7 to 3.5 K and in the eastern tropical Pacific from 3.0 to 2.3 K; off the Canaries, already too cold, it grows from 3.2 to 3.6 K, and off California from 1.5 to 1.8 K. Over the whole sea it grows from 3.06 to 3.22 K, the sea coming out 0.5 K colder.
+
+### What upwelling gets wrong
+
+- **The heat is not given back.** The cold water below is kept cold, in the real ocean, by the water that sinks near the poles, which gives its heat up to the air there; here it leaves the climate, and the whole sea comes out about 0.5 K colder than without it.
+- **No equatorial upwelling** by default (see above), so the cold tongues of the eastern equatorial Pacific and Atlantic away from the coasts are not cooled from below.
+- **One profile below the mixed layer** everywhere: the thermocline is shallower and sharper off the upwelling coasts and in the eastern tropical Pacific than its mean.
+- **A coast's upwelling is spread over its cell**, about 156 km on the 64 grid, where the real upwelling lies within a few tens of kilometres of the coast; the heat taken is about the same, but the coldest water is spread wider.
 
 ## How far to trust it
 

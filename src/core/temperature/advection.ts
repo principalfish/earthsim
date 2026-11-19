@@ -266,6 +266,33 @@ export const createHeatAdvector = (
 };
 
 /**
+ * The two months a time of year lies between, each standing for its
+ * middle, and how far it lies from the first toward the second: the
+ * months and weight {@link interpolateFlows} takes its flows between. The
+ * year wraps round.
+ *
+ * @param months - Twelve fields, January to December, or any number of
+ * months to the year.
+ * @param yearFraction - The time of year, from 0 at the start of January
+ * to 1 at the end of December; one outside that wraps round.
+ * @returns The month before the time and the month after it, and the
+ * weight of the second, from 0 to below 1.
+ */
+export const monthsAround = <T>(
+	months: readonly T[],
+	yearFraction: number,
+): { readonly from: T; readonly to: T; readonly weight: number } => {
+	const count = months.length;
+	const position = yearFraction * count - 0.5;
+	const first = Math.floor(position);
+	return {
+		from: months[((first % count) + count) % count] as T,
+		to: months[(((first + 1) % count) + count) % count] as T,
+		weight: position - first,
+	};
+};
+
+/**
  * The flows at a time of year, interpolated linearly between the months'.
  *
  * @remarks
@@ -287,14 +314,7 @@ export const interpolateFlows = (
 	yearFraction: number,
 	into: Float64Array,
 ): Float64Array => {
-	const count = months.length;
-	const position = yearFraction * count - 0.5;
-	const first = Math.floor(position);
-	const weight = position - first;
-	const from = months[((first % count) + count) % count] as ArrayLike<number>;
-	const to = months[
-		(((first + 1) % count) + count) % count
-	] as ArrayLike<number>;
+	const { from, to, weight } = monthsAround(months, yearFraction);
 	for (let entry = 0; entry < into.length; entry++) {
 		into[entry] =
 			(1 - weight) * (from[entry] as number) + weight * (to[entry] as number);

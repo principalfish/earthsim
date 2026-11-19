@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+	type ClimateProgress,
 	computeTerrainStats,
 	createBlankWorld,
 	DEFAULT_MAX_YEARS,
 	generateWorld,
+	getGrid,
 	type SimPass,
 	type SimProgress,
 	type SimRequest,
@@ -202,11 +204,22 @@ const CLIMATE_SOLVE_TIMEOUT_MS = 300_000;
 describe('handleRequest for climate', {
 	timeout: CLIMATE_SOLVE_TIMEOUT_MS,
 }, () => {
-	// A blank ocean on the smallest grid: its climate settles in three
-	// passes, at about half the cost of a generated world's, so it has
-	// passes before the last, whose arrays are posted as copies, and a
-	// settled result for a start to carry on from.
-	const CLIMATE_WORLD = createBlankWorld(64);
+	// A blank ocean on the smallest grid with one round continent, 40° of
+	// arc across, on the equator: its coasts give it gyres, so every array
+	// of the currents is in use, and its climate settles in a few passes at
+	// about half the cost of a generated world's, so it has passes before
+	// the last, whose arrays are posted as copies, and a settled result for
+	// a start to carry on from.
+	const CLIMATE_WORLD = (() => {
+		const world = createBlankWorld(64);
+		const { centres } = getGrid(64);
+		for (let cell = 0; cell < world.elevation.length; cell++) {
+			if ((centres[3 * cell] as number) > Math.cos((20 * Math.PI) / 180)) {
+				world.elevation[cell] = 500;
+			}
+		}
+		return world;
+	})();
 	const climateRequest = (extras: Record<string, unknown> = {}) => ({
 		id: 50,
 		kind: 'climate',
@@ -214,8 +227,14 @@ describe('handleRequest for climate', {
 		...extras,
 	});
 
+	/** Each pass the core gives directly, copied as it finishes. */
+	const directPasses: ClimateProgress[] = [];
 	/** What the core gives directly, which a post must not disturb. */
-	const directClimate = shared(() => solveClimate(CLIMATE_WORLD));
+	const directClimate = shared(() =>
+		solveClimate(CLIMATE_WORLD, {
+			onPass: (pass) => directPasses.push(structuredClone(pass)),
+		}),
+	);
 
 	/**
 	 * A climate request answered as the worker answers it: each pass posted
@@ -278,9 +297,35 @@ describe('handleRequest for climate', {
 		expect(last?.winds).toEqual(direct.winds);
 		expect(last?.currents).toEqual(direct.currents);
 		expect(last?.temperature.state).toEqual(direct.temperature.state);
-		// An earlier pass's arrays arrived whole.
+		// The currents are in use, every array of them, so a copy that
+		// mixed them up would not match the core's.
+		for (const field of [
+			'flows',
+			'east',
+			'north',
+			'ekmanEast',
+			'ekmanNorth',
+			'streamfunction',
+		] as const) {
+			expect(
+				last?.currents[field].some((month) =>
+					month.some((value) => value !== 0),
+				),
+				field,
+			).toBe(true);
+		}
+		// An earlier pass's arrays arrived whole: those of the core's first
+		// pass, copied as it finished.
 		const first = passes[0]?.climatePass;
+		const directFirst = directPasses[0];
 		expect(first?.changeC).toBeNull();
+		expect(first?.temperature.months).toEqual(directFirst?.temperature.months);
+		expect(first?.temperature.seaMonths).toEqual(
+			directFirst?.temperature.seaMonths,
+		);
+		expect(first?.temperature.state).toEqual(directFirst?.temperature.state);
+		expect(first?.winds).toEqual(directFirst?.winds);
+		expect(first?.currents).toEqual(directFirst?.currents);
 		expect(first?.temperature.months.every((month) => month.length > 0)).toBe(
 			true,
 		);

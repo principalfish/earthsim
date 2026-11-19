@@ -10,9 +10,10 @@
  * {@link solveGyres} gives them. Each later pass solves the temperature
  * again, carried on from the last pass's, with the air's heat carried along
  * the last pass's winds (their flowing part: see
- * {@link flowingPartForSolve}) and the sea's along the last pass's
- * currents, and then the winds from the new temperature and the currents
- * from the new winds.
+ * {@link flowingPartForSolve}), the sea's along the last pass's currents,
+ * and the sea cooled where those winds' Ekman transport draws water up
+ * from below (see {@link upwelling}), and then the winds from the new
+ * temperature and the currents from the new winds.
  *
  * The loop stops when the root-mean-square change a pass makes to the
  * monthly temperature, over the area and the twelve months, is no more than
@@ -26,8 +27,10 @@
  * applied, and its currents those of those winds.
  *
  * With no winds to carry heat, on a world with no sea or no coast, whose
- * currents are still, the loop is only the temperature solve and the winds
- * from it: the second pass changes nothing and the loop settles there.
+ * currents are still and whose sea wells up nowhere (with the upwelling's
+ * default, beside the coasts alone), the loop is only the temperature solve
+ * and the winds from it: the second pass changes nothing and the loop
+ * settles there.
  */
 
 import { coarsenField, coarsenWorld } from './grid/coarsen';
@@ -38,6 +41,7 @@ import {
 	type GyreResult,
 	solveGyres,
 } from './ocean/gyres';
+import { type Upwelling, upwelling } from './ocean/upwelling';
 import { MONTHS_PER_YEAR } from './planet/insolation';
 import { normalisePlanet } from './planet/planet';
 import {
@@ -45,6 +49,7 @@ import {
 	assertSolvableWorld,
 	conditionsMatch,
 	landCrossing,
+	SEA_WATER_HEAT_CAPACITY_J_M3_K,
 	solveResolution,
 	solveTemperature,
 	TEMPERATURE_MODEL,
@@ -362,26 +367,28 @@ const suits = (
  * See the module's description for the loop. The first pass, from nothing,
  * is exactly {@link solveTemperature}, the {@link solveWinds} of its months
  * and the {@link solveGyres} of those winds. Passes after it carry the
- * temperature on from the pass before's state, which takes about a year of
- * solving each: a pass costs the temperature's warm solve, the flowing part
- * of the winds (about 60 ms a month on the 64 grid, whatever the world's
- * resolution), the winds and the currents.
+ * temperature on from the pass before's state, which takes a year or more
+ * of solving each (the second pass on the Earth takes 5): a pass costs the
+ * temperature's warm solve, the flowing part of the winds (about 60 ms a
+ * month on the 64 grid, whatever the world's resolution), the winds, the
+ * currents and the upwelling.
  *
- * The currents are solved on the world on the grid the temperature is
- * solved on, with the winds on that grid, so that their flows are those of
- * the coasts the heat is carried between; each pass's start from the pass
- * before's streamfunction. The sea's heat is carried with the whole
- * transport of the gyres' wind-driven layer: their flows over its depth,
- * the gyres' `layerDepthM`.
+ * The currents and the upwelling are solved on the world on the grid the
+ * temperature is solved on, with the winds on that grid, so that their
+ * flows are those of the coasts the heat is carried between; each pass's
+ * currents start from the pass before's streamfunction. The sea's heat is
+ * carried with the whole transport of the gyres' wind-driven layer: their
+ * flows over its depth, the gyres' `layerDepthM`. The upwelling's mixed
+ * layer is the one the model's `oceanHeatCapacity` is reckoned at.
  *
  * A start that suits the world makes the first pass carry on from its
- * temperature's state with heat carried along its winds and currents, and
- * compare its result with the start's months. The first pass never settles the
- * climate: the start's winds may be those of a world since edited, and a
- * local edit moves the global change by less than the tolerance, so the
- * winds of the new temperature are tried once more. A start that was
- * settled and whose world has not changed therefore settles at the second
- * pass.
+ * temperature's state, with heat carried along its winds and currents and
+ * the sea cooled by its winds' upwelling, and compare its result with the
+ * start's months. The first pass never settles the climate: the start's
+ * winds may be those of a world since edited, and a local edit moves the
+ * global change by less than the tolerance, so the winds of the new
+ * temperature are tried once more. A start that was settled and whose world
+ * has not changed therefore settles at the second pass.
  *
  * The temperature of a settled climate depends on the day length, through
  * the winds, which turn with it and are as wide as it sets; the first pass
@@ -396,9 +403,9 @@ const suits = (
  * range, if a start is not twelve months of one value per cell in each of
  * its temperature, eastward wind and northward wind, if a start's currents
  * are not twelve months of the flows and the streamfunction of the grid
- * solved on, or if a start's
- * temperature does not record a finite sea level and the planet's
- * temperature settings, as {@link solveTemperature}'s start must.
+ * solved on, or if a start's temperature does not record a finite sea
+ * level and the planet's temperature settings, as {@link solveTemperature}'s
+ * start must.
  * @throws Error if a month's currents do not converge, as
  * {@link solveGyres} throws it.
  * @throws Whatever `onPass` or `onYear` throws, as it is.
@@ -420,21 +427,23 @@ export const solveClimate = (
 		solvedOn === resolution
 			? field
 			: Float32Array.from(coarsenField(field, resolution));
+	const onSolveWorld = (winds: MonthlyWind): MonthlyWind => ({
+		east: winds.east.map(onSolveGrid),
+		north: winds.north.map(onSolveGrid),
+	});
 	const currentsOf = (
 		winds: MonthlyWind,
 		guess: CarriedCurrents | undefined,
 	): GyreResult =>
-		solveGyres(
-			solveWorld,
-			{
-				east: winds.east.map(onSolveGrid),
-				north: winds.north.map(onSolveGrid),
-			},
-			{ guess: guess?.streamfunction },
-		);
+		solveGyres(solveWorld, winds, { guess: guess?.streamfunction });
+	const mixedLayerDepthM =
+		model.oceanHeatCapacity / SEA_WATER_HEAT_CAPACITY_J_M3_K;
+	const upwellingOf = (winds: MonthlyWind): Upwelling =>
+		upwelling(solveWorld, winds, { mixedLayerDepthM });
 	let before: CarriedTemperature | undefined;
 	let windsBefore: MonthlyWind | undefined;
 	let currentsBefore: CarriedCurrents | undefined;
+	let upwellingBefore: Upwelling | undefined;
 	let lastChange: number | null = null;
 	if (options.start !== undefined) {
 		assertStart(options.start, cells);
@@ -443,13 +452,15 @@ export const solveClimate = (
 			const { temperature, winds, currents } = options.start;
 			before = temperature;
 			windsBefore = winds;
+			const startWinds = onSolveWorld(winds);
 			// Currents that cross what is now a coast are worked out afresh
 			// for the land as it is, from the winds they go with.
 			currentsBefore = currents?.flows.every(
 				(flows) => landCrossing(solveWorld, flows) < 0,
 			)
 				? currents
-				: currentsOf(winds, currents);
+				: currentsOf(startWinds, currents);
+			upwellingBefore = upwellingOf(startWinds);
 		}
 	}
 	const { climateMaxPasses, climateToleranceC, climateOvershootShare } = model;
@@ -487,6 +498,7 @@ export const solveClimate = (
 							flows: currentsBefore.flows,
 							depthM: DEFAULT_GYRE_SETTINGS.layerDepthM,
 						},
+			upwelling: upwellingBefore,
 			onYear: onYear === undefined ? undefined : (p) => onYear(p, pass),
 		});
 		const change =
@@ -502,7 +514,8 @@ export const solveClimate = (
 		const winds = solveWinds(world, temperature.months, {
 			settings: windSettings,
 		});
-		const currents = currentsOf(winds, currentsBefore);
+		const windsOnGrid = onSolveWorld(winds);
+		const currents = currentsOf(windsOnGrid, currentsBefore);
 		// A pass settles only from the second: the first of a start that suits
 		// carries heat along the start's winds, which may be those of a world
 		// since edited, and a local edit moves the global rms change by less
@@ -536,6 +549,7 @@ export const solveClimate = (
 		before = temperature;
 		windsBefore = winds;
 		currentsBefore = currents;
+		upwellingBefore = upwellingOf(windsOnGrid);
 		lastChange = change;
 	}
 };

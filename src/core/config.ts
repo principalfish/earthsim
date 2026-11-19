@@ -2307,6 +2307,116 @@ export const OCEAN_CONFIG = defineSection(
 			},
 		},
 		{
+			title: 'Upwelling',
+			settings: {
+				/**
+				 * The Ekman transport, held finite within `equatorFloorDeg`, turns
+				 * poleward on both sides of the equator under the trades and draws
+				 * the water apart there. Held at its value at 5°, it draws about
+				 * 150 Sv apart round the globe on the Earth at 64, against about
+				 * 50 Sv observed across the equatorial Pacific (Wyrtki, 1981, "An
+				 * estimate of equatorial upwelling in the Pacific", Journal of
+				 * Physical Oceanography 11), so the band is 0 until the floor is
+				 * physical: the sea wells up only beside the coasts. 5°, the floor's
+				 * width, would take in the equatorial cold tongues.
+				 */
+				upwellingEquatorDeg: {
+					value: 0,
+					unit: '°',
+					what:
+						'Within this latitude of the equator, the sea wells up from' +
+						' below wherever the Ekman transport draws the water apart;' +
+						' beyond it, only beside a coast. At 0 the sea wells up only' +
+						' beside the coasts.',
+					raising:
+						'A band in which the open sea wells up as well: at 5°, the' +
+						" width of equatorFloorDeg, the trades' sea along the equator" +
+						' is cooled from below, by about three times the observed' +
+						' upwelling there.',
+					lowering: 'At 0, the least, no band: only the coasts well up.',
+					source:
+						'Chosen: off, because the 5° floor on the Coriolis term' +
+						' (equatorFloorDeg) gives about three times the observed' +
+						' equatorial upwelling, about 150 Sv against about 50 Sv' +
+						' (Wyrtki, 1981); on until the floor is physical.',
+					tuned: null,
+				},
+				/**
+				 * The water below the thermocline: about 4 °C at 1000 m at low and
+				 * middle latitudes in the World Ocean Atlas's annual mean.
+				 */
+				deepSeaC: {
+					value: 4,
+					unit: '°C',
+					what:
+						'The temperature the sea tends to with depth, below its' +
+						' thermocline. The water that wells up into the mixed layer' +
+						' lies between the surface and this temperature.',
+					raising:
+						'The water that wells up is warmer: upwelling cools the sea' +
+						' less.',
+					lowering:
+						'The water that wells up is colder: upwelling cools the sea' +
+						' more.',
+					source:
+						'Estimated: about 4 °C at 1000 m at low and middle latitudes,' +
+						' the World Ocean Atlas annual mean as remembered, not checked' +
+						' against its data files.',
+					tuned: null,
+				},
+				/**
+				 * Upwelled water rises from about 100 to 200 m below the surface
+				 * off Oregon, Peru and northwest Africa and at the equator, where
+				 * the Equatorial Undercurrent's core lies (Talley et al., 2011,
+				 * Descriptive Physical Oceanography, chapters 7 and 10).
+				 */
+				upwellingSourceDepthM: {
+					value: 150,
+					unit: 'm',
+					what:
+						'The depth the water that wells up into the mixed layer rises' +
+						" from. Its temperature is the thermocline's there.",
+					raising:
+						'Colder water wells up: upwelling cools the sea more. At or' +
+						" above the mixed layer's depth it cools it not at all.",
+					lowering: 'Warmer water wells up: upwelling cools the sea less.',
+					source:
+						'Estimated: 100 to 200 m off the coasts where the sea wells' +
+						' up and at the equator (Talley et al., 2011), not checked' +
+						' against the World Ocean Atlas data files.',
+					tuned: null,
+				},
+				/**
+				 * The upper ocean's annual mean temperature between about 40°S and
+				 * 40°N in the World Ocean Atlas falls from about 21 °C at the
+				 * surface toward 4 °C, by about 1/e of its excess in 300 m.
+				 */
+				thermoclineScaleM: {
+					value: 300,
+					unit: 'm',
+					what:
+						'How fast the sea cools with depth below its mixed layer: the' +
+						' depth in which its excess over deepSeaC falls by 1/e. The' +
+						" water a cell's sea wells up from is taken that much nearer" +
+						' deepSeaC than the sea itself.',
+					raising:
+						'A deeper thermocline: the water that wells up is nearer the' +
+						" surface's temperature, and cools the sea less.",
+					lowering:
+						'A sharper thermocline: the water that wells up is colder, and' +
+						' cools the sea more.',
+					source:
+						"Estimated: the e-folding depth of the upper ocean's mean" +
+						' temperature between about 40°S and 40°N, the World Ocean' +
+						' Atlas annual mean as remembered, not checked against its' +
+						' data files. With the other two it gives about 13 to 14 °C' +
+						' at the source under Peru, against 13 to 15 °C observed at' +
+						' 100 to 150 m.',
+					tuned: null,
+				},
+			},
+		},
+		{
 			title: 'How the gyres are solved (numerical, not physical)',
 			numerical: true,
 			settings: {

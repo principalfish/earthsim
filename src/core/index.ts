@@ -14,6 +14,7 @@ export * from './grid/vector';
 export * from './ocean/basins';
 export * from './ocean/gyres';
 export * from './ocean/observed';
+export * from './ocean/upwelling';
 export * from './planet/insolation';
 export * from './planet/planet';
 export * from './planet/star';

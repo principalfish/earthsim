@@ -14,6 +14,7 @@ import {
 import { decodeEarth, earthWorld } from './earth/earth';
 import { getGrid } from './grid/grid';
 import { DEFAULT_GYRE_SETTINGS, solveGyres } from './ocean/gyres';
+import { upwelling } from './ocean/upwelling';
 import { MONTHS_PER_YEAR } from './planet/insolation';
 import { solveTemperature, TEMPERATURE_MODEL } from './temperature/temperature';
 import { FLOWING_RESOLUTION, flowingPartForSolve } from './wind/flowing';
@@ -149,7 +150,7 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 		}
 	});
 
-	it('solves each pass as temperature, winds, currents, the temperature carrying heat along the pass before’s winds and currents', () => {
+	it('solves each pass as temperature, winds, currents, the temperature carrying heat along the pass before’s winds and currents and cooled by those winds’ upwelling', () => {
 		const [first, second] = earth().passes as [
 			ClimateProgress,
 			ClimateProgress,
@@ -171,7 +172,9 @@ describe('solveClimate on the Earth', { timeout: SOLVE_TIMEOUT_MS }, () => {
 				flows: first.currents.flows,
 				depthM: DEFAULT_GYRE_SETTINGS.layerDepthM,
 			},
+			upwelling: upwelling(EARTH, first.winds),
 		});
+		expect(temperature.upwellingW).toBeGreaterThan(0);
 		expect(second.temperature.months).toEqual(temperature.months);
 		expect(second.temperature.seaMonths).toEqual(temperature.seaMonths);
 		expect(second.winds).toEqual(solveWinds(EARTH, temperature.months));
@@ -514,13 +517,13 @@ describe('solveClimate with no winds to carry heat', {
 describe('solveClimate when the winds and the temperature chase each other', {
 	timeout: 3 * SOLVE_TIMEOUT_MS,
 }, () => {
-	// A generated world with the thermal highs and lows at 3 hPa a kelvin,
-	// three times the winds' default: the loop does not settle, its change
-	// grows from the fourth pass to the fifth and, left whole, grows again to
-	// the sixth.
+	// A generated world with the thermal highs and lows at 3.5 hPa a kelvin,
+	// five times the winds' default: the loop does not settle, its change
+	// grows from the fourth pass to the fifth (0.82 to 0.86 °C) and, left
+	// whole, grows again to the sixth (1.05 °C).
 	const WORLD = generateWorld({ resolution: 64, seed: 1, landFraction: 0.3 });
 	const MODEL = { ...COARSE, climateMaxPasses: 6 };
-	const WINDS = { thermalHpaPerK: 3 };
+	const WINDS = { thermalHpaPerK: 3.5 };
 
 	const whole = shared(() =>
 		run(WORLD, {

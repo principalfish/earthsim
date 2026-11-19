@@ -20,7 +20,7 @@ import {
  * @returns A new result whose arrays, the months (the air's and the sea's)
  * and the state's, are all zero, with a `stepSeconds` of 1, solved for a
  * sea level of 0 m and Earth's planet, `converged` true, a `finalChangeK`
- * of 0 and the years run given.
+ * and an `upwellingW` of 0 and the years run given.
  */
 export const temperatureOf = (
 	yearsRun: number,
@@ -40,6 +40,7 @@ export const temperatureOf = (
 	yearsRun,
 	converged: true,
 	finalChangeK: 0,
+	upwellingW: 0,
 });
 
 /**

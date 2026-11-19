@@ -118,8 +118,9 @@ describe('the Earth temperature baseline', () => {
 		// for the year and 2.4 K in January, and North America −0.8 and −0.6 K,
 		// against the observed 11.5 and 22.9, and 5.8 and 15.1. The winds
 		// without the currents give 2.8 and 6.3, and −0.1 and 2.8; with the
-		// currents, 0.9 and 4.6, and 1.3 and 4.1: the currents warm East Asia's
-		// coasts, beside the Kuroshio, more than western Europe.
+		// currents and the upwelling, 0.9 and 4.2, and 1.4 and 4.2: the
+		// currents warm East Asia's coasts, beside the Kuroshio, more than
+		// western Europe.
 		const { europeAsia, northAmerica } = committed.coastContrast;
 		expect(europeAsia.simulated.annual).toBeGreaterThan(0.7);
 		expect(europeAsia.simulated.january).toBeGreaterThan(4);

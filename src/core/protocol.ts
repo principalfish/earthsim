@@ -14,9 +14,9 @@
  * A computation that takes a while may also post progress messages before
  * its response, each carrying the request's id and kind. A climate request
  * also posts a pass message as each pass of its loop finishes, carrying
- * that pass's temperature and winds, and its response then holds only what
- * the passes do not: the last pass's arrays are the result's. Every message
- * is plain data that survives a structured clone.
+ * that pass's temperature, winds and currents, and its response then holds
+ * only what the passes do not: the last pass's arrays are the result's.
+ * Every message is plain data that survives a structured clone.
  */
 
 import type {
@@ -165,8 +165,8 @@ export type SimPass = {
 	/** The kind of that request, always a climate request. */
 	readonly kind: 'climate';
 	/**
-	 * The pass: its temperature and winds, how much it changed the
-	 * temperature and whether it settled the climate.
+	 * The pass: its temperature, winds and currents, how much it changed
+	 * the temperature and whether it settled the climate.
 	 */
 	readonly climatePass: ClimateProgress;
 };

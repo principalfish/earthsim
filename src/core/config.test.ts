@@ -404,6 +404,10 @@ const OCEAN_LITERAL = {
 	channelFrictionPerS: 2e-6,
 	layerDepthM: 200,
 	equatorFloorDeg: 5,
+	upwellingEquatorDeg: 0,
+	deepSeaC: 4,
+	upwellingSourceDepthM: 150,
+	thermoclineScaleM: 300,
 	maxIslands: 32,
 	gyreTolerance: 1e-4,
 };
@@ -445,19 +449,45 @@ describe('OCEAN_CONFIG', () => {
 		}
 	});
 
-	it('lists each setting once, in three groups, the solver last and numerical', () => {
+	it('lists each setting once, in four groups, the solver last and numerical', () => {
 		const names = entries.map(([name]) => name);
 		expect(new Set(names).size).toBe(names.length);
 		expect(section.groups.map((group) => group.title)).toEqual([
 			"The wind's push on the sea",
 			'The gyres',
+			'Upwelling',
 			'How the gyres are solved (numerical, not physical)',
 		]);
 		expect(section.groups.map((group) => group.numerical === true)).toEqual([
 			false,
 			false,
+			false,
 			true,
 		]);
+	});
+
+	it('gives the upwelling its physical starting values, the water below with its sources', () => {
+		const upwelling = section.groups[2]?.settings ?? {};
+		expect(
+			Object.fromEntries(
+				Object.entries(upwelling).map(([name, entry]) => [
+					name,
+					[entry.value, entry.unit],
+				]),
+			),
+		).toEqual({
+			upwellingEquatorDeg: [0, '°'],
+			deepSeaC: [4, '°C'],
+			upwellingSourceDepthM: [150, 'm'],
+			thermoclineScaleM: [300, 'm'],
+		});
+		for (const entry of Object.values(upwelling)) {
+			expect(entry.tuned).toBeNull();
+		}
+		expect(upwelling.upwellingEquatorDeg?.source).toContain('150 Sv');
+		expect(upwelling.deepSeaC?.source).toContain('World Ocean Atlas');
+		expect(upwelling.upwellingSourceDepthM?.source).toContain('Talley');
+		expect(upwelling.thermoclineScaleM?.source).toContain('World Ocean Atlas');
 	});
 });
 

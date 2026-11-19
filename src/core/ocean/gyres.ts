@@ -48,7 +48,8 @@
  * {@link GyreSettings.equatorFloorDeg} from the equator, where `f` passes
  * through zero. It is zero over land and over the seas held still within
  * islands, as their gyres are; a planet with no land, whose gyres are held
- * still for want of a coast, keeps its Ekman transport.
+ * still for want of a coast, keeps its Ekman transport. {@link ekmanTransport}
+ * gives it alone, without solving the gyres.
  *
  * The flows across the edges and the surface current at the cells' centres
  * are the transport spread over the depth of the wind-driven layer,
@@ -619,6 +620,160 @@ export const gyreForcing = (
 };
 
 /**
+ * What the Ekman transport of a solver's world needs: the cells the wind
+ * drives it in, and the terms of the Coriolis parameter and the push.
+ */
+type EkmanTerms = {
+	/**
+	 * One value per cell: 1 where the wind drives an Ekman transport, not
+	 * the world's land and not the seas held still, but all of a planet with
+	 * no land.
+	 */
+	readonly driven: Uint8Array;
+	/** Twice the planet's rotation rate, in radians a second. */
+	readonly twiceOmega: number;
+	/** The least `|f|`, its value at the equator's floor. */
+	readonly floor: number;
+	/** The air's density times the drag coefficient. */
+	readonly drag: number;
+};
+
+/** The Ekman transport's terms of a solver's world. */
+const ekmanTerms = (gyres: GyreSolver): EkmanTerms => {
+	const { basins, settings, worldLand } = gyres;
+	const noCoast = basins.coasts.length === 0;
+	const driven = new Uint8Array(worldLand.length);
+	for (let cell = 0; cell < driven.length; cell++) {
+		driven[cell] =
+			worldLand[cell] === 0 && (noCoast || basins.land[cell] === 0) ? 1 : 0;
+	}
+	const twiceOmega = 2 * gyres.rotationRate;
+	return {
+		driven,
+		twiceOmega,
+		floor: twiceOmega * Math.sin((settings.equatorFloorDeg * Math.PI) / 180),
+		drag: AIR_DENSITY_KG_M3 * settings.dragCoefficient,
+	};
+};
+
+/**
+ * Writes one month's Ekman transport at each cell's centre, eastward and
+ * northward, in square metres a second: `τ × ẑ / (ρ f)`, with `|f|` held
+ * at no less than its floor, and zero where the wind drives none and on the
+ * equator itself.
+ */
+const writeEkman = (
+	grid: Grid,
+	terms: EkmanTerms,
+	windEast: ArrayLike<number>,
+	windNorth: ArrayLike<number>,
+	intoEast: Float32Array,
+	intoNorth: Float32Array,
+): void => {
+	const { centres, cellCount } = grid;
+	const { driven, twiceOmega, floor, drag } = terms;
+	const rho = SEA_WATER_DENSITY_KG_M3;
+	intoEast.fill(0);
+	intoNorth.fill(0);
+	for (let cell = 0; cell < cellCount; cell++) {
+		if (driven[cell] === 1) {
+			const f = twiceOmega * (centres[3 * cell + 2] as number);
+			if (f !== 0) {
+				const u = windEast[cell] as number;
+				const v = windNorth[cell] as number;
+				const push = drag * Math.sqrt(u * u + v * v);
+				const floored = f > 0 ? Math.max(f, floor) : Math.min(f, -floor);
+				intoEast[cell] = (push * v) / (rho * floored);
+				intoNorth[cell] = -(push * u) / (rho * floored);
+			}
+		}
+	}
+};
+
+/** The solver given for a world, or the one kept for it, checked. */
+const solverFor = (
+	world: World,
+	options: Pick<SolveGyresOptions, 'settings' | 'solver'>,
+): GyreSolver => {
+	const grid = getGrid(world.resolution);
+	const gyres =
+		options.solver ??
+		keptSolver(world, options.settings ?? DEFAULT_GYRE_SETTINGS);
+	if (gyres.grid !== grid || !sameValues(gyres.worldLand, landOf(world))) {
+		throw new RangeError(
+			"The gyres' solver was built for another grid or another land",
+		);
+	}
+	if (gyres.rotationRate !== rotationRate(world.planet)) {
+		throw new RangeError(
+			`The gyres' solver was built for a rotation rate of ${gyres.rotationRate} rad/s; the world's planet turns at ${rotationRate(world.planet)} rad/s`,
+		);
+	}
+	return gyres;
+};
+
+/** Twelve months of the Ekman transport, from {@link ekmanTransport}. */
+export type EkmanTransport = {
+	/**
+	 * The eastward Ekman transport at each cell's centre, January to
+	 * December, in square metres a second, as {@link GyreResult.ekmanEast}.
+	 */
+	readonly east: readonly Float32Array[];
+	/** The northward Ekman transport, in the same way. */
+	readonly north: readonly Float32Array[];
+	/**
+	 * One value per cell: 1 where the wind drives an Ekman transport, 0 over
+	 * land and over the seas held still within islands.
+	 */
+	readonly driven: Uint8Array;
+};
+
+/**
+ * The Ekman transport of a world's winds through its year, without the
+ * gyres: the same as {@link solveGyres} returns beside them, for the same
+ * world, winds and settings.
+ *
+ * @param world - The world, whose land is the cells above its sea level.
+ * Not changed.
+ * @param winds - Twelve months of the surface wind at each cell's centre,
+ * eastward and northward, in metres a second. Not changed.
+ * @param options - The settings, or a solver built already, whose basins
+ * say which seas are held still.
+ * @returns New arrays.
+ * @throws RangeError if the winds are not twelve months of finite values
+ * of the right length, a setting is out of range, or the solver given was
+ * built for another grid, another land or another rotation rate.
+ */
+export const ekmanTransport = (
+	world: World,
+	winds: MonthlyWind,
+	options: Pick<SolveGyresOptions, 'settings' | 'solver'> = {},
+): EkmanTransport => {
+	const grid = getGrid(world.resolution);
+	const { cellCount } = grid;
+	assertMonths(winds.east, cellCount, 'eastward winds');
+	assertMonths(winds.north, cellCount, 'northward winds');
+	const terms = ekmanTerms(solverFor(world, options));
+	const east: Float32Array[] = [];
+	const north: Float32Array[] = [];
+	for (let month = 0; month < MONTHS_PER_YEAR; month++) {
+		const intoEast = new Float32Array(cellCount);
+		const intoNorth = new Float32Array(cellCount);
+		writeEkman(
+			grid,
+			terms,
+			winds.east[month] as ArrayLike<number>,
+			winds.north[month] as ArrayLike<number>,
+			intoEast,
+			intoNorth,
+		);
+		east.push(intoEast);
+		north.push(intoNorth);
+	}
+	return { east, north, driven: terms.driven };
+};
+
+/**
  * The wind-driven gyres of a world through its year, one solve for each
  * month's wind.
  *
@@ -652,19 +807,7 @@ export const solveGyres = (
 	const { cellCount } = grid;
 	assertMonths(winds.east, cellCount, 'eastward winds');
 	assertMonths(winds.north, cellCount, 'northward winds');
-	const gyres =
-		options.solver ??
-		keptSolver(world, options.settings ?? DEFAULT_GYRE_SETTINGS);
-	if (gyres.grid !== grid || !sameValues(gyres.worldLand, landOf(world))) {
-		throw new RangeError(
-			"The gyres' solver was built for another grid or another land",
-		);
-	}
-	if (gyres.rotationRate !== rotationRate(world.planet)) {
-		throw new RangeError(
-			`The gyres' solver was built for a rotation rate of ${gyres.rotationRate} rad/s; the world's planet turns at ${rotationRate(world.planet)} rad/s`,
-		);
-	}
+	const gyres = solverFor(world, options);
 	const index = cornerIndex(grid);
 	const { cornerCount, cellCorners } = index;
 	if (options.guess !== undefined) {
@@ -672,24 +815,10 @@ export const solveGyres = (
 	}
 	const { basins, settings, corners, netCorners, netCoasts } = gyres;
 	const { slopeEast, slopeNorth, areas } = geometryOf(grid);
-	const { centres } = grid;
 	const flowedOver = basins.flowedOver;
-	const rho = SEA_WATER_DENSITY_KG_M3;
-	const drag = AIR_DENSITY_KG_M3 * settings.dragCoefficient;
-	const twiceOmega = 2 * gyres.rotationRate;
-	const floor =
-		twiceOmega * Math.sin((settings.equatorFloorDeg * Math.PI) / 180);
+	const terms = ekmanTerms(gyres);
 	const depth = settings.layerDepthM;
 	const noCoast = basins.coasts.length === 0;
-	// The sea the wind drives an Ekman transport in: not the world's land,
-	// and not the seas held still, but all of a planet with no land.
-	const driven = new Uint8Array(cellCount);
-	for (let cell = 0; cell < cellCount; cell++) {
-		driven[cell] =
-			gyres.worldLand[cell] === 0 && (noCoast || basins.land[cell] === 0)
-				? 1
-				: 0;
-	}
 
 	const stress = {
 		x: new Float64Array(cellCount),
@@ -712,20 +841,8 @@ export const solveGyres = (
 		const windNorth = winds.north[month] as ArrayLike<number>;
 		const pushEast = new Float32Array(cellCount);
 		const pushNorth = new Float32Array(cellCount);
-		writeForcing(grid, windEast, windNorth, drag, stress, forcing);
-		for (let cell = 0; cell < cellCount; cell++) {
-			if (driven[cell] === 1) {
-				const f = twiceOmega * (centres[3 * cell + 2] as number);
-				if (f !== 0) {
-					const u = windEast[cell] as number;
-					const v = windNorth[cell] as number;
-					const push = drag * Math.sqrt(u * u + v * v);
-					const floored = f > 0 ? Math.max(f, floor) : Math.min(f, -floor);
-					pushEast[cell] = (push * v) / (rho * floored);
-					pushNorth[cell] = -(push * u) / (rho * floored);
-				}
-			}
-		}
+		writeForcing(grid, windEast, windNorth, terms.drag, stress, forcing);
+		writeEkman(grid, terms, windEast, windNorth, pushEast, pushNorth);
 		// Each island's condition: the wind's circulation round it, as a sum
 		// over its corners of the forcing times their areas on the unit
 		// sphere, as the corner solver sums the operator.

@@ -9,9 +9,10 @@
  *   in all;
  * - the same carried on from the settled result, which is the case after an
  *   edit that changes little: the passes and the time;
- * - the currents' part of a pass: the gyres of the settled winds, on the
- *   grid the temperature is solved on, started from the settled currents'
- *   streamfunction, as a later pass solves them.
+ * - the currents' and the upwelling's parts of a pass: the gyres of the
+ *   settled winds, on the grid the temperature is solved on, started from
+ *   the settled currents' streamfunction, as a later pass solves them, and
+ *   the upwelling of the same winds on the same grid.
  *
  * One climate is solved first and not timed, so that the times do not
  * include the JavaScript engine's warming up. The output depends on the
@@ -30,6 +31,7 @@ import {
 	solveGyres,
 	solveResolution,
 	TEMPERATURE_MODEL,
+	upwelling,
 } from '../src/core/index';
 import { readEarthDataFile } from './earth/dataFile.mjs';
 
@@ -109,16 +111,22 @@ export const main = (): void => {
 		const onGrid = (field: Float32Array): Float32Array =>
 			own ? field : Float32Array.from(coarsenField(field, resolution));
 		const { winds } = again.result;
+		const solveWorld = own ? world : coarsenWorld(world);
+		const onSolveGrid = {
+			east: winds.east.map(onGrid),
+			north: winds.north.map(onGrid),
+		};
 		const begun = performance.now();
-		solveGyres(
-			own ? world : coarsenWorld(world),
-			{ east: winds.east.map(onGrid), north: winds.north.map(onGrid) },
-			{ guess: again.result.currents.streamfunction },
-		);
+		solveGyres(solveWorld, onSolveGrid, {
+			guess: again.result.currents.streamfunction,
+		});
+		const gyresDone = performance.now();
+		upwelling(solveWorld, onSolveGrid);
 		currents.push([
 			String(resolution),
 			String(solvedOn),
-			seconds((performance.now() - begun) / 1000),
+			seconds((gyresDone - begun) / 1000),
+			seconds((performance.now() - gyresDone) / 1000),
 		]);
 	}
 	say('## From nothing, on the Earth');
@@ -137,7 +145,15 @@ export const main = (): void => {
 	say('## Carried on from the settled result');
 	say();
 	table(['Cells per face edge', 'Passes', 'In all (s)'], warm);
-	say("## The currents' part of a pass");
+	say("## The currents' and the upwelling's parts of a pass");
 	say();
-	table(['Cells per face edge', 'Solved on', 'Twelve months (s)'], currents);
+	table(
+		[
+			'Cells per face edge',
+			'Solved on',
+			"The currents' twelve months (s)",
+			"The upwelling's twelve months (s)",
+		],
+		currents,
+	);
 };

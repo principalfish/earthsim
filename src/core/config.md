@@ -160,7 +160,7 @@ The settings of the wind model, read from `WIND_CONFIG` into `DEFAULT_WIND_SETTI
 
 The settings of the wind-driven gyres, read from `OCEAN_CONFIG` into `DEFAULT_GYRE_SETTINGS`. How the gyres work is in [Ocean](../../docs/ocean.md).
 
-7 settings: 5 physical and 2 numerical, 0 of them tuned against the observed Earth. A run may override these. Beyond them the code reads 2 fixed choices directly, which a run cannot override.
+11 settings: 9 physical and 2 numerical, 0 of them tuned against the observed Earth. A run may override these. Beyond them the code reads 2 fixed choices directly, which a run cannot override.
 
 ### The wind's push on the sea
 
@@ -176,6 +176,15 @@ The settings of the wind-driven gyres, read from `OCEAN_CONFIG` into `DEFAULT_GY
 | `channelFrictionPerS` | 2e-6 1/s | The friction on the sea where it can flow round the globe, along circles of latitude that cross no land, as between Antarctica and the southern tips of the continents. It stands for the pressure on the sea floor that holds the observed circumpolar current back, and keeps that current from following the gyres' friction. | Less flows round the globe, in proportion: a weaker circumpolar current. | More flows round the globe, in proportion: a stronger circumpolar current. | Worked out from the observed circumpolar current: about 140 Sv (Cunningham et al., 2003) under about 0.15 N/m² of wind stress across about 2000 km. | No |
 | `layerDepthM` | 200 m | The depth the gyres' transport is taken to be spread over: the surface current is the transport over this depth, and so are the flows across the edges the heat is carried by. | Slower surface currents and smaller flows for the same transport. | Faster surface currents and larger flows for the same transport. | Worked out from the Florida Current's observed transport, surface speed and width (Meinen et al., 2010). | No |
 | `equatorFloorDeg` | 5° | Within this latitude of the equator the Coriolis parameter in the Ekman transport is held at its value here, so the transport stays finite where the parameter passes through zero. | A wider band of capped transport: a weaker Ekman transport near the equator. | A narrower band: a stronger Ekman transport close to the equator, without limit as the floor nears 0°. | Physical: the Ekman balance fails within a few degrees of the equator. | No |
+
+### Upwelling
+
+| Setting | Value | What it controls | Raising it | Lowering it | Where it comes from | Tuned |
+|-|-|-|-|-|-|-|
+| `upwellingEquatorDeg` | 0° | Within this latitude of the equator, the sea wells up from below wherever the Ekman transport draws the water apart; beyond it, only beside a coast. At 0 the sea wells up only beside the coasts. | A band in which the open sea wells up as well: at 5°, the width of equatorFloorDeg, the trades' sea along the equator is cooled from below, by about three times the observed upwelling there. | At 0, the least, no band: only the coasts well up. | Chosen: off, because the 5° floor on the Coriolis term (equatorFloorDeg) gives about three times the observed equatorial upwelling, about 150 Sv against about 50 Sv (Wyrtki, 1981); on until the floor is physical. | No |
+| `deepSeaC` | 4 °C | The temperature the sea tends to with depth, below its thermocline. The water that wells up into the mixed layer lies between the surface and this temperature. | The water that wells up is warmer: upwelling cools the sea less. | The water that wells up is colder: upwelling cools the sea more. | Estimated: about 4 °C at 1000 m at low and middle latitudes, the World Ocean Atlas annual mean as remembered, not checked against its data files. | No |
+| `upwellingSourceDepthM` | 150 m | The depth the water that wells up into the mixed layer rises from. Its temperature is the thermocline's there. | Colder water wells up: upwelling cools the sea more. At or above the mixed layer's depth it cools it not at all. | Warmer water wells up: upwelling cools the sea less. | Estimated: 100 to 200 m off the coasts where the sea wells up and at the equator (Talley et al., 2011), not checked against the World Ocean Atlas data files. | No |
+| `thermoclineScaleM` | 300 m | How fast the sea cools with depth below its mixed layer: the depth in which its excess over deepSeaC falls by 1/e. The water a cell's sea wells up from is taken that much nearer deepSeaC than the sea itself. | A deeper thermocline: the water that wells up is nearer the surface's temperature, and cools the sea less. | A sharper thermocline: the water that wells up is colder, and cools the sea more. | Estimated: the e-folding depth of the upper ocean's mean temperature between about 40°S and 40°N, the World Ocean Atlas annual mean as remembered, not checked against its data files. With the other two it gives about 13 to 14 °C at the source under Peru, against 13 to 15 °C observed at 100 to 150 m. | No |
 
 ### How the gyres are solved (numerical, not physical)
 
