@@ -10,15 +10,15 @@ Not included: real sea ice (step 6), rain (step 4), the deep ocean beyond the ov
 
 ## Plan
 
-_2026-11-19 · 2 of 9 pieces done · now: piece 3 in progress_
+_2026-11-19 · 3 of 9 pieces done · now: piece 4 in progress_
 
 - [x] **1/9 Observed sea temperatures and currents** · `5354dc1`
   The observed sea temperatures (OISST) and drifter currents, built into shipped data files with their loaders.
 - [x] **2/9 The sea's own temperature** · `e585ffc`
   Sea cells get a temperature of their own beside the air's, exchanging heat with it; the ice stand-in follows the sea.
-- [ ] **3/9 Grid corners** · in progress
+- [x] **3/9 Grid corners** · `91c4a02`
   A shared corner index on the globe's grid, with exact flows from corner values and a solve that holds each coast.
-- [ ] **4/9 Wind-driven gyres** · not started
+- [ ] **4/9 Wind-driven gyres** · in progress
   Monthly gyres from the winds on any coastline, with strong currents on each basin's western side.
 - [ ] **5/9 Currents carry the sea's heat in the loop** · not started
   Each pass becomes temperature, winds, currents; the sea's heat moves along the currents.
