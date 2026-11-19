@@ -231,3 +231,7 @@ The user: "Wording with piece 5". Piece 5's commit also fixes piece 2's re-check
 ### Piece 5: the double count and speed (2026-11-19)
 
 The user chose "Correct the double count (Recommended)" and "Yes, in piece 5 (Recommended)". Added to piece 5: lower the sea's `diffusivity` by the share of poleward heat the winds and currents now carry explicitly, worked out from the model's own transports (the diffusive transport across 30N/30S and the latitude bands, before and after), with the reasoning in the config entry's `source`; `landDiffusivity` stays unless measured and reported. Re-measure the regions, coast contrasts and loop. Then make the sea step cheaper and pass 2's settling shorter, aiming near the old timings (8.9 s at 64, 29.5 s at 256 from nothing). Stops still apply.
+
+### Piece 6: coastal upwelling only (2026-11-19)
+
+The user chose "Coasts only (Recommended)": piece 6 ships the coastal upwelling, with the equatorial band kept as a setting whose default is 0 (its config entry says why: the 5° Coriolis floor gives about three times the observed equatorial upwelling). Piece 6's Acceptance on the equator no longer applies; the equatorial divergence is left for step 6b or a later fix of the Ekman floor.
