@@ -211,3 +211,7 @@ Built and uncommitted in the worktree, not yet reviewed. Stopped for the user: w
 ### Piece 5: carried over from piece 2 (2026-11-19)
 
 The user: "Wording with piece 5". Piece 5's commit also fixes piece 2's re-check wording: say what the model does, not what it did before the sea had a temperature of its own, at `docs/temperature.md:30`, `src/core/temperature/temperature.ts:41`, `src/core/temperature/temperature.test.ts:527` and `scripts/tune/tuning.test.ts:85`; restate the figures at `docs/winds.md:47` and `:114` with the current model or drop them; and update `docs/temperature.md:28` once currents carry the sea's heat. The two optional tests are not added.
+
+### Piece 5: the double count and speed (2026-11-19)
+
+The user chose "Correct the double count (Recommended)" and "Yes, in piece 5 (Recommended)". Added to piece 5: lower the sea's `diffusivity` by the share of poleward heat the winds and currents now carry explicitly, worked out from the model's own transports (the diffusive transport across 30N/30S and the latitude bands, before and after), with the reasoning in the config entry's `source`; `landDiffusivity` stays unless measured and reported. Re-measure the regions, coast contrasts and loop. Then make the sea step cheaper and pass 2's settling shorter, aiming near the old timings (8.9 s at 64, 29.5 s at 256 from nothing). Stops still apply.
