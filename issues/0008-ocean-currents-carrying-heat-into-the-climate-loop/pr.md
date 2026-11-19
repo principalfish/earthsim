@@ -11,3 +11,5 @@ Not included: real sea ice (step 6), rain (step 4), the deep ocean beyond the ov
 Closes #15
 
 Progress: the plan checklist on #15.
+
+<!-- For /publish: the final text's "Known limits" comes from the roadmap's "Step 5: left for later steps" section (kept current per piece): Pacific regions and the Europe–Asia contrast for 6b; landDiffusivity not re-derived; equatorial upwelling off (Ekman floor); weak currents (monthly mean stress), Drake, no equatorial currents, Panama at 64; the sea's loss not growing with its temperature; upwelling depth figures unchecked; polar summers for step 6; the slowdown (+46% at 64, +74% at 256). -->
