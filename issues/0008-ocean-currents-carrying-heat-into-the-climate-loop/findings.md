@@ -91,3 +91,26 @@
 | re-check | docs | low | docs | verified | deferred to piece 5 | `docs/ocean.md:47`, `src/core/ocean/gyres.ts:64`, `:109` | "built once for a world's land (and settings)" omits the rotation rate, which now invalidates the kept solver |
 | re-check | correctness | - | - | - | - | - | Clean |
 | manual | planner | - | - | - | - | piece 4 re-check findings | Decided by the planner chat under the user's "make your own decisions!": the three "rotation" wording nits are fixed in piece 5's commit; the ring-island test is accepted as it is |
+
+## piece 5 · 2026-11-19 · Currents carry the sea's heat
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | low | cleanup | verified | fixed | `src/worker/handle.ts:98` | `passBuffers` and `copyOfPass` left out the currents (a full result structured-cloned every pass, about 14 MB at 64); now transferred and copied like the winds (also raised by security) |
+| round | coverage | low | test | verified | accepted | `src/core/temperature/temperature.ts:1785` | `solved = false` when the sea's sweeps do not converge is untested; no cheap input reaches it (an eastward band at 1e6 m and random recirculating flows both converge); the advector's cap is tested at `advection.test.ts:246` and the line passes the result on; accepted by the coverage re-check |
+| round | correctness | low | docs | verified | fixed | `temperature.ts:1871` | `CarriedSea` and its constant sat between `correctYearEnd`'s doc block and the function |
+| round | docs | low | docs | verified | fixed | `docs/ocean.md:57` | "The heat they carry" section above the boundary-current table, which fell under it |
+| round | docs | low | docs | verified | fixed | `config.ts:244`, `:249`, `:590` | landDiffusivity read against the sea's new 0.48; climateMaxPasses left out the currents and said three or four passes |
+| round | docs | low | docs | verified | fixed | `advection.ts:6`, `docs/temperature.md:78` | Module doc still said capacity "of the air", broken wrap; "took 3" narrated history |
+| round | coverage | low | test | verified | fixed | `src/app/layers/refresh.ts:451`, `temperature.ts:2133` | The start without currents and the non-array flows refusal were untested; tests added |
+| round | correctness | low | cleanup | verified | fixed | `climate.ts:288`, `temperature.ts:2590` | `assertMonths` repeated `assertStart`'s loop; "carried" named two things, now `crossedCells`, `seaCurrents`, `CrossedSea` |
+| round | correctness | low | cleanup | dropped | - | `advection.ts:200` | Zero capacity with a flow in is unenforced: `assertCurrents` refuses flows across land, the only zero-capacity sea cell |
+| round | correctness | info | cleanup | dropped | - | `advection.ts:211` | "Bit for bit" differs by an ulp: the old sweeps also started inactive cells at storage times T over storage |
+| round | docs | low | docs | dropped | - | `processDiagram.ts:514`, `README.md:11`, `:19` | Status text says currents are planned: piece 9 rewrites the docs for the finished model |
+| round | security | - | - | - | - | - | Clean |
+| re-check | coverage | low | test | verified | open | `src/worker/handle.test.ts:209`, `:296` | The worker test's blank world has no coast, so its currents are all zero: a miswired copy (east into north) would pass, and "the first pass arrived whole" only tests lengths; compare the first pass with the core's, or raise a few cells above sea level (also raised by correctness) |
+| re-check | docs | low | docs | verified | open | `src/worker/handle.ts:57`, `protocol.ts:17`, `:168`, `client.ts:56`, `layers.ts:170`, `:178`, `:187`, `refresh.ts:499`, `:561` | Comments say a pass or start carries "temperature and winds"; it carries the currents too |
+| re-check | docs | low | docs | verified | open | `src/core/climate.ts:365` | "about a year of solving each" against the 5 years of pass 2 in `docs/temperature.md:78` |
+| re-check | correctness | nit | cleanup | verified | open | `src/core/climate.ts:372` | A sentence missing a verb and uneven rewraps |
+| re-check | docs | low | docs | dropped | - | `docs/ocean.md` "What it costs" | 0.17-0.20 s for a year from a 5% different start against 0.05 s a pass in the loop: plausible, no contradiction |
+| re-check | security | - | - | - | - | - | Clean |
