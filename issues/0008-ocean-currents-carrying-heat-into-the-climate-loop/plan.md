@@ -220,6 +220,10 @@ Built on `claude-opus-5-5`. The user's decisions (relayed by the planner chat): 
 - Accepted reason for the uncovered line `temperature.ts:1785` (`solved = false` when the sea's sweeps do not converge): the advector's cap is tested at `advection.test.ts:246`, no cheap input makes the sweeps fail, and the line only passes the result on. The re-check accepted it.
 - Re-check findings left to the planner chat (all low): the worker test's blank world has no coast so its currents are zero and a miswired copy would pass; "temperature and winds" comments that should include the currents; one "about a year of solving each" figure; a sentence missing a verb.
 
+### Piece 6, paused for the user (2026-11-19)
+
+Built and uncommitted in the worktree, not yet reviewed; the baselines and the Earth figures in four tests are not re-recorded. Stopped: global sea rms against OISST 3.06 to 3.48 (over the builder's 0.2 line; air rms 3.88 to 4.00, no region worse by more than 1.5 K); the sea in the tropics 20S-20N is worse (+1.15 K) and the whole sea is 1.2 K colder because the heat upwelling takes leaves the climate (1.58 PW: 1.12 PW within 5 degrees of the equator, 0.48 PW beside coasts), and the equatorial overturning is about 150 Sv, three times the observed, because of the 5 degree Ekman floor. Better: Peru sea 3.70 to 1.47, Benguela 4.68 to 2.97, eastern tropical Pacific 2.95 to 1.58. Measured variants: heat returned evenly: sea 3.21, air 4.13; coasts only (equatorial band 0): sea 3.21, air 3.94, Peru 2.23, Benguela 3.46. Awaiting the user's choice before the review round.
+
 ### Piece 5: carried over from piece 2 (2026-11-19)
 
 The user: "Wording with piece 5". Piece 5's commit also fixes piece 2's re-check wording: say what the model does, not what it did before the sea had a temperature of its own, at `docs/temperature.md:30`, `src/core/temperature/temperature.ts:41`, `src/core/temperature/temperature.test.ts:527` and `scripts/tune/tuning.test.ts:85`; restate the figures at `docs/winds.md:47` and `:114` with the current model or drop them; and update `docs/temperature.md:28` once currents carry the sea's heat. The two optional tests are not added.
