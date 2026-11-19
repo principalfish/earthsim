@@ -61,11 +61,12 @@
 | round | correctness | low | defect | verified | fixed | `src/core/grid/corners.ts:1175` | A sea piece with only net coasts is singular; now documented (no connectivity check) |
 | round | docs | low | docs | verified | fixed | `docs/development.md:61` | `corners.ts` table row a paragraph long, duplicating the header; cut to one clause, timings moved into the header |
 | round | security | low | defect | verified | fixed | `src/core/grid/corners.ts:1111`, `sparse.ts:346` | Dense coarsest level: memory grows with the square of the net coasts (about 800 MB for 10^4); documented |
-| round | correctness | low | cleanup | verified | open | `src/core/grid/grid.ts:492` | `neighbourTable` is public through `export *` but only tests use it; left: hiding it needs about 30 explicit grid.ts names in index.ts, which breaks the `export *` convention (the builder's reason, for the user) |
+| round | correctness | low | cleanup | verified | accepted | `src/core/grid/grid.ts:492` | `neighbourTable` is public through `export *` but only tests use it; left: hiding it needs about 30 explicit grid.ts names in index.ts, which breaks the `export *` convention (the builder's reason, for the user) |
 | round | docs | low | docs | dropped | - | `corners.ts:1` | Timings missing from the header: dropped as stated, folded into the table-row finding |
 | round | coverage | low | test | dropped | - | `corners.ts:453`, `:777` | Internal-invariant throws: accepted, cannot fire on a valid grid |
 | round | security | - | - | - | - | - | Clean otherwise |
-| re-check | coverage | medium | test | verified | open | `src/core/grid/corners.ts:1383`, `corners.test.ts:642` | No test pins that a net coast takes its first corner's guess; overwrite all but the first island corner with 1e6 and expect 0 iterations (also raised by correctness) |
-| re-check | docs | low | docs | verified | open | `src/core/grid/corners.ts:226`, `:1129`, `sparse.ts:374` | "singular and the solve reports converged: false" is stated as certain; a consistent right-hand side can still converge; soften |
+| re-check | coverage | medium | test | verified | deferred to piece 4 | `src/core/grid/corners.ts:1383`, `corners.test.ts:642` | No test pins that a net coast takes its first corner's guess; overwrite all but the first island corner with 1e6 and expect 0 iterations (also raised by correctness) |
+| re-check | docs | low | docs | verified | deferred to piece 4 | `src/core/grid/corners.ts:226`, `:1129`, `sparse.ts:374` | "singular and the solve reports converged: false" is stated as certain; a consistent right-hand side can still converge; soften |
 | re-check | correctness | - | - | - | - | - | Clean |
 | re-check | security | - | - | - | - | - | Clean |
+| manual | planner | - | - | - | - | piece 3 findings | Decided by the planner chat under the user's "make your own decisions!": the first-guess test and the "may fail to converge" wording are fixed in piece 4's commit; `neighbourTable` stays public for the builder's reason |
