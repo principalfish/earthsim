@@ -70,3 +70,24 @@
 | re-check | correctness | - | - | - | - | - | Clean |
 | re-check | security | - | - | - | - | - | Clean |
 | manual | planner | - | - | - | - | piece 3 findings | Decided by the planner chat under the user's "make your own decisions!": the first-guess test and the "may fail to converge" wording are fixed in piece 4's commit; `neighbourTable` stays public for the builder's reason |
+
+## piece 4 · 2026-11-19 · Wind-driven gyres
+
+| Phase | Check | Severity | Kind | Verdict | Outcome | Where | Finding |
+|-|-|-|-|-|-|-|-|
+| round | correctness | medium | defect | verified | fixed | `src/core/ocean/basins.ts:194` | An all-land world has one coast and no sea, so its kind stayed undefined and `createGyreSolver` threw; `findBasins` now returns the held-still shape |
+| round | correctness | low | defect | verified | fixed | `src/core/ocean/gyres.ts:654` | A solver passed in was not checked for rotation (wrong beta and Ekman f); now a RangeError |
+| round | coverage | low | test | verified | fixed | `src/core/ocean/gyres.ts:734` | The non-convergence throw was untested; test added (tolerance 1e-300) |
+| round | coverage | low | test | verified | fixed | `src/core/ocean/gyres.ts:367` | The length-mismatch branch of `sameValues` was untested; test added |
+| round | correctness | low | docs | verified | fixed | `basins.ts:305`, `config.md:184` | "Leaves no more islands than that" is false (a lagoon island); wording softened |
+| round | docs | low | docs | verified | fixed | `README.md:36`, `README.md:42`, `docs/user-guide.md:375` | No Ocean row; the settings row and the user guide claimed the page lists every setting |
+| round | docs | low | docs | verified | fixed | `src/core/ocean/gyres.ts:58` | Header said 15 to 20 ms a month at 64; the cost table says 21 to 25 ms (14 to 17 warm) |
+| round | correctness | low | docs | verified | fixed | `src/core/ocean/gyres.ts:700` | Ekman transport nonzero over seas held still while the docs say they are held still; now zero there (a planet with no land keeps it) |
+| round | coverage | low | test | verified | fixed | `src/core/ocean/gyres.test.ts:397` | "Keeps the solver it built" would pass if rebuilt every call; rewritten without timing |
+| round | security | - | - | dropped | - | `maxIslands` | No upper bound: self-inflicted slowdown in a local app, informational |
+| round | docs | low | docs | dropped | - | `docs/development.md:42` | Still true for temperature and wind |
+| round | security | - | - | - | - | - | Clean otherwise |
+| re-check | coverage | low | test | verified | open | `src/core/ocean/basins.test.ts:106` | The documented cap rule (an island in a flowed-over island's lagoon can add one more) is untested; optional ring-island test |
+| re-check | docs | low | docs | verified | open | `docs/ocean.md:47`, `src/core/ocean/gyres.ts:64`, `:109` | "built once for a world's land (and settings)" omits the rotation rate, which now invalidates the kept solver |
+| re-check | correctness | - | - | - | - | - | Clean |
+

@@ -137,7 +137,7 @@ Rejected (with the user's choices): gyres alone (the North Atlantic barely warms
 - [x] 1. Observed sea temperatures and currents
 - [x] 2. The sea's own temperature
 - [x] 3. Grid corners
-- [ ] 4. Wind-driven gyres
+- [x] 4. Wind-driven gyres
 - [ ] 5. Currents carry the sea's heat in the loop
 - [ ] 6. Upwelling
 - [ ] 7. The overturning
@@ -188,6 +188,21 @@ Built on `claude-opus-5-5`. Decided by the builder:
 - **Deviations from the plan.** An extra module `sparse.ts` (sparse matrices, ILU(0), the V-cycle, BiCGSTAB, with its own tests), plus `coastLabels`, `neighbourTable` (grid.ts; neighbours for any n so tests run at n = 8), `apply`, `cornerAreas` and face ids in the index. A solve that runs out of iterations returns `converged: false` rather than throwing.
 - Accepted reasons for uncovered lines (changed-lines report, `src/`): `corners.ts:453` and `:777` throw on internal invariants the construction guarantees (cannot fire on a valid grid); `sparse.ts:617`'s `rhoNext === 0` half cannot fire when the residual is above tolerance, and its overflow half is now tested.
 - Findings decided by the planner chat (see `findings.md`): `neighbourTable` stays public (accepted) through `export *` (hiding it needs about 30 explicit names in `index.ts`, which breaks the `export *` convention; it validates its input, is documented, and sits beside `sideCorners` and `faceCorners`); a test that pins the net coast's first-corner guess (medium); softening "the solve reports converged: false" for a singular system to "may fail to converge" in `corners.ts:226`, `:1129` and `sparse.ts:374`. The test and the wording are deferred to piece 4's commit, which touches `corners.ts`.
+
+### Piece 4 (2026-11-19)
+
+Built on `claude-opus-5-5`. Decided by the builder:
+- **Grid.** `solveGyres` solves on the world's own grid; piece 5 should pass the world on the grid the temperature solves on (64 for 64 and 128 worlds, 128 for a 256 world), since solving a 256 world on 256 adds 35–45% to a pass. Carrying a 64 solution up was ruled out: it would put flows across the finer grid's coasts. The solver is built once per land mask, settings and rotation and kept per grid; each month starts from the previous month's answer, or from a guess the caller passes; tolerance 1e-4 (the flows are differences of psi, so they stay exactly divergence-free at any tolerance).
+- **Islands.** Each sea's largest coast is held at 0; every other coast uses the frictional island rule. At most 32 islands are 'net' coasts; smaller ones are flowed over and then held at their mean psi. A sea whose only coasts are islands is held still, as is a planet with no land or no sea. A lake inside an island has no Ekman transport.
+- **Channel clamp.** Corners on latitude circles that cross no land, plus coasts reaching every longitude (Antarctica), use a separate channel friction.
+- **Equatorial floor.** The Coriolis term appears only in the Ekman transport (returned apart from the flows), with |f| floored at 5 degrees. A planet with no land keeps its Ekman transport.
+- **Settings (OCEAN_CONFIG, none tuned to the Earth).** Drag 1.2e-3 (Large and Pond 1981); gyre friction 2e-6 /s (r/beta about 100 km, the Gulf Stream's width); channel friction 2e-6 /s (worked out from the circumpolar current, Cunningham 2003); layer depth 200 m (Florida Current transport, Meinen 2010); floor 5 degrees; island cap 32. Measured: gyre friction 6e-6 with channel friction 2e-6 turned the Agulhas the wrong way, so both are 2e-6. The boundary current e-folds at 160, 190 and 110 km at 64, 128 and 256, peaking at 0.13, 0.19 and 0.22 m/s.
+- **Timing, Earth, 12 months:** build 0.25, 0.65 and 2.0 s at 64, 128 and 256; from nothing 0.25–0.30, 0.82 and 3.2 s; warm with winds 5% different 0.17–0.20, 0.60–0.74 and 2.1 s. Added per pass: about 0.2–0.3 s at 64 (10–15% of a 9.6 s climate solve) and 0.6–0.8 s for a 256 world solved on 128 (10–12% of 31 s).
+- **Earth at 64 against the drifters** (speed-weighted cosine, model winds / observed winds): North Atlantic 0.20 / 0.48, North Pacific 0.21 / 0.44, South Atlantic 0.23 / 0.41, South Pacific 0.07 / 0.48, Indian 0.40 / 0.54, Southern 0.32 / 0.84, all 0.24 / 0.53. Every named current is in the right place and direction (model winds, annual box mean, peak against the drifter peak): Gulf Stream 52 degrees, 0.17 against 0.73 m/s; Kuroshio 45, 0.36 against 0.79; Brazil 227, 0.17 against 0.34; East Australian 175, 0.12 against 0.63; Agulhas 202, 0.23 against 1.12. The circumpolar current flows east at all longitudes; Drake transport 7–36 Sv over the year (33–51 Sv with observed winds) against about 140 observed.
+- **What is wrong.** Currents are a fifth to a half of the drifters' strength, because the stress comes from monthly mean winds (a gustiness term would be a follow-up beyond the plan's formula); no equatorial currents; Panama is open at 64 (a small spurious Atlantic–Pacific throughflow), closed at 128 and 256.
+- Piece 3's two deferred fixes (the first-corner guess test and the "may fail to converge" wording) are in this commit.
+- Accepted reasons for uncovered lines: none for piece 4 (the tests reach every changed line in `src/` except piece 3's two internal-invariant throws accepted earlier).
+- Re-check findings left to the planner chat (both low, optional): a test for the documented island-cap rule (a lagoon island), and "rotation" missing from three places that say the solver is built for a land and settings (`docs/ocean.md:47`, `gyres.ts:64` and `:109`).
 
 ### Piece 5: carried over from piece 2 (2026-11-19)
 
